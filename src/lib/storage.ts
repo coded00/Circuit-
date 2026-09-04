@@ -12,7 +12,7 @@
  * above this file should need to change.
  */
 
-import { randomUUID } from "crypto";
+import { randomUUID, createHmac, timingSafeEqual } from "crypto";
 import { mkdir, writeFile, readFile } from "fs/promises";
 import path from "path";
 
@@ -32,12 +32,59 @@ type ProofRef = {
   contentType: string;
 };
 
+// Refs are handed back to the client and round-trip through whatever route
+// handler serves a proof file, so they're untrusted input by the time
+// decodeRef sees them again. Signing (not just encoding) them stops two
+// otherwise-real risks: a forged ref pointing outside STORAGE_ROOT (path
+// traversal, since path.join doesn't sanitize ".." segments) and a forged
+// ref pointing at a *different* match's file than the one access control
+// was actually checked against.
+function getRefSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error(
+      "JWT_SECRET is not set — it's also used to sign proof storage references. Set it in .env."
+    );
+  }
+  return secret;
+}
+
+function sign(payload: string): string {
+  return createHmac("sha256", getRefSecret()).update(payload).digest("base64url");
+}
+
+function safeEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  return bufA.length === bufB.length && timingSafeEqual(bufA, bufB);
+}
+
 function encodeRef(ref: ProofRef): string {
-  return Buffer.from(JSON.stringify(ref)).toString("base64url");
+  const payload = Buffer.from(JSON.stringify(ref)).toString("base64url");
+  return `${payload}.${sign(payload)}`;
 }
 
 function decodeRef(ref: string): ProofRef {
-  return JSON.parse(Buffer.from(ref, "base64url").toString("utf8"));
+  const separatorIndex = ref.lastIndexOf(".");
+  if (separatorIndex === -1) {
+    throw new Error("Malformed proof reference.");
+  }
+  const payload = ref.slice(0, separatorIndex);
+  const signature = ref.slice(separatorIndex + 1);
+  if (!safeEqual(sign(payload), signature)) {
+    throw new Error("Invalid or tampered proof reference.");
+  }
+
+  const decoded = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as ProofRef;
+  // Belt-and-suspenders: reject anything that isn't a plain path segment,
+  // even though a validly-signed ref can only ever contain values this
+  // module itself wrote in store().
+  for (const segment of [decoded.matchId, decoded.fileId]) {
+    if (!segment || segment.includes("/") || segment.includes("\\") || segment.includes("..")) {
+      throw new Error("Invalid proof reference.");
+    }
+  }
+  return decoded;
 }
 
 const STORAGE_ROOT = path.join(process.cwd(), "storage", "proof");
