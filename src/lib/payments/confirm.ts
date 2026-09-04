@@ -13,6 +13,7 @@
 import { prisma } from "@/lib/db";
 import { notify } from "@/lib/notifications";
 import { getPaymentProvider } from "@/lib/payments";
+import { maybeGenerateBracketOnCapFill } from "@/lib/matches";
 
 export async function confirmEntryFeePayment(reference: string): Promise<void> {
   const registration = await prisma.registration.findUnique({
@@ -57,4 +58,6 @@ export async function confirmEntryFeePayment(reference: string): Promise<void> {
   await notify(registration.userId, "REGISTRATION_CONFIRMED", {
     tournamentId: registration.tournamentId,
   });
+
+  await maybeGenerateBracketOnCapFill(registration.tournamentId); // BRK-1's cap-fill path
 }

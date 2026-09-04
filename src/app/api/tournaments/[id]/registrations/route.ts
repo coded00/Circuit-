@@ -19,6 +19,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { getDefaultPaymentProvider } from "@/lib/payments";
+import { maybeGenerateBracketOnCapFill } from "@/lib/matches";
 
 function toCheckoutEmail(emailOrPhone: string, userId: string): string {
   // ACC-2 allows phone-only signup, but both payment providers' hosted
@@ -96,6 +97,7 @@ export async function POST(
       : await prisma.registration.create({
           data: { tournamentId, userId: user.id, inGameId, status: "CONFIRMED" },
         });
+    await maybeGenerateBracketOnCapFill(tournamentId); // BRK-1's cap-fill path
     return NextResponse.json(
       { id: registration.id, status: registration.status },
       { status: 201 }

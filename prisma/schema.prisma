@@ -104,6 +104,11 @@ model User {
   ageVerified     Boolean   @default(false)
   /// P0-7: linked payout destination — what REG-6's payout actually pays out to.
   payoutMethodRef String?
+  /// P6-1/P6-2/P6-4: Circuit staff access — dispute-queue escalation
+  /// ruling, account suspension. No self-serve grant path exists yet;
+  /// setting this currently means a direct DB write, which is fine at V1's
+  /// staffing size but is itself worth flagging as a gap.
+  isStaff         Boolean   @default(false)
   createdAt       DateTime  @default(now())
 
   organizerProfile OrganizerProfile?
@@ -268,6 +273,11 @@ model Dispute {
   raisedById String
   raisedBy   User          @relation("DisputeRaisedBy", fields: [raisedById], references: [id])
   status     DisputeStatus @default(OPEN)
+  /// BRK-5's 24h (placeholder) window: the organizer must rule by this
+  /// time or the sweep (P3-6/BRK-6) escalates to the Phase 6 staff queue.
+  /// Null for a Battle dispute or one escalated immediately (organizer is
+  /// a disputant) — there's no organizer-review phase to time out.
+  organizerRulingDeadline DateTime?
   ruling     String?
   ruledById  String?
   ruledAt    DateTime?

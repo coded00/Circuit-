@@ -25,9 +25,9 @@ queue, Redis, a WebSocket server) so those don't get added speculatively.
 
 ## Status
 
-**Phase 0 (Foundations) done. Phase 1 (Tournament Creation & Discovery) and
-Phase 2 (Registration & Payments) both in progress.** What's here so far,
-matched to the Build Plan's task IDs:
+**Phase 0 (Foundations) done. Phases 1, 2, and 3 in progress, plus a slice
+of Phase 6 that Phase 3 depends on.** What's here so far, matched to the
+Build Plan's task IDs:
 
 | Task | What | File |
 |---|---|---|
@@ -42,29 +42,46 @@ matched to the Build Plan's task IDs:
 | P1-2 | Public tournament page | `src/app/tournaments/[id]/page.tsx` |
 | P2-1 | Registration flow | `src/app/tournaments/[id]/register/`, `src/app/api/tournaments/[id]/registrations/route.ts` |
 | P2-2 | Paid registration & escrow hold | same route (paid branch), `src/lib/payments/confirm.ts`, `src/app/api/webhooks/{paystack,flutterwave}/` |
-| P2-3 | Registration auto-close | enforced live in the registrations route (no background sweep yet — see Scheduled work in `docs/circuit-stack.md`) |
+| P2-3 | Registration auto-close | enforced live at write time, plus the deadline path in the sweep (P3-6) |
 | P2-4 | Withdrawal & refund | `src/app/api/registrations/[id]/withdraw/route.ts` |
 | P2-5 | Cancellation refund fan-out | `src/app/api/tournaments/[id]/cancel/route.ts` |
+| P3-1..P3-3 | Match/Bracket entities, bracket generation, match codes | `src/lib/matches.ts` (`generateBracket`) |
+| P3-4 | Result submission & proof upload | `src/app/api/matches/[id]/results/route.ts`, `src/app/matches/[id]/` |
+| P3-5 | Auto-complete on matching reports | `src/lib/matches.ts` (`resolveAfterSubmission`, `completeMatch`) |
+| P3-6 | Silent-side auto-accept + dispute-escalation timeout | `src/lib/matches.ts` (`runScheduledSweep`), `src/app/api/cron/sweep/route.ts` — not wired to an actual scheduler yet |
+| P3-7 | Dispute creation on conflict | `src/lib/matches.ts` (`openDispute`) |
+| P3-8 | Organizer ruling & staff escalation | `src/app/api/disputes/[id]/rule/route.ts`, `src/lib/matches.ts` (`ruleDispute`) |
+| P3-9 | Live bracket view (polling) | `src/app/tournaments/[id]/bracket/` |
+| P6-1 | Staff dispute queue | `src/app/staff/disputes/page.tsx` |
+| P6-2 | Staff ruling | `src/app/api/staff/disputes/[id]/rule/route.ts` — void restricted to Battles only, see gaps below |
 
 Not yet built: P1-3 (field locking — same Phase 2 dependency it always
 had), P1-4 (discovery list, P2 priority), P2-6 (prize payout — blocked on
-Phase 3's dispute-window state, per the Build Plan's own watch-item ①,
-don't build it against a stub), P2-7 (registrant/payment status view — P1
-priority, feeds the Phase 5 dashboard rather than standing alone).
+Phase 3's dispute-window state; now that Phase 3 exists this is the
+natural next slice), P2-7 (registrant/payment status view — feeds the
+Phase 5 dashboard), P3-10 (match history on profile — P2, no profile page
+exists yet), P6-3/P6-4 (abuse reporting, account suspension — P1).
 
 **Known gaps, called out rather than silently dropped** (see the relevant
-route's own comment for each):
+file's own comment for each):
 - Login has no rate-limiting yet (ACC-5).
 - The registration cap check has a narrow race under concurrent requests at
   the last open slot (not worth a row lock at V1's expected concurrency).
 - Withdrawing a still-processing (PENDING_PAYMENT) registration can miss a
   refund if the charge actually completes moments later — needs a
   reconciliation job V1 doesn't have.
-
-**Known gap:** ACC-5 requires rate-limited login attempts; `POST
-/api/auth/login` doesn't implement that yet. Flagged in that route's own
-comment, not silently dropped — see `docs/circuit-stack.md`'s Rate limiting
-section for the intended approach (a Postgres attempts table, not Redis).
+- **Voiding a tournament bracket match is refused, not implemented** — PRD
+  §19 flags this as an open product question (replay? split the round?
+  organizer's call?) for both free and paid matches. Staff can only void a
+  Battle (no stake, nothing to return); a bracket match dispute must be
+  resolved with a winner until someone signs off on an answer.
+- No self-serve way to grant `User.isStaff` yet — it's a direct DB write.
+- Bracket generation has a narrow, unlikely-in-practice race if two
+  triggers (cap-fill and the deadline sweep) fire for the same tournament
+  at the same instant — see `generateBracket`'s own comment.
+- The sweep endpoint (`/api/cron/sweep`) exists and is secret-protected but
+  isn't hooked up to an actual scheduler — there's no deployment target
+  for Vercel Cron yet.
 
 ## Setup
 

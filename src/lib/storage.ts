@@ -110,15 +110,26 @@ export const proofStorage: ProofStorage = new LocalProofStorage();
 /**
  * The access rule NFR-4 actually cares about. Call this in the route
  * handler that serves a proof file, before calling proofStorage.read().
+ *
+ * NFR-4's own wording names only "match participants and staff" — it
+ * doesn't mention the organizer. But P3-8 requires the organizer to
+ * review evidence to rule on a dispute, which is impossible without
+ * seeing it. Rather than silently resolve that tension either way,
+ * `isOrganizerCurrentlyRuling` exists as a narrow, deliberate carve-out:
+ * pass true only while a dispute on this exact match is actually awaiting
+ * that organizer's ruling (see the route that computes it), never for
+ * blanket access to every match in their tournaments.
  */
 export function canAccessProof(params: {
   requestingUserId: string;
   match: { playerAId: string; playerBId: string };
   isStaff: boolean;
+  isOrganizerCurrentlyRuling?: boolean;
 }): boolean {
-  const { requestingUserId, match, isStaff } = params;
+  const { requestingUserId, match, isStaff, isOrganizerCurrentlyRuling } = params;
   return (
     isStaff ||
+    Boolean(isOrganizerCurrentlyRuling) ||
     requestingUserId === match.playerAId ||
     requestingUserId === match.playerBId
   );

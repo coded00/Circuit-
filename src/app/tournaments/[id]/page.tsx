@@ -64,6 +64,11 @@ export default async function TournamentPage({
         </span>
         <h1 className="text-3xl font-semibold">{tournament.name}</h1>
         <p className="text-zinc-500">{tournament.game} · Single-elimination knockout</p>
+        {(tournament.status === "LIVE" || tournament.status === "COMPLETE") && (
+          <Link href={`/tournaments/${tournament.id}/bracket`} className="w-fit text-sm font-medium underline">
+            View bracket
+          </Link>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-4 rounded border border-black/10 p-4 dark:border-white/15 sm:grid-cols-4">
