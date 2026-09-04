@@ -1,0 +1,67 @@
+/**
+ * Circuit — notification delivery pipeline (Build Plan task P0-6).
+ *
+ * This is the pipe, not the wiring. Per-event triggers (NOT-1, NOT-2 — "on
+ * registration confirmed, notify the player") get added in Phase 7, one per
+ * feature, as that feature ships. What lives here is the one place every
+ * one of those triggers calls into.
+ *
+ * NOT-3: in-app plus mobile web push at minimum; email/SMS is a fallback
+ * channel, not primary. Only the in-app channel is implemented for now —
+ * push needs a service-worker + subscription-management piece that's its
+ * own task, not a P0 blocker.
+ */
+
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
+
+export type NotificationType =
+  | "REGISTRATION_CONFIRMED"
+  | "MATCH_READY"
+  | "RESULT_DISPUTED"
+  | "DISPUTE_RESOLVED"
+  | "TOURNAMENT_CANCELLED"
+  | "BATTLE_CHALLENGE"
+  | "REGISTRATION_CAP_FILLED"
+  | "REGISTRATION_CLOSED"
+  | "DISPUTE_NEEDS_RULING";
+
+export interface NotificationChannel {
+  send(userId: string, type: NotificationType, payload: Record<string, unknown>): Promise<void>;
+}
+
+/** Always-on channel — every notification lands here regardless of push/email state. */
+class InAppChannel implements NotificationChannel {
+  async send(userId: string, type: NotificationType, payload: Record<string, unknown>) {
+    await prisma.notification.create({
+      data: { userId, type, payload },
+    });
+  }
+}
+
+/** Placeholder — wire up web push subscriptions here when that task starts. */
+class PushChannel implements NotificationChannel {
+  async send(_userId: string, _type: NotificationType, _payload: Record<string, unknown>) {
+    // Intentionally a no-op until push subscription storage exists.
+    // Not implementing this silently-succeed-forever is the point: it's
+    // easy to forget NOT-3 isn't done if this throws instead.
+  }
+}
+
+const channels: NotificationChannel[] = [new InAppChannel(), new PushChannel()];
+
+/**
+ * The single entry point every feature's event trigger should call.
+ * Fires exactly once per occurrence (NOT-1's acceptance criteria) — callers
+ * are responsible for not calling this twice for the same event, e.g. by
+ * making the triggering DB write and this call part of the same
+ * transaction/idempotency key where duplication risk exists.
+ */
+export async function notify(
+  userId: string,
+  type: NotificationType,
+  payload: Record<string, unknown> = {}
+): Promise<void> {
+  await Promise.all(channels.map((channel) => channel.send(userId, type, payload)));
+}

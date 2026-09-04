@@ -1,0 +1,316 @@
+// Circuit — V1 data model
+// Conceptual source: Circuit PRD, section 14 (Data Model)
+// https://claude.ai/code/artifact/f568d35d-e93e-4205-9242-6a70c3a99d90
+//
+// This is a real schema derived from that conceptual model, built for task
+// P0-1 in the Circuit Build Plan:
+// https://claude.ai/code/artifact/a4a8a76e-68a5-4d50-b710-cda50106af8b
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum TournamentStatus {
+  DRAFT
+  OPEN
+  CLOSED
+  LIVE
+  COMPLETE
+  CANCELLED
+}
+
+enum RegistrationStatus {
+  PENDING_PAYMENT
+  CONFIRMED
+  WITHDRAWN
+  REFUNDED
+}
+
+enum MatchStatus {
+  UPCOMING
+  NEEDS_RESULT
+  DISPUTED
+  COMPLETE
+}
+
+enum DisputeStatus {
+  OPEN
+  ORGANIZER_REVIEW
+  ESCALATED
+  RESOLVED
+  VOID
+}
+
+enum EscrowType {
+  ENTRY_FEE
+  REFUND
+  PRIZE_PAYOUT
+}
+
+enum EscrowStatus {
+  PENDING
+  COMPLETE
+  FAILED
+}
+
+enum PaymentProviderName {
+  PAYSTACK
+  FLUTTERWAVE
+}
+
+enum BattleVisibility {
+  OPEN
+  TARGETED
+}
+
+enum BattleStatus {
+  OPEN
+  ACCEPTED
+  CANCELLED
+  COMPLETE
+}
+
+enum ReportStatus {
+  OPEN
+  REVIEWED
+  ACTIONED
+  DISMISSED
+}
+
+// ---------------------------------------------------------------------------
+// Models
+// ---------------------------------------------------------------------------
+
+/// Core identity. Maps to ACC-1..ACC-6.
+/// Account creation is deferred (D4) — a User row is only created at
+/// register-with-intent-to-pay, Battle accept, or payout claim.
+model User {
+  id              String    @id @default(cuid())
+  displayName     String
+  handle          String    @unique
+  emailOrPhone    String    @unique
+  passwordHash    String?
+  avatarUrl       String?
+  dateOfBirth     DateTime?
+  ageVerified     Boolean   @default(false)
+  /// P0-7: linked payout destination — what REG-6's payout actually pays out to.
+  payoutMethodRef String?
+  createdAt       DateTime  @default(now())
+
+  organizerProfile OrganizerProfile?
+  registrations    Registration[]
+  matchesAsPlayerA Match[]           @relation("MatchPlayerA")
+  matchesAsPlayerB Match[]           @relation("MatchPlayerB")
+  matchesWon       Match[]           @relation("MatchWinner")
+  battlesCreated   Battle[]          @relation("BattleCreator")
+  battlesTargeted  Battle[]          @relation("BattleTarget")
+  disputesRaised   Dispute[]         @relation("DisputeRaisedBy")
+  notifications    Notification[]
+  reportsFiled     Report[]          @relation("ReportFiledBy")
+  reportsReceived  Report[]          @relation("ReportAgainstUser")
+
+  @@index([emailOrPhone])
+}
+
+/// 1:1 with User, created automatically on that user's first tournament (ACC-4).
+/// Not a separate signup — see D4 and the PRD's Users & Roles section.
+model OrganizerProfile {
+  userId      String       @id
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verified    Boolean      @default(false)
+  tournaments Tournament[]
+}
+
+/// Maps to TRN-1..TRN-6.
+model Tournament {
+  id                  String           @id @default(cuid())
+  organizerId         String
+  organizer           OrganizerProfile @relation(fields: [organizerId], references: [userId])
+  name                String
+  game                String
+  /// V1 is knockout-only (D2). Kept as a string, not an enum, so V2 formats
+  /// (round-robin, league) don't require a migration to add.
+  format              String           @default("KNOCKOUT")
+  /// Minor currency units (kobo), never a float. 0 = free tournament.
+  entryFee            Int              @default(0)
+  prizeAmount         Int?
+  prizeText           String?
+  rulesText           String?
+  participantCap      Int
+  registrationOpenAt  DateTime
+  registrationCloseAt DateTime
+  startAt             DateTime
+  status              TournamentStatus @default(DRAFT)
+  createdAt           DateTime         @default(now())
+
+  registrations Registration[]
+  bracket       Bracket?
+  matches       Match[]
+  escrowTxns    EscrowTransaction[]
+
+  @@index([game, status])
+}
+
+/// Links a User to a Tournament. Maps to REG-1..REG-7.
+model Registration {
+  id           String              @id @default(cuid())
+  tournamentId String
+  tournament   Tournament          @relation(fields: [tournamentId], references: [id])
+  userId       String
+  user         User                @relation(fields: [userId], references: [id])
+  status       RegistrationStatus  @default(PENDING_PAYMENT)
+  paymentRef   String?
+  createdAt    DateTime            @default(now())
+
+  escrowTxns EscrowTransaction[]
+
+  @@unique([tournamentId, userId])
+  @@index([tournamentId, status])
+}
+
+/// 1:1 with Tournament. Maps to BRK-1.
+model Bracket {
+  id           String     @id @default(cuid())
+  tournamentId String     @unique
+  tournament   Tournament @relation(fields: [tournamentId], references: [id])
+  generatedAt  DateTime   @default(now())
+  /// Rounds & seeding — kept as JSON at this stage; promote specific fields
+  /// to columns only if a query needs to filter on them directly.
+  structure    Json
+}
+
+/// Belongs to a Tournament+Bracket OR a Battle — never both.
+/// Enforced at the application layer (see src/lib/matches — not yet built,
+/// this is scaffolding only); Postgres CHECK constraint is worth adding in
+/// a migration once the app-layer invariant is proven out.
+/// Maps to BRK-2..BRK-10 and BTL-4.
+model Match {
+  id           String      @id @default(cuid())
+  tournamentId String?
+  tournament   Tournament? @relation(fields: [tournamentId], references: [id])
+  battleId     String?
+  battle       Battle?     @relation(fields: [battleId], references: [id])
+  round        Int?
+
+  /// BRK-9: per-match code shown to both players before they play; must
+  /// appear in submitted proof to bind that proof to this specific match.
+  matchCode String @unique
+
+  playerAId String
+  playerA   User   @relation("MatchPlayerA", fields: [playerAId], references: [id])
+  playerBId String
+  playerB   User   @relation("MatchPlayerB", fields: [playerBId], references: [id])
+
+  status   MatchStatus @default(UPCOMING)
+  resultA  Json?
+  resultB  Json?
+  proofARef String?
+  proofBRef String?
+
+  winnerId String?
+  winner   User?   @relation("MatchWinner", fields: [winnerId], references: [id])
+
+  /// BRK-10: silent-side auto-accept deadline once one side has reported.
+  reportWindowExpiresAt DateTime?
+  createdAt             DateTime  @default(now())
+
+  dispute Dispute?
+
+  @@index([tournamentId])
+  @@index([battleId])
+  @@index([status])
+}
+
+/// Created by a User. Maps to BTL-1..BTL-6.
+model Battle {
+  id           String           @id @default(cuid())
+  creatorId    String
+  creator      User             @relation("BattleCreator", fields: [creatorId], references: [id])
+  game         String
+  /// "SINGLE" | "BEST_OF_3" — kept as string for the same reason as
+  /// Tournament.format above.
+  format       String
+  visibility   BattleVisibility @default(OPEN)
+  targetUserId String?
+  targetUser   User?            @relation("BattleTarget", fields: [targetUserId], references: [id])
+  /// Field exists so the ladder/stake model doesn't need a migration later,
+  /// but D1/BTL-1 mean no V1 UI path may ever set this above zero.
+  stakeAmount  Int              @default(0)
+  status       BattleStatus     @default(OPEN)
+  createdAt    DateTime         @default(now())
+
+  matches Match[]
+
+  @@index([game, status])
+}
+
+/// Belongs to a Match. Maps to BRK-5, BRK-6, TRU-1..TRU-2.
+model Dispute {
+  id         String        @id @default(cuid())
+  matchId    String        @unique
+  match      Match         @relation(fields: [matchId], references: [id])
+  raisedById String
+  raisedBy   User          @relation("DisputeRaisedBy", fields: [raisedById], references: [id])
+  status     DisputeStatus @default(OPEN)
+  ruling     String?
+  ruledById  String?
+  ruledAt    DateTime?
+  createdAt  DateTime      @default(now())
+
+  @@index([status])
+}
+
+/// Belongs to a Tournament, optionally a Registration. Maps to REG-2, REG-5,
+/// REG-6, ORG-4.
+model EscrowTransaction {
+  id             String              @id @default(cuid())
+  tournamentId   String
+  tournament     Tournament          @relation(fields: [tournamentId], references: [id])
+  registrationId String?
+  registration   Registration?       @relation(fields: [registrationId], references: [id])
+  type           EscrowType
+  /// Minor currency units (kobo).
+  amount         Int
+  provider       PaymentProviderName
+  providerRef    String?
+  status         EscrowStatus        @default(PENDING)
+  createdAt      DateTime            @default(now())
+
+  @@index([tournamentId, type])
+}
+
+/// Belongs to a User. Maps to NOT-1..NOT-4.
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  type      String
+  payload   Json
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt])
+}
+
+/// Belongs to a reported User. Maps to TRU-3.
+model Report {
+  id             String       @id @default(cuid())
+  reportedUserId String
+  reportedUser   User         @relation("ReportAgainstUser", fields: [reportedUserId], references: [id])
+  reportedById   String
+  reportedBy     User         @relation("ReportFiledBy", fields: [reportedById], references: [id])
+  reason         String
+  status         ReportStatus @default(OPEN)
+  createdAt      DateTime     @default(now())
+
+  @@index([reportedUserId, status])
+}
