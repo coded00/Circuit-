@@ -25,23 +25,41 @@ queue, Redis, a WebSocket server) so those don't get added speculatively.
 
 ## Status
 
-**Phase 0 (Foundations) done. Phase 1 (Tournament Creation & Discovery) in
-progress.** What's here so far, matched to the Build Plan's task IDs:
+**Phase 0 (Foundations) done. Phase 1 (Tournament Creation & Discovery) and
+Phase 2 (Registration & Payments) both in progress.** What's here so far,
+matched to the Build Plan's task IDs:
 
 | Task | What | File |
 |---|---|---|
 | P0-1 | Data model | `prisma/schema.prisma` |
 | P0-2 | Auth: hashing, sessions, signup/login/logout routes | `src/lib/auth.ts`, `src/lib/session.ts`, `src/app/api/auth/`, `src/app/signup/`, `src/app/login/` |
 | P0-3 | Age gate | `src/lib/age-gate.ts` |
-| P0-4 | Payment provider abstraction | `src/lib/payments/` |
+| P0-4 | Payment provider abstraction (incl. refundCharge) | `src/lib/payments/` |
 | P0-5 | Proof file storage | `src/lib/storage.ts` |
 | P0-6 | Notification pipeline | `src/lib/notifications.ts` |
 | P0-7 | Payout method field | `prisma/schema.prisma` (`User.payoutMethodRef`) |
 | P1-1 | Tournament creation form + API | `src/app/tournaments/new/`, `src/app/api/tournaments/route.ts` |
 | P1-2 | Public tournament page | `src/app/tournaments/[id]/page.tsx` |
+| P2-1 | Registration flow | `src/app/tournaments/[id]/register/`, `src/app/api/tournaments/[id]/registrations/route.ts` |
+| P2-2 | Paid registration & escrow hold | same route (paid branch), `src/lib/payments/confirm.ts`, `src/app/api/webhooks/{paystack,flutterwave}/` |
+| P2-3 | Registration auto-close | enforced live in the registrations route (no background sweep yet — see Scheduled work in `docs/circuit-stack.md`) |
+| P2-4 | Withdrawal & refund | `src/app/api/registrations/[id]/withdraw/route.ts` |
+| P2-5 | Cancellation refund fan-out | `src/app/api/tournaments/[id]/cancel/route.ts` |
 
-Not yet built: P1-3 (edit & field locking — blocked on Phase 2's escrow
-existing), P1-4 (discovery list, P2 priority).
+Not yet built: P1-3 (field locking — same Phase 2 dependency it always
+had), P1-4 (discovery list, P2 priority), P2-6 (prize payout — blocked on
+Phase 3's dispute-window state, per the Build Plan's own watch-item ①,
+don't build it against a stub), P2-7 (registrant/payment status view — P1
+priority, feeds the Phase 5 dashboard rather than standing alone).
+
+**Known gaps, called out rather than silently dropped** (see the relevant
+route's own comment for each):
+- Login has no rate-limiting yet (ACC-5).
+- The registration cap check has a narrow race under concurrent requests at
+  the last open slot (not worth a row lock at V1's expected concurrency).
+- Withdrawing a still-processing (PENDING_PAYMENT) registration can miss a
+  refund if the charge actually completes moments later — needs a
+  reconciliation job V1 doesn't have.
 
 **Known gap:** ACC-5 requires rate-limited login attempts; `POST
 /api/auth/login` doesn't implement that yet. Flagged in that route's own

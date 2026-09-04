@@ -11,7 +11,9 @@ import type {
   InitializeChargeResult,
   InitiateTransferInput,
   InitiateTransferResult,
+  MinorAmount,
   PaymentProviderClient,
+  RefundChargeResult,
   VerifyChargeResult,
 } from "./types";
 
@@ -80,6 +82,20 @@ export const paystackClient: PaymentProviderClient = {
       currency: "NGN",
       providerReference: data.reference,
       paidAt: data.paid_at ? new Date(data.paid_at) : null,
+    };
+  },
+
+  async refundCharge(providerReference: string, amount: MinorAmount): Promise<RefundChargeResult> {
+    const data = await paystackFetch<{ status: string; transaction: { reference: string } }>(
+      "/refund",
+      {
+        method: "POST",
+        body: JSON.stringify({ transaction: providerReference, amount }),
+      }
+    );
+    return {
+      status: data.status === "processed" ? "SUCCESS" : "PENDING",
+      providerReference: data.transaction?.reference ?? providerReference,
     };
   },
 

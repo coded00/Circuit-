@@ -168,7 +168,14 @@ model Registration {
   userId       String
   user         User                @relation(fields: [userId], references: [id])
   status       RegistrationStatus  @default(PENDING_PAYMENT)
-  paymentRef   String?
+  /// REG-1's minimum organizer-required field. Display name comes from the
+  /// linked User (see ORG-5's CSV export) — in-game ID doesn't live there
+  /// since it's per-tournament, not identity.
+  inGameId     String
+  /// Our own reference (not the provider's), generated at P2-2's charge
+  /// init and echoed back by both PaymentProviderClient implementations —
+  /// what a webhook looks up a Registration by.
+  paymentRef   String?             @unique
   createdAt    DateTime            @default(now())
 
   escrowTxns EscrowTransaction[]

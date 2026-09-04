@@ -38,6 +38,11 @@ export type VerifyChargeResult = {
   paidAt: Date | null;
 };
 
+export type RefundChargeResult = {
+  status: "SUCCESS" | "PENDING" | "FAILED";
+  providerReference: string;
+};
+
 export type InitiateTransferInput = {
   amount: MinorAmount;
   currency: "NGN";
@@ -65,4 +70,8 @@ export interface PaymentProviderClient {
   initializeCharge(input: InitializeChargeInput): Promise<InitializeChargeResult>;
   verifyCharge(providerReference: string): Promise<VerifyChargeResult>;
   initiateTransfer(input: InitiateTransferInput): Promise<InitiateTransferResult>;
+  /** Reverses a prior charge (REG-4/REG-5's entry-fee refund) — distinct
+   *  from initiateTransfer, which pays out to a bank account (P2-6's prize
+   *  payout) rather than reversing a charge on the original payment method. */
+  refundCharge(providerReference: string, amount: MinorAmount): Promise<RefundChargeResult>;
 }

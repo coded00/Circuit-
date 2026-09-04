@@ -10,7 +10,9 @@ import type {
   InitializeChargeResult,
   InitiateTransferInput,
   InitiateTransferResult,
+  MinorAmount,
   PaymentProviderClient,
+  RefundChargeResult,
   VerifyChargeResult,
 } from "./types";
 
@@ -75,6 +77,26 @@ export const flutterwaveClient: PaymentProviderClient = {
       currency: "NGN",
       providerReference: data.tx_ref,
       paidAt: data.created_at ? new Date(data.created_at) : null,
+    };
+  },
+
+  async refundCharge(providerReference: string, amount: MinorAmount): Promise<RefundChargeResult> {
+    // Flutterwave's /refunds endpoint wants the numeric transaction id, not
+    // our tx_ref — verify_by_reference is the lookup that resolves one to
+    // the other.
+    const transaction = await flutterwaveFetch<{ id: number }>(
+      `/transactions/verify_by_reference?tx_ref=${encodeURIComponent(providerReference)}`
+    );
+    const data = await flutterwaveFetch<{ status: string }>(
+      `/transactions/${transaction.id}/refund`,
+      {
+        method: "POST",
+        body: JSON.stringify({ amount: amount / 100 }),
+      }
+    );
+    return {
+      status: data.status === "completed" ? "SUCCESS" : "PENDING",
+      providerReference,
     };
   },
 
