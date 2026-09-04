@@ -7,6 +7,7 @@ the "how" below:
 - [Circuit Strategy](https://claude.ai/code/artifact/c31a90db-7742-4492-90a7-47be71c05daf) — positioning, audience, business model (also mirrored as text at [`docs/circuit-strategy.md`](docs/circuit-strategy.md), so a local session can read it without fetching a URL)
 - [Circuit PRD](https://claude.ai/code/artifact/f568d35d-e93e-4205-9242-6a70c3a99d90) — V1 requirements, data model, release criteria
 - [Circuit Build Plan](https://claude.ai/code/artifact/a4a8a76e-68a5-4d50-b710-cda50106af8b) — task-by-task build order with dependencies
+- [`docs/circuit-ui-references.md`](docs/circuit-ui-references.md) — six verified, live UI references (desktop + mobile) combined into Circuit's design system direction
 
 ## Stack
 
@@ -24,49 +25,38 @@ queue, Redis, a WebSocket server) so those don't get added speculatively.
 
 ## Status
 
-**Phase 0 (Foundations) in progress.** What's here so far, matched to the
-Build Plan's task IDs:
+**Phase 0 (Foundations) done. Phase 1 (Tournament Creation & Discovery) in
+progress.** What's here so far, matched to the Build Plan's task IDs:
 
 | Task | What | File |
 |---|---|---|
 | P0-1 | Data model | `prisma/schema.prisma` |
-| P0-2 | Password hashing + session tokens | `src/lib/auth.ts` |
+| P0-2 | Auth: hashing, sessions, signup/login/logout routes | `src/lib/auth.ts`, `src/lib/session.ts`, `src/app/api/auth/`, `src/app/signup/`, `src/app/login/` |
 | P0-3 | Age gate | `src/lib/age-gate.ts` |
 | P0-4 | Payment provider abstraction | `src/lib/payments/` |
 | P0-5 | Proof file storage | `src/lib/storage.ts` |
 | P0-6 | Notification pipeline | `src/lib/notifications.ts` |
 | P0-7 | Payout method field | `prisma/schema.prisma` (`User.payoutMethodRef`) |
+| P1-1 | Tournament creation form + API | `src/app/tournaments/new/`, `src/app/api/tournaments/route.ts` |
+| P1-2 | Public tournament page | `src/app/tournaments/[id]/page.tsx` |
 
-Nothing user-facing yet — no routes, no UI beyond what `create-next-app`
-scaffolded. That's Phase 1 onward, per the Build Plan.
+Not yet built: P1-3 (edit & field locking — blocked on Phase 2's escrow
+existing), P1-4 (discovery list, P2 priority).
+
+**Known gap:** ACC-5 requires rate-limited login attempts; `POST
+/api/auth/login` doesn't implement that yet. Flagged in that route's own
+comment, not silently dropped — see `docs/circuit-stack.md`'s Rate limiting
+section for the intended approach (a Postgres attempts table, not Redis).
 
 ## Setup
-
-`node_modules` and `.git` were **not** finished through the assistant —
-finish both yourself in Terminal, on this machine, not through any bridged
-shell. Both `npm install` and `git`'s own commit process need to rename and
-delete files as part of normal operation (npm prunes platform-specific
-binaries it doesn't need; git writes and atomically replaces objects and
-lock files), and a sandboxed bridge blocks exactly that for safety. That's a
-permissions boundary, not a bug to route around — plain Terminal has no
-such restriction.
 
 ```bash
 cd ~/Dev/circuit
 
-# --- dependencies: clean slate, the bridged install never finished ---
-rm -rf node_modules package-lock.json
-npm install
-
-# --- git: the bridge left a stale lock after a blocked cleanup step ---
-rm -rf .git
-git init
-git add -A
-git commit -m "Circuit V1: Phase 0 foundations scaffold"
-
 cp .env.example .env
-# Then edit .env: at minimum set JWT_SECRET (openssl rand -base64 32) and
-# DATABASE_URL. Payment keys can wait until Phase 2 work starts.
+# Edit .env: at minimum set JWT_SECRET (openssl rand -base64 32) and
+# DATABASE_URL, pointing at a real Postgres instance. Payment keys can wait
+# until Phase 2 work starts.
 
 npx prisma generate
 npx prisma migrate dev --name init   # needs DATABASE_URL pointing at a real Postgres
@@ -74,8 +64,8 @@ npx prisma migrate dev --name init   # needs DATABASE_URL pointing at a real Pos
 npm run dev
 ```
 
-Open http://localhost:3000 — you'll see the default Next.js starter page
-until Phase 1 (Tournament Creation & Discovery) replaces it.
+Open http://localhost:3000 — sign up, then create a tournament to get a
+shareable public page at `/tournaments/[id]`.
 
 ## Conventions worth knowing before adding to this
 

@@ -12,9 +12,8 @@
  * own task, not a P0 blocker.
  */
 
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import type { Prisma } from "@prisma/client";
+import { prisma } from "@/lib/db";
 
 export type NotificationType =
   | "REGISTRATION_CONFIRMED"
@@ -35,7 +34,7 @@ export interface NotificationChannel {
 class InAppChannel implements NotificationChannel {
   async send(userId: string, type: NotificationType, payload: Record<string, unknown>) {
     await prisma.notification.create({
-      data: { userId, type, payload },
+      data: { userId, type, payload: payload as Prisma.InputJsonValue },
     });
   }
 }
