@@ -327,9 +327,9 @@ export default async function Home({
     <div className="flex w-full flex-1 flex-col gap-10 px-6 py-10">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-10">
         {/* Hero row — its own explicit container, exactly two divs:
-            the carousel (70%) and the Next Tournament card (30%), not
+            the carousel (80%) and the Next Tournament card (20%), not
             reliant on the content grid below happening to line up. */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[80%_20%]">
           <div>
             <HeroCarousel slides={heroSlides} />
           </div>
