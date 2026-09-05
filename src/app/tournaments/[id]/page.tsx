@@ -9,6 +9,7 @@
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Tv } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { StatusPill, tournamentStatusInfo } from "@/components/StatusPill";
@@ -92,9 +93,10 @@ export default async function TournamentPage({
               href={tournament.streamUrl}
               target="_blank"
               rel="noreferrer"
-              className="text-sm font-medium text-brand underline"
+              className="flex items-center gap-1.5 text-sm font-medium text-brand underline"
             >
-              📺 Watch stream
+              <Tv size={14} />
+              Watch stream
             </a>
           )}
         </div>

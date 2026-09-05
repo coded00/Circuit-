@@ -3,21 +3,22 @@
  * exists (Tournament.game/Battle.game are free-text), and no real
  * photography or licensing path exists to source real cover art. This
  * renders a deterministic (same game → same look every time, SSR/CSR
- * stable) gradient + diagonal-stripe treatment with the game name
- * overlaid, evoking an image-led card without any image request.
+ * stable) tinted-vignette treatment with the game name overlaid,
+ * evoking an image-led card without any image request.
+ *
+ * Every entry resolves to near-black — one shared "dark box-art vignette"
+ * feel with a different accent tint per game, rather than blending two
+ * saturated hues (the two-bright-colors-diagonally trick reads as a
+ * generic AI-gradient-generator default, not an intentional card system).
  */
 
-type GradientPair = readonly [string, string];
-
-const PALETTE: readonly GradientPair[] = [
-  ["#7c3aed", "#4338ca"], // violet -> indigo
-  ["#c026d3", "#7c3aed"], // fuchsia -> violet
-  ["#7c3aed", "#2563eb"], // violet -> blue
-  ["#e11d48", "#7c3aed"], // rose -> violet
-  ["#f59e0b", "#7c3aed"], // amber -> violet
-  ["#14b8a6", "#4338ca"], // teal -> indigo
-  ["#4338ca", "#0b0d10"], // indigo -> near-black
-  ["#ec4899", "#7c3aed"], // pink -> violet
+const PALETTE: readonly string[] = [
+  "#2f2a5c", // indigo
+  "#3a1f52", // violet
+  "#1e3350", // slate blue
+  "#153f3c", // deep teal
+  "#4a1f3d", // plum
+  "#1f2937", // charcoal blue
 ];
 
 function hashGameName(game: string): number {
@@ -28,7 +29,7 @@ function hashGameName(game: string): number {
   return hash;
 }
 
-export function gameGradient(game: string): GradientPair {
+export function gameTint(game: string): string {
   return PALETTE[hashGameName(game) % PALETTE.length];
 }
 
@@ -41,27 +42,19 @@ export function GameArtTile({
   className?: string;
   children?: React.ReactNode;
 }) {
-  const [from, to] = gameGradient(game);
+  const tint = gameTint(game);
 
   return (
     <div
       className={`relative overflow-hidden ${className}`}
-      style={{ backgroundImage: `linear-gradient(135deg, ${from}, ${to})` }}
+      style={{ backgroundImage: `linear-gradient(160deg, ${tint}, #0b0d10 85%)` }}
     >
       <div
         aria-hidden
-        className="absolute inset-0 opacity-[0.06]"
-        style={{
-          backgroundImage:
-            "repeating-linear-gradient(45deg, #fff 0 2px, transparent 2px 40px)",
-        }}
-      />
-      <div
-        aria-hidden
         className="absolute inset-x-0 bottom-0 h-2/3"
-        style={{ backgroundImage: "linear-gradient(to top, rgba(0,0,0,0.7), transparent)" }}
+        style={{ backgroundImage: "linear-gradient(to top, rgba(0,0,0,0.75), transparent)" }}
       />
-      <span className="absolute bottom-2 left-3 right-3 truncate text-sm font-bold tracking-tight text-white uppercase">
+      <span className="absolute bottom-2 left-3 right-3 truncate text-sm font-bold tracking-tight text-white">
         {game}
       </span>
       {children}

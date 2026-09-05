@@ -1,3 +1,4 @@
+import { Wallet } from "lucide-react";
 import { ComingSoon } from "@/components/ComingSoon";
 
 export default function WalletPage() {
@@ -5,7 +6,7 @@ export default function WalletPage() {
     <ComingSoon
       title="Wallet"
       description="Manage your Circuit balance and payouts here soon."
-      icon="💳"
+      icon={<Wallet size={28} />}
     />
   );
 }

@@ -9,6 +9,7 @@
  */
 
 import Link from "next/link";
+import { CheckCircle2 } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { confirmEntryFeePayment } from "@/lib/payments/confirm";
 
@@ -31,7 +32,7 @@ export default async function RegistrationCallbackPage({
     <div className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-4 px-6 py-16 text-center">
       {registration?.status === "CONFIRMED" ? (
         <>
-          <span className="text-3xl">✓</span>
+          <CheckCircle2 size={40} className="text-status-live" />
           <h1 className="text-2xl font-semibold">You&apos;re in!</h1>
           <p className="text-muted">Your registration is confirmed.</p>
         </>

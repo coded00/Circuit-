@@ -4,6 +4,7 @@
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Tv } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { StatusPill, battleStatusInfo } from "@/components/StatusPill";
@@ -52,9 +53,10 @@ export default async function BattlePage({
             href={battle.streamUrl}
             target="_blank"
             rel="noreferrer"
-            className="w-fit text-sm font-medium text-brand underline"
+            className="flex w-fit items-center gap-1.5 text-sm font-medium text-brand underline"
           >
-            📺 Watch stream
+            <Tv size={14} />
+            Watch stream
           </a>
         )}
       </div>

@@ -5,6 +5,7 @@
  */
 
 import { notFound } from "next/navigation";
+import { Trophy } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { StatusPill, matchStatusInfo } from "@/components/StatusPill";
@@ -138,7 +139,7 @@ export default async function MatchPage({
             <div key={i} className="flex flex-col gap-1">
               <div className="text-xs text-muted">Player {i === 0 ? "A" : "B"}</div>
               <div className={isWinner ? "flex items-center gap-1.5 font-semibold text-brand" : "font-medium"}>
-                {isWinner && <span>🏆</span>}
+                {isWinner && <Trophy size={14} />}
                 {playerLabel(p)}
               </div>
             </div>

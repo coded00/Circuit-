@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Trophy } from "lucide-react";
 
 export default function ClaimPrizeButton({ tournamentId }: { tournamentId: string }) {
   const router = useRouter();
@@ -29,16 +30,18 @@ export default function ClaimPrizeButton({ tournamentId }: { tournamentId: strin
 
   if (status) {
     return (
-      <p className="text-sm text-status-live">
-        {status === "SUCCESS" ? "Prize payout sent! 🏆" : "Prize payout initiated — processing."}
+      <p className="flex items-center gap-1.5 text-sm text-status-live">
+        {status === "SUCCESS" && <Trophy size={14} />}
+        {status === "SUCCESS" ? "Prize payout sent!" : "Prize payout initiated — processing."}
       </p>
     );
   }
 
   return (
     <div className="flex flex-col gap-1">
-      <button onClick={handleClick} disabled={submitting} className="btn-primary w-fit">
-        {submitting ? "Claiming…" : "🏆 Claim prize"}
+      <button onClick={handleClick} disabled={submitting} className="btn-primary w-fit gap-1.5">
+        {!submitting && <Trophy size={14} />}
+        {submitting ? "Claiming…" : "Claim prize"}
       </button>
       {error && <p className="text-sm text-danger">{error}</p>}
     </div>

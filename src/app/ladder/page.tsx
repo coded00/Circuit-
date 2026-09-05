@@ -49,7 +49,7 @@ export default async function LadderPage({
 
   const ranked = await gameStandings(game);
 
-  const medal = ["🥇", "🥈", "🥉"];
+  const rankColors = ["#eab308", "#9ca3af", "#b45309"]; // gold, silver, bronze
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-6 py-16">
@@ -76,7 +76,18 @@ export default async function LadderPage({
             <tbody>
               {ranked.map((s, i) => (
                 <tr key={s.userId} className="border-t border-border">
-                  <td className="px-4 py-3">{medal[i] ?? i + 1}</td>
+                  <td className="px-4 py-3">
+                    {rankColors[i] ? (
+                      <span
+                        className="flex h-5 w-5 items-center justify-center rounded-full font-mono text-xs font-bold tabular-nums text-[#0b0d10]"
+                        style={{ backgroundColor: rankColors[i] }}
+                      >
+                        {i + 1}
+                      </span>
+                    ) : (
+                      <span className="font-mono text-xs tabular-nums text-muted">{i + 1}</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 font-medium">
                     {s.displayName} <span className="text-muted">(@{s.handle})</span>
                   </td>

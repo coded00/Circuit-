@@ -16,7 +16,7 @@
  */
 
 import Link from "next/link";
-import { Calendar, Users, Swords } from "lucide-react";
+import { Calendar, Users, Swords, Radio, Clock, ClipboardList, CheckCircle2, Tv, type LucideIcon } from "lucide-react";
 import { getCurrentUser } from "@/lib/session";
 import { prisma } from "@/lib/db";
 import { LiveCounter } from "@/components/LiveCounter";
@@ -110,7 +110,7 @@ function TournamentGrid({ tournaments }: { tournaments: TournamentCard[] }) {
               <span className="flex items-center gap-1.5 text-xs text-muted">
                 <Users size={12} />
                 {tournament._count.registrations}/{tournament.participantCap} players
-                {tournament.streamUrl && " · 📺"}
+                {tournament.streamUrl && <Tv size={12} />}
               </span>
             </div>
           </Link>
@@ -121,11 +121,13 @@ function TournamentGrid({ tournaments }: { tournaments: TournamentCard[] }) {
 }
 
 function Section({
+  icon: Icon,
   title,
   count,
   viewAllHref,
   children,
 }: {
+  icon: LucideIcon;
   title: string;
   count: number;
   viewAllHref?: string;
@@ -134,8 +136,11 @@ function Section({
   if (count === 0) return null;
   return (
     <section className="flex flex-col gap-4">
-      <div className="flex items-baseline justify-between">
-        <h2 className="text-xs font-bold tracking-widest text-muted uppercase">{title}</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="flex items-center gap-2 text-base font-semibold">
+          <Icon size={17} className="text-muted" />
+          {title}
+        </h2>
         {viewAllHref && (
           <Link href={viewAllHref} className="text-xs font-medium text-brand hover:underline">
             View All →
@@ -253,11 +258,6 @@ export default async function Home({
                 "linear-gradient(135deg, #0b0d10, #140f1f 55%, #1a0f24)",
             }}
           >
-            <div
-              aria-hidden
-              className="absolute inset-0 opacity-[0.05]"
-              style={{ backgroundImage: "repeating-linear-gradient(45deg, #fff 0 2px, transparent 2px 40px)" }}
-            />
             <div className="relative z-10 flex flex-col items-start gap-4">
               <LiveCounter label="competing right now" count={liveTournamentCount} />
               <h1 className="max-w-md text-4xl leading-[1.05] font-bold tracking-tight text-white sm:text-5xl">
@@ -324,26 +324,29 @@ export default async function Home({
             </p>
           ) : (
             <>
-              <Section title="🔴 Live now" count={liveTournaments.length}>
+              <Section icon={Radio} title="Live now" count={liveTournaments.length}>
                 <TournamentGrid tournaments={liveTournaments} />
               </Section>
 
-              <Section title="⏱ Starting soon" count={startingSoon.length}>
+              <Section icon={Clock} title="Starting soon" count={startingSoon.length}>
                 <TournamentGrid tournaments={startingSoon} />
               </Section>
 
-              <Section title="📝 Registration open" count={registrationOpen.length}>
+              <Section icon={ClipboardList} title="Registration open" count={registrationOpen.length}>
                 <TournamentGrid tournaments={registrationOpen} />
               </Section>
 
-              <Section title="✅ Recently finished" count={recentlyFinished.length}>
+              <Section icon={CheckCircle2} title="Recently finished" count={recentlyFinished.length}>
                 <TournamentGrid tournaments={recentlyFinished} />
               </Section>
 
               {battles.length > 0 && (
                 <section className="flex flex-col gap-4">
-                  <div className="flex items-baseline justify-between">
-                    <h2 className="text-xs font-bold tracking-widest text-muted uppercase">⚔️ Open Battles</h2>
+                  <div className="flex items-center justify-between">
+                    <h2 className="flex items-center gap-2 text-base font-semibold">
+                      <Swords size={17} className="text-muted" />
+                      Open Battles
+                    </h2>
                     <div className="flex items-center gap-3">
                       <LiveCounter
                         label={openBattleCount === 1 ? "open Battle" : "open Battles"}
@@ -369,9 +372,9 @@ export default async function Home({
                           </span>
                         </GameArtTile>
                         <div className="flex flex-col gap-1.5 bg-surface p-3">
-                          <span className="font-semibold">
+                          <span className="flex items-center gap-1.5 font-semibold">
                             {battle.format === "BEST_OF_3" ? "Best of 3" : "Single match"}
-                            {battle.streamUrl && " · 📺"}
+                            {battle.streamUrl && <Tv size={13} className="text-muted" />}
                           </span>
                           <span className="text-xs text-muted">opened by {battle.creator.displayName}</span>
                         </div>
@@ -380,11 +383,6 @@ export default async function Home({
                   </CardCarousel>
                 </section>
               )}
-
-              <div className="flex min-h-24 w-64 flex-col justify-center gap-1 rounded-xl bg-gradient-to-br from-brand-strong to-[#0b0d10] p-5">
-                <span className="h-2 w-2 rounded-full bg-brand" />
-                <span className="text-lg font-bold text-white">Play. Compete. Belong.</span>
-              </div>
             </>
           )}
         </div>

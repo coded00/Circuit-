@@ -4,6 +4,7 @@
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Trophy } from "lucide-react";
 import { prisma } from "@/lib/db";
 import Poller from "@/app/Poller";
 import { StatusPill } from "@/components/StatusPill";
@@ -71,7 +72,8 @@ export default async function BracketPage({
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Bracket</h1>
         {champion && (
           <StatusPill tone="complete" size="md">
-            🏆 Champion: {label(champion)}
+            <Trophy size={14} />
+            Champion: {label(champion)}
           </StatusPill>
         )}
       </div>
@@ -101,7 +103,7 @@ export default async function BracketPage({
                               : "text-muted italic"
                       }
                     >
-                      {p.isWinner && <span>✓</span>}
+                      {p.isWinner && <Trophy size={13} />}
                       {label(p.id)}
                     </div>
                   ))}

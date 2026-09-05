@@ -7,6 +7,7 @@
 
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { AlertTriangle } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { StatusPill, registrationStatusInfo, tournamentStatusInfo } from "@/components/StatusPill";
@@ -79,7 +80,10 @@ export default async function DashboardTournamentDetailPage({
 
       {openDisputes.length > 0 && (
         <section className="flex flex-col gap-3 rounded-xl border border-status-cancelled/30 bg-status-cancelled/5 p-4">
-          <h2 className="font-semibold text-status-cancelled">⚠️ Disputes need your ruling</h2>
+          <h2 className="flex items-center gap-2 font-semibold text-status-cancelled">
+            <AlertTriangle size={16} />
+            Disputes need your ruling
+          </h2>
           {openDisputes.map((dispute) => (
             <Link
               key={dispute.id}
