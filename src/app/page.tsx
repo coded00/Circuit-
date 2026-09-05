@@ -325,10 +325,63 @@ export default async function Home({
 
   return (
     <div className="flex w-full flex-1 flex-col gap-10 px-6 py-10">
-      <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-10 lg:grid-cols-[1fr_320px]">
-        <div className="flex min-w-0 flex-col gap-10">
-          <HeroCarousel slides={heroSlides} />
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-10">
+        {/* Hero row — its own explicit container, exactly two divs:
+            the carousel (70%) and the Next Tournament card (30%), not
+            reliant on the content grid below happening to line up. */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
+          <div>
+            <HeroCarousel slides={heroSlides} />
+          </div>
 
+          <div className="flex min-w-0 flex-col gap-3">
+            {nextTournament && (
+              <>
+                <h2 className="flex items-center gap-2 text-sm font-semibold">
+                  <Trophy size={15} className="text-muted" />
+                  Next Tournament
+                </h2>
+                <Link
+                  href={`/tournaments/${nextTournament.id}`}
+                  className="flex flex-col overflow-hidden rounded-xl border border-border shadow-lg shadow-black/30 transition hover:border-border-strong"
+                >
+                  <GameArtTile game={nextTournament.game} className="h-32 w-full">
+                    {nextTournament.status === "LIVE" && (
+                      <span className="absolute top-2 right-2">
+                        <LiveBadge />
+                      </span>
+                    )}
+                  </GameArtTile>
+                  <div className="flex flex-col gap-2 bg-surface p-4">
+                    <span className="font-semibold">{nextTournament.name}</span>
+                    <div>
+                      <div className={`text-2xl font-bold tabular-nums ${nextTournament.prizeAmount ? "text-gold" : "text-brand"}`}>
+                        {nextTournament.prizeAmount ? formatNaira(nextTournament.prizeAmount) : formatNaira(nextTournament.entryFee)}
+                      </div>
+                      <div className="text-xs text-muted">
+                        {nextTournament.prizeAmount ? "Prize pool" : nextTournament.entryFee === 0 ? "Free entry" : "Entry fee"}
+                      </div>
+                    </div>
+                    <span className="flex items-center gap-1.5 text-xs text-muted">
+                      <Calendar size={12} />
+                      {formatCardDate(nextTournament.startAt)}
+                    </span>
+                    <span className="flex items-center gap-1.5 text-xs text-muted">
+                      <Users size={12} />
+                      {nextTournament._count.registrations}/{nextTournament.participantCap} players
+                    </span>
+                    <span className="btn-primary mt-1 w-full">Register Now</span>
+                  </div>
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Content row — a separate 2-column grid for everything else,
+            independent of the hero row above. */}
+        <div className="grid grid-cols-1 gap-10 lg:grid-cols-[1fr_320px]">
+        <div className="flex min-w-0 flex-col gap-10">
           <ConnectAccountsRow />
 
           <form className="flex w-full max-w-md gap-2">
@@ -418,49 +471,9 @@ export default async function Home({
           )}
         </div>
 
-        {/* Right column: Next Tournament spotlight, Live Now, Leaderboard */}
+        {/* Right column: Live Now, Leaderboard (Next Tournament now lives
+            in the dedicated hero row above) */}
         <div className="flex min-w-0 flex-col gap-6">
-          {nextTournament && (
-            <div className="flex flex-col gap-3">
-              <h2 className="flex items-center gap-2 text-sm font-semibold">
-                <Trophy size={15} className="text-muted" />
-                Next Tournament
-              </h2>
-              <Link
-                href={`/tournaments/${nextTournament.id}`}
-                className="flex flex-col overflow-hidden rounded-xl border border-border shadow-lg shadow-black/30 transition hover:border-border-strong"
-              >
-                <GameArtTile game={nextTournament.game} className="h-32 w-full">
-                  {nextTournament.status === "LIVE" && (
-                    <span className="absolute top-2 right-2">
-                      <LiveBadge />
-                    </span>
-                  )}
-                </GameArtTile>
-                <div className="flex flex-col gap-2 bg-surface p-4">
-                  <span className="font-semibold">{nextTournament.name}</span>
-                  <div>
-                    <div className={`text-2xl font-bold tabular-nums ${nextTournament.prizeAmount ? "text-gold" : "text-brand"}`}>
-                      {nextTournament.prizeAmount ? formatNaira(nextTournament.prizeAmount) : formatNaira(nextTournament.entryFee)}
-                    </div>
-                    <div className="text-xs text-muted">
-                      {nextTournament.prizeAmount ? "Prize pool" : nextTournament.entryFee === 0 ? "Free entry" : "Entry fee"}
-                    </div>
-                  </div>
-                  <span className="flex items-center gap-1.5 text-xs text-muted">
-                    <Calendar size={12} />
-                    {formatCardDate(nextTournament.startAt)}
-                  </span>
-                  <span className="flex items-center gap-1.5 text-xs text-muted">
-                    <Users size={12} />
-                    {nextTournament._count.registrations}/{nextTournament.participantCap} players
-                  </span>
-                  <span className="btn-primary mt-1 w-full">Register Now</span>
-                </div>
-              </Link>
-            </div>
-          )}
-
           {liveNow.length > 0 && (
             <div className="flex flex-col gap-3">
               <h2 className="flex items-center gap-2 text-sm font-semibold">
@@ -519,6 +532,7 @@ export default async function Home({
               </div>
             </div>
           )}
+        </div>
         </div>
       </div>
     </div>
