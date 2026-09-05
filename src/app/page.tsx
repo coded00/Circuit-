@@ -23,6 +23,7 @@ import { LiveCounter } from "@/components/LiveCounter";
 import { StatusPill, tournamentStatusInfo } from "@/components/StatusPill";
 import { GameArtTile } from "@/components/GameArtTile";
 import { ConnectAccountsRow } from "@/components/ConnectAccountsRow";
+import { HeroCarousel } from "@/components/HeroCarousel";
 import { CardCarousel } from "@/components/CardCarousel";
 import { globalStandings } from "@/lib/standings";
 
@@ -76,6 +77,35 @@ function PrizeOrEntry({ tournament }: { tournament: TournamentCard }) {
     <span className="text-sm font-bold tabular-nums text-brand">
       {tournament.entryFee === 0 ? "Free entry" : `${formatNaira(tournament.entryFee)} entry`}
     </span>
+  );
+}
+
+/** A hero slide for one real live tournament — same cinematic-slide shape
+ *  as the brand slide, background swapped for GameArtTile so each slide
+ *  still reads as a distinct tournament rather than a repeated banner. */
+function HeroTournamentSlide({ tournament }: { tournament: TournamentCard }) {
+  return (
+    <Link
+      href={`/tournaments/${tournament.id}`}
+      className="relative flex min-h-72 w-full flex-col justify-center overflow-hidden rounded-2xl"
+    >
+      <GameArtTile game={tournament.game} className="absolute inset-0" />
+      <div className="relative z-10 flex flex-col items-start gap-3 p-8">
+        <span className="absolute top-2 right-2">
+          <LiveBadge />
+        </span>
+        <span className="text-xs font-semibold tracking-wide text-white/70 uppercase">{tournament.game}</span>
+        <h2 className="max-w-md text-3xl leading-tight font-bold text-white sm:text-4xl">{tournament.name}</h2>
+        <div className="flex items-center gap-4">
+          <PrizeOrEntry tournament={tournament} />
+          <span className="flex items-center gap-1.5 text-sm text-white/80">
+            <Users size={14} />
+            {tournament._count.registrations}/{tournament.participantCap} players
+          </span>
+        </div>
+        <span className="btn-primary mt-1 whitespace-nowrap">View tournament</span>
+      </div>
+    </Link>
   );
 }
 
@@ -239,59 +269,65 @@ export default async function Home({
   const liveNow = liveTournaments.slice(0, 2);
   const topLeaderboard = leaderboard.slice(0, 5);
 
+  // Hero is a carousel: slide 0 is always Circuit's own brand pitch;
+  // additional slides are real LIVE tournaments (capped at 3) rather than
+  // invented promotional content — nothing to show, no extra slides.
+  const heroBrandSlide = (
+    <div
+      className="relative flex min-h-72 w-full flex-col justify-center overflow-hidden rounded-2xl p-8"
+      style={{
+        backgroundImage:
+          "radial-gradient(ellipse 650px 500px at 88% 20%, rgba(124,58,237,0.45), transparent 65%)," +
+          "radial-gradient(ellipse 450px 400px at 15% 90%, rgba(37,42,90,0.5), transparent 70%)," +
+          "linear-gradient(135deg, #0b0d10, #140f1f 55%, #1a0f24)",
+      }}
+    >
+      <div className="relative z-10 flex flex-col items-start gap-4">
+        <LiveCounter label="competing right now" count={liveTournamentCount} />
+        <h1 className="max-w-md text-4xl leading-[1.05] font-bold tracking-tight text-white sm:text-5xl">
+          Play.
+          <br />
+          Compete.
+          <br />
+          Get Paid.
+        </h1>
+        <p className="max-w-xs text-sm text-white/80">
+          Find a tournament. Join a Battle. Skip the WhatsApp chaos.
+        </p>
+        {!user ? (
+          <div className="flex flex-wrap gap-3">
+            <Link href="/signup" className="btn-primary whitespace-nowrap">
+              Sign up
+            </Link>
+            <Link href="/login" className="btn-secondary gap-1.5 bg-white/10 whitespace-nowrap text-white hover:bg-white/20">
+              Log in
+            </Link>
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-3">
+            <Link href="/tournaments/new" className="btn-primary whitespace-nowrap">
+              Create a tournament
+            </Link>
+            <Link href="/battles/new" className="btn-secondary gap-1.5 bg-white/10 whitespace-nowrap text-white hover:bg-white/20">
+              <Swords size={14} />
+              Open a Battle
+            </Link>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  const heroSlides = [
+    heroBrandSlide,
+    ...liveTournaments.slice(0, 3).map((t) => <HeroTournamentSlide key={t.id} tournament={t} />),
+  ];
+
   return (
     <div className="flex w-full flex-1 flex-col gap-10 px-6 py-10">
       <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-10 lg:grid-cols-[1fr_320px]">
         <div className="flex min-w-0 flex-col gap-10">
-          {/* Hero — left-aligned copy over a cinematic, mostly-dark
-              gradient with controlled purple glow (not GameArtTile's
-              bright per-game hash — this is Circuit's own brand
-              artwork, not tied to a specific game). Matches the
-              reference's "dark, atmospheric, premium" mood rather than
-              a bright poster. */}
-          <div
-            className="relative flex min-h-72 w-full flex-col justify-center overflow-hidden rounded-2xl p-8"
-            style={{
-              backgroundImage:
-                "radial-gradient(ellipse 650px 500px at 88% 20%, rgba(124,58,237,0.45), transparent 65%)," +
-                "radial-gradient(ellipse 450px 400px at 15% 90%, rgba(37,42,90,0.5), transparent 70%)," +
-                "linear-gradient(135deg, #0b0d10, #140f1f 55%, #1a0f24)",
-            }}
-          >
-            <div className="relative z-10 flex flex-col items-start gap-4">
-              <LiveCounter label="competing right now" count={liveTournamentCount} />
-              <h1 className="max-w-md text-4xl leading-[1.05] font-bold tracking-tight text-white sm:text-5xl">
-                Play.
-                <br />
-                Compete.
-                <br />
-                Get Paid.
-              </h1>
-              <p className="max-w-xs text-sm text-white/80">
-                Find a tournament. Join a Battle. Skip the WhatsApp chaos.
-              </p>
-              {!user ? (
-                <div className="flex flex-wrap gap-3">
-                  <Link href="/signup" className="btn-primary whitespace-nowrap">
-                    Sign up
-                  </Link>
-                  <Link href="/login" className="btn-secondary gap-1.5 bg-white/10 whitespace-nowrap text-white hover:bg-white/20">
-                    Log in
-                  </Link>
-                </div>
-              ) : (
-                <div className="flex flex-wrap gap-3">
-                  <Link href="/tournaments/new" className="btn-primary whitespace-nowrap">
-                    Create a tournament
-                  </Link>
-                  <Link href="/battles/new" className="btn-secondary gap-1.5 bg-white/10 whitespace-nowrap text-white hover:bg-white/20">
-                    <Swords size={14} />
-                    Open a Battle
-                  </Link>
-                </div>
-              )}
-            </div>
-          </div>
+          <HeroCarousel slides={heroSlides} />
 
           <ConnectAccountsRow />
 
