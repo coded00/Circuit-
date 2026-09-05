@@ -345,17 +345,17 @@ export default async function Home({
                   href={`/tournaments/${nextTournament.id}`}
                   className="flex flex-col overflow-hidden rounded-xl border border-border shadow-lg shadow-black/30 transition hover:border-border-strong"
                 >
-                  <GameArtTile game={nextTournament.game} className="h-32 w-full">
+                  <GameArtTile game={nextTournament.game} className="h-20 w-full shrink-0">
                     {nextTournament.status === "LIVE" && (
-                      <span className="absolute top-2 right-2">
+                      <span className="absolute top-1.5 right-1.5">
                         <LiveBadge />
                       </span>
                     )}
                   </GameArtTile>
-                  <div className="flex flex-col gap-2 bg-surface p-4">
-                    <span className="font-semibold">{nextTournament.name}</span>
+                  <div className="flex flex-col gap-1.5 bg-surface p-3">
+                    <span className="truncate font-semibold">{nextTournament.name}</span>
                     <div>
-                      <div className={`text-2xl font-bold tabular-nums ${nextTournament.prizeAmount ? "text-gold" : "text-brand"}`}>
+                      <div className={`text-lg font-bold tabular-nums ${nextTournament.prizeAmount ? "text-gold" : "text-brand"}`}>
                         {nextTournament.prizeAmount ? formatNaira(nextTournament.prizeAmount) : formatNaira(nextTournament.entryFee)}
                       </div>
                       <div className="text-xs text-muted">
@@ -363,14 +363,16 @@ export default async function Home({
                       </div>
                     </div>
                     <span className="flex items-center gap-1.5 text-xs text-muted">
-                      <Calendar size={12} />
-                      {formatCardDate(nextTournament.startAt)}
+                      <Calendar size={12} className="shrink-0" />
+                      <span className="truncate">{formatCardDate(nextTournament.startAt)}</span>
                     </span>
                     <span className="flex items-center gap-1.5 text-xs text-muted">
-                      <Users size={12} />
-                      {nextTournament._count.registrations}/{nextTournament.participantCap} players
+                      <Users size={12} className="shrink-0" />
+                      <span className="truncate">
+                        {nextTournament._count.registrations}/{nextTournament.participantCap} players
+                      </span>
                     </span>
-                    <span className="btn-primary mt-1 w-full">Register Now</span>
+                    <span className="btn-primary mt-1 w-full text-sm">Register Now</span>
                   </div>
                 </Link>
               </>
