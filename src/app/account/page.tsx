@@ -14,6 +14,12 @@ export default async function AccountPage() {
         <h1 className="text-2xl font-semibold">Account settings</h1>
         <p className="text-sm text-muted">@{user.handle}</p>
       </div>
+      {user.isSuspended && (
+        <p className="rounded-lg border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">
+          Your account is suspended: {user.suspensionReason ?? "contact support."} You can&apos;t register,
+          pay, or accept Battles while suspended.
+        </p>
+      )}
       <AccountForm
         initialDisplayName={user.displayName}
         initialAvatarUrl={user.avatarUrl ?? ""}

@@ -48,7 +48,12 @@ export default async function StaffDisputeQueuePage() {
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-6 py-16">
-      <h1 className="text-2xl font-semibold">Escalated disputes</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Escalated disputes</h1>
+        <Link href="/staff/reports" className="text-sm font-medium text-brand underline">
+          Abuse reports →
+        </Link>
+      </div>
 
       {disputes.length === 0 ? (
         <p className="card text-center text-muted">No escalated disputes right now.</p>

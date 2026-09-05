@@ -40,6 +40,12 @@ export async function POST(
       { status: 401 }
     );
   }
+  if (user.isSuspended) {
+    return NextResponse.json(
+      { error: `Your account is suspended: ${user.suspensionReason ?? "contact support."}` },
+      { status: 403 }
+    );
+  }
 
   const { id: tournamentId } = await params;
   const body = await request.json().catch(() => null);

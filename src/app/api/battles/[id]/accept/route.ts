@@ -15,6 +15,12 @@ export async function POST(
   if (!user) {
     return NextResponse.json({ error: "You must be signed in to accept a Battle." }, { status: 401 });
   }
+  if (user.isSuspended) {
+    return NextResponse.json(
+      { error: `Your account is suspended: ${user.suspensionReason ?? "contact support."}` },
+      { status: 403 }
+    );
+  }
 
   const { id } = await params;
   const battle = await prisma.battle.findUnique({ where: { id } });

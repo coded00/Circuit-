@@ -5,8 +5,10 @@
  * payoutMethodRef stay private (edited at /account, never rendered here).
  */
 
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { getCurrentUser } from "@/lib/session";
 
 export default async function PlayerProfilePage({
   params,
@@ -17,6 +19,8 @@ export default async function PlayerProfilePage({
 
   const player = await prisma.user.findUnique({ where: { handle } });
   if (!player) notFound();
+
+  const viewer = await getCurrentUser();
 
   const matches = await prisma.match.findMany({
     where: {
@@ -51,9 +55,16 @@ export default async function PlayerProfilePage({
             {player.displayName.slice(0, 1).toUpperCase()}
           </div>
         )}
-        <div>
-          <h1 className="text-2xl font-semibold">{player.displayName}</h1>
-          <p className="text-muted">@{player.handle}</p>
+        <div className="flex flex-1 items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold">{player.displayName}</h1>
+            <p className="text-muted">@{player.handle}</p>
+          </div>
+          {viewer && viewer.id !== player.id && (
+            <Link href={`/players/${player.handle}/report`} className="text-xs text-muted hover:text-danger">
+              Report
+            </Link>
+          )}
         </div>
       </div>
 

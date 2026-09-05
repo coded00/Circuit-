@@ -94,22 +94,27 @@ enum ReportStatus {
 /// Account creation is deferred (D4) — a User row is only created at
 /// register-with-intent-to-pay, Battle accept, or payout claim.
 model User {
-  id              String    @id @default(cuid())
-  displayName     String
-  handle          String    @unique
-  emailOrPhone    String    @unique
-  passwordHash    String?
-  avatarUrl       String?
-  dateOfBirth     DateTime?
-  ageVerified     Boolean   @default(false)
+  id               String    @id @default(cuid())
+  displayName      String
+  handle           String    @unique
+  emailOrPhone     String    @unique
+  passwordHash     String?
+  avatarUrl        String?
+  dateOfBirth      DateTime?
+  ageVerified      Boolean   @default(false)
   /// P0-7: linked payout destination — what REG-6's payout actually pays out to.
-  payoutMethodRef String?
+  payoutMethodRef  String?
   /// P6-1/P6-2/P6-4: Circuit staff access — dispute-queue escalation
   /// ruling, account suspension. No self-serve grant path exists yet;
   /// setting this currently means a direct DB write, which is fine at V1's
   /// staffing size but is itself worth flagging as a gap.
-  isStaff         Boolean   @default(false)
-  createdAt       DateTime  @default(now())
+  isStaff          Boolean   @default(false)
+  /// P6-4/TRU-4: blocks registering, paying, or accepting Battles —
+  /// checked at those specific write actions, never at login or browsing
+  /// (same "don't touch the read path" discipline as the age gate, TRU-5).
+  isSuspended      Boolean   @default(false)
+  suspensionReason String?
+  createdAt        DateTime  @default(now())
 
   organizerProfile OrganizerProfile?
   registrations    Registration[]
@@ -172,12 +177,12 @@ model Tournament {
 
 /// Links a User to a Tournament. Maps to REG-1..REG-7.
 model Registration {
-  id           String              @id @default(cuid())
+  id           String             @id @default(cuid())
   tournamentId String
-  tournament   Tournament          @relation(fields: [tournamentId], references: [id])
+  tournament   Tournament         @relation(fields: [tournamentId], references: [id])
   userId       String
-  user         User                @relation(fields: [userId], references: [id])
-  status       RegistrationStatus  @default(PENDING_PAYMENT)
+  user         User               @relation(fields: [userId], references: [id])
+  status       RegistrationStatus @default(PENDING_PAYMENT)
   /// REG-1's minimum organizer-required field. Display name comes from the
   /// linked User (see ORG-5's CSV export) — in-game ID doesn't live there
   /// since it's per-tournament, not identity.
@@ -185,8 +190,8 @@ model Registration {
   /// Our own reference (not the provider's), generated at P2-2's charge
   /// init and echoed back by both PaymentProviderClient implementations —
   /// what a webhook looks up a Registration by.
-  paymentRef   String?             @unique
-  createdAt    DateTime            @default(now())
+  paymentRef   String?            @unique
+  createdAt    DateTime           @default(now())
 
   escrowTxns EscrowTransaction[]
 
@@ -227,9 +232,9 @@ model Match {
   playerBId String
   playerB   User   @relation("MatchPlayerB", fields: [playerBId], references: [id])
 
-  status   MatchStatus @default(UPCOMING)
-  resultA  Json?
-  resultB  Json?
+  status    MatchStatus @default(UPCOMING)
+  resultA   Json?
+  resultB   Json?
   proofARef String?
   proofBRef String?
 
@@ -275,21 +280,21 @@ model Battle {
 
 /// Belongs to a Match. Maps to BRK-5, BRK-6, TRU-1..TRU-2.
 model Dispute {
-  id         String        @id @default(cuid())
-  matchId    String        @unique
-  match      Match         @relation(fields: [matchId], references: [id])
-  raisedById String
-  raisedBy   User          @relation("DisputeRaisedBy", fields: [raisedById], references: [id])
-  status     DisputeStatus @default(OPEN)
+  id                      String        @id @default(cuid())
+  matchId                 String        @unique
+  match                   Match         @relation(fields: [matchId], references: [id])
+  raisedById              String
+  raisedBy                User          @relation("DisputeRaisedBy", fields: [raisedById], references: [id])
+  status                  DisputeStatus @default(OPEN)
   /// BRK-5's 24h (placeholder) window: the organizer must rule by this
   /// time or the sweep (P3-6/BRK-6) escalates to the Phase 6 staff queue.
   /// Null for a Battle dispute or one escalated immediately (organizer is
   /// a disputant) — there's no organizer-review phase to time out.
   organizerRulingDeadline DateTime?
-  ruling     String?
-  ruledById  String?
-  ruledAt    DateTime?
-  createdAt  DateTime      @default(now())
+  ruling                  String?
+  ruledById               String?
+  ruledAt                 DateTime?
+  createdAt               DateTime      @default(now())
 
   @@index([status])
 }
@@ -334,6 +339,10 @@ model Report {
   reportedById   String
   reportedBy     User         @relation("ReportFiledBy", fields: [reportedById], references: [id])
   reason         String
+  /// Optional evidence upload (TRU-3) — reuses proofStorage (src/lib/
+  /// storage.ts), keyed by this report's own id rather than a matchId;
+  /// that storage interface only ever cared about an opaque string key.
+  evidenceRef    String?
   status         ReportStatus @default(OPEN)
   createdAt      DateTime     @default(now())
 
