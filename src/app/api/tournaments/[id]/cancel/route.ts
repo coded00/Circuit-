@@ -13,6 +13,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { getPaymentProvider } from "@/lib/payments";
+import { notify } from "@/lib/notifications";
 
 export async function POST(
   request: Request,
@@ -50,6 +51,15 @@ export async function POST(
   });
 
   await prisma.tournament.update({ where: { id }, data: { status: "CANCELLED" } });
+
+  // Every confirmed registrant hears about it, not just the ones getting a
+  // refund — a free registrant has no money moving but still had plans
+  // around this tournament.
+  await Promise.all(
+    confirmedRegistrations.map((registration) =>
+      notify(registration.userId, "TOURNAMENT_CANCELLED", { tournamentId: id })
+    )
+  );
 
   const failedRefunds: string[] = [];
   let refundedCount = 0;

@@ -25,9 +25,10 @@ queue, Redis, a WebSocket server) so those don't get added speculatively.
 
 ## Status
 
-**Phase 0 (Foundations) done. Phases 1 through 4 in progress, plus a
-slice of Phase 6 that Phase 3 depends on.** What's here so far, matched
-to the Build Plan's task IDs:
+**Phases 0 through 6 done.** Every task from the Build Plan is built
+except Phase 8 (see below — it needs real third-party keys this
+environment doesn't have). What's here, matched to the Build Plan's task
+IDs:
 
 | Task | What | File |
 |---|---|---|
@@ -72,6 +73,8 @@ to the Build Plan's task IDs:
 | P5-4 | Escrow visibility (read-only fees collected/refunded/payout status) | same manage view — no dashboard action can release escrow itself, matching ORG-4 |
 | P6-3 | Abuse reporting (reason code + optional evidence upload) | `src/app/players/[handle]/report/`, `src/app/api/reports/route.ts` |
 | P6-4 | Account suspension (blocks register/pay/accept-Battle; visible to the affected user) | `src/app/staff/reports/`, `src/app/api/staff/users/[id]/{suspend,unsuspend}/route.ts`, suspension check in the registrations and Battle-accept routes |
+| P5-5 | Registrant CSV export | `src/app/api/tournaments/[id]/registrants.csv/route.ts` |
+| — | **Phase 7 audit**: 3 of 9 `NotificationType`s had never actually fired (`TOURNAMENT_CANCELLED`, `REGISTRATION_CAP_FILLED`, `REGISTRATION_CLOSED`) despite the pipeline existing since P0-6. Wired up all three — cancellation now notifies every registrant, not just the ones getting refunded. |
 
 Also added, not in the original Build Plan: a lightweight `streamUrl`
 field on Tournament and Battle (link only, no embed, no live-status
@@ -79,8 +82,13 @@ check — the PRD's actual "streaming build-out" is documented V2 scope,
 this is not that). Shown as a "📺 Watch stream" link on the tournament/
 Battle page and a 📺 badge on homepage cards.
 
-Not yet built: P5-5 (CSV export, P2 priority), Phase 8 (NFR/analytics —
-needs real Sentry/PostHog keys this environment doesn't have).
+Every Build Plan task is now built except **Phase 8 (NFR & Analytics)**,
+which needs real Sentry/PostHog account keys this environment doesn't
+have — see docs/circuit-stack.md's Observability section for what it
+needs once those exist. Also not attempted: a real Lighthouse/3G pass
+(NFR-1) and resolving `payoutMethodRef` into a live Paystack recipient
+code (needs a live Paystack sandbox) — both flagged as open items in
+their respective source docs already.
 
 **Known gaps, called out rather than silently dropped** (see the relevant
 file's own comment for each):

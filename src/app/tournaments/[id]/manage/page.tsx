@@ -123,7 +123,17 @@ export default async function ManageTournamentPage({
       </section>
 
       <section className="flex flex-col gap-2">
-        <h2 className="text-lg font-semibold">Registrants ({registrations.length})</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Registrants ({registrations.length})</h2>
+          {registrations.length > 0 && (
+            <a
+              href={`/api/tournaments/${id}/registrants.csv`}
+              className="text-sm font-medium text-brand underline"
+            >
+              Export CSV
+            </a>
+          )}
+        </div>
         {registrations.length === 0 ? (
           <p className="card text-center text-muted">No registrants yet.</p>
         ) : (

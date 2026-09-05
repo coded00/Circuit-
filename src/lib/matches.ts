@@ -652,9 +652,10 @@ export async function runScheduledSweep(): Promise<{
       status: { notIn: ["CANCELLED", "COMPLETE", "LIVE"] },
       bracket: null,
     },
-    select: { id: true },
+    select: { id: true, organizerId: true },
   });
   for (const tournament of readyTournaments) {
+    await notify(tournament.organizerId, "REGISTRATION_CLOSED", { tournamentId: tournament.id });
     await generateBracket(tournament.id);
   }
 
@@ -689,7 +690,7 @@ export async function runScheduledSweep(): Promise<{
 export async function maybeGenerateBracketOnCapFill(tournamentId: string): Promise<void> {
   const tournament = await prisma.tournament.findUnique({
     where: { id: tournamentId },
-    select: { participantCap: true },
+    select: { participantCap: true, organizerId: true },
   });
   if (!tournament) return;
 
@@ -697,6 +698,7 @@ export async function maybeGenerateBracketOnCapFill(tournamentId: string): Promi
     where: { tournamentId, status: "CONFIRMED" },
   });
   if (confirmedCount >= tournament.participantCap) {
+    await notify(tournament.organizerId, "REGISTRATION_CAP_FILLED", { tournamentId });
     await generateBracket(tournamentId);
   }
 }
