@@ -135,7 +135,7 @@ function Section({
 }) {
   if (count === 0) return null;
   return (
-    <section className="flex flex-col gap-4">
+    <section className="flex min-w-0 flex-col gap-4">
       <div className="flex items-center justify-between">
         <h2 className="flex items-center gap-2 text-base font-semibold">
           <Icon size={17} className="text-muted" />
@@ -242,7 +242,7 @@ export default async function Home({
   return (
     <div className="flex w-full flex-1 flex-col gap-10 px-6 py-10">
       <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-10 lg:grid-cols-[1fr_320px]">
-        <div className="flex flex-col gap-10">
+        <div className="flex min-w-0 flex-col gap-10">
           {/* Hero — left-aligned copy over a cinematic, mostly-dark
               gradient with controlled purple glow (not GameArtTile's
               bright per-game hash — this is Circuit's own brand
@@ -336,7 +336,7 @@ export default async function Home({
               </Section>
 
               {battles.length > 0 && (
-                <section className="flex flex-col gap-4">
+                <section className="flex min-w-0 flex-col gap-4">
                   <div className="flex items-center justify-between">
                     <h2 className="flex items-center gap-2 text-base font-semibold">
                       <Swords size={17} className="text-muted" />
@@ -383,7 +383,7 @@ export default async function Home({
         </div>
 
         {/* Right column: Next Tournament spotlight, Live Now, Leaderboard */}
-        <div className="flex flex-col gap-6">
+        <div className="flex min-w-0 flex-col gap-6">
           {nextTournament && (
             <div className="flex flex-col gap-3">
               <h2 className="flex items-center gap-2 text-sm font-semibold">

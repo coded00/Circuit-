@@ -41,7 +41,7 @@ export function AccountMenu({ user }: { user: NavUser }) {
             {user.displayName.slice(0, 1).toUpperCase()}
           </div>
         )}
-        <span className="hidden text-sm font-medium sm:inline">{user.displayName}</span>
+        <span className="hidden max-w-24 truncate text-sm font-medium lg:inline">{user.displayName}</span>
         <ChevronDown size={14} className="text-muted" />
       </button>
 

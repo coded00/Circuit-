@@ -18,7 +18,7 @@ export function CardCarousel({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="group relative">
+    <div className="group relative min-w-0">
       <div
         ref={scrollerRef}
         className="flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"

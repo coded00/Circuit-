@@ -18,7 +18,7 @@ export async function TopBar({ user }: { user: User | null }) {
         Circuit
       </Link>
 
-      <SearchInput className="mx-auto hidden w-full max-w-md sm:block" />
+      <SearchInput className="mx-auto hidden min-w-0 flex-1 sm:block" />
 
       <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
         {user ? (
