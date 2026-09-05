@@ -448,6 +448,11 @@ async function completeMatch(match: Match, winnerId: string): Promise<Match> {
 
   if (match.tournamentId) {
     await applyWinnerAdvancement(match.tournamentId, match.id, winnerId);
+  } else if (match.battleId) {
+    // P4-5/BTL-5: the ladder counts wins from completed Battles — nothing
+    // else in this file ever flips Battle.status, so without this the
+    // ladder query would never find anything to count.
+    await prisma.battle.update({ where: { id: match.battleId }, data: { status: "COMPLETE" } });
   }
 
   await Promise.all([
@@ -555,7 +560,9 @@ export async function ruleDispute(input: RulingInput): Promise<Dispute> {
       );
     }
 
-    const [updatedDispute] = await prisma.$transaction([
+    // Only reachable for a Battle match (the check above refuses any
+    // match with a tournamentId), so battleId is guaranteed here.
+    const writes: Prisma.PrismaPromise<unknown>[] = [
       prisma.dispute.update({
         where: { id: dispute.id },
         data: {
@@ -569,7 +576,13 @@ export async function ruleDispute(input: RulingInput): Promise<Dispute> {
         where: { id: dispute.matchId },
         data: { status: "COMPLETE", reportWindowExpiresAt: null },
       }),
-    ]);
+    ];
+    if (dispute.match.battleId) {
+      writes.push(
+        prisma.battle.update({ where: { id: dispute.match.battleId }, data: { status: "COMPLETE" } })
+      );
+    }
+    const [updatedDispute] = (await prisma.$transaction(writes)) as [Dispute, ...unknown[]];
     await Promise.all([
       notify(dispute.match.playerAId, "DISPUTE_RESOLVED", { matchId: dispute.matchId, voided: true }),
       notify(dispute.match.playerBId, "DISPUTE_RESOLVED", { matchId: dispute.matchId, voided: true }),
@@ -598,6 +611,25 @@ export async function ruleDispute(input: RulingInput): Promise<Dispute> {
   ]);
 
   return updatedDispute;
+}
+
+// ---------------------------------------------------------------------------
+// P4-4: Battles' entry point into this engine. Accepting a Battle creates
+// a Match exactly the way bracket generation does — same unique-code
+// helper, no separate creation path — and every function above already
+// handles battleId-only matches (no tournamentId) generically. This is
+// the whole proof that the engine didn't need a Battle-specific fork.
+// ---------------------------------------------------------------------------
+
+export async function createBattleMatch(
+  battle: { id: string; creatorId: string },
+  accepterId: string
+): Promise<Match> {
+  return createMatchWithUniqueCode({
+    battleId: battle.id,
+    playerAId: battle.creatorId,
+    playerBId: accepterId,
+  });
 }
 
 // ---------------------------------------------------------------------------

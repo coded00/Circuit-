@@ -5,7 +5,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
-import BracketPoller from "./BracketPoller";
+import Poller from "@/app/Poller";
 
 type BracketSlot = {
   position: number;
@@ -62,7 +62,7 @@ export default async function BracketPage({
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-6 py-16">
-      <BracketPoller />
+      <Poller />
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold">{tournament.name} — Bracket</h1>
         {champion && <p className="text-sm font-medium text-zinc-500">Champion: {label(champion)}</p>}

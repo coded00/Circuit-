@@ -25,9 +25,9 @@ queue, Redis, a WebSocket server) so those don't get added speculatively.
 
 ## Status
 
-**Phase 0 (Foundations) done. Phases 1, 2, and 3 in progress, plus a slice
-of Phase 6 that Phase 3 depends on.** What's here so far, matched to the
-Build Plan's task IDs:
+**Phase 0 (Foundations) done. Phases 1 through 4 in progress, plus a
+slice of Phase 6 that Phase 3 depends on.** What's here so far, matched
+to the Build Plan's task IDs:
 
 | Task | What | File |
 |---|---|---|
@@ -54,6 +54,12 @@ Build Plan's task IDs:
 | P3-9 | Live bracket view (polling) | `src/app/tournaments/[id]/bracket/` |
 | P6-1 | Staff dispute queue | `src/app/staff/disputes/page.tsx` |
 | P6-2 | Staff ruling | `src/app/api/staff/disputes/[id]/rule/route.ts` — void restricted to Battles only, see gaps below |
+| P4-1 | Battle entity & creation | `src/app/battles/new/`, `src/app/api/battles/route.ts` |
+| P4-2 | Open Battle board | `src/app/battles/page.tsx` |
+| P4-3 | Targeted challenge notification | same route — `notify(..., "BATTLE_CHALLENGE", ...)` |
+| P4-4 | Accept → attach to Match/Dispute engine | `src/app/api/battles/[id]/accept/route.ts`, `src/lib/matches.ts` (`createBattleMatch`) — no new match/dispute/proof code, the Phase 3 engine handles it as-is |
+| P4-5 | Ranked ladder | `src/app/ladder/` |
+| P4-6 | Cancel open Battle | `src/app/api/battles/[id]/cancel/route.ts` |
 
 Not yet built: P1-3 (field locking — same Phase 2 dependency it always
 had), P1-4 (discovery list, P2 priority), P2-6 (prize payout — blocked on
