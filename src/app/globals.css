@@ -1,29 +1,32 @@
 @import "tailwindcss";
 
 /*
- * Design tokens — see docs/circuit-ui-references.md for the sourcing.
- * Brand green doubles as the "live" status color (Discord's presence-dot
- * idiom: a color that reads as real-time even backed by ordinary polling)
- * and nods at Nigeria-first positioning without being literal about it.
+ * Design tokens — see docs/circuit-ui-references.md for the original
+ * sourcing and the NEXA-reference rebuild notes for this palette. One
+ * deliberate always-dark theme (not OS-driven, no light mode) — every
+ * screen in the reference is dark, so Circuit commits to dark the same
+ * way Discord/Linear/most gaming platforms do, rather than toggling.
+ * Brand purple replaces the previous green; --status-live keeps green
+ * since it's now free of brand-collision and still reads as "active/go."
  */
 :root {
-  --background: #f6f7f8;
-  --surface: #ffffff;
-  --surface-hover: #eef0f2;
-  --border: rgba(15, 23, 32, 0.1);
-  --border-strong: rgba(15, 23, 32, 0.18);
-  --foreground: #14171c;
-  --muted: #5b6472;
+  --background: #0b0d10;
+  --surface: #14171c;
+  --surface-hover: #1b1f26;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --foreground: #f3f4f6;
+  --muted: #9199a6;
 
-  --brand: #10b981;
-  --brand-strong: #059669;
-  --brand-soft: rgba(16, 185, 129, 0.12);
+  --brand: #7c3aed;
+  --brand-strong: #6d28d9;
+  --brand-soft: rgba(124, 58, 237, 0.2);
   --brand-foreground: #ffffff;
 
   --status-live: #10b981;
   --status-open: #0ea5e9;
   --status-neutral: #6b7280;
-  --status-complete: #8b5cf6;
+  --status-complete: #14b8a6;
   --status-cancelled: #ef4444;
   --status-attention: #f59e0b;
 
@@ -59,46 +62,12 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0b0d10;
-    --surface: #14171c;
-    --surface-hover: #1b1f26;
-    --border: rgba(255, 255, 255, 0.08);
-    --border-strong: rgba(255, 255, 255, 0.16);
-    --foreground: #f3f4f6;
-    --muted: #9199a6;
-
-    --brand-soft: rgba(16, 185, 129, 0.16);
-  }
-}
-
-/*
- * Zone scoping — Linear's app shell is "always dark," not "dark when the
- * OS happens to be dark." One data-zone attribute reassigns the SAME
- * custom-property names @theme inline maps below, so component color
- * classes don't change, only the wrapping element's attribute does.
- * No [data-zone="marketing"] block needed — that zone IS the :root
- * default (light-first, OS-driven dark), left untouched.
- */
-[data-zone="dashboard"] {
-  --background: #0b0d10;
-  --surface: #121519;
-  --surface-hover: #191d23;
-  --border: rgba(255, 255, 255, 0.07);
-  --border-strong: rgba(255, 255, 255, 0.14);
-  --foreground: #e6e8eb;
-  --muted: #838d99;
-  --brand-soft: rgba(16, 185, 129, 0.14);
-  color-scheme: dark;
-}
-
 * {
   border-color: var(--border);
 }
 
 html {
-  color-scheme: light dark;
+  color-scheme: dark;
 }
 
 body {
@@ -106,7 +75,7 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   background-image:
-    radial-gradient(ellipse 900px 500px at 50% -10%, var(--brand-soft), transparent);
+    radial-gradient(ellipse 1100px 600px at 50% -10%, var(--brand-soft), transparent);
   background-repeat: no-repeat;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;

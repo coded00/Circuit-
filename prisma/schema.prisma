@@ -127,6 +127,7 @@ model User {
   notifications    Notification[]
   reportsFiled     Report[]          @relation("ReportFiledBy")
   reportsReceived  Report[]          @relation("ReportAgainstUser")
+  communityPosts   CommunityPost[]   @relation("CommunityPostAuthor")
 
   @@index([emailOrPhone])
 }
@@ -329,6 +330,26 @@ model Notification {
   createdAt DateTime  @default(now())
 
   @@index([userId, readAt])
+}
+
+/// Belongs to a User. New for the community-feed rebuild (not in the
+/// original PRD's requirement numbering) — a public, unmoderated-beyond-
+/// Report post feed. No likes/comments yet (deferred as a smaller,
+/// separately-scoped follow-up); no following/team scope (Friends/Teams
+/// tabs are UI-only "coming soon" until that's its own explicit decision,
+/// same treatment as Wallet/Marketplace/Rewards).
+model CommunityPost {
+  id        String   @id @default(cuid())
+  authorId  String
+  author    User     @relation("CommunityPostAuthor", fields: [authorId], references: [id])
+  /// Plain text, length-capped (see parseCommunityPostContent) — no rich
+  /// text, no image attachment (an attachment would need either the
+  /// private HMAC-signed proof storage repurposed for public reads, or a
+  /// second storage path — real scope this request didn't ask for).
+  content   String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
 }
 
 /// Belongs to a reported User. Maps to TRU-3.

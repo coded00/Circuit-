@@ -9,6 +9,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
+import { playerRankInGame } from "@/lib/standings";
 
 export default async function PlayerProfilePage({
   params,
@@ -39,6 +40,13 @@ export default async function PlayerProfilePage({
 
   const wins = matches.filter((m) => m.winnerId === player.id).length;
   const losses = matches.filter((m) => m.winnerId && m.winnerId !== player.id).length;
+  const played = wins + losses;
+  const winRate = played === 0 ? null : Math.round((wins / played) * 100);
+
+  const games = [...new Set(matches.map((m) => m.battle?.game).filter((g): g is string => Boolean(g)))];
+  const rankChips = (
+    await Promise.all(games.map(async (game) => ({ game, rank: await playerRankInGame(game, player.id) })))
+  ).filter((chip) => chip.rank !== null);
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-6 py-16">
@@ -68,16 +76,38 @@ export default async function PlayerProfilePage({
         </div>
       </div>
 
-      <div className="card flex gap-8">
-        <div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="card">
+          <div className="text-xs text-muted">Matches played</div>
+          <div className="font-mono text-lg font-semibold tabular-nums">{played}</div>
+        </div>
+        <div className="card">
+          <div className="text-xs text-muted">Win rate</div>
+          <div className="font-mono text-lg font-semibold tabular-nums">{winRate === null ? "—" : `${winRate}%`}</div>
+        </div>
+        <div className="card">
           <div className="text-xs text-muted">Wins</div>
           <div className="font-mono text-lg font-semibold tabular-nums text-brand">{wins}</div>
         </div>
-        <div>
+        <div className="card">
           <div className="text-xs text-muted">Losses</div>
           <div className="font-mono text-lg font-semibold tabular-nums">{losses}</div>
         </div>
       </div>
+
+      {rankChips.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {rankChips.map((chip) => (
+            <Link
+              key={chip.game}
+              href={`/ladder?game=${encodeURIComponent(chip.game)}`}
+              className="rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium transition hover:border-border-strong"
+            >
+              {chip.game} — Rank #{chip.rank}
+            </Link>
+          ))}
+        </div>
+      )}
 
       <div className="flex flex-col gap-2">
         <h2 className="text-lg font-semibold">Match history</h2>

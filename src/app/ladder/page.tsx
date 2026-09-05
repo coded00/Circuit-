@@ -8,8 +8,7 @@
 
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-
-type Standing = { userId: string; displayName: string; handle: string; wins: number; losses: number };
+import { gameStandings } from "@/lib/standings";
 
 export default async function LadderPage({
   searchParams,
@@ -48,41 +47,7 @@ export default async function LadderPage({
     );
   }
 
-  const matches = await prisma.match.findMany({
-    where: { status: "COMPLETE", battle: { game, status: "COMPLETE" } },
-    select: {
-      winnerId: true,
-      playerAId: true,
-      playerBId: true,
-      playerA: { select: { displayName: true, handle: true } },
-      playerB: { select: { displayName: true, handle: true } },
-    },
-  });
-
-  const standings = new Map<string, Standing>();
-  function ensure(userId: string, displayName: string, handle: string): Standing {
-    let s = standings.get(userId);
-    if (!s) {
-      s = { userId, displayName, handle, wins: 0, losses: 0 };
-      standings.set(userId, s);
-    }
-    return s;
-  }
-
-  for (const match of matches) {
-    if (!match.winnerId) continue; // shouldn't happen for COMPLETE, defensive
-    const a = ensure(match.playerAId, match.playerA.displayName, match.playerA.handle);
-    const b = ensure(match.playerBId, match.playerB.displayName, match.playerB.handle);
-    if (match.winnerId === match.playerAId) {
-      a.wins++;
-      b.losses++;
-    } else {
-      b.wins++;
-      a.losses++;
-    }
-  }
-
-  const ranked = [...standings.values()].sort((x, y) => y.wins - x.wins || x.losses - y.losses);
+  const ranked = await gameStandings(game);
 
   const medal = ["🥇", "🥈", "🥉"];
 

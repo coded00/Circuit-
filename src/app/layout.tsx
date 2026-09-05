@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { headers } from "next/headers";
 import "./globals.css";
-import SiteHeader from "./SiteHeader";
-import BottomTabBar from "./BottomTabBar";
+import { prisma } from "@/lib/db";
+import { getCurrentUser } from "@/lib/session";
+import { AppSidebar } from "@/components/nav/AppSidebar";
+import { TopBar } from "@/components/nav/TopBar";
+import { MobileTabBar } from "@/components/nav/MobileTabBar";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -21,28 +23,31 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const pathname = (await headers()).get("x-pathname") ?? "";
-  const inDashboard = pathname.startsWith("/dashboard");
+  const user = await getCurrentUser();
+  const disputeCount = user
+    ? await prisma.dispute.count({
+        where: {
+          status: { in: ["OPEN", "ORGANIZER_REVIEW"] },
+          match: { tournament: { organizerId: user.id } },
+        },
+      })
+    : 0;
+  const navUser = user ? { handle: user.handle, isStaff: user.isStaff } : null;
 
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      {/* data-zone on body itself, not just a nested wrapper — body's own
-          background/color in globals.css resolve var(--background)/
-          var(--foreground) at the body element, and plain inherited text
-          (no explicit text-* utility) inherits body's computed color, so
-          the zone override has to reach body directly or unstyled text
-          and the base page background stay stuck on the marketing zone's
-          light tokens even inside a dashboard-zone subtree. */}
-      <body
-        data-zone={inDashboard ? "dashboard" : undefined}
-        className="min-h-full flex flex-col pb-14 sm:pb-0"
-      >
-        <SiteHeader />
-        {children}
-        <BottomTabBar />
+      <body className="min-h-full pb-28 sm:pb-0">
+        <div className="mx-auto flex min-h-full w-full max-w-7xl">
+          <AppSidebar user={navUser} disputeCount={disputeCount} />
+          <div className="flex min-w-0 flex-1 flex-col">
+            <TopBar user={user} />
+            <main className="flex flex-1 flex-col">{children}</main>
+          </div>
+        </div>
+        <MobileTabBar user={navUser} />
       </body>
     </html>
   );

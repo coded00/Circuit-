@@ -1,7 +1,20 @@
 /**
  * Circuit — small shared request-body validators used by more than one
- * route (currently: Tournament and Battle's optional streamUrl).
+ * route (currently: Tournament and Battle's optional streamUrl, and the
+ * community feed's post content).
  */
+
+const COMMUNITY_POST_MAX_LENGTH = 500;
+
+/** Trims, rejects empty/non-string, caps length. No rich text, no
+ *  profanity filtering — a plain length cap matches this feed's
+ *  deliberately lightweight scope. */
+export function parseCommunityPostContent(value: unknown): { ok: true; content: string } | { ok: false } {
+  if (typeof value !== "string") return { ok: false };
+  const trimmed = value.trim();
+  if (trimmed.length === 0 || trimmed.length > COMMUNITY_POST_MAX_LENGTH) return { ok: false };
+  return { ok: true, content: trimmed };
+}
 
 /** Returns the trimmed URL if it's a well-formed http(s) URL, null if the
  *  field was empty/omitted, or throws-as-error-string via the caller's own

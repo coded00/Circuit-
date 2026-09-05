@@ -10,6 +10,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import Poller from "@/app/Poller";
 import { StatusPill } from "@/components/StatusPill";
+import { GameArtTile } from "@/components/GameArtTile";
 
 export default async function BattleBoardPage({
   searchParams,
@@ -56,8 +57,9 @@ export default async function BattleBoardPage({
       ) : (
         <div className="flex flex-col gap-3">
           {battles.map((battle) => (
-            <Link key={battle.id} href={`/battles/${battle.id}`} className="card-row flex items-center justify-between p-4">
-              <div className="flex flex-col gap-1">
+            <Link key={battle.id} href={`/battles/${battle.id}`} className="card-row flex items-center gap-3 p-3">
+              <GameArtTile game={battle.game} className="h-14 w-14 shrink-0 rounded-lg" />
+              <div className="flex flex-1 flex-col gap-1">
                 <span className="font-medium">{battle.game}</span>
                 <span className="text-muted">
                   {battle.format === "BEST_OF_3" ? "Best of 3" : "Single match"} · opened by{" "}
