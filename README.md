@@ -60,13 +60,20 @@ to the Build Plan's task IDs:
 | P4-4 | Accept → attach to Match/Dispute engine | `src/app/api/battles/[id]/accept/route.ts`, `src/lib/matches.ts` (`createBattleMatch`) — no new match/dispute/proof code, the Phase 3 engine handles it as-is |
 | P4-5 | Ranked ladder | `src/app/ladder/` |
 | P4-6 | Cancel open Battle | `src/app/api/battles/[id]/cancel/route.ts` |
+| P1-4 | Discovery — homepage rebuilt as a sectioned feed (Live Now / Starting Soon / Registration Open / Recently Finished / Open Battles), filterable by game, not a separate route | `src/app/page.tsx` |
+
+Also added, not in the original Build Plan: a lightweight `streamUrl`
+field on Tournament and Battle (link only, no embed, no live-status
+check — the PRD's actual "streaming build-out" is documented V2 scope,
+this is not that). Shown as a "📺 Watch stream" link on the tournament/
+Battle page and a 📺 badge on homepage cards.
 
 Not yet built: P1-3 (field locking — same Phase 2 dependency it always
-had), P1-4 (discovery list, P2 priority), P2-6 (prize payout — blocked on
-Phase 3's dispute-window state; now that Phase 3 exists this is the
-natural next slice), P2-7 (registrant/payment status view — feeds the
-Phase 5 dashboard), P3-10 (match history on profile — P2, no profile page
-exists yet), P6-3/P6-4 (abuse reporting, account suspension — P1).
+had), P2-6 (prize payout — blocked on Phase 3's dispute-window state;
+now that Phase 3 exists this is the natural next slice), P2-7
+(registrant/payment status view — feeds the Phase 5 dashboard), P3-10
+(match history on profile — P2, no profile page exists yet), P6-3/P6-4
+(abuse reporting, account suspension — P1).
 
 **Known gaps, called out rather than silently dropped** (see the relevant
 file's own comment for each):

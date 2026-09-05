@@ -47,6 +47,16 @@ export default async function BattlePage({
           {battle.format === "BEST_OF_3" ? "Best of 3" : "Single match"} ·{" "}
           {battle.visibility === "TARGETED" ? "Targeted challenge" : "Open to anyone"}
         </p>
+        {battle.streamUrl && (
+          <a
+            href={battle.streamUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="w-fit text-sm font-medium text-brand underline"
+          >
+            📺 Watch stream
+          </a>
+        )}
       </div>
 
       <div className="card text-sm text-muted">

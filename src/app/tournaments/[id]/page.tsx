@@ -74,6 +74,16 @@ export default async function TournamentPage({
               View bracket →
             </Link>
           )}
+          {tournament.streamUrl && (
+            <a
+              href={tournament.streamUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-sm font-medium text-brand underline"
+            >
+              📺 Watch stream
+            </a>
+          )}
         </div>
         <h1 className="text-3xl font-semibold tracking-tight">{tournament.name}</h1>
         <p className="text-muted">{tournament.game} · Single-elimination knockout</p>

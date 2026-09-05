@@ -10,6 +10,7 @@ export default function BattleForm() {
   const [format, setFormat] = useState<"SINGLE" | "BEST_OF_3">("SINGLE");
   const [visibility, setVisibility] = useState<"OPEN" | "TARGETED">("OPEN");
   const [targetHandle, setTargetHandle] = useState("");
+  const [streamUrl, setStreamUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -26,6 +27,7 @@ export default function BattleForm() {
         format,
         visibility,
         targetHandle: visibility === "TARGETED" ? targetHandle : undefined,
+        streamUrl: streamUrl || null,
       }),
     });
     const data = await res.json().catch(() => null);
@@ -107,6 +109,20 @@ export default function BattleForm() {
           />
         </div>
       )}
+
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="streamUrl" className="field-label">
+          Stream link (optional)
+        </label>
+        <input
+          id="streamUrl"
+          type="url"
+          placeholder="https://twitch.tv/yourchannel"
+          value={streamUrl}
+          onChange={(e) => setStreamUrl(e.target.value)}
+          className="field-input"
+        />
+      </div>
 
       {error && <p className="text-sm text-danger">{error}</p>}
 

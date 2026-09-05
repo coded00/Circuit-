@@ -150,6 +150,11 @@ model Tournament {
   prizeAmount         Int?
   prizeText           String?
   rulesText           String?
+  /// Just a link (Twitch/YouTube/anything) — no embed, no live-status
+  /// check. Full streaming integration is a documented V2 item (PRD's
+  /// Fraud & Trust backlog note on "live proctoring... bundled with the
+  /// streaming build-out"); this is the lightweight V1 slice of it.
+  streamUrl           String?
   participantCap      Int
   registrationOpenAt  DateTime
   registrationCloseAt DateTime
@@ -257,6 +262,9 @@ model Battle {
   /// Field exists so the ladder/stake model doesn't need a migration later,
   /// but D1/BTL-1 mean no V1 UI path may ever set this above zero.
   stakeAmount  Int              @default(0)
+  /// Same lightweight link-only field as Tournament.streamUrl — see that
+  /// field's comment.
+  streamUrl    String?
   status       BattleStatus     @default(OPEN)
   createdAt    DateTime         @default(now())
 

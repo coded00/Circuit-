@@ -11,6 +11,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
+import { parseOptionalUrl } from "@/lib/validation";
 
 const MAX_PARTICIPANT_CAP = 128; // D2: V1 bracket ceiling.
 
@@ -48,6 +49,7 @@ export async function POST(request: Request) {
   const registrationOpenAt = parseDate(body.registrationOpenAt);
   const registrationCloseAt = parseDate(body.registrationCloseAt);
   const startAt = parseDate(body.startAt);
+  const streamUrlResult = parseOptionalUrl(body.streamUrl);
 
   // TRN-1: all fields required except prize info.
   if (!name || !game || !rulesText) {
@@ -93,6 +95,12 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
+  if (!streamUrlResult.ok) {
+    return NextResponse.json(
+      { error: "Stream link must be a valid http(s) URL." },
+      { status: 400 }
+    );
+  }
 
   const organizerProfile = await prisma.organizerProfile.upsert({
     where: { userId: user.id },
@@ -115,6 +123,7 @@ export async function POST(request: Request) {
       registrationOpenAt,
       registrationCloseAt,
       startAt,
+      streamUrl: streamUrlResult.url,
       status,
     },
   });

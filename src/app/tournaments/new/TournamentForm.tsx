@@ -22,6 +22,7 @@ export default function TournamentForm() {
   const [prizeAmountNaira, setPrizeAmountNaira] = useState("");
   const [prizeText, setPrizeText] = useState("");
   const [rulesText, setRulesText] = useState("");
+  const [streamUrl, setStreamUrl] = useState("");
   const [registrationOpenAt, setRegistrationOpenAt] = useState("");
   const [registrationCloseAt, setRegistrationCloseAt] = useState("");
   const [startAt, setStartAt] = useState("");
@@ -44,6 +45,7 @@ export default function TournamentForm() {
         prizeAmount: prizeAmountNaira ? nairaToKobo(prizeAmountNaira) : null,
         prizeText: prizeText || null,
         rulesText,
+        streamUrl: streamUrl || null,
         registrationOpenAt: registrationOpenAt
           ? new Date(registrationOpenAt).toISOString()
           : null,
@@ -217,6 +219,21 @@ export default function TournamentForm() {
           onChange={(e) => setRulesText(e.target.value)}
           className={inputClass}
         />
+      </div>
+
+      <div className={fieldClass}>
+        <label htmlFor="streamUrl" className={labelClass}>
+          Stream link (optional)
+        </label>
+        <input
+          id="streamUrl"
+          type="url"
+          placeholder="https://twitch.tv/yourchannel"
+          value={streamUrl}
+          onChange={(e) => setStreamUrl(e.target.value)}
+          className={inputClass}
+        />
+        <span className="text-xs text-muted">Shown as a &quot;Watch stream&quot; link on the tournament page.</span>
       </div>
 
       {error && <p className="text-sm text-danger">{error}</p>}

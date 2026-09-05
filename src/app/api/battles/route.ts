@@ -10,6 +10,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { notify } from "@/lib/notifications";
+import { parseOptionalUrl } from "@/lib/validation";
 
 const VALID_FORMATS = ["SINGLE", "BEST_OF_3"];
 
@@ -31,6 +32,10 @@ export async function POST(request: Request) {
   }
   if (!VALID_FORMATS.includes(format)) {
     return NextResponse.json({ error: "Format must be a single match or best of three." }, { status: 400 });
+  }
+  const streamUrlResult = parseOptionalUrl(body?.streamUrl);
+  if (!streamUrlResult.ok) {
+    return NextResponse.json({ error: "Stream link must be a valid http(s) URL." }, { status: 400 });
   }
 
   let targetUserId: string | null = null;
@@ -58,6 +63,7 @@ export async function POST(request: Request) {
       format,
       visibility,
       targetUserId,
+      streamUrl: streamUrlResult.url,
     },
   });
 
