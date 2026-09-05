@@ -32,6 +32,12 @@
 
   --danger: #ef4444;
   --danger-strong: #dc2626;
+
+  /* Reserved for real prize pools/high-value rewards only — never a
+     general accent. Keeps purple's meaning (brand/CTA/active state)
+     uncluttered by also having to carry "money," per the NEXA design
+     brief's color-atmosphere rules. */
+  --gold: #eab308;
 }
 
 @theme inline {
@@ -57,6 +63,8 @@
 
   --color-danger: var(--danger);
   --color-danger-strong: var(--danger-strong);
+
+  --color-gold: var(--gold);
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);

@@ -51,6 +51,34 @@ function formatNaira(kobo: number): string {
   return `₦${(kobo / 100).toLocaleString("en-NG")}`;
 }
 
+/** Red is reserved for true LIVE/broadcast indicators and alerts per the
+ *  NEXA design brief — StatusPill's shared "live" tone stays green
+ *  elsewhere (Battles' "Open" status, etc. — a different, non-broadcast
+ *  meaning this pass doesn't touch), so this is a local, literal-LIVE-only
+ *  badge rather than a change to the shared component's semantics. */
+function LiveBadge() {
+  return (
+    <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-status-cancelled/15 px-2.5 py-1 text-xs font-medium text-status-cancelled">
+      <span className="relative flex h-1.5 w-1.5">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-current opacity-75" />
+        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-current" />
+      </span>
+      Live
+    </span>
+  );
+}
+
+function PrizeOrEntry({ tournament }: { tournament: TournamentCard }) {
+  if (tournament.prizeAmount) {
+    return <span className="font-mono text-sm font-bold tabular-nums text-gold">{formatNaira(tournament.prizeAmount)} prize</span>;
+  }
+  return (
+    <span className="font-mono text-sm font-bold tabular-nums text-brand">
+      {tournament.entryFee === 0 ? "Free entry" : `${formatNaira(tournament.entryFee)} entry`}
+    </span>
+  );
+}
+
 function TournamentGrid({ tournaments }: { tournaments: TournamentCard[] }) {
   return (
     <CardCarousel>
@@ -60,21 +88,21 @@ function TournamentGrid({ tournaments }: { tournaments: TournamentCard[] }) {
           <Link
             key={tournament.id}
             href={`/tournaments/${tournament.id}`}
-            className="flex w-64 shrink-0 snap-start flex-col gap-2 overflow-hidden rounded-xl border border-border transition hover:border-border-strong"
+            className="flex w-64 shrink-0 snap-start flex-col gap-2 overflow-hidden rounded-xl border border-border shadow-lg shadow-black/30 transition hover:border-border-strong"
           >
             <GameArtTile game={tournament.game} className="h-32 w-full">
               <span className="absolute top-2 right-2">
-                <StatusPill tone={status.tone} pulse={status.pulse}>
-                  {status.label}
-                </StatusPill>
+                {tournament.status === "LIVE" ? <LiveBadge /> : (
+                  <StatusPill tone={status.tone} pulse={status.pulse}>
+                    {status.label}
+                  </StatusPill>
+                )}
               </span>
             </GameArtTile>
             <div className="flex flex-col gap-1.5 bg-surface p-3">
               <span className="truncate font-semibold">{tournament.name}</span>
               <span className="truncate text-xs text-muted">{tournament.game}</span>
-              <span className="font-mono text-sm font-bold tabular-nums text-brand">
-                {tournament.prizeAmount ? `${formatNaira(tournament.prizeAmount)} prize` : formatNaira(tournament.entryFee) === "₦0" ? "Free entry" : `${formatNaira(tournament.entryFee)} entry`}
-              </span>
+              <PrizeOrEntry tournament={tournament} />
               <span className="flex items-center gap-1.5 text-xs text-muted">
                 <Calendar size={12} />
                 {formatCardDate(tournament.startAt)}
@@ -210,10 +238,26 @@ export default async function Home({
     <div className="flex w-full flex-1 flex-col gap-10 px-6 py-10">
       <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-10 lg:grid-cols-[1fr_320px]">
         <div className="flex flex-col gap-10">
-          {/* Hero — left-aligned copy over generated art, matching the
-              reference's banner (badge top, headline, subtext, two CTAs,
-              stacked corner tagline) */}
-          <GameArtTile game={nextTournament?.game ?? "Circuit"} className="flex min-h-72 w-full flex-col justify-between rounded-2xl p-8">
+          {/* Hero — left-aligned copy over a cinematic, mostly-dark
+              gradient with controlled purple glow (not GameArtTile's
+              bright per-game hash — this is Circuit's own brand
+              artwork, not tied to a specific game). Matches the
+              reference's "dark, atmospheric, premium" mood rather than
+              a bright poster. */}
+          <div
+            className="relative flex min-h-72 w-full flex-col justify-between overflow-hidden rounded-2xl p-8"
+            style={{
+              backgroundImage:
+                "radial-gradient(ellipse 650px 500px at 88% 20%, rgba(124,58,237,0.45), transparent 65%)," +
+                "radial-gradient(ellipse 450px 400px at 15% 90%, rgba(37,42,90,0.5), transparent 70%)," +
+                "linear-gradient(135deg, #0b0d10, #140f1f 55%, #1a0f24)",
+            }}
+          >
+            <div
+              aria-hidden
+              className="absolute inset-0 opacity-[0.05]"
+              style={{ backgroundImage: "repeating-linear-gradient(45deg, #fff 0 2px, transparent 2px 40px)" }}
+            />
             <div className="relative z-10 flex flex-col items-start gap-4">
               <LiveCounter label="competing right now" count={liveTournamentCount} />
               <h1 className="max-w-md text-4xl leading-[1.05] font-bold tracking-tight text-white sm:text-5xl">
@@ -252,7 +296,7 @@ export default async function Home({
               <br />
               tournaments
             </span>
-          </GameArtTile>
+          </div>
 
           <ConnectAccountsRow />
 
@@ -315,7 +359,7 @@ export default async function Home({
                       <Link
                         key={battle.id}
                         href={`/battles/${battle.id}`}
-                        className="flex w-64 shrink-0 snap-start flex-col gap-2 overflow-hidden rounded-xl border border-border transition hover:border-border-strong"
+                        className="flex w-64 shrink-0 snap-start flex-col gap-2 overflow-hidden rounded-xl border border-border shadow-lg shadow-black/30 transition hover:border-border-strong"
                       >
                         <GameArtTile game={battle.game} className="h-28 w-full">
                           <span className="absolute top-2 right-2">
@@ -354,13 +398,19 @@ export default async function Home({
               </div>
               <Link
                 href={`/tournaments/${nextTournament.id}`}
-                className="flex flex-col overflow-hidden rounded-xl border border-border transition hover:border-border-strong"
+                className="flex flex-col overflow-hidden rounded-xl border border-border shadow-lg shadow-black/30 transition hover:border-border-strong"
               >
-                <GameArtTile game={nextTournament.game} className="h-32 w-full" />
+                <GameArtTile game={nextTournament.game} className="h-32 w-full">
+                  {nextTournament.status === "LIVE" && (
+                    <span className="absolute top-2 right-2">
+                      <LiveBadge />
+                    </span>
+                  )}
+                </GameArtTile>
                 <div className="flex flex-col gap-2 bg-surface p-4">
                   <span className="font-semibold">{nextTournament.name}</span>
                   <div>
-                    <div className="font-mono text-2xl font-bold tabular-nums text-brand">
+                    <div className={`font-mono text-2xl font-bold tabular-nums ${nextTournament.prizeAmount ? "text-gold" : "text-brand"}`}>
                       {nextTournament.prizeAmount ? formatNaira(nextTournament.prizeAmount) : formatNaira(nextTournament.entryFee)}
                     </div>
                     <div className="text-xs text-muted">
@@ -386,12 +436,10 @@ export default async function Home({
               <h2 className="text-xs font-bold tracking-widest text-muted uppercase">Live Now</h2>
               <div className="grid grid-cols-2 gap-3">
                 {liveNow.map((t) => (
-                  <Link key={t.id} href={`/tournaments/${t.id}`} className="overflow-hidden rounded-xl border border-border">
+                  <Link key={t.id} href={`/tournaments/${t.id}`} className="overflow-hidden rounded-xl border border-border shadow-lg shadow-black/30">
                     <GameArtTile game={t.game} className="h-24 w-full">
                       <span className="absolute top-1.5 left-1.5">
-                        <StatusPill tone="live" pulse size="sm">
-                          Live
-                        </StatusPill>
+                        <LiveBadge />
                       </span>
                       <span className="absolute right-1.5 bottom-6 left-1.5 truncate text-[10px] text-white/90">
                         {t._count.registrations}/{t.participantCap} players
