@@ -32,7 +32,7 @@ export default async function BattleBoardPage({
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-6 py-16">
       <Poller />
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Open Battles</h1>
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Open Battles</h1>
         <Link href="/battles/new" className="btn-primary">
           Open a Battle
         </Link>
@@ -56,11 +56,7 @@ export default async function BattleBoardPage({
       ) : (
         <div className="flex flex-col gap-3">
           {battles.map((battle) => (
-            <Link
-              key={battle.id}
-              href={`/battles/${battle.id}`}
-              className="flex items-center justify-between rounded-xl border border-border bg-surface p-4 text-sm transition hover:border-border-strong hover:bg-surface-hover"
-            >
+            <Link key={battle.id} href={`/battles/${battle.id}`} className="card-row flex items-center justify-between p-4">
               <div className="flex flex-col gap-1">
                 <span className="font-medium">{battle.game}</span>
                 <span className="text-muted">

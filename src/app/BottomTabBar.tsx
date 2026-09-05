@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { getCurrentUser } from "@/lib/session";
 
 /**
@@ -9,10 +10,14 @@ import { getCurrentUser } from "@/lib/session";
  * `sm:hidden` — one component set, reflowed, not a second build.
  */
 export default async function BottomTabBar() {
-  const user = await getCurrentUser();
+  const [user, pathname] = await Promise.all([getCurrentUser(), headers().then((h) => h.get("x-pathname") ?? "")]);
+  const inDashboard = pathname.startsWith("/dashboard");
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-10 flex border-t border-border bg-background/95 backdrop-blur-md sm:hidden">
+    <nav
+      data-zone={inDashboard ? "dashboard" : undefined}
+      className="fixed inset-x-0 bottom-0 z-10 flex border-t border-border bg-background/95 backdrop-blur-md sm:hidden"
+    >
       <Link href="/" className="flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs text-muted">
         <span className="text-base">🏠</span>
         Home

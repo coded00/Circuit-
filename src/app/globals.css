@@ -73,6 +73,26 @@
   }
 }
 
+/*
+ * Zone scoping — Linear's app shell is "always dark," not "dark when the
+ * OS happens to be dark." One data-zone attribute reassigns the SAME
+ * custom-property names @theme inline maps below, so component color
+ * classes don't change, only the wrapping element's attribute does.
+ * No [data-zone="marketing"] block needed — that zone IS the :root
+ * default (light-first, OS-driven dark), left untouched.
+ */
+[data-zone="dashboard"] {
+  --background: #0b0d10;
+  --surface: #121519;
+  --surface-hover: #191d23;
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  --foreground: #e6e8eb;
+  --muted: #838d99;
+  --brand-soft: rgba(16, 185, 129, 0.14);
+  color-scheme: dark;
+}
+
 * {
   border-color: var(--border);
 }
@@ -144,5 +164,14 @@ body {
 
   .card {
     @apply rounded-xl border border-border bg-surface p-5;
+  }
+
+  /* The recurring "bordered surface row" — every list item across the
+     battle board, ladder, player profile, dashboard kanban/lists, and
+     staff queues was hand-repeating this. Padding/flex/gap stay
+     per-call-site since they genuinely differ. */
+  .card-row {
+    @apply rounded-xl border border-border bg-surface text-sm
+      transition hover:border-border-strong hover:bg-surface-hover;
   }
 }

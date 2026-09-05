@@ -98,7 +98,7 @@ export default async function TournamentPage({
             </a>
           )}
         </div>
-        <h1 className="text-3xl font-semibold tracking-tight">{tournament.name}</h1>
+        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">{tournament.name}</h1>
         <p className="text-muted">{tournament.game} · Single-elimination knockout</p>
       </div>
 

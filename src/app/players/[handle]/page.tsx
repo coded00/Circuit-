@@ -57,7 +57,7 @@ export default async function PlayerProfilePage({
         )}
         <div className="flex flex-1 items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold">{player.displayName}</h1>
+            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{player.displayName}</h1>
             <p className="text-muted">@{player.handle}</p>
           </div>
           {viewer && viewer.id !== player.id && (
@@ -71,11 +71,11 @@ export default async function PlayerProfilePage({
       <div className="card flex gap-8">
         <div>
           <div className="text-xs text-muted">Wins</div>
-          <div className="text-lg font-semibold text-brand">{wins}</div>
+          <div className="font-mono text-lg font-semibold tabular-nums text-brand">{wins}</div>
         </div>
         <div>
           <div className="text-xs text-muted">Losses</div>
-          <div className="text-lg font-semibold">{losses}</div>
+          <div className="font-mono text-lg font-semibold tabular-nums">{losses}</div>
         </div>
       </div>
 
@@ -90,11 +90,7 @@ export default async function PlayerProfilePage({
               const won = match.winnerId === player.id;
               const voided = !match.winnerId;
               return (
-                <a
-                  key={match.id}
-                  href={`/matches/${match.id}`}
-                  className="flex items-center justify-between rounded-xl border border-border bg-surface p-3 text-sm transition hover:border-border-strong hover:bg-surface-hover"
-                >
+                <a key={match.id} href={`/matches/${match.id}`} className="card-row flex items-center justify-between p-3">
                   <span>
                     {match.tournament?.name ?? `Battle · ${match.battle?.game}`} vs{" "}
                     {opponent.displayName}

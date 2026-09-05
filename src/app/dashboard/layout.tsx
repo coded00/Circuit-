@@ -24,7 +24,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   });
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col sm:flex-row">
+    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col sm:flex-row" data-zone="dashboard">
       <aside className="hidden w-52 shrink-0 border-r border-border px-3 py-8 sm:block">
         <DashboardNav disputeCount={disputeCount} orientation="vertical" />
       </aside>

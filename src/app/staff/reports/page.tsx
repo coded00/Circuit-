@@ -40,7 +40,7 @@ export default async function StaffReportsPage() {
       ) : (
         <div className="flex flex-col gap-3">
           {reports.map((report) => (
-            <div key={report.id} className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4">
+            <div key={report.id} className="card-row flex flex-col gap-3 p-4">
               <div className="flex items-center justify-between">
                 <Link href={`/players/${report.reportedUser.handle}`} className="font-medium hover:underline">
                   {report.reportedUser.displayName} (@{report.reportedUser.handle})

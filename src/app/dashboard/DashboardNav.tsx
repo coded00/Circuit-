@@ -29,18 +29,21 @@ export function DashboardNav({
     >
       {ITEMS.map((item) => {
         const active = item.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(item.href);
+        const activeBorder = orientation === "vertical" ? "border-l-2" : "border-b-2";
         return (
           <Link
             key={item.href}
             href={item.href}
-            className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${
-              active ? "bg-brand-soft text-brand" : "text-muted hover:bg-surface-hover hover:text-foreground"
+            className={`flex shrink-0 items-center gap-2 px-3 py-2 text-sm font-medium transition ${activeBorder} ${
+              active
+                ? "border-brand bg-brand-soft/40 text-foreground"
+                : "border-transparent text-muted hover:bg-surface-hover hover:text-foreground"
             }`}
           >
             <span>{item.icon}</span>
             {item.label}
             {item.href === "/dashboard/disputes" && disputeCount > 0 && (
-              <span className="ml-auto rounded-full bg-status-cancelled/15 px-1.5 py-0.5 text-xs font-semibold text-status-cancelled">
+              <span className="ml-auto rounded-full bg-status-cancelled/15 px-1.5 py-0.5 font-mono text-xs font-semibold tabular-nums text-status-cancelled">
                 {disputeCount}
               </span>
             )}

@@ -15,18 +15,25 @@ const TONE_CLASSES: Record<StatusTone, string> = {
   attention: "bg-status-attention/15 text-status-attention",
 };
 
+const SIZE_CLASSES = {
+  sm: "px-2.5 py-1 text-xs",
+  md: "px-4 py-2 text-sm",
+} as const;
+
 export function StatusPill({
   tone,
   children,
   pulse = false,
+  size = "sm",
 }: {
   tone: StatusTone;
   children: React.ReactNode;
   pulse?: boolean;
+  size?: "sm" | "md";
 }) {
   return (
     <span
-      className={`inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap ${TONE_CLASSES[tone]}`}
+      className={`inline-flex w-fit items-center gap-1.5 rounded-full font-medium whitespace-nowrap ${SIZE_CLASSES[size]} ${TONE_CLASSES[tone]}`}
     >
       {pulse && (
         <span className="relative flex h-1.5 w-1.5">

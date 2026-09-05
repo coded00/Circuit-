@@ -38,11 +38,7 @@ export default async function DashboardDisputesPage() {
       ) : (
         <div className="flex flex-col gap-3">
           {disputes.map((dispute) => (
-            <Link
-              key={dispute.id}
-              href={`/matches/${dispute.matchId}`}
-              className="flex items-center justify-between rounded-xl border border-border bg-surface p-4 text-sm transition hover:border-border-strong hover:bg-surface-hover"
-            >
+            <Link key={dispute.id} href={`/matches/${dispute.matchId}`} className="card-row flex items-center justify-between p-4">
               <div className="flex flex-col gap-1">
                 <span className="font-medium">{dispute.match.tournament?.name}</span>
                 <span className="text-muted">

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import Poller from "@/app/Poller";
+import { StatusPill } from "@/components/StatusPill";
 
 type BracketSlot = {
   position: number;
@@ -67,18 +68,18 @@ export default async function BracketPage({
         <Link href={`/tournaments/${id}`} className="w-fit text-sm text-muted hover:text-foreground">
           ← {tournament.name}
         </Link>
-        <h1 className="text-2xl font-semibold">Bracket</h1>
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Bracket</h1>
         {champion && (
-          <div className="flex w-fit items-center gap-2 rounded-full border border-status-complete/30 bg-status-complete/10 px-4 py-2 text-sm font-medium text-status-complete">
+          <StatusPill tone="complete" size="md">
             🏆 Champion: {label(champion)}
-          </div>
+          </StatusPill>
         )}
       </div>
 
       <div className="flex gap-6 overflow-x-auto pb-4">
         {structure.rounds.map((round) => (
           <div key={round.round} className="flex min-w-[240px] flex-col gap-4">
-            <h2 className="text-xs font-semibold tracking-wide text-muted uppercase">
+            <h2 className="text-xs font-semibold tracking-widest text-muted uppercase">
               {round.round === structure.totalRounds ? "Final" : `Round ${round.round}`}
             </h2>
             <div className="flex flex-1 flex-col justify-around gap-4">

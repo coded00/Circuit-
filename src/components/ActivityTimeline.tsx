@@ -29,7 +29,7 @@ export function ActivityTimeline({ events }: { events: TimelineEvent[] }) {
           <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-border-strong" />
           <div className="flex flex-1 flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
             <span>{event.label}</span>
-            <span className="shrink-0 text-xs text-muted">{formatTimestamp(event.at)}</span>
+            <span className="shrink-0 font-mono text-xs tabular-nums text-muted">{formatTimestamp(event.at)}</span>
           </div>
         </li>
       ))}

@@ -60,11 +60,7 @@ export default async function StaffDisputeQueuePage() {
       ) : (
         <div className="flex flex-col gap-3">
           {disputes.map((dispute) => (
-            <Link
-              key={dispute.id}
-              href={`/matches/${dispute.matchId}`}
-              className="flex flex-col gap-1 rounded-xl border border-border bg-surface p-4 transition hover:border-border-strong hover:bg-surface-hover"
-            >
+            <Link key={dispute.id} href={`/matches/${dispute.matchId}`} className="card-row flex flex-col gap-1 p-4">
               <div className="flex items-center justify-between">
                 <span className="font-medium">
                   {dispute.match.tournament?.name ?? `Battle (${dispute.match.battle?.game})`}

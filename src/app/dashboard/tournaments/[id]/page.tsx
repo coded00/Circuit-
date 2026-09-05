@@ -98,11 +98,11 @@ export default async function DashboardTournamentDetailPage({
       <section className="card grid grid-cols-3 gap-4">
         <div>
           <div className="text-xs text-muted">Entry fees collected</div>
-          <div className="font-medium">{formatNaira(collected)}</div>
+          <div className="font-mono font-medium tabular-nums">{formatNaira(collected)}</div>
         </div>
         <div>
           <div className="text-xs text-muted">Refunded</div>
-          <div className="font-medium">{formatNaira(refunded)}</div>
+          <div className="font-mono font-medium tabular-nums">{formatNaira(refunded)}</div>
         </div>
         <div>
           <div className="text-xs text-muted">Prize payout</div>
@@ -128,7 +128,9 @@ export default async function DashboardTournamentDetailPage({
 
       <section className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Registrants ({registrations.length})</h2>
+          <h2 className="text-lg font-semibold">
+            Registrants (<span className="font-mono tabular-nums">{registrations.length}</span>)
+          </h2>
           {registrations.length > 0 && (
             <a href={`/api/tournaments/${id}/registrants.csv`} className="text-sm font-medium text-brand underline">
               Export CSV

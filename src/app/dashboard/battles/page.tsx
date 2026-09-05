@@ -32,11 +32,7 @@ export default async function DashboardBattlesPage() {
           {battles.map((battle) => {
             const status = battleStatusInfo(battle.status);
             return (
-              <Link
-                key={battle.id}
-                href={`/battles/${battle.id}`}
-                className="flex items-center justify-between rounded-xl border border-border bg-surface p-4 text-sm transition hover:border-border-strong hover:bg-surface-hover"
-              >
+              <Link key={battle.id} href={`/battles/${battle.id}`} className="card-row flex items-center justify-between p-4">
                 <div className="flex flex-col gap-1">
                   <span className="font-medium">{battle.game}</span>
                   <span className="text-muted">

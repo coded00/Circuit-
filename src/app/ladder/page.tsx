@@ -28,7 +28,7 @@ export default async function LadderPage({
   if (!game) {
     return (
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-6 py-16">
-        <h1 className="text-2xl font-semibold">Ladders</h1>
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Ladders</h1>
         {games.length === 0 ? (
           <p className="card text-center text-muted">No completed Battles yet.</p>
         ) : (
@@ -37,7 +37,7 @@ export default async function LadderPage({
               <Link
                 key={g.game}
                 href={`/ladder?game=${encodeURIComponent(g.game)}`}
-                className="rounded-xl border border-border bg-surface px-4 py-3 font-medium transition hover:border-border-strong hover:bg-surface-hover"
+                className="card-row px-4 py-3 font-medium"
               >
                 {g.game}
               </Link>
@@ -92,7 +92,7 @@ export default async function LadderPage({
         <Link href="/ladder" className="w-fit text-xs text-muted hover:text-foreground">
           ← All games
         </Link>
-        <h1 className="text-2xl font-semibold">{game} ladder</h1>
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{game} ladder</h1>
       </div>
 
       {ranked.length === 0 ? (
@@ -115,8 +115,8 @@ export default async function LadderPage({
                   <td className="px-4 py-3 font-medium">
                     {s.displayName} <span className="text-muted">(@{s.handle})</span>
                   </td>
-                  <td className="px-4 py-3 text-right text-brand">{s.wins}</td>
-                  <td className="px-4 py-3 text-right text-muted">{s.losses}</td>
+                  <td className="px-4 py-3 text-right font-mono text-brand tabular-nums">{s.wins}</td>
+                  <td className="px-4 py-3 text-right font-mono text-muted tabular-nums">{s.losses}</td>
                 </tr>
               ))}
             </tbody>

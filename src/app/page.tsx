@@ -36,11 +36,7 @@ function TournamentGrid({ tournaments }: { tournaments: TournamentCard[] }) {
       {tournaments.map((tournament) => {
         const status = tournamentStatusInfo(tournament.status);
         return (
-          <Link
-            key={tournament.id}
-            href={`/tournaments/${tournament.id}`}
-            className="flex flex-col gap-2 rounded-xl border border-border bg-surface p-4 transition hover:border-border-strong hover:bg-surface-hover"
-          >
+          <Link key={tournament.id} href={`/tournaments/${tournament.id}`} className="card-row flex flex-col gap-2 p-4">
             <div className="flex items-center justify-between gap-2">
               <span className="truncate text-xs font-medium text-muted">{tournament.game}</span>
               <StatusPill tone={status.tone} pulse={status.pulse}>
@@ -75,7 +71,7 @@ function Section({
   if (count === 0) return null;
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-lg font-semibold">{title}</h2>
+      <h2 className="text-xs font-bold tracking-widest text-muted uppercase">{title}</h2>
       {children}
     </section>
   );
@@ -158,7 +154,7 @@ export default async function Home({
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-10 px-6 py-10">
       <div className="flex flex-col items-center gap-4 py-6 text-center">
         <LiveCounter label="competing right now" count={liveTournamentCount} />
-        <h1 className="max-w-xl text-3xl font-semibold tracking-tight text-balance">
+        <h1 className="max-w-xl text-4xl font-bold tracking-tight text-balance sm:text-5xl">
           Find a tournament. <span className="text-brand">Skip the WhatsApp chaos.</span>
         </h1>
         {!user && (
@@ -226,7 +222,7 @@ export default async function Home({
           {battles.length > 0 && (
             <section className="flex flex-col gap-4">
               <div className="flex items-baseline justify-between">
-                <h2 className="text-lg font-semibold">⚔️ Open Battles</h2>
+                <h2 className="text-xs font-bold tracking-widest text-muted uppercase">⚔️ Open Battles</h2>
                 <LiveCounter
                   label={openBattleCount === 1 ? "open Battle" : "open Battles"}
                   count={openBattleCount}
@@ -234,11 +230,7 @@ export default async function Home({
               </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {battles.map((battle) => (
-                  <Link
-                    key={battle.id}
-                    href={`/battles/${battle.id}`}
-                    className="flex flex-col gap-2 rounded-xl border border-border bg-surface p-4 transition hover:border-border-strong hover:bg-surface-hover"
-                  >
+                  <Link key={battle.id} href={`/battles/${battle.id}`} className="card-row flex flex-col gap-2 p-4">
                     <div className="flex items-center justify-between gap-2">
                       <span className="truncate text-xs font-medium text-muted">{battle.game}</span>
                       <StatusPill tone="live" pulse>
