@@ -67,14 +67,15 @@ IDs:
 | P3-10/ACC-6 | Public player profile + match history (tournament + Battle) | `src/app/players/[handle]/page.tsx` |
 | P2-6 | Prize payout release, age-gated | `src/app/api/tournaments/[id]/payout/route.ts` — "final match clears its dispute window" is just `Tournament.status === COMPLETE`, see that route's own comment |
 | — | **ACC-3's age gate is now actually wired up** — it existed since Phase 0 but nothing ever called it. Now gates paid registration and prize payout claim; never free registration or browsing (TRU-5) |
-| P5-1 | Organizer dashboard — every tournament the user organizes, live status, registrant count, disputes-need-ruling badge | `src/app/dashboard/page.tsx` |
-| P5-2 | Per-tournament manage view — registrants + payment status, bracket state, disputes surfaced above the fold | `src/app/tournaments/[id]/manage/page.tsx` — this is P2-7 too, not a separate build |
+| P5-1 | Organizer dashboard — sidebar + detail-panel shell (Linear pattern), kanban board of every tournament the user organizes grouped by status | `src/app/dashboard/layout.tsx`, `DashboardNav.tsx`, `src/app/dashboard/page.tsx` |
+| P5-2 | Per-tournament manage view — registrants + payment status, bracket state, disputes surfaced above the fold | `src/app/dashboard/tournaments/[id]/page.tsx` — this is P2-7 too, not a separate build. Moved here from `/tournaments/[id]/manage` in the UI rework below; the sidebar shell replaces that route's own page chrome |
 | P5-3 | Dispute-ruling notification | already existed as a side effect of Phase 3's `openDispute()` — `notify(organizerId, "DISPUTE_NEEDS_RULING", ...)` |
 | P5-4 | Escrow visibility (read-only fees collected/refunded/payout status) | same manage view — no dashboard action can release escrow itself, matching ORG-4 |
 | P6-3 | Abuse reporting (reason code + optional evidence upload) | `src/app/players/[handle]/report/`, `src/app/api/reports/route.ts` |
 | P6-4 | Account suspension (blocks register/pay/accept-Battle; visible to the affected user) | `src/app/staff/reports/`, `src/app/api/staff/users/[id]/{suspend,unsuspend}/route.ts`, suspension check in the registrations and Battle-accept routes |
 | P5-5 | Registrant CSV export | `src/app/api/tournaments/[id]/registrants.csv/route.ts` |
 | — | **Phase 7 audit**: 3 of 9 `NotificationType`s had never actually fired (`TOURNAMENT_CANCELLED`, `REGISTRATION_CAP_FILLED`, `REGISTRATION_CLOSED`) despite the pipeline existing since P0-6. Wired up all three — cancellation now notifies every registrant, not just the ones getting refunded. |
+| — | **UI rework**: the first design pass against `docs/circuit-ui-references.md` skipped its three most structural patterns. Added: the dashboard sidebar+panel shell above; `ActivityTimeline` (`src/components/ActivityTimeline.tsx`) on the match page, a chronological log of submissions/disputes/rulings; `/dashboard/disputes` and `/dashboard/payouts` as dedicated cross-tournament views (previously only visible per-tournament); `/dashboard/battles` for the organizer's own Battles. Also fixed two smaller doc gaps: homepage discovery cards were missing their start date, and auth screens had no visual weight tier between the primary submit button and the secondary link (`.btn-ghost` in `globals.css`). |
 
 Also added, not in the original Build Plan: a lightweight `streamUrl`
 field on Tournament and Battle (link only, no embed, no live-status
@@ -152,7 +153,16 @@ shareable public page at `/tournaments/[id]`.
   never `zinc-*` or `black/white` opacity classes — see
   `docs/circuit-ui-references.md` for where each pattern came from.
   Shared primitives: `.field-input`/`.field-label`/`.btn-primary`/
-  `.btn-secondary`/`.btn-danger`/`.card` (global CSS classes) and
-  `<StatusPill>`/`<OptionCard>`/`<LiveCounter>` (`src/components/`). Mobile
-  nav is `BottomTabBar` (`sm:hidden`), not a squeezed copy of
-  `SiteHeader`'s desktop nav — reflow into it, don't add a third nav.
+  `.btn-secondary`/`.btn-ghost`/`.btn-danger`/`.card` (global CSS classes)
+  and `<StatusPill>`/`<OptionCard>`/`<LiveCounter>`/`<ActivityTimeline>`
+  (`src/components/`). `.btn-ghost` is the lowest-emphasis tier (Pinterest's
+  stacked-pill pattern) — use it for a screen's secondary action, never as a
+  `.btn-secondary` substitute. Mobile nav is `BottomTabBar` (`sm:hidden`),
+  not a squeezed copy of `SiteHeader`'s desktop nav — reflow into it, don't
+  add a third nav.
+- **The organizer dashboard is a sidebar + detail-panel shell
+  (`src/app/dashboard/layout.tsx`), not a flat page per tournament.** Add a
+  new organizer-facing view under `src/app/dashboard/`, not back under
+  `/tournaments/[id]/`; the old `/tournaments/[id]/manage` route was deleted
+  in the UI rework and its content lives at
+  `src/app/dashboard/tournaments/[id]/page.tsx` now.
