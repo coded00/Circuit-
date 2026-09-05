@@ -70,12 +70,9 @@ export default function LoginForm() {
       <button type="submit" disabled={submitting} className="btn-primary w-full">
         {submitting ? "Logging in…" : "Log in"}
       </button>
-      <p className="text-center text-sm text-muted">
-        Need an account?{" "}
-        <Link href={`/signup?next=${encodeURIComponent(next)}`} className="font-medium text-brand underline">
-          Sign up
-        </Link>
-      </p>
+      <Link href={`/signup?next=${encodeURIComponent(next)}`} className="btn-ghost w-full">
+        Need an account? Sign up
+      </Link>
     </form>
   );
 }

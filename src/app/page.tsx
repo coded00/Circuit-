@@ -23,7 +23,12 @@ type TournamentCard = {
   entryFee: number;
   participantCap: number;
   streamUrl: string | null;
+  startAt: Date;
 };
+
+function formatCardDate(date: Date): string {
+  return date.toLocaleString("en-NG", { dateStyle: "medium", timeStyle: "short" });
+}
 
 function TournamentGrid({ tournaments }: { tournaments: TournamentCard[] }) {
   return (
@@ -43,6 +48,7 @@ function TournamentGrid({ tournaments }: { tournaments: TournamentCard[] }) {
               </StatusPill>
             </div>
             <span className="font-medium">{tournament.name}</span>
+            <span className="text-xs text-muted">{formatCardDate(tournament.startAt)}</span>
             <span className="text-xs text-muted">
               {tournament.entryFee === 0
                 ? "Free entry"
@@ -93,6 +99,7 @@ export default async function Home({
     entryFee: true,
     participantCap: true,
     streamUrl: true,
+    startAt: true,
   } as const;
 
   const [

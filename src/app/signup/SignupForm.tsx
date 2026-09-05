@@ -72,12 +72,9 @@ export default function SignupForm() {
       <button type="submit" disabled={submitting} className="btn-primary w-full">
         {submitting ? "Creating account…" : "Create account"}
       </button>
-      <p className="text-center text-sm text-muted">
-        Already have an account?{" "}
-        <Link href={`/login?next=${encodeURIComponent(next)}`} className="font-medium text-brand underline">
-          Log in
-        </Link>
-      </p>
+      <Link href={`/login?next=${encodeURIComponent(next)}`} className="btn-ghost w-full">
+        I already have an account
+      </Link>
     </form>
   );
 }

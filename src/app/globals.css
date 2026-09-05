@@ -126,6 +126,16 @@ body {
       disabled:cursor-not-allowed disabled:opacity-50;
   }
 
+  /* Third visual weight for stacked-pill screens (docs/circuit-ui-references.md:
+     Pinterest's auth pattern — solid/bordered/light-grey signaling
+     primary/secondary/tertiary at a glance). No border at all, unlike
+     .btn-secondary — the lowest-emphasis tier. */
+  .btn-ghost {
+    @apply inline-flex items-center justify-center rounded-full bg-surface-hover px-5 py-2.5
+      text-sm font-medium text-muted transition hover:text-foreground
+      disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
   .btn-danger {
     @apply inline-flex items-center justify-center rounded-full border border-danger/40
       px-5 py-2.5 text-sm font-medium text-danger transition hover:bg-danger/10

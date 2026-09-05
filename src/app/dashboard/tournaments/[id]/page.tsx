@@ -1,21 +1,21 @@
 /**
- * Circuit — per-tournament organizer view (Build Plan P5-2 + P5-4, maps:
- * ORG-2, REG-7, ORG-4). Registrant list with payment status, bracket
- * state, escrow visibility, and any open disputes — surfaced above the
- * fold per P5-2's own acceptance criteria, not buried at the bottom.
+ * Circuit — tournament detail panel (Build Plan P5-2 + P5-4, maps: ORG-2,
+ * REG-7, ORG-4). This is the "detail panel" half of the dashboard's
+ * sidebar-plus-detail-panel shell (docs/circuit-ui-references.md, Linear)
+ * — it renders inside src/app/dashboard/layout.tsx, sidebar always visible.
  */
 
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
-import { StatusPill, registrationStatusInfo } from "@/components/StatusPill";
+import { StatusPill, registrationStatusInfo, tournamentStatusInfo } from "@/components/StatusPill";
 
 function formatNaira(kobo: number): string {
   return `₦${(kobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 0 })}`;
 }
 
-export default async function ManageTournamentPage({
+export default async function DashboardTournamentDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
@@ -23,7 +23,7 @@ export default async function ManageTournamentPage({
   const { id } = await params;
   const user = await getCurrentUser();
   if (!user) {
-    redirect(`/login?next=${encodeURIComponent(`/tournaments/${id}/manage`)}`);
+    redirect(`/login?next=${encodeURIComponent(`/dashboard/tournaments/${id}`)}`);
   }
 
   const tournament = await prisma.tournament.findUnique({ where: { id } });
@@ -56,21 +56,25 @@ export default async function ManageTournamentPage({
   const collected = escrowTxns
     .filter((t) => t.type === "ENTRY_FEE" && t.status === "COMPLETE")
     .reduce((sum, t) => sum + t.amount, 0);
-  const refunded = escrowTxns
-    .filter((t) => t.type === "REFUND")
-    .reduce((sum, t) => sum + t.amount, 0);
+  const refunded = escrowTxns.filter((t) => t.type === "REFUND").reduce((sum, t) => sum + t.amount, 0);
   const payout = escrowTxns.find((t) => t.type === "PRIZE_PAYOUT");
+  const status = tournamentStatusInfo(tournament.status);
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-6 py-16">
-      <div className="flex flex-col gap-1">
-        <Link href="/dashboard" className="w-fit text-xs text-muted hover:text-foreground">
-          ← Your tournaments
-        </Link>
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-2">
+        <StatusPill tone={status.tone} pulse={status.pulse}>
+          {status.label}
+        </StatusPill>
         <h1 className="text-2xl font-semibold">{tournament.name}</h1>
-        <Link href={`/tournaments/${id}`} className="w-fit text-sm text-brand underline">
-          View public page →
-        </Link>
+        <div className="flex gap-3">
+          <Link href={`/tournaments/${id}`} className="text-sm font-medium text-brand underline">
+            Public page →
+          </Link>
+          <Link href={`/tournaments/${id}/edit`} className="text-sm font-medium text-brand underline">
+            Edit →
+          </Link>
+        </div>
       </div>
 
       {openDisputes.length > 0 && (
@@ -126,10 +130,7 @@ export default async function ManageTournamentPage({
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Registrants ({registrations.length})</h2>
           {registrations.length > 0 && (
-            <a
-              href={`/api/tournaments/${id}/registrants.csv`}
-              className="text-sm font-medium text-brand underline"
-            >
+            <a href={`/api/tournaments/${id}/registrants.csv`} className="text-sm font-medium text-brand underline">
               Export CSV
             </a>
           )}
@@ -148,7 +149,7 @@ export default async function ManageTournamentPage({
               </thead>
               <tbody>
                 {registrations.map((reg) => {
-                  const status = registrationStatusInfo(reg.status);
+                  const regStatus = registrationStatusInfo(reg.status);
                   return (
                     <tr key={reg.id} className="border-t border-border">
                       <td className="px-4 py-3 font-medium">
@@ -156,7 +157,7 @@ export default async function ManageTournamentPage({
                       </td>
                       <td className="px-4 py-3 text-muted">{reg.inGameId}</td>
                       <td className="px-4 py-3 text-right">
-                        <StatusPill tone={status.tone}>{status.label}</StatusPill>
+                        <StatusPill tone={regStatus.tone}>{regStatus.label}</StatusPill>
                       </td>
                     </tr>
                   );
