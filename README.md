@@ -75,7 +75,8 @@ IDs:
 | P6-4 | Account suspension (blocks register/pay/accept-Battle; visible to the affected user) | `src/app/staff/reports/`, `src/app/api/staff/users/[id]/{suspend,unsuspend}/route.ts`, suspension check in the registrations and Battle-accept routes |
 | P5-5 | Registrant CSV export | `src/app/api/tournaments/[id]/registrants.csv/route.ts` |
 | — | **Phase 7 audit**: 3 of 9 `NotificationType`s had never actually fired (`TOURNAMENT_CANCELLED`, `REGISTRATION_CAP_FILLED`, `REGISTRATION_CLOSED`) despite the pipeline existing since P0-6. Wired up all three — cancellation now notifies every registrant, not just the ones getting refunded. |
-| — | **UI rework**: the first design pass against `docs/circuit-ui-references.md` skipped its three most structural patterns. Added: the dashboard sidebar+panel shell above; `ActivityTimeline` (`src/components/ActivityTimeline.tsx`) on the match page, a chronological log of submissions/disputes/rulings; `/dashboard/disputes` and `/dashboard/payouts` as dedicated cross-tournament views (previously only visible per-tournament); `/dashboard/battles` for the organizer's own Battles. Also fixed two smaller doc gaps: homepage discovery cards were missing their start date, and auth screens had no visual weight tier between the primary submit button and the secondary link (`.btn-ghost` in `globals.css`). |
+| — | **UI rework, pass 1**: the first design pass against `docs/circuit-ui-references.md` skipped its three most structural patterns. Added: the dashboard sidebar+panel shell above; `ActivityTimeline` (`src/components/ActivityTimeline.tsx`) on the match page, a chronological log of submissions/disputes/rulings; `/dashboard/disputes` and `/dashboard/payouts` as dedicated cross-tournament views (previously only visible per-tournament); `/dashboard/battles` for the organizer's own Battles. Also fixed two smaller doc gaps: homepage discovery cards were missing their start date, and auth screens had no visual weight tier between the primary submit button and the secondary link (`.btn-ghost` in `globals.css`). |
+| — | **UI rework, pass 2**: pass 1 built every pattern structurally but ran it all through one uniform global theme, so every screen looked like the same generic app instead of carrying its own source platform's character. Added zone scoping (`[data-zone="dashboard"]` in `globals.css` + `src/proxy.ts`/`x-pathname` header) so `/dashboard/*` is always-dark and dense (Linear) while everything else stays the light-first, bolder marketing zone (FACEIT/start.gg) — see the Conventions section below for how it works and what to watch for when adding new screens. Also: `.card-row` shared class replacing 10 copies of the same hand-rolled row markup, `StatusPill`'s new `size="md"`, and marketing-zone typography (eyebrow section labels, bolder headlines) plus dashboard-zone density (tabular-nums figures, tighter kanban spacing, accent-bar nav state). |
 
 Also added, not in the original Build Plan: a lightweight `streamUrl`
 field on Tournament and Battle (link only, no embed, no live-status
@@ -166,3 +167,21 @@ shareable public page at `/tournaments/[id]`.
   `/tournaments/[id]/`; the old `/tournaments/[id]/manage` route was deleted
   in the UI rework and its content lives at
   `src/app/dashboard/tournaments/[id]/page.tsx` now.
+- **Two visual zones, not one uniform skin.** `[data-zone="dashboard"]` in
+  `globals.css` reassigns the same `--background`/`--surface`/`--border`/
+  etc. custom properties for `/dashboard/*` — always dark, dense (Linear) —
+  while every other route stays the light-first marketing zone (FACEIT/
+  start.gg's bolder, card-heavy energy). The tag is applied at `<body>`
+  itself in `layout.tsx` (read from the `x-pathname` header `src/proxy.ts`
+  sets on every request) — **not** just on a nested wrapper div, because
+  `body`'s own `background`/`color` declarations resolve their `var()` at
+  the body element, so plain inherited text and the base page background
+  need the zone tag there too. `SiteHeader`/`BottomTabBar` read the same
+  header to tag themselves and, for `SiteHeader`, drop the Battles/Ladders/
+  Dashboard links on `/dashboard/*` (the sidebar is already primary nav
+  there). When adding a new zone-scoped surface, tag color with an
+  explicit Tailwind utility (`text-muted`, `text-foreground`, etc.) rather
+  than leaving text unstyled to inherit — only elements with an explicit
+  color utility re-resolve against the zone's overridden custom property.
+  `.card-row` (the shared "bordered surface row" class, next to `.card`)
+  is zone-aware for free since it only references those same properties.
