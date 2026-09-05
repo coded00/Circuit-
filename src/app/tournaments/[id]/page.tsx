@@ -14,6 +14,7 @@ import { getCurrentUser } from "@/lib/session";
 import { StatusPill, tournamentStatusInfo } from "@/components/StatusPill";
 import CancelButton from "./CancelButton";
 import WithdrawButton from "./WithdrawButton";
+import ClaimPrizeButton from "./ClaimPrizeButton";
 
 function formatNaira(kobo: number): string {
   return `₦${(kobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 0 })}`;
@@ -58,6 +59,18 @@ export default async function TournamentPage({
     registrantCount < tournament.participantCap;
   const status = tournamentStatusInfo(tournament.status);
   const fillPct = Math.min(100, Math.round((registrantCount / tournament.participantCap) * 100));
+
+  let canClaimPrize = false;
+  if (user && tournament.status === "COMPLETE" && tournament.prizeAmount && tournament.prizeAmount > 0) {
+    const [finalMatch, existingPayout] = await Promise.all([
+      prisma.match.findFirst({
+        where: { tournamentId: tournament.id, round: { not: null } },
+        orderBy: { round: "desc" },
+      }),
+      prisma.escrowTransaction.findFirst({ where: { tournamentId: tournament.id, type: "PRIZE_PAYOUT" } }),
+    ]);
+    canClaimPrize = finalMatch?.winnerId === user.id && !existingPayout;
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-6 py-16">
@@ -132,7 +145,14 @@ export default async function TournamentPage({
             This tournament has been cancelled. Paid entries have been refunded.
           </p>
         ) : isOrganizer ? (
-          <CancelButton tournamentId={tournament.id} />
+          <div className="flex gap-2">
+            {now < tournament.registrationCloseAt && (
+              <Link href={`/tournaments/${tournament.id}/edit`} className="btn-secondary">
+                Edit
+              </Link>
+            )}
+            <CancelButton tournamentId={tournament.id} />
+          </div>
         ) : myRegistration?.status === "CONFIRMED" ? (
           <div className="flex flex-col gap-2">
             <p className="text-sm text-muted">You&apos;re registered for this tournament.</p>
@@ -166,6 +186,8 @@ export default async function TournamentPage({
           </p>
         )}
       </div>
+
+      {canClaimPrize && <ClaimPrizeButton tournamentId={tournament.id} />}
 
       <div className="flex flex-col gap-2 border-t border-border pt-6">
         <h2 className="text-lg font-semibold">Rules</h2>

@@ -61,6 +61,11 @@ to the Build Plan's task IDs:
 | P4-5 | Ranked ladder | `src/app/ladder/` |
 | P4-6 | Cancel open Battle | `src/app/api/battles/[id]/cancel/route.ts` |
 | P1-4 | Discovery — homepage rebuilt as a sectioned feed (Live Now / Starting Soon / Registration Open / Recently Finished / Open Battles), filterable by game, not a separate route | `src/app/page.tsx` |
+| P1-3 | Tournament edit + field locking (entryFee/prizeAmount lock once a paid registration exists) | `src/app/tournaments/[id]/edit/`, `src/app/api/tournaments/[id]/route.ts` |
+| P0-7/ACC-6 | Account settings (display name, avatar, DOB, payout method ref) | `src/app/account/`, `src/app/api/account/route.ts` |
+| P3-10/ACC-6 | Public player profile + match history (tournament + Battle) | `src/app/players/[handle]/page.tsx` |
+| P2-6 | Prize payout release, age-gated | `src/app/api/tournaments/[id]/payout/route.ts` — "final match clears its dispute window" is just `Tournament.status === COMPLETE`, see that route's own comment |
+| — | **ACC-3's age gate is now actually wired up** — it existed since Phase 0 but nothing ever called it. Now gates paid registration and prize payout claim; never free registration or browsing (TRU-5) |
 
 Also added, not in the original Build Plan: a lightweight `streamUrl`
 field on Tournament and Battle (link only, no embed, no live-status
@@ -68,12 +73,10 @@ check — the PRD's actual "streaming build-out" is documented V2 scope,
 this is not that). Shown as a "📺 Watch stream" link on the tournament/
 Battle page and a 📺 badge on homepage cards.
 
-Not yet built: P1-3 (field locking — same Phase 2 dependency it always
-had), P2-6 (prize payout — blocked on Phase 3's dispute-window state;
-now that Phase 3 exists this is the natural next slice), P2-7
-(registrant/payment status view — feeds the Phase 5 dashboard), P3-10
-(match history on profile — P2, no profile page exists yet), P6-3/P6-4
-(abuse reporting, account suspension — P1).
+Not yet built: P2-7 (registrant/payment status view — feeds the Phase 5
+dashboard), P6-3/P6-4 (abuse reporting, account suspension — P1), Phase 5
+(Organizer Dashboard), Phase 8 (NFR/analytics — needs real Sentry/PostHog
+keys this environment doesn't have).
 
 **Known gaps, called out rather than silently dropped** (see the relevant
 file's own comment for each):

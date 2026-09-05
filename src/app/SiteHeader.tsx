@@ -26,7 +26,12 @@ export default async function SiteHeader() {
       <div className="flex min-w-0 shrink-0 items-center gap-3 sm:gap-4">
         {user ? (
           <>
-            <span className="hidden truncate text-muted sm:inline">@{user.handle}</span>
+            <Link href={`/players/${user.handle}`} className="hidden truncate text-muted hover:text-foreground sm:inline">
+              @{user.handle}
+            </Link>
+            <Link href="/account" className="text-muted transition hover:text-foreground">
+              Account
+            </Link>
             <LogoutButton />
           </>
         ) : (

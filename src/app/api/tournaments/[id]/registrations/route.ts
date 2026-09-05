@@ -20,6 +20,7 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { getDefaultPaymentProvider } from "@/lib/payments";
 import { maybeGenerateBracketOnCapFill } from "@/lib/matches";
+import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
 
 function toCheckoutEmail(emailOrPhone: string, userId: string): string {
   // ACC-2 allows phone-only signup, but both payment providers' hosted
@@ -102,6 +103,25 @@ export async function POST(
       { id: registration.id, status: registration.status },
       { status: 201 }
     );
+  }
+
+  // ACC-3: paid registration is a cash-touching action — age-gated, unlike
+  // free registration or plain browsing (TRU-5).
+  try {
+    assertAgeGate(user.dateOfBirth);
+  } catch (err) {
+    if (err instanceof AgeGateError) {
+      return NextResponse.json(
+        {
+          error:
+            err.code === "MISSING_DOB"
+              ? "Add your date of birth in your account settings before registering for a paid tournament."
+              : err.message,
+        },
+        { status: 403 }
+      );
+    }
+    throw err;
   }
 
   const registration = existing
