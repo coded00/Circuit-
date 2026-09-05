@@ -65,7 +65,7 @@ export function AppSidebar({ user, disputeCount }: { user: NavUser; disputeCount
   const pathname = usePathname();
 
   return (
-    <aside className="hidden w-56 shrink-0 flex-col gap-6 border-r border-border px-3 py-6 sm:flex">
+    <aside className="hidden w-full flex-col gap-6 border-r border-border px-3 py-6 sm:flex">
       <nav className="flex flex-col gap-1">
         {PRIMARY.map((item) => (
           <NavLink key={item.href} item={item} active={isActive(pathname, item.href)} />
