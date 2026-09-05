@@ -12,9 +12,9 @@ the "how" below:
 ## Stack
 
 Next.js (App Router) + TypeScript + Tailwind, Prisma + PostgreSQL, Paystack
-and Flutterwave for payments. One full-stack codebase — see the PRD's D5 and
-NFR-3 for why both payment rails exist and why raw card/bank data never
-touches this app directly.
+and Flutterwave for payments, `lucide-react` for icons. One full-stack
+codebase — see the PRD's D5 and NFR-3 for why both payment rails exist and
+why raw card/bank data never touches this app directly.
 
 Everything beyond the app framework itself — hosting, file storage,
 scheduled work, push/email, rate limiting, observability — is decided in
@@ -67,7 +67,7 @@ IDs:
 | P3-10/ACC-6 | Public player profile + match history (tournament + Battle) | `src/app/players/[handle]/page.tsx` |
 | P2-6 | Prize payout release, age-gated | `src/app/api/tournaments/[id]/payout/route.ts` — "final match clears its dispute window" is just `Tournament.status === COMPLETE`, see that route's own comment |
 | — | **ACC-3's age gate is now actually wired up** — it existed since Phase 0 but nothing ever called it. Now gates paid registration and prize payout claim; never free registration or browsing (TRU-5) |
-| P5-1 | Organizer dashboard — sidebar + detail-panel shell (Linear pattern), kanban board of every tournament the user organizes grouped by status | `src/app/dashboard/layout.tsx`, `DashboardNav.tsx`, `src/app/dashboard/page.tsx` |
+| P5-1 | Organizer dashboard — detail-panel content (nav now lives in the app-wide sidebar, see the NEXA rebuild below), kanban board of every tournament the user organizes grouped by status | `src/app/dashboard/layout.tsx`, `src/components/nav/AppSidebar.tsx`, `src/app/dashboard/page.tsx` |
 | P5-2 | Per-tournament manage view — registrants + payment status, bracket state, disputes surfaced above the fold | `src/app/dashboard/tournaments/[id]/page.tsx` — this is P2-7 too, not a separate build. Moved here from `/tournaments/[id]/manage` in the UI rework below; the sidebar shell replaces that route's own page chrome |
 | P5-3 | Dispute-ruling notification | already existed as a side effect of Phase 3's `openDispute()` — `notify(organizerId, "DISPUTE_NEEDS_RULING", ...)` |
 | P5-4 | Escrow visibility (read-only fees collected/refunded/payout status) | same manage view — no dashboard action can release escrow itself, matching ORG-4 |
@@ -76,7 +76,8 @@ IDs:
 | P5-5 | Registrant CSV export | `src/app/api/tournaments/[id]/registrants.csv/route.ts` |
 | — | **Phase 7 audit**: 3 of 9 `NotificationType`s had never actually fired (`TOURNAMENT_CANCELLED`, `REGISTRATION_CAP_FILLED`, `REGISTRATION_CLOSED`) despite the pipeline existing since P0-6. Wired up all three — cancellation now notifies every registrant, not just the ones getting refunded. |
 | — | **UI rework, pass 1**: the first design pass against `docs/circuit-ui-references.md` skipped its three most structural patterns. Added: the dashboard sidebar+panel shell above; `ActivityTimeline` (`src/components/ActivityTimeline.tsx`) on the match page, a chronological log of submissions/disputes/rulings; `/dashboard/disputes` and `/dashboard/payouts` as dedicated cross-tournament views (previously only visible per-tournament); `/dashboard/battles` for the organizer's own Battles. Also fixed two smaller doc gaps: homepage discovery cards were missing their start date, and auth screens had no visual weight tier between the primary submit button and the secondary link (`.btn-ghost` in `globals.css`). |
-| — | **UI rework, pass 2**: pass 1 built every pattern structurally but ran it all through one uniform global theme, so every screen looked like the same generic app instead of carrying its own source platform's character. Added zone scoping (`[data-zone="dashboard"]` in `globals.css` + `src/proxy.ts`/`x-pathname` header) so `/dashboard/*` is always-dark and dense (Linear) while everything else stays the light-first, bolder marketing zone (FACEIT/start.gg) — see the Conventions section below for how it works and what to watch for when adding new screens. Also: `.card-row` shared class replacing 10 copies of the same hand-rolled row markup, `StatusPill`'s new `size="md"`, and marketing-zone typography (eyebrow section labels, bolder headlines) plus dashboard-zone density (tabular-nums figures, tighter kanban spacing, accent-bar nav state). |
+| — | **UI rework, pass 2**: pass 1 built every pattern structurally but ran it all through one uniform global theme, so every screen looked like the same generic app instead of carrying its own source platform's character. Added zone scoping (`[data-zone="dashboard"]`) so `/dashboard/*` read as always-dark and dense (Linear) while everything else stayed a light-first marketing zone (FACEIT/start.gg). **Superseded by pass 3 below** — the zone mechanism, `src/proxy.ts`, and OS-driven light mode are all gone now that the whole app is one always-dark theme. Also from this pass, still current: `.card-row` shared class replacing hand-rolled row markup, `StatusPill`'s `size="md"`. |
+| — | **UI rework, pass 3 — full NEXA-reference rebuild**: the user supplied a screenshot of a reference gaming platform ("NEXA": dark, purple-branded, image-led cards, persistent sidebar, hero banner, notification bell, search, a social feed) after passes 1-2 still read as "a sheet." Full rebrand — green to purple/violet (`--brand: #7c3aed`), one always-dark theme, no OS light mode. One persistent sidebar + top bar (`src/components/nav/AppSidebar.tsx`, `TopBar.tsx`, `MobileTabBar.tsx`) replaces the old `SiteHeader`/`BottomTabBar`/`DashboardNav` three-way split — see the Conventions section for the shape. New: a real notification bell + inbox surfacing the existing write-only pipeline (`src/lib/notification-format.ts`, `src/app/api/notifications/`, `src/app/notifications/`); cross-entity search (`src/app/api/search/route.ts`, `src/components/SearchInput.tsx`); a community feed (`CommunityPost` model, `src/app/community/`) — Global tab real, Friends/Teams shown disabled (no friend-graph/team model exists, never scoped); `GameArtTile` (`src/components/GameArtTile.tsx`) — deterministic generated-gradient "cover art" per game name, since no real photography/licensing path exists; homepage hero banner, Next Tournament spotlight, Live Now widget, and a cross-game leaderboard (`src/lib/standings.ts`, extracted from the ladder page); profile stat cards + per-game ladder rank chips (no Level/XP — no such data exists); a disabled "Connect your accounts" row on `/account` (no OAuth — needs real per-platform developer credentials, same blocker class as Phase 8); Wallet/Marketplace/Rewards sidebar items landing on `ComingSoon` placeholder pages (no product spec exists for any of the three yet). New dependency: `lucide-react` (no icon library existed before; every icon was a raw emoji). |
 
 Also added, not in the original Build Plan: a lightweight `streamUrl`
 field on Tournament and Battle (link only, no embed, no live-status
@@ -151,37 +152,41 @@ shareable public page at `/tournaments/[id]`.
   TRU-5 in the PRD).
 - **Design tokens live in `src/app/globals.css`, not scattered Tailwind
   colors.** Use `bg-surface`/`text-muted`/`border-border`/`bg-brand`/etc.,
-  never `zinc-*` or `black/white` opacity classes — see
-  `docs/circuit-ui-references.md` for where each pattern came from.
-  Shared primitives: `.field-input`/`.field-label`/`.btn-primary`/
-  `.btn-secondary`/`.btn-ghost`/`.btn-danger`/`.card` (global CSS classes)
-  and `<StatusPill>`/`<OptionCard>`/`<LiveCounter>`/`<ActivityTimeline>`
+  never `zinc-*` or `black/white` opacity classes. One always-dark theme —
+  no OS-driven light mode, no per-route zone — brand is purple (`--brand:
+  #7c3aed`); `--status-live` stays green (still distinct, reads as
+  "active/go"), `--status-complete` is teal (moved off violet once brand
+  took that hue). Shared primitives: `.field-input`/`.field-label`/
+  `.btn-primary`/`.btn-secondary`/`.btn-ghost`/`.btn-danger`/`.card`/
+  `.card-row` (global CSS classes) and `<StatusPill>`/`<OptionCard>`/
+  `<LiveCounter>`/`<ActivityTimeline>`/`<GameArtTile>`/`<ComingSoon>`
   (`src/components/`). `.btn-ghost` is the lowest-emphasis tier (Pinterest's
   stacked-pill pattern) — use it for a screen's secondary action, never as a
-  `.btn-secondary` substitute. Mobile nav is `BottomTabBar` (`sm:hidden`),
-  not a squeezed copy of `SiteHeader`'s desktop nav — reflow into it, don't
-  add a third nav.
-- **The organizer dashboard is a sidebar + detail-panel shell
-  (`src/app/dashboard/layout.tsx`), not a flat page per tournament.** Add a
-  new organizer-facing view under `src/app/dashboard/`, not back under
-  `/tournaments/[id]/`; the old `/tournaments/[id]/manage` route was deleted
-  in the UI rework and its content lives at
-  `src/app/dashboard/tournaments/[id]/page.tsx` now.
-- **Two visual zones, not one uniform skin.** `[data-zone="dashboard"]` in
-  `globals.css` reassigns the same `--background`/`--surface`/`--border`/
-  etc. custom properties for `/dashboard/*` — always dark, dense (Linear) —
-  while every other route stays the light-first marketing zone (FACEIT/
-  start.gg's bolder, card-heavy energy). The tag is applied at `<body>`
-  itself in `layout.tsx` (read from the `x-pathname` header `src/proxy.ts`
-  sets on every request) — **not** just on a nested wrapper div, because
-  `body`'s own `background`/`color` declarations resolve their `var()` at
-  the body element, so plain inherited text and the base page background
-  need the zone tag there too. `SiteHeader`/`BottomTabBar` read the same
-  header to tag themselves and, for `SiteHeader`, drop the Battles/Ladders/
-  Dashboard links on `/dashboard/*` (the sidebar is already primary nav
-  there). When adding a new zone-scoped surface, tag color with an
-  explicit Tailwind utility (`text-muted`, `text-foreground`, etc.) rather
-  than leaving text unstyled to inherit — only elements with an explicit
-  color utility re-resolve against the zone's overridden custom property.
-  `.card-row` (the shared "bordered surface row" class, next to `.card`)
-  is zone-aware for free since it only references those same properties.
+  `.btn-secondary` substitute.
+- **Navigation is one persistent shell, not per-page chrome.**
+  `src/components/nav/AppSidebar.tsx` (desktop, sectioned: Primary/Footer/
+  Organize/Staff) + `TopBar.tsx` (search/notifications/Create/account) +
+  `MobileTabBar.tsx` (5-slot bottom bar + a "Menu" sheet for overflow) are
+  mounted once in `src/app/layout.tsx`, which calls `getCurrentUser()` a
+  single time and passes it down — don't add a new top-level nav component
+  or call `getCurrentUser()` again just to render a nav item; add the item
+  to the existing sidebar/menu sheet instead. The dashboard's own mobile
+  sub-nav strip (`MobileTabBar`, pathname-gated) is the one remaining
+  per-route nav exception, coexisting with the main tab bar.
+- **The organizer dashboard is nav-less content, not its own shell.**
+  `src/app/dashboard/layout.tsx` only guards the route — its nav lives in
+  `AppSidebar`'s "Organize" section and the mobile sub-nav strip above.
+  Add a new organizer-facing view under `src/app/dashboard/`, not back
+  under `/tournaments/[id]/`.
+- **No real game cover-art exists.** `GameArtTile` (`src/components/
+  GameArtTile.tsx`) generates a deterministic gradient + name overlay from
+  a hash of the game string — never point an `<img>`/`next/image` at an
+  external URL for game art, there's no licensing path or asset pipeline
+  for it.
+- **Wallet/Marketplace/Rewards are placeholders, not features.** Each
+  route (`src/app/wallet/`, `/marketplace/`, `/rewards/`) renders
+  `<ComingSoon>` — no product spec exists for any of the three. Don't
+  build real logic into them without a separate scoping pass first, same
+  for the disabled "Connect your accounts" row on `/account` (no OAuth —
+  needs real per-platform developer credentials) and the Community
+  feed's Friends/Teams tabs (no friend-graph/team model exists).
