@@ -1,24 +1,29 @@
 /**
  * Circuit — homepage as a real discovery feed (maps: TRN-6/P1-4, BTL-2),
  * not a marketing page with a preview bolted on. Sectioned by timing and
- * status (start.gg's pattern, docs/circuit-ui-references.md) — Live Now,
- * Starting Soon, Registration Open, Recently Finished, plus a compact
- * Battles strip linking to the full board. Fully guest-browsable (ACC-1).
+ * status (start.gg's pattern) — Live Now, Starting Soon, Registration
+ * Open, Recently Finished, plus a compact Battles strip. Fully
+ * guest-browsable (ACC-1).
  *
- * Rebuilt for the NEXA reference: hero banner + Next Tournament spotlight
- * + Live Now + Leaderboard widgets, image-led cards via GameArtTile (no
- * real cover-art/photography source exists — see that component's own
- * comment). "Connect Your Accounts" deliberately does NOT live here — see
- * /account, since this page is guest-browsable and account-linking is a
- * private per-user action.
+ * Laid out stroke-for-stroke against the NEXA reference screenshot: a
+ * left-aligned hero banner, a "Connect Your Accounts" row directly below
+ * it, a horizontally-scrolling (carousel) card row per section, and a
+ * right-hand column with a Next Tournament spotlight, Live Now grid, and
+ * Leaderboard widget. The underlying data/sections are Circuit's own
+ * (kept exactly as already built) — only the visual structure/positioning
+ * matches the reference. Cards use GameArtTile's generated gradient art
+ * (no real cover-art/photography source exists).
  */
 
 import Link from "next/link";
+import { Calendar, Users, Swords } from "lucide-react";
 import { getCurrentUser } from "@/lib/session";
 import { prisma } from "@/lib/db";
 import { LiveCounter } from "@/components/LiveCounter";
 import { StatusPill, tournamentStatusInfo } from "@/components/StatusPill";
 import { GameArtTile } from "@/components/GameArtTile";
+import { ConnectAccountsRow } from "@/components/ConnectAccountsRow";
+import { CardCarousel } from "@/components/CardCarousel";
 import { globalStandings } from "@/lib/standings";
 
 const STARTING_SOON_WINDOW_MS = 48 * 60 * 60 * 1000;
@@ -33,59 +38,82 @@ type TournamentCard = {
   participantCap: number;
   streamUrl: string | null;
   startAt: Date;
+  prizeAmount: number | null;
+  prizeText: string | null;
   _count: { registrations: number };
 };
 
 function formatCardDate(date: Date): string {
-  return date.toLocaleString("en-NG", { dateStyle: "medium", timeStyle: "short" });
+  return date.toLocaleString("en-NG", { dateStyle: "medium" });
 }
 
 function formatNaira(kobo: number): string {
-  return kobo === 0 ? "Free entry" : `₦${(kobo / 100).toLocaleString("en-NG")} entry`;
+  return `₦${(kobo / 100).toLocaleString("en-NG")}`;
 }
 
 function TournamentGrid({ tournaments }: { tournaments: TournamentCard[] }) {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <CardCarousel>
       {tournaments.map((tournament) => {
         const status = tournamentStatusInfo(tournament.status);
         return (
-          <Link key={tournament.id} href={`/tournaments/${tournament.id}`} className="group flex flex-col gap-2 overflow-hidden rounded-xl border border-border transition hover:border-border-strong">
-            <GameArtTile game={tournament.game} className="h-28 w-full">
+          <Link
+            key={tournament.id}
+            href={`/tournaments/${tournament.id}`}
+            className="flex w-64 shrink-0 snap-start flex-col gap-2 overflow-hidden rounded-xl border border-border transition hover:border-border-strong"
+          >
+            <GameArtTile game={tournament.game} className="h-32 w-full">
               <span className="absolute top-2 right-2">
                 <StatusPill tone={status.tone} pulse={status.pulse}>
                   {status.label}
                 </StatusPill>
               </span>
             </GameArtTile>
-            <div className="flex flex-col gap-1 bg-surface p-3">
-              <span className="truncate font-medium">{tournament.name}</span>
-              <span className="text-xs text-muted">{formatCardDate(tournament.startAt)}</span>
-              <span className="text-xs text-muted">
-                {formatNaira(tournament.entryFee)} · {tournament._count.registrations}/{tournament.participantCap} players
+            <div className="flex flex-col gap-1.5 bg-surface p-3">
+              <span className="truncate font-semibold">{tournament.name}</span>
+              <span className="truncate text-xs text-muted">{tournament.game}</span>
+              <span className="font-mono text-sm font-bold tabular-nums text-brand">
+                {tournament.prizeAmount ? `${formatNaira(tournament.prizeAmount)} prize` : formatNaira(tournament.entryFee) === "₦0" ? "Free entry" : `${formatNaira(tournament.entryFee)} entry`}
+              </span>
+              <span className="flex items-center gap-1.5 text-xs text-muted">
+                <Calendar size={12} />
+                {formatCardDate(tournament.startAt)}
+              </span>
+              <span className="flex items-center gap-1.5 text-xs text-muted">
+                <Users size={12} />
+                {tournament._count.registrations}/{tournament.participantCap} players
                 {tournament.streamUrl && " · 📺"}
               </span>
             </div>
           </Link>
         );
       })}
-    </div>
+    </CardCarousel>
   );
 }
 
 function Section({
   title,
   count,
+  viewAllHref,
   children,
 }: {
   title: string;
   count: number;
+  viewAllHref?: string;
   children: React.ReactNode;
 }) {
   if (count === 0) return null;
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-xs font-bold tracking-widest text-muted uppercase">{title}</h2>
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-xs font-bold tracking-widest text-muted uppercase">{title}</h2>
+        {viewAllHref && (
+          <Link href={viewAllHref} className="text-xs font-medium text-brand hover:underline">
+            View All →
+          </Link>
+        )}
+      </div>
       {children}
     </section>
   );
@@ -180,58 +208,72 @@ export default async function Home({
 
   return (
     <div className="flex w-full flex-1 flex-col gap-10 px-6 py-10">
-      {/* Hero */}
-      <GameArtTile
-        game={nextTournament?.game ?? "Circuit"}
-        className="mx-auto flex w-full max-w-6xl flex-col items-center gap-4 rounded-2xl py-16 text-center"
-      >
-        <div className="relative z-10 flex flex-col items-center gap-4">
-          <LiveCounter label="competing right now" count={liveTournamentCount} />
-          <h1 className="max-w-xl text-4xl font-bold tracking-tight text-balance text-white sm:text-5xl">
-            Find a tournament. <span className="text-brand-foreground/90">Skip the WhatsApp chaos.</span>
-          </h1>
-          {!user ? (
-            <div className="flex gap-3">
-              <Link href="/signup" className="btn-primary">
-                Sign up
-              </Link>
-              <Link href="/login" className="btn-secondary bg-white/10 text-white hover:bg-white/20">
-                Log in
-              </Link>
-            </div>
-          ) : (
-            <div className="flex gap-3">
-              <Link href="/tournaments/new" className="btn-primary">
-                Create a tournament
-              </Link>
-              <Link href="/battles/new" className="btn-secondary bg-white/10 text-white hover:bg-white/20">
-                Open a Battle
-              </Link>
-            </div>
-          )}
-        </div>
-      </GameArtTile>
-
-      <form className="mx-auto flex w-full max-w-md gap-2">
-        <input
-          type="text"
-          name="game"
-          defaultValue={game ?? ""}
-          placeholder="Filter everything by game"
-          className="field-input flex-1"
-        />
-        <button type="submit" className="btn-secondary">
-          Filter
-        </button>
-        {game && (
-          <Link href="/" className="btn-secondary">
-            Clear
-          </Link>
-        )}
-      </form>
-
       <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-10 lg:grid-cols-[1fr_320px]">
         <div className="flex flex-col gap-10">
+          {/* Hero — left-aligned copy over generated art, matching the
+              reference's banner (badge top, headline, subtext, two CTAs,
+              stacked corner tagline) */}
+          <GameArtTile game={nextTournament?.game ?? "Circuit"} className="flex min-h-72 w-full flex-col justify-between rounded-2xl p-8">
+            <div className="relative z-10 flex flex-col items-start gap-4">
+              <LiveCounter label="competing right now" count={liveTournamentCount} />
+              <h1 className="max-w-md text-4xl leading-[1.05] font-bold tracking-tight text-white sm:text-5xl">
+                Play.
+                <br />
+                Compete.
+                <br />
+                Get Paid.
+              </h1>
+              <p className="max-w-xs text-sm text-white/80">
+                Find a tournament. Join a Battle. Skip the WhatsApp chaos.
+              </p>
+              {!user ? (
+                <div className="flex flex-wrap gap-3">
+                  <Link href="/signup" className="btn-primary whitespace-nowrap">
+                    Sign up
+                  </Link>
+                  <Link href="/login" className="btn-secondary gap-1.5 bg-white/10 whitespace-nowrap text-white hover:bg-white/20">
+                    Log in
+                  </Link>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-3">
+                  <Link href="/tournaments/new" className="btn-primary whitespace-nowrap">
+                    Create a tournament
+                  </Link>
+                  <Link href="/battles/new" className="btn-secondary gap-1.5 bg-white/10 whitespace-nowrap text-white hover:bg-white/20">
+                    <Swords size={14} />
+                    Open a Battle
+                  </Link>
+                </div>
+              )}
+            </div>
+            <span className="relative z-10 self-end text-right text-xs leading-tight font-bold tracking-widest text-white/70 uppercase">
+              More than
+              <br />
+              tournaments
+            </span>
+          </GameArtTile>
+
+          <ConnectAccountsRow />
+
+          <form className="flex w-full max-w-md gap-2">
+            <input
+              type="text"
+              name="game"
+              defaultValue={game ?? ""}
+              placeholder="Filter everything by game"
+              className="field-input flex-1"
+            />
+            <button type="submit" className="btn-secondary">
+              Filter
+            </button>
+            {game && (
+              <Link href="/" className="btn-secondary">
+                Clear
+              </Link>
+            )}
+          </form>
+
           {nothingToShow ? (
             <p className="card text-center text-muted">
               {game ? `Nothing live for "${game}" right now.` : "Nothing live right now — be the first."}
@@ -258,23 +300,32 @@ export default async function Home({
                 <section className="flex flex-col gap-4">
                   <div className="flex items-baseline justify-between">
                     <h2 className="text-xs font-bold tracking-widest text-muted uppercase">⚔️ Open Battles</h2>
-                    <LiveCounter
-                      label={openBattleCount === 1 ? "open Battle" : "open Battles"}
-                      count={openBattleCount}
-                    />
+                    <div className="flex items-center gap-3">
+                      <LiveCounter
+                        label={openBattleCount === 1 ? "open Battle" : "open Battles"}
+                        count={openBattleCount}
+                      />
+                      <Link href="/battles" className="text-xs font-medium text-brand hover:underline">
+                        View All →
+                      </Link>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <CardCarousel>
                     {battles.map((battle) => (
-                      <Link key={battle.id} href={`/battles/${battle.id}`} className="group flex flex-col gap-2 overflow-hidden rounded-xl border border-border transition hover:border-border-strong">
-                        <GameArtTile game={battle.game} className="h-20 w-full">
+                      <Link
+                        key={battle.id}
+                        href={`/battles/${battle.id}`}
+                        className="flex w-64 shrink-0 snap-start flex-col gap-2 overflow-hidden rounded-xl border border-border transition hover:border-border-strong"
+                      >
+                        <GameArtTile game={battle.game} className="h-28 w-full">
                           <span className="absolute top-2 right-2">
                             <StatusPill tone="live" pulse>
                               Open
                             </StatusPill>
                           </span>
                         </GameArtTile>
-                        <div className="flex flex-col gap-1 bg-surface p-3">
-                          <span className="font-medium">
+                        <div className="flex flex-col gap-1.5 bg-surface p-3">
+                          <span className="font-semibold">
                             {battle.format === "BEST_OF_3" ? "Best of 3" : "Single match"}
                             {battle.streamUrl && " · 📺"}
                           </span>
@@ -282,12 +333,14 @@ export default async function Home({
                         </div>
                       </Link>
                     ))}
-                  </div>
-                  <Link href="/battles" className="w-fit text-sm font-medium text-brand underline">
-                    See all open Battles →
-                  </Link>
+                  </CardCarousel>
                 </section>
               )}
+
+              <div className="flex min-h-24 w-64 flex-col justify-center gap-1 rounded-xl bg-gradient-to-br from-brand-strong to-[#0b0d10] p-5">
+                <span className="h-2 w-2 rounded-full bg-brand" />
+                <span className="text-lg font-bold text-white">Play. Compete. Belong.</span>
+              </div>
             </>
           )}
         </div>
@@ -296,7 +349,9 @@ export default async function Home({
         <div className="flex flex-col gap-6">
           {nextTournament && (
             <div className="flex flex-col gap-3">
-              <h2 className="text-xs font-bold tracking-widest text-muted uppercase">Next Tournament</h2>
+              <div className="flex items-baseline justify-between">
+                <h2 className="text-xs font-bold tracking-widest text-muted uppercase">Next Tournament</h2>
+              </div>
               <Link
                 href={`/tournaments/${nextTournament.id}`}
                 className="flex flex-col overflow-hidden rounded-xl border border-border transition hover:border-border-strong"
@@ -304,12 +359,22 @@ export default async function Home({
                 <GameArtTile game={nextTournament.game} className="h-32 w-full" />
                 <div className="flex flex-col gap-2 bg-surface p-4">
                   <span className="font-semibold">{nextTournament.name}</span>
-                  <span className="text-xs text-muted">
-                    {nextTournament.prizeAmount
-                      ? `₦${(nextTournament.prizeAmount / 100).toLocaleString("en-NG")} prize pool`
-                      : (nextTournament.prizeText ?? "No cash prize")}
+                  <div>
+                    <div className="font-mono text-2xl font-bold tabular-nums text-brand">
+                      {nextTournament.prizeAmount ? formatNaira(nextTournament.prizeAmount) : formatNaira(nextTournament.entryFee)}
+                    </div>
+                    <div className="text-xs text-muted">
+                      {nextTournament.prizeAmount ? "Prize pool" : nextTournament.entryFee === 0 ? "Free entry" : "Entry fee"}
+                    </div>
+                  </div>
+                  <span className="flex items-center gap-1.5 text-xs text-muted">
+                    <Calendar size={12} />
+                    {formatCardDate(nextTournament.startAt)}
                   </span>
-                  <span className="text-xs text-muted">{formatCardDate(nextTournament.startAt)}</span>
+                  <span className="flex items-center gap-1.5 text-xs text-muted">
+                    <Users size={12} />
+                    {nextTournament._count.registrations}/{nextTournament.participantCap} players
+                  </span>
                   <span className="btn-primary mt-1 w-full">Register Now</span>
                 </div>
               </Link>
@@ -321,17 +386,17 @@ export default async function Home({
               <h2 className="text-xs font-bold tracking-widest text-muted uppercase">Live Now</h2>
               <div className="grid grid-cols-2 gap-3">
                 {liveNow.map((t) => (
-                  <Link key={t.id} href={`/tournaments/${t.id}`} className="flex flex-col overflow-hidden rounded-xl border border-border">
-                    <GameArtTile game={t.game} className="h-16 w-full">
+                  <Link key={t.id} href={`/tournaments/${t.id}`} className="overflow-hidden rounded-xl border border-border">
+                    <GameArtTile game={t.game} className="h-24 w-full">
                       <span className="absolute top-1.5 left-1.5">
                         <StatusPill tone="live" pulse size="sm">
                           Live
                         </StatusPill>
                       </span>
+                      <span className="absolute right-1.5 bottom-6 left-1.5 truncate text-[10px] text-white/90">
+                        {t._count.registrations}/{t.participantCap} players
+                      </span>
                     </GameArtTile>
-                    <div className="bg-surface p-2 text-xs text-muted">
-                      {t._count.registrations}/{t.participantCap} players
-                    </div>
                   </Link>
                 ))}
               </div>
@@ -349,7 +414,7 @@ export default async function Home({
                   This Month
                 </span>
               </div>
-              <div className="card flex flex-col gap-2 p-3">
+              <div className="card flex flex-col gap-1 p-3">
                 {topLeaderboard.map((s, i) => (
                   <Link
                     key={s.userId}
@@ -358,9 +423,12 @@ export default async function Home({
                   >
                     <span className="flex items-center gap-2 truncate">
                       <span className="w-4 font-mono text-xs tabular-nums text-muted">{i + 1}</span>
-                      {s.displayName}
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border bg-surface-hover text-xs font-semibold text-muted">
+                        {s.displayName.slice(0, 1).toUpperCase()}
+                      </span>
+                      <span className="truncate">{s.displayName}</span>
                     </span>
-                    <span className="font-mono text-xs tabular-nums text-brand">{s.wins}W</span>
+                    <span className="font-mono text-xs font-semibold tabular-nums text-brand">{s.wins}</span>
                   </Link>
                 ))}
               </div>

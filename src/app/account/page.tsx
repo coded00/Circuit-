@@ -1,9 +1,7 @@
 import { redirect } from "next/navigation";
-import { Gamepad2 } from "lucide-react";
 import { getCurrentUser } from "@/lib/session";
+import { ConnectAccountsRow } from "@/components/ConnectAccountsRow";
 import AccountForm from "./AccountForm";
-
-const PLATFORMS = ["PlayStation", "Xbox", "Steam", "Epic Games", "EA", "Call of Duty", "Nintendo"];
 
 export default async function AccountPage() {
   const user = await getCurrentUser();
@@ -31,30 +29,11 @@ export default async function AccountPage() {
       />
 
       <div className="card flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-semibold">Connect your accounts</span>
-          <span className="rounded-full bg-status-neutral/15 px-2 py-0.5 text-xs font-medium text-status-neutral">
-            Coming soon
-          </span>
-        </div>
+        <ConnectAccountsRow />
         <p className="text-xs text-muted">
           Link your platform accounts to show your gamertag on your profile. Not available yet — needs
           developer credentials from each platform.
         </p>
-        <div className="flex flex-wrap gap-2">
-          {PLATFORMS.map((platform) => (
-            <button
-              key={platform}
-              type="button"
-              disabled
-              title="Coming soon"
-              className="flex cursor-not-allowed items-center gap-1.5 rounded-full border border-border-strong px-3 py-1.5 text-xs font-medium text-muted opacity-50"
-            >
-              <Gamepad2 size={14} />
-              {platform}
-            </button>
-          ))}
-        </div>
       </div>
     </div>
   );
