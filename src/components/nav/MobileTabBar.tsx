@@ -30,10 +30,10 @@ import {
 type NavUser = { handle: string; isStaff: boolean } | null;
 
 const DASHBOARD_ITEMS = [
-  { href: "/dashboard", label: "Tournaments" },
-  { href: "/dashboard/battles", label: "Battles" },
-  { href: "/dashboard/disputes", label: "Disputes" },
-  { href: "/dashboard/payouts", label: "Payouts" },
+  { href: "/dashboard", label: "Tournaments", icon: Trophy },
+  { href: "/dashboard/battles", label: "Battles", icon: Swords },
+  { href: "/dashboard/disputes", label: "Disputes", icon: Shield },
+  { href: "/dashboard/payouts", label: "Payouts", icon: Wallet },
 ];
 
 export function MobileTabBar({ user }: { user: NavUser }) {
@@ -138,7 +138,7 @@ export function MobileTabBar({ user }: { user: NavUser }) {
                 <span className="mt-2 px-3 text-xs font-bold tracking-wide text-muted uppercase">Organize</span>
                 {DASHBOARD_ITEMS.map((item) => (
                   <Link key={item.href} href={item.href} onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
-                    <Shield size={18} /> {item.label}
+                    <item.icon size={18} /> {item.label}
                   </Link>
                 ))}
                 {user.isStaff && (

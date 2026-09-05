@@ -266,7 +266,6 @@ export default async function Home({
     recentlyFinished.length === 0 &&
     battles.length === 0;
 
-  const liveNow = liveTournaments.slice(0, 2);
   const topLeaderboard = leaderboard.slice(0, 5);
 
   // Hero is a carousel: slide 0 is always Circuit's own brand pitch;
@@ -473,32 +472,12 @@ export default async function Home({
           )}
         </div>
 
-        {/* Right column: Live Now, Leaderboard (Next Tournament now lives
-            in the dedicated hero row above) */}
+        {/* Right column: Leaderboard (Next Tournament lives in the hero
+            row above; a "Live Now" mini-widget used to duplicate the main
+            content column's own "Live now" section a few pixels to its
+            left — same tournaments, near-identical label — so it's gone,
+            not just restyled). */}
         <div className="flex min-w-0 flex-col gap-6">
-          {liveNow.length > 0 && (
-            <div className="flex flex-col gap-3">
-              <h2 className="flex items-center gap-2 text-sm font-semibold">
-                <Radio size={15} className="text-muted" />
-                Live Now
-              </h2>
-              <div className="grid grid-cols-2 gap-3">
-                {liveNow.map((t) => (
-                  <Link key={t.id} href={`/tournaments/${t.id}`} className="overflow-hidden rounded-xl border border-border shadow-lg shadow-black/30">
-                    <GameArtTile game={t.game} className="h-24 w-full">
-                      <span className="absolute top-1.5 left-1.5">
-                        <LiveBadge />
-                      </span>
-                      <span className="absolute right-1.5 bottom-6 left-1.5 truncate text-[10px] text-white/90">
-                        {t._count.registrations}/{t.participantCap} players
-                      </span>
-                    </GameArtTile>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-
           {topLeaderboard.length > 0 && (
             <div className="flex flex-col gap-3">
               <h2 className="flex items-center gap-2 text-sm font-semibold">
