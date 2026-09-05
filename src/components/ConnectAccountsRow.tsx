@@ -6,7 +6,7 @@
  * treatment never drifts between the two places it appears.
  */
 
-import { Gamepad2 } from "lucide-react";
+import { Gamepad2, Link2 } from "lucide-react";
 
 const PLATFORMS = [
   { name: "PlayStation", color: "#0f4fa8" },
@@ -21,7 +21,10 @@ const PLATFORMS = [
 export function ConnectAccountsRow() {
   return (
     <div className="flex flex-col gap-3">
-      <h2 className="text-xs font-bold tracking-widest text-muted uppercase">Connect Your Accounts</h2>
+      <h2 className="flex items-center gap-2 text-base font-semibold">
+        <Link2 size={17} className="text-muted" />
+        Connect Your Accounts
+      </h2>
       <div className="flex flex-wrap gap-4">
         {PLATFORMS.map((platform) => (
           <button

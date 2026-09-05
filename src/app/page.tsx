@@ -16,7 +16,7 @@
  */
 
 import Link from "next/link";
-import { Calendar, Users, Swords, Radio, Clock, ClipboardList, CheckCircle2, Tv, type LucideIcon } from "lucide-react";
+import { Calendar, Users, Swords, Radio, Clock, ClipboardList, CheckCircle2, Tv, Trophy, type LucideIcon } from "lucide-react";
 import { getCurrentUser } from "@/lib/session";
 import { prisma } from "@/lib/db";
 import { LiveCounter } from "@/components/LiveCounter";
@@ -48,7 +48,7 @@ function formatCardDate(date: Date): string {
 }
 
 function formatNaira(kobo: number): string {
-  return `₦${(kobo / 100).toLocaleString("en-NG")}`;
+  return `₦ ${(kobo / 100).toLocaleString("en-NG")}`;
 }
 
 /** Red is reserved for true LIVE/broadcast indicators and alerts per the
@@ -70,10 +70,10 @@ function LiveBadge() {
 
 function PrizeOrEntry({ tournament }: { tournament: TournamentCard }) {
   if (tournament.prizeAmount) {
-    return <span className="font-mono text-sm font-bold tabular-nums text-gold">{formatNaira(tournament.prizeAmount)} prize</span>;
+    return <span className="text-sm font-bold tabular-nums text-gold">{formatNaira(tournament.prizeAmount)} prize</span>;
   }
   return (
-    <span className="font-mono text-sm font-bold tabular-nums text-brand">
+    <span className="text-sm font-bold tabular-nums text-brand">
       {tournament.entryFee === 0 ? "Free entry" : `${formatNaira(tournament.entryFee)} entry`}
     </span>
   );
@@ -250,7 +250,7 @@ export default async function Home({
               reference's "dark, atmospheric, premium" mood rather than
               a bright poster. */}
           <div
-            className="relative flex min-h-72 w-full flex-col justify-between overflow-hidden rounded-2xl p-8"
+            className="relative flex min-h-72 w-full flex-col justify-center overflow-hidden rounded-2xl p-8"
             style={{
               backgroundImage:
                 "radial-gradient(ellipse 650px 500px at 88% 20%, rgba(124,58,237,0.45), transparent 65%)," +
@@ -291,11 +291,6 @@ export default async function Home({
                 </div>
               )}
             </div>
-            <span className="relative z-10 self-end text-right text-xs leading-tight font-bold tracking-widest text-white/70 uppercase">
-              More than
-              <br />
-              tournaments
-            </span>
           </div>
 
           <ConnectAccountsRow />
@@ -391,9 +386,10 @@ export default async function Home({
         <div className="flex flex-col gap-6">
           {nextTournament && (
             <div className="flex flex-col gap-3">
-              <div className="flex items-baseline justify-between">
-                <h2 className="text-xs font-bold tracking-widest text-muted uppercase">Next Tournament</h2>
-              </div>
+              <h2 className="flex items-center gap-2 text-sm font-semibold">
+                <Trophy size={15} className="text-muted" />
+                Next Tournament
+              </h2>
               <Link
                 href={`/tournaments/${nextTournament.id}`}
                 className="flex flex-col overflow-hidden rounded-xl border border-border shadow-lg shadow-black/30 transition hover:border-border-strong"
@@ -408,7 +404,7 @@ export default async function Home({
                 <div className="flex flex-col gap-2 bg-surface p-4">
                   <span className="font-semibold">{nextTournament.name}</span>
                   <div>
-                    <div className={`font-mono text-2xl font-bold tabular-nums ${nextTournament.prizeAmount ? "text-gold" : "text-brand"}`}>
+                    <div className={`text-2xl font-bold tabular-nums ${nextTournament.prizeAmount ? "text-gold" : "text-brand"}`}>
                       {nextTournament.prizeAmount ? formatNaira(nextTournament.prizeAmount) : formatNaira(nextTournament.entryFee)}
                     </div>
                     <div className="text-xs text-muted">
@@ -431,7 +427,10 @@ export default async function Home({
 
           {liveNow.length > 0 && (
             <div className="flex flex-col gap-3">
-              <h2 className="text-xs font-bold tracking-widest text-muted uppercase">Live Now</h2>
+              <h2 className="flex items-center gap-2 text-sm font-semibold">
+                <Radio size={15} className="text-muted" />
+                Live Now
+              </h2>
               <div className="grid grid-cols-2 gap-3">
                 {liveNow.map((t) => (
                   <Link key={t.id} href={`/tournaments/${t.id}`} className="overflow-hidden rounded-xl border border-border shadow-lg shadow-black/30">
@@ -451,8 +450,12 @@ export default async function Home({
 
           {topLeaderboard.length > 0 && (
             <div className="flex flex-col gap-3">
+              <h2 className="flex items-center gap-2 text-sm font-semibold">
+                <Trophy size={15} className="text-muted" />
+                Leaderboard
+              </h2>
               <div className="flex gap-1 border-b border-border">
-                <span className="border-b-2 border-brand px-2 py-1.5 text-xs font-semibold uppercase">Global</span>
+                <span className="border-b-2 border-brand px-2 py-1.5 text-xs font-semibold">Global</span>
                 <span className="px-2 py-1.5 text-xs text-muted" title="Coming soon">
                   Friends
                 </span>

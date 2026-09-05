@@ -63,8 +63,8 @@ export function SearchInput({ className = "" }: { className?: string }) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => setOpen(true)}
-          placeholder="Search games, players, tournaments…"
-          className="field-input pl-9"
+          placeholder="Search…"
+          className="field-input min-w-0 truncate pl-9"
         />
       </div>
 

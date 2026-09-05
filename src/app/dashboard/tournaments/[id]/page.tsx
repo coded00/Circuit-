@@ -13,7 +13,7 @@ import { getCurrentUser } from "@/lib/session";
 import { StatusPill, registrationStatusInfo, tournamentStatusInfo } from "@/components/StatusPill";
 
 function formatNaira(kobo: number): string {
-  return `₦${(kobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 0 })}`;
+  return `₦ ${(kobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 0 })}`;
 }
 
 export default async function DashboardTournamentDetailPage({
@@ -102,11 +102,11 @@ export default async function DashboardTournamentDetailPage({
       <section className="card grid grid-cols-3 gap-4">
         <div>
           <div className="text-xs text-muted">Entry fees collected</div>
-          <div className="font-mono font-medium tabular-nums">{formatNaira(collected)}</div>
+          <div className="font-medium tabular-nums">{formatNaira(collected)}</div>
         </div>
         <div>
           <div className="text-xs text-muted">Refunded</div>
-          <div className="font-mono font-medium tabular-nums">{formatNaira(refunded)}</div>
+          <div className="font-medium tabular-nums">{formatNaira(refunded)}</div>
         </div>
         <div>
           <div className="text-xs text-muted">Prize payout</div>

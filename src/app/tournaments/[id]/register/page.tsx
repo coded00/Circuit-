@@ -25,7 +25,7 @@ export default async function RegisterPage({
       <p className="text-sm text-muted">
         {tournament.entryFee === 0
           ? "This tournament is free to enter."
-          : `Entry fee: ₦${(tournament.entryFee / 100).toLocaleString("en-NG")} — you'll be redirected to pay after submitting.`}
+          : `Entry fee: ₦ ${(tournament.entryFee / 100).toLocaleString("en-NG")} — you'll be redirected to pay after submitting.`}
       </p>
       <RegistrationForm tournamentId={tournament.id} />
     </div>

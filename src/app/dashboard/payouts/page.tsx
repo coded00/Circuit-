@@ -9,7 +9,7 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 
 function formatNaira(kobo: number): string {
-  return `₦${(kobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 0 })}`;
+  return `₦ ${(kobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 0 })}`;
 }
 
 export default async function DashboardPayoutsPage() {
@@ -43,11 +43,11 @@ export default async function DashboardPayoutsPage() {
       <div className="card grid grid-cols-2 gap-4">
         <div>
           <div className="text-xs text-muted">Total collected</div>
-          <div className="font-mono text-lg font-semibold tabular-nums">{formatNaira(totalCollected)}</div>
+          <div className="text-lg font-semibold tabular-nums">{formatNaira(totalCollected)}</div>
         </div>
         <div>
           <div className="text-xs text-muted">Total refunded</div>
-          <div className="font-mono text-lg font-semibold tabular-nums">{formatNaira(totalRefunded)}</div>
+          <div className="text-lg font-semibold tabular-nums">{formatNaira(totalRefunded)}</div>
         </div>
       </div>
 
@@ -72,8 +72,8 @@ export default async function DashboardPayoutsPage() {
                       {row.tournament.name}
                     </Link>
                   </td>
-                  <td className="px-4 py-3 text-right font-mono tabular-nums">{formatNaira(row.collected)}</td>
-                  <td className="px-4 py-3 text-right font-mono tabular-nums">{formatNaira(row.refunded)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">{formatNaira(row.collected)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">{formatNaira(row.refunded)}</td>
                   <td className="px-4 py-3 text-right text-muted">
                     {row.payout ? (row.payout.status === "COMPLETE" ? "Sent" : "Processing") : "Not yet claimed"}
                   </td>

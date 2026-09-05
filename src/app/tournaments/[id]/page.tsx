@@ -18,7 +18,7 @@ import WithdrawButton from "./WithdrawButton";
 import ClaimPrizeButton from "./ClaimPrizeButton";
 
 function formatNaira(kobo: number): string {
-  return `₦${(kobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 0 })}`;
+  return `₦ ${(kobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 0 })}`;
 }
 
 function formatDate(date: Date): string {
