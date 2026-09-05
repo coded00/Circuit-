@@ -66,6 +66,10 @@ to the Build Plan's task IDs:
 | P3-10/ACC-6 | Public player profile + match history (tournament + Battle) | `src/app/players/[handle]/page.tsx` |
 | P2-6 | Prize payout release, age-gated | `src/app/api/tournaments/[id]/payout/route.ts` — "final match clears its dispute window" is just `Tournament.status === COMPLETE`, see that route's own comment |
 | — | **ACC-3's age gate is now actually wired up** — it existed since Phase 0 but nothing ever called it. Now gates paid registration and prize payout claim; never free registration or browsing (TRU-5) |
+| P5-1 | Organizer dashboard — every tournament the user organizes, live status, registrant count, disputes-need-ruling badge | `src/app/dashboard/page.tsx` |
+| P5-2 | Per-tournament manage view — registrants + payment status, bracket state, disputes surfaced above the fold | `src/app/tournaments/[id]/manage/page.tsx` — this is P2-7 too, not a separate build |
+| P5-3 | Dispute-ruling notification | already existed as a side effect of Phase 3's `openDispute()` — `notify(organizerId, "DISPUTE_NEEDS_RULING", ...)` |
+| P5-4 | Escrow visibility (read-only fees collected/refunded/payout status) | same manage view — no dashboard action can release escrow itself, matching ORG-4 |
 
 Also added, not in the original Build Plan: a lightweight `streamUrl`
 field on Tournament and Battle (link only, no embed, no live-status
@@ -73,10 +77,9 @@ check — the PRD's actual "streaming build-out" is documented V2 scope,
 this is not that). Shown as a "📺 Watch stream" link on the tournament/
 Battle page and a 📺 badge on homepage cards.
 
-Not yet built: P2-7 (registrant/payment status view — feeds the Phase 5
-dashboard), P6-3/P6-4 (abuse reporting, account suspension — P1), Phase 5
-(Organizer Dashboard), Phase 8 (NFR/analytics — needs real Sentry/PostHog
-keys this environment doesn't have).
+Not yet built: P5-5 (CSV export, P2 priority), P6-3/P6-4 (abuse
+reporting, account suspension — P1), Phase 8 (NFR/analytics — needs real
+Sentry/PostHog keys this environment doesn't have).
 
 **Known gaps, called out rather than silently dropped** (see the relevant
 file's own comment for each):

@@ -21,6 +21,11 @@ export default async function SiteHeader() {
           <Link href="/ladder" className="text-muted transition hover:text-foreground">
             Ladders
           </Link>
+          {user && (
+            <Link href="/dashboard" className="text-muted transition hover:text-foreground">
+              Dashboard
+            </Link>
+          )}
         </nav>
       </div>
       <div className="flex min-w-0 shrink-0 items-center gap-3 sm:gap-4">

@@ -146,6 +146,9 @@ export default async function TournamentPage({
           </p>
         ) : isOrganizer ? (
           <div className="flex gap-2">
+            <Link href={`/tournaments/${tournament.id}/manage`} className="btn-secondary">
+              Manage
+            </Link>
             {now < tournament.registrationCloseAt && (
               <Link href={`/tournaments/${tournament.id}/edit`} className="btn-secondary">
                 Edit
