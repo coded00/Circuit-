@@ -40,10 +40,10 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full pb-28 sm:pb-0">
-        {/* Page shell — exactly two divs: the nav (15%) and everything
-            else (85%), as its own explicit grid row rather than an
+        {/* Page shell — exactly two divs: the nav (20%) and everything
+            else (80%), as its own explicit grid row rather than an
             implicit flex split. */}
-        <div className="mx-auto grid min-h-full w-full max-w-7xl grid-cols-1 sm:grid-cols-[15%_85%]">
+        <div className="mx-auto grid min-h-full w-full max-w-7xl grid-cols-1 sm:grid-cols-[20%_80%]">
           <div>
             <AppSidebar user={navUser} disputeCount={disputeCount} />
           </div>
