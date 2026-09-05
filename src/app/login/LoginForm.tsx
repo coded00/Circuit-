@@ -37,9 +37,9 @@ export default function LoginForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex w-full max-w-sm flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <label htmlFor="emailOrPhone" className="text-sm font-medium">
+    <form onSubmit={handleSubmit} className="card flex w-full max-w-sm flex-col gap-4">
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="emailOrPhone" className="field-label">
           Email or phone
         </label>
         <input
@@ -49,11 +49,11 @@ export default function LoginForm() {
           autoComplete="username"
           value={emailOrPhone}
           onChange={(e) => setEmailOrPhone(e.target.value)}
-          className="rounded border border-black/15 px-3 py-2 dark:border-white/20 dark:bg-black"
+          className="field-input"
         />
       </div>
-      <div className="flex flex-col gap-1">
-        <label htmlFor="password" className="text-sm font-medium">
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="password" className="field-label">
           Password
         </label>
         <input
@@ -63,20 +63,16 @@ export default function LoginForm() {
           autoComplete="current-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="rounded border border-black/15 px-3 py-2 dark:border-white/20 dark:bg-black"
+          className="field-input"
         />
       </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button
-        type="submit"
-        disabled={submitting}
-        className="rounded bg-foreground px-4 py-2 font-medium text-background disabled:opacity-50"
-      >
+      {error && <p className="text-sm text-danger">{error}</p>}
+      <button type="submit" disabled={submitting} className="btn-primary w-full">
         {submitting ? "Logging in…" : "Log in"}
       </button>
-      <p className="text-sm text-zinc-500">
+      <p className="text-center text-sm text-muted">
         Need an account?{" "}
-        <Link href={`/signup?next=${encodeURIComponent(next)}`} className="font-medium underline">
+        <Link href={`/signup?next=${encodeURIComponent(next)}`} className="font-medium text-brand underline">
           Sign up
         </Link>
       </p>

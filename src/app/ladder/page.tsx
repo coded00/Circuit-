@@ -30,11 +30,15 @@ export default async function LadderPage({
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-6 py-16">
         <h1 className="text-2xl font-semibold">Ladders</h1>
         {games.length === 0 ? (
-          <p className="text-zinc-500">No completed Battles yet.</p>
+          <p className="card text-center text-muted">No completed Battles yet.</p>
         ) : (
           <div className="flex flex-col gap-2">
             {games.map((g) => (
-              <Link key={g.game} href={`/ladder?game=${encodeURIComponent(g.game)}`} className="underline">
+              <Link
+                key={g.game}
+                href={`/ladder?game=${encodeURIComponent(g.game)}`}
+                className="rounded-xl border border-border bg-surface px-4 py-3 font-medium transition hover:border-border-strong hover:bg-surface-hover"
+              >
                 {g.game}
               </Link>
             ))}
@@ -80,40 +84,44 @@ export default async function LadderPage({
 
   const ranked = [...standings.values()].sort((x, y) => y.wins - x.wins || x.losses - y.losses);
 
+  const medal = ["🥇", "🥈", "🥉"];
+
   return (
     <div className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-6 py-16">
       <div className="flex flex-col gap-1">
-        <Link href="/ladder" className="w-fit text-xs text-zinc-500 underline">
-          All games
+        <Link href="/ladder" className="w-fit text-xs text-muted hover:text-foreground">
+          ← All games
         </Link>
         <h1 className="text-2xl font-semibold">{game} ladder</h1>
       </div>
 
       {ranked.length === 0 ? (
-        <p className="text-zinc-500">No completed Battles for this game yet.</p>
+        <p className="card text-center text-muted">No completed Battles for this game yet.</p>
       ) : (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-zinc-500">
-              <th className="pb-2">#</th>
-              <th className="pb-2">Player</th>
-              <th className="pb-2 text-right">W</th>
-              <th className="pb-2 text-right">L</th>
-            </tr>
-          </thead>
-          <tbody>
-            {ranked.map((s, i) => (
-              <tr key={s.userId} className="border-t border-black/10 dark:border-white/15">
-                <td className="py-2">{i + 1}</td>
-                <td className="py-2">
-                  {s.displayName} (@{s.handle})
-                </td>
-                <td className="py-2 text-right">{s.wins}</td>
-                <td className="py-2 text-right">{s.losses}</td>
+        <div className="card overflow-hidden p-0">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-muted">
+                <th className="px-4 pt-4 pb-2 font-medium">#</th>
+                <th className="px-4 pt-4 pb-2 font-medium">Player</th>
+                <th className="px-4 pt-4 pb-2 text-right font-medium">W</th>
+                <th className="px-4 pt-4 pb-2 text-right font-medium">L</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {ranked.map((s, i) => (
+                <tr key={s.userId} className="border-t border-border">
+                  <td className="px-4 py-3">{medal[i] ?? i + 1}</td>
+                  <td className="px-4 py-3 font-medium">
+                    {s.displayName} <span className="text-muted">(@{s.handle})</span>
+                  </td>
+                  <td className="px-4 py-3 text-right text-brand">{s.wins}</td>
+                  <td className="px-4 py-3 text-right text-muted">{s.losses}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

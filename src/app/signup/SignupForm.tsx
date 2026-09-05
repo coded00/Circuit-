@@ -37,9 +37,9 @@ export default function SignupForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex w-full max-w-sm flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <label htmlFor="emailOrPhone" className="text-sm font-medium">
+    <form onSubmit={handleSubmit} className="card flex w-full max-w-sm flex-col gap-4">
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="emailOrPhone" className="field-label">
           Email or phone
         </label>
         <input
@@ -49,11 +49,11 @@ export default function SignupForm() {
           autoComplete="username"
           value={emailOrPhone}
           onChange={(e) => setEmailOrPhone(e.target.value)}
-          className="rounded border border-black/15 px-3 py-2 dark:border-white/20 dark:bg-black"
+          className="field-input"
         />
       </div>
-      <div className="flex flex-col gap-1">
-        <label htmlFor="password" className="text-sm font-medium">
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="password" className="field-label">
           Password
         </label>
         <input
@@ -64,21 +64,17 @@ export default function SignupForm() {
           autoComplete="new-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="rounded border border-black/15 px-3 py-2 dark:border-white/20 dark:bg-black"
+          className="field-input"
         />
-        <span className="text-xs text-zinc-500">At least 8 characters.</span>
+        <span className="text-xs text-muted">At least 8 characters.</span>
       </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button
-        type="submit"
-        disabled={submitting}
-        className="rounded bg-foreground px-4 py-2 font-medium text-background disabled:opacity-50"
-      >
+      {error && <p className="text-sm text-danger">{error}</p>}
+      <button type="submit" disabled={submitting} className="btn-primary w-full">
         {submitting ? "Creating account…" : "Create account"}
       </button>
-      <p className="text-sm text-zinc-500">
+      <p className="text-center text-sm text-muted">
         Already have an account?{" "}
-        <Link href={`/login?next=${encodeURIComponent(next)}`} className="font-medium underline">
+        <Link href={`/login?next=${encodeURIComponent(next)}`} className="font-medium text-brand underline">
           Log in
         </Link>
       </p>

@@ -31,20 +31,21 @@ export default async function RegistrationCallbackPage({
     <div className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-4 px-6 py-16 text-center">
       {registration?.status === "CONFIRMED" ? (
         <>
+          <span className="text-3xl">✓</span>
           <h1 className="text-2xl font-semibold">You&apos;re in!</h1>
-          <p className="text-zinc-500">Your registration is confirmed.</p>
+          <p className="text-muted">Your registration is confirmed.</p>
         </>
       ) : (
         <>
           <h1 className="text-2xl font-semibold">Payment processing</h1>
-          <p className="text-zinc-500">
+          <p className="text-muted">
             This can take a minute. Refresh this page, or check back on the
             tournament page shortly.
           </p>
         </>
       )}
       {registration && (
-        <Link href={`/tournaments/${registration.tournamentId}`} className="font-medium underline">
+        <Link href={`/tournaments/${registration.tournamentId}`} className="font-medium text-brand underline">
           Back to tournament
         </Link>
       )}

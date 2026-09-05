@@ -27,14 +27,10 @@ export default function AcceptButton({ battleId }: { battleId: string }) {
 
   return (
     <div className="flex flex-col gap-1">
-      <button
-        onClick={handleClick}
-        disabled={submitting}
-        className="w-fit rounded bg-foreground px-6 py-3 font-medium text-background disabled:opacity-50"
-      >
+      <button onClick={handleClick} disabled={submitting} className="btn-primary w-fit">
         {submitting ? "Accepting…" : "Accept Battle"}
       </button>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
     </div>
   );
 }

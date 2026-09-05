@@ -1,26 +1,138 @@
 @import "tailwindcss";
 
+/*
+ * Design tokens — see docs/circuit-ui-references.md for the sourcing.
+ * Brand green doubles as the "live" status color (Discord's presence-dot
+ * idiom: a color that reads as real-time even backed by ordinary polling)
+ * and nods at Nigeria-first positioning without being literal about it.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f6f7f8;
+  --surface: #ffffff;
+  --surface-hover: #eef0f2;
+  --border: rgba(15, 23, 32, 0.1);
+  --border-strong: rgba(15, 23, 32, 0.18);
+  --foreground: #14171c;
+  --muted: #5b6472;
+
+  --brand: #10b981;
+  --brand-strong: #059669;
+  --brand-soft: rgba(16, 185, 129, 0.12);
+  --brand-foreground: #ffffff;
+
+  --status-live: #10b981;
+  --status-open: #0ea5e9;
+  --status-neutral: #6b7280;
+  --status-complete: #8b5cf6;
+  --status-cancelled: #ef4444;
+  --status-attention: #f59e0b;
+
+  --danger: #ef4444;
+  --danger-strong: #dc2626;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+
+  --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-foreground: var(--brand-foreground);
+
+  --color-status-live: var(--status-live);
+  --color-status-open: var(--status-open);
+  --color-status-neutral: var(--status-neutral);
+  --color-status-complete: var(--status-complete);
+  --color-status-cancelled: var(--status-cancelled);
+  --color-status-attention: var(--status-attention);
+
+  --color-danger: var(--danger);
+  --color-danger-strong: var(--danger-strong);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #0b0d10;
+    --surface: #14171c;
+    --surface-hover: #1b1f26;
+    --border: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.16);
+    --foreground: #f3f4f6;
+    --muted: #9199a6;
+
+    --brand-soft: rgba(16, 185, 129, 0.16);
   }
+}
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  color-scheme: light dark;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  background-image:
+    radial-gradient(ellipse 900px 500px at 50% -10%, var(--brand-soft), transparent);
+  background-repeat: no-repeat;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--brand-soft);
+  color: var(--foreground);
+}
+
+/*
+ * Shared form/button primitives — every form in the app (auth, tournament
+ * creation, registration, battle creation, result/ruling submission) was
+ * repeating the same input/button Tailwind soup with tiny drifts between
+ * copies. One definition here instead of a dozen near-duplicates.
+ */
+@layer components {
+  .field-label {
+    @apply text-sm font-medium;
+  }
+
+  .field-input {
+    @apply w-full rounded-lg border border-border bg-surface px-3.5 py-2.5 text-sm
+      outline-none transition placeholder:text-muted
+      focus:border-brand focus:ring-2 focus:ring-brand-soft;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-full bg-brand px-5 py-2.5
+      text-sm font-medium text-brand-foreground shadow-sm shadow-brand/30 transition
+      hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center rounded-full border border-border-strong
+      px-5 py-2.5 text-sm font-medium transition hover:bg-surface-hover
+      disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center justify-center rounded-full border border-danger/40
+      px-5 py-2.5 text-sm font-medium text-danger transition hover:bg-danger/10
+      disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .card {
+    @apply rounded-xl border border-border bg-surface p-5;
+  }
 }

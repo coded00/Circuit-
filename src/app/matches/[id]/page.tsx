@@ -7,6 +7,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
+import { StatusPill, matchStatusInfo } from "@/components/StatusPill";
 import ResultForm from "./ResultForm";
 import RulingForm from "./RulingForm";
 
@@ -44,45 +45,52 @@ export default async function MatchPage({
   const canRuleAsOrganizer =
     isOrganizer && match.dispute?.status === "ORGANIZER_REVIEW" && !isParticipant;
   const canRuleAsStaff = user?.isStaff === true && match.dispute?.status === "ESCALATED";
+  const status = matchStatusInfo(match.status);
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-6 py-16">
-      <div className="flex flex-col gap-1">
-        <span className="text-sm font-medium uppercase tracking-wide text-zinc-500">
-          {match.status.replace("_", " ")}
-        </span>
+      <div className="flex flex-col gap-2">
+        <StatusPill tone={status.tone}>{status.label}</StatusPill>
         <h1 className="text-2xl font-semibold">
           {match.tournament ? `${match.tournament.name} — Round ${match.round}` : "Battle match"}
         </h1>
-        <p className="text-sm text-zinc-500">Match code: {match.matchCode}</p>
+        <p className="font-mono text-xs text-muted">Match code · {match.matchCode}</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 rounded border border-black/10 p-4 dark:border-white/15">
-        <div>
-          <div className="text-xs text-zinc-500">Player A</div>
-          <div className="font-medium">{playerLabel(match.playerA)}</div>
-        </div>
-        <div>
-          <div className="text-xs text-zinc-500">Player B</div>
-          <div className="font-medium">{playerLabel(match.playerB)}</div>
-        </div>
+      <div className="card grid grid-cols-2 gap-4">
+        {[match.playerA, match.playerB].map((p, i) => {
+          const isWinner = match.winnerId === p.id;
+          return (
+            <div key={i} className="flex flex-col gap-1">
+              <div className="text-xs text-muted">Player {i === 0 ? "A" : "B"}</div>
+              <div className={isWinner ? "flex items-center gap-1.5 font-semibold text-brand" : "font-medium"}>
+                {isWinner && <span>🏆</span>}
+                {playerLabel(p)}
+              </div>
+            </div>
+          );
+        })}
       </div>
-
-      {match.status === "COMPLETE" && match.winner && (
-        <p className="text-sm text-zinc-500">
-          Winner: <span className="font-medium text-zinc-900 dark:text-zinc-100">{playerLabel(match.winner)}</span>
-        </p>
-      )}
 
       {(match.proofARef || match.proofBRef) && (
         <div className="flex gap-4 text-sm">
           {match.proofARef && (
-            <a href={`/api/matches/${match.id}/proof/a`} className="underline" target="_blank" rel="noreferrer">
+            <a
+              href={`/api/matches/${match.id}/proof/a`}
+              className="font-medium text-brand hover:underline"
+              target="_blank"
+              rel="noreferrer"
+            >
               View Player A&apos;s proof
             </a>
           )}
           {match.proofBRef && (
-            <a href={`/api/matches/${match.id}/proof/b`} className="underline" target="_blank" rel="noreferrer">
+            <a
+              href={`/api/matches/${match.id}/proof/b`}
+              className="font-medium text-brand hover:underline"
+              target="_blank"
+              rel="noreferrer"
+            >
               View Player B&apos;s proof
             </a>
           )}
@@ -93,14 +101,14 @@ export default async function MatchPage({
         <ResultForm matchId={match.id} playerA={match.playerA} playerB={match.playerB} />
       )}
       {isParticipant && hasSubmitted && match.status === "NEEDS_RESULT" && (
-        <p className="text-sm text-zinc-500">
+        <p className="rounded-lg border border-status-attention/30 bg-status-attention/10 px-4 py-3 text-sm text-status-attention">
           You&apos;ve submitted your result. Waiting on the other player.
         </p>
       )}
 
       {match.status === "DISPUTED" && match.dispute && (
-        <div className="flex flex-col gap-2 rounded border border-amber-300 p-4 text-sm dark:border-amber-800">
-          <p className="font-medium">This match is under dispute review.</p>
+        <div className="flex flex-col gap-3 rounded-xl border border-status-cancelled/30 bg-status-cancelled/5 p-4 text-sm">
+          <p className="font-medium text-status-cancelled">This match is under dispute review.</p>
           {canRuleAsOrganizer && match.dispute && (
             <RulingForm
               disputeId={match.dispute.id}

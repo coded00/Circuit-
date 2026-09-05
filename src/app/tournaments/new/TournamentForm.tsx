@@ -3,10 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-const inputClass =
-  "rounded border border-black/15 px-3 py-2 dark:border-white/20 dark:bg-black";
-const labelClass = "text-sm font-medium";
-const fieldClass = "flex flex-col gap-1";
+const inputClass = "field-input";
+const labelClass = "field-label";
+const fieldClass = "flex flex-col gap-1.5";
 
 function nairaToKobo(value: string): number {
   const naira = Number(value || 0);
@@ -98,7 +97,7 @@ export default function TournamentForm() {
 
       <div className={fieldClass}>
         <span className={labelClass}>Format</span>
-        <span className="text-sm text-zinc-500">
+        <span className="text-sm text-muted">
           Single-elimination knockout — the only format Circuit supports in V1.
         </span>
       </div>
@@ -220,13 +219,9 @@ export default function TournamentForm() {
         />
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
 
-      <button
-        type="submit"
-        disabled={submitting}
-        className="rounded bg-foreground px-4 py-2 font-medium text-background disabled:opacity-50"
-      >
+      <button type="submit" disabled={submitting} className="btn-primary w-full">
         {submitting ? "Creating…" : "Create tournament"}
       </button>
     </form>

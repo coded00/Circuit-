@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { OptionCard } from "@/components/OptionCard";
 
 type PlayerOption = { id: string; displayName: string; handle: string };
 
@@ -51,35 +52,30 @@ export default function RulingForm({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-      <fieldset className="flex flex-col gap-2">
-        <legend className="text-sm font-medium">Ruling</legend>
-        {[playerA, playerB].map((player) => (
-          <label key={player.id} className="flex items-center gap-2 text-sm">
-            <input
-              type="radio"
-              name="ruledWinnerId"
-              value={player.id}
-              checked={!voidMatch && winnerId === player.id}
-              onChange={() => {
+      <div className="flex flex-col gap-2">
+        <span className="field-label">Ruling</span>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {[playerA, playerB].map((player) => (
+            <OptionCard
+              key={player.id}
+              selected={!voidMatch && winnerId === player.id}
+              onSelect={() => {
                 setWinnerId(player.id);
                 setVoidMatch(false);
               }}
+              title={`${player.displayName} wins`}
             />
-            {player.displayName} wins
-          </label>
-        ))}
+          ))}
+        </div>
         {allowVoid && (
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="radio"
-              name="ruledWinnerId"
-              checked={voidMatch}
-              onChange={() => setVoidMatch(true)}
-            />
-            Void this match (no winner)
-          </label>
+          <OptionCard
+            selected={voidMatch}
+            onSelect={() => setVoidMatch(true)}
+            title="Void this match"
+            description="No winner — Battle only, nothing to return"
+          />
         )}
-      </fieldset>
+      </div>
 
       <textarea
         required
@@ -87,15 +83,15 @@ export default function RulingForm({
         value={ruling}
         onChange={(e) => setRuling(e.target.value)}
         rows={3}
-        className="rounded border border-black/15 px-3 py-2 text-sm dark:border-white/20 dark:bg-black"
+        className="field-input"
       />
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
 
       <button
         type="submit"
         disabled={submitting || (!voidMatch && !winnerId)}
-        className="w-fit rounded bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-50"
+        className="btn-primary w-fit"
       >
         {submitting ? "Submitting ruling…" : "Submit ruling"}
       </button>

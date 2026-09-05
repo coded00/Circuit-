@@ -2,11 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-
-const inputClass =
-  "rounded border border-black/15 px-3 py-2 dark:border-white/20 dark:bg-black";
-const labelClass = "text-sm font-medium";
-const fieldClass = "flex flex-col gap-1";
+import { OptionCard } from "@/components/OptionCard";
 
 export default function BattleForm() {
   const router = useRouter();
@@ -45,9 +41,9 @@ export default function BattleForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-      <div className={fieldClass}>
-        <label htmlFor="game" className={labelClass}>
+    <form onSubmit={handleSubmit} className="card flex flex-col gap-5">
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="game" className="field-label">
           Game
         </label>
         <input
@@ -56,41 +52,49 @@ export default function BattleForm() {
           placeholder="e.g. EA FC 26"
           value={game}
           onChange={(e) => setGame(e.target.value)}
-          className={inputClass}
+          className="field-input"
         />
       </div>
 
-      <fieldset className="flex flex-col gap-2">
-        <legend className={labelClass}>Format</legend>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="radio" checked={format === "SINGLE"} onChange={() => setFormat("SINGLE")} />
-          Single match
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="radio" checked={format === "BEST_OF_3"} onChange={() => setFormat("BEST_OF_3")} />
-          Best of 3
-        </label>
-      </fieldset>
-
-      <fieldset className="flex flex-col gap-2">
-        <legend className={labelClass}>Who can accept</legend>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="radio" checked={visibility === "OPEN"} onChange={() => setVisibility("OPEN")} />
-          Anyone — post to the open board
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="radio"
-            checked={visibility === "TARGETED"}
-            onChange={() => setVisibility("TARGETED")}
+      <div className="flex flex-col gap-2">
+        <span className="field-label">Format</span>
+        <div className="grid grid-cols-2 gap-2">
+          <OptionCard
+            selected={format === "SINGLE"}
+            onSelect={() => setFormat("SINGLE")}
+            title="Single match"
+            description="One game decides it"
           />
-          A specific player
-        </label>
-      </fieldset>
+          <OptionCard
+            selected={format === "BEST_OF_3"}
+            onSelect={() => setFormat("BEST_OF_3")}
+            title="Best of 3"
+            description="First to 2 wins"
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <span className="field-label">Who can accept</span>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <OptionCard
+            selected={visibility === "OPEN"}
+            onSelect={() => setVisibility("OPEN")}
+            title="Anyone"
+            description="Posted to the open board"
+          />
+          <OptionCard
+            selected={visibility === "TARGETED"}
+            onSelect={() => setVisibility("TARGETED")}
+            title="A specific player"
+            description="They're notified directly"
+          />
+        </div>
+      </div>
 
       {visibility === "TARGETED" && (
-        <div className={fieldClass}>
-          <label htmlFor="targetHandle" className={labelClass}>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="targetHandle" className="field-label">
             Their handle
           </label>
           <input
@@ -99,18 +103,14 @@ export default function BattleForm() {
             placeholder="e.g. player_kb6rfwj1"
             value={targetHandle}
             onChange={(e) => setTargetHandle(e.target.value)}
-            className={inputClass}
+            className="field-input"
           />
         </div>
       )}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
 
-      <button
-        type="submit"
-        disabled={submitting}
-        className="rounded bg-foreground px-4 py-2 font-medium text-background disabled:opacity-50"
-      >
+      <button type="submit" disabled={submitting} className="btn-primary w-full">
         {submitting ? "Opening…" : "Open Battle"}
       </button>
     </form>

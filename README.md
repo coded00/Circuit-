@@ -125,3 +125,12 @@ shareable public page at `/tournaments/[id]`.
 - **`assertAgeGate()` goes on cash-touching actions only** — paid
   registration, payout claim. Never on a browsing or discovery route (see
   TRU-5 in the PRD).
+- **Design tokens live in `src/app/globals.css`, not scattered Tailwind
+  colors.** Use `bg-surface`/`text-muted`/`border-border`/`bg-brand`/etc.,
+  never `zinc-*` or `black/white` opacity classes — see
+  `docs/circuit-ui-references.md` for where each pattern came from.
+  Shared primitives: `.field-input`/`.field-label`/`.btn-primary`/
+  `.btn-secondary`/`.btn-danger`/`.card` (global CSS classes) and
+  `<StatusPill>`/`<OptionCard>`/`<LiveCounter>` (`src/components/`). Mobile
+  nav is `BottomTabBar` (`sm:hidden`), not a squeezed copy of
+  `SiteHeader`'s desktop nav — reflow into it, don't add a third nav.

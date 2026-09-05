@@ -6,6 +6,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
+import { StatusPill, battleStatusInfo } from "@/components/StatusPill";
 import AcceptButton from "./AcceptButton";
 import CancelBattleButton from "./CancelBattleButton";
 
@@ -33,37 +34,43 @@ export default async function BattlePage({
     !isCreator &&
     battle.status === "OPEN" &&
     (battle.visibility === "OPEN" || battle.targetUserId === user.id);
+  const status = battleStatusInfo(battle.status);
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-6 py-16">
-      <div className="flex flex-col gap-1">
-        <span className="text-sm font-medium uppercase tracking-wide text-zinc-500">
-          {battle.status}
-        </span>
+      <div className="flex flex-col gap-2">
+        <StatusPill tone={status.tone} pulse={status.pulse}>
+          {status.label}
+        </StatusPill>
         <h1 className="text-2xl font-semibold">{battle.game}</h1>
-        <p className="text-zinc-500">
+        <p className="text-muted">
           {battle.format === "BEST_OF_3" ? "Best of 3" : "Single match"} ·{" "}
           {battle.visibility === "TARGETED" ? "Targeted challenge" : "Open to anyone"}
         </p>
       </div>
 
-      <p className="text-sm text-zinc-500">
-        Opened by {battle.creator.displayName} (@{battle.creator.handle})
+      <div className="card text-sm text-muted">
+        Opened by <span className="font-medium text-foreground">{battle.creator.displayName}</span> (@
+        {battle.creator.handle})
         {battle.targetUser && (
           <>
             {" "}
-            — challenging {battle.targetUser.displayName} (@{battle.targetUser.handle})
+            — challenging{" "}
+            <span className="font-medium text-foreground">{battle.targetUser.displayName}</span> (@
+            {battle.targetUser.handle})
           </>
         )}
-      </p>
+      </div>
 
       {battle.status === "ACCEPTED" && battle.matches[0] && (
-        <Link href={`/matches/${battle.matches[0].id}`} className="w-fit font-medium underline">
-          View match
+        <Link href={`/matches/${battle.matches[0].id}`} className="btn-primary w-fit">
+          View match →
         </Link>
       )}
       {battle.status === "CANCELLED" && (
-        <p className="text-sm text-zinc-500">This Battle was cancelled.</p>
+        <p className="rounded-lg border border-border bg-surface px-4 py-3 text-sm text-muted">
+          This Battle was cancelled.
+        </p>
       )}
       {isCreator && battle.status === "OPEN" && <CancelBattleButton battleId={battle.id} />}
       {canAccept && <AcceptButton battleId={battle.id} />}

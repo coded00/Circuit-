@@ -51,22 +51,24 @@ export default async function StaffDisputeQueuePage() {
       <h1 className="text-2xl font-semibold">Escalated disputes</h1>
 
       {disputes.length === 0 ? (
-        <p className="text-zinc-500">No escalated disputes right now.</p>
+        <p className="card text-center text-muted">No escalated disputes right now.</p>
       ) : (
         <div className="flex flex-col gap-3">
           {disputes.map((dispute) => (
             <Link
               key={dispute.id}
               href={`/matches/${dispute.matchId}`}
-              className="flex flex-col gap-1 rounded border border-black/10 p-4 hover:bg-black/[.02] dark:border-white/15 dark:hover:bg-white/[.04]"
+              className="flex flex-col gap-1 rounded-xl border border-border bg-surface p-4 transition hover:border-border-strong hover:bg-surface-hover"
             >
               <div className="flex items-center justify-between">
                 <span className="font-medium">
                   {dispute.match.tournament?.name ?? `Battle (${dispute.match.battle?.game})`}
                 </span>
-                <span className="text-xs text-zinc-500">Waiting {timeSince(dispute.createdAt)}</span>
+                <span className="rounded-full bg-status-attention/15 px-2.5 py-1 text-xs font-medium text-status-attention">
+                  Waiting {timeSince(dispute.createdAt)}
+                </span>
               </div>
-              <span className="text-sm text-zinc-500">
+              <span className="text-sm text-muted">
                 {dispute.match.playerA.displayName} vs {dispute.match.playerB.displayName}
               </span>
             </Link>

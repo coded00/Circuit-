@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { OptionCard } from "@/components/OptionCard";
 
 type PlayerOption = { id: string; displayName: string; handle: string };
 
@@ -44,28 +45,26 @@ export default function ResultForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4 rounded border border-black/10 p-4 dark:border-white/15">
+    <form onSubmit={handleSubmit} className="card flex flex-col gap-4">
       <h2 className="text-lg font-semibold">Submit result</h2>
 
-      <fieldset className="flex flex-col gap-2">
-        <legend className="text-sm font-medium">Winner</legend>
-        {[playerA, playerB].map((player) => (
-          <label key={player.id} className="flex items-center gap-2 text-sm">
-            <input
-              type="radio"
-              name="winnerId"
-              value={player.id}
-              checked={winnerId === player.id}
-              onChange={() => setWinnerId(player.id)}
-              required
+      <div className="flex flex-col gap-2">
+        <span className="field-label">Winner</span>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {[playerA, playerB].map((player) => (
+            <OptionCard
+              key={player.id}
+              selected={winnerId === player.id}
+              onSelect={() => setWinnerId(player.id)}
+              title={player.displayName}
+              description={`@${player.handle}`}
             />
-            {player.displayName} (@{player.handle})
-          </label>
-        ))}
-      </fieldset>
+          ))}
+        </div>
+      </div>
 
-      <div className="flex flex-col gap-1">
-        <label htmlFor="score" className="text-sm font-medium">
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="score" className="field-label">
           Score
         </label>
         <input
@@ -74,12 +73,12 @@ export default function ResultForm({
           placeholder="e.g. 3-1"
           value={score}
           onChange={(e) => setScore(e.target.value)}
-          className="rounded border border-black/15 px-3 py-2 dark:border-white/20 dark:bg-black"
+          className="field-input"
         />
       </div>
 
-      <div className="flex flex-col gap-1">
-        <label htmlFor="proof" className="text-sm font-medium">
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="proof" className="field-label">
           Proof (screenshot or clip)
         </label>
         <input
@@ -88,28 +87,24 @@ export default function ResultForm({
           type="file"
           accept="image/*,video/*"
           required
-          className="text-sm"
+          className="text-sm text-muted file:mr-3 file:rounded-full file:border-0 file:bg-surface-hover file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-foreground"
         />
       </div>
 
-      <label className="flex items-start gap-2 text-sm">
+      <label className="flex items-start gap-2 text-sm text-muted">
         <input
           type="checkbox"
           checked={confirmed}
           onChange={(e) => setConfirmed(e.target.checked)}
           required
-          className="mt-1"
+          className="mt-1 accent-brand"
         />
         I confirm the match code shown to both players is visible in this proof.
       </label>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
 
-      <button
-        type="submit"
-        disabled={submitting}
-        className="w-fit rounded bg-foreground px-4 py-2 font-medium text-background disabled:opacity-50"
-      >
+      <button type="submit" disabled={submitting} className="btn-primary w-fit">
         {submitting ? "Submitting…" : "Submit result"}
       </button>
     </form>

@@ -9,6 +9,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import Poller from "@/app/Poller";
+import { StatusPill } from "@/components/StatusPill";
 
 export default async function BattleBoardPage({
   searchParams,
@@ -32,7 +33,7 @@ export default async function BattleBoardPage({
       <Poller />
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Open Battles</h1>
-        <Link href="/battles/new" className="text-sm font-medium underline">
+        <Link href="/battles/new" className="btn-primary">
           Open a Battle
         </Link>
       </div>
@@ -43,30 +44,33 @@ export default async function BattleBoardPage({
           name="game"
           defaultValue={game ?? ""}
           placeholder="Filter by game"
-          className="flex-1 rounded border border-black/15 px-3 py-2 text-sm dark:border-white/20 dark:bg-black"
+          className="field-input flex-1"
         />
-        <button type="submit" className="rounded border border-black/15 px-4 py-2 text-sm dark:border-white/20">
+        <button type="submit" className="btn-secondary">
           Filter
         </button>
       </form>
 
       {battles.length === 0 ? (
-        <p className="text-zinc-500">No open Battles right now.</p>
+        <p className="card text-center text-muted">No open Battles right now.</p>
       ) : (
         <div className="flex flex-col gap-3">
           {battles.map((battle) => (
             <Link
               key={battle.id}
               href={`/battles/${battle.id}`}
-              className="flex items-center justify-between rounded border border-black/10 p-4 text-sm hover:bg-black/[.02] dark:border-white/15 dark:hover:bg-white/[.04]"
+              className="flex items-center justify-between rounded-xl border border-border bg-surface p-4 text-sm transition hover:border-border-strong hover:bg-surface-hover"
             >
               <div className="flex flex-col gap-1">
                 <span className="font-medium">{battle.game}</span>
-                <span className="text-zinc-500">
+                <span className="text-muted">
                   {battle.format === "BEST_OF_3" ? "Best of 3" : "Single match"} · opened by{" "}
                   {battle.creator.displayName} (@{battle.creator.handle})
                 </span>
               </div>
+              <StatusPill tone="live" pulse>
+                Open
+              </StatusPill>
             </Link>
           ))}
         </div>

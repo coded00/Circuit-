@@ -11,6 +11,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
+import { StatusPill, tournamentStatusInfo } from "@/components/StatusPill";
 import CancelButton from "./CancelButton";
 import WithdrawButton from "./WithdrawButton";
 
@@ -55,66 +56,76 @@ export default async function TournamentPage({
     now >= tournament.registrationOpenAt &&
     now < tournament.registrationCloseAt &&
     registrantCount < tournament.participantCap;
+  const status = tournamentStatusInfo(tournament.status);
+  const fillPct = Math.min(100, Math.round((registrantCount / tournament.participantCap) * 100));
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-6 py-16">
-      <div className="flex flex-col gap-1">
-        <span className="text-sm font-medium uppercase tracking-wide text-zinc-500">
-          {tournament.status.replace("_", " ")}
-        </span>
-        <h1 className="text-3xl font-semibold">{tournament.name}</h1>
-        <p className="text-zinc-500">{tournament.game} · Single-elimination knockout</p>
-        {(tournament.status === "LIVE" || tournament.status === "COMPLETE") && (
-          <Link href={`/tournaments/${tournament.id}/bracket`} className="w-fit text-sm font-medium underline">
-            View bracket
-          </Link>
-        )}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+          <StatusPill tone={status.tone} pulse={status.pulse}>
+            {status.label}
+          </StatusPill>
+          {(tournament.status === "LIVE" || tournament.status === "COMPLETE") && (
+            <Link
+              href={`/tournaments/${tournament.id}/bracket`}
+              className="text-sm font-medium text-brand underline"
+            >
+              View bracket →
+            </Link>
+          )}
+        </div>
+        <h1 className="text-3xl font-semibold tracking-tight">{tournament.name}</h1>
+        <p className="text-muted">{tournament.game} · Single-elimination knockout</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 rounded border border-black/10 p-4 dark:border-white/15 sm:grid-cols-4">
+      <div className="card grid grid-cols-2 gap-5 sm:grid-cols-4">
         <div>
-          <div className="text-xs text-zinc-500">Entry fee</div>
+          <div className="text-xs text-muted">Entry fee</div>
           <div className="font-medium">
             {tournament.entryFee === 0 ? "Free" : formatNaira(tournament.entryFee)}
           </div>
         </div>
         <div>
-          <div className="text-xs text-zinc-500">Prize</div>
+          <div className="text-xs text-muted">Prize</div>
           <div className="font-medium">
-            {tournament.prizeAmount ? formatNaira(tournament.prizeAmount) : tournament.prizeText ?? "—"}
+            {tournament.prizeAmount ? formatNaira(tournament.prizeAmount) : (tournament.prizeText ?? "—")}
           </div>
         </div>
-        <div>
-          <div className="text-xs text-zinc-500">Registrants</div>
+        <div className="col-span-2 sm:col-span-1">
+          <div className="text-xs text-muted">Registrants</div>
           <div className="font-medium">
             {registrantCount} / {tournament.participantCap}
           </div>
+          <div className="mt-1.5 h-1.5 w-full max-w-24 overflow-hidden rounded-full bg-surface-hover">
+            <div className="h-full rounded-full bg-brand transition-all" style={{ width: `${fillPct}%` }} />
+          </div>
         </div>
         <div>
-          <div className="text-xs text-zinc-500">Starts</div>
+          <div className="text-xs text-muted">Starts</div>
           <div className="font-medium">{formatDate(tournament.startAt)}</div>
         </div>
       </div>
 
-      <div className="flex flex-col gap-1 text-sm text-zinc-500">
+      <div className="flex flex-col gap-1 text-sm text-muted">
         <span>Registration opens {formatDate(tournament.registrationOpenAt)}</span>
         <span>Registration closes {formatDate(tournament.registrationCloseAt)}</span>
       </div>
 
       {tournament.prizeText && tournament.prizeAmount ? (
-        <p className="text-sm text-zinc-500">{tournament.prizeText}</p>
+        <p className="text-sm text-muted">{tournament.prizeText}</p>
       ) : null}
 
       <div className="flex flex-col gap-1">
         {tournament.status === "CANCELLED" ? (
-          <p className="rounded border border-red-300 px-4 py-2 text-sm text-red-600 dark:border-red-900">
+          <p className="rounded-lg border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">
             This tournament has been cancelled. Paid entries have been refunded.
           </p>
         ) : isOrganizer ? (
           <CancelButton tournamentId={tournament.id} />
         ) : myRegistration?.status === "CONFIRMED" ? (
           <div className="flex flex-col gap-2">
-            <p className="text-sm text-zinc-500">You&apos;re registered for this tournament.</p>
+            <p className="text-sm text-muted">You&apos;re registered for this tournament.</p>
             {now < tournament.registrationCloseAt &&
               tournament.status !== "LIVE" &&
               tournament.status !== "COMPLETE" && (
@@ -122,24 +133,21 @@ export default async function TournamentPage({
               )}
           </div>
         ) : myRegistration?.status === "PENDING_PAYMENT" ? (
-          <p className="text-sm text-zinc-500">
+          <p className="text-sm text-muted">
             Your payment is processing.{" "}
             <Link
               href={`/tournaments/${tournament.id}/register/callback?ref=${myRegistration.paymentRef}`}
-              className="font-medium underline"
+              className="font-medium text-brand underline"
             >
               Check status
             </Link>
           </p>
         ) : registrationOpen ? (
-          <Link
-            href={`/tournaments/${tournament.id}/register`}
-            className="w-fit rounded-full bg-foreground px-6 py-3 font-medium text-background"
-          >
+          <Link href={`/tournaments/${tournament.id}/register`} className="btn-primary w-fit">
             Register
           </Link>
         ) : (
-          <p className="text-sm text-zinc-500">
+          <p className="text-sm text-muted">
             {now < tournament.registrationOpenAt
               ? "Registration hasn't opened yet."
               : now >= tournament.registrationCloseAt
@@ -149,11 +157,9 @@ export default async function TournamentPage({
         )}
       </div>
 
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2 border-t border-border pt-6">
         <h2 className="text-lg font-semibold">Rules</h2>
-        <p className="whitespace-pre-wrap text-zinc-700 dark:text-zinc-300">
-          {tournament.rulesText}
-        </p>
+        <p className="whitespace-pre-wrap text-sm text-muted">{tournament.rulesText}</p>
       </div>
     </div>
   );

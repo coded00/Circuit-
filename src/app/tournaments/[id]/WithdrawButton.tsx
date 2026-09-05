@@ -28,14 +28,10 @@ export default function WithdrawButton({ registrationId }: { registrationId: str
 
   return (
     <div className="flex flex-col gap-1">
-      <button
-        onClick={handleClick}
-        disabled={submitting}
-        className="rounded border border-black/15 px-4 py-2 text-sm font-medium disabled:opacity-50 dark:border-white/20"
-      >
+      <button onClick={handleClick} disabled={submitting} className="btn-secondary w-fit">
         {submitting ? "Withdrawing…" : "Withdraw"}
       </button>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
     </div>
   );
 }

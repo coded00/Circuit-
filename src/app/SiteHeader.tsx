@@ -6,30 +6,38 @@ export default async function SiteHeader() {
   const user = await getCurrentUser();
 
   return (
-    <header className="flex items-center justify-between border-b border-black/10 px-6 py-3 text-sm dark:border-white/15">
-      <div className="flex items-center gap-4">
-        <Link href="/" className="font-semibold">
+    <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border bg-background/80 px-4 py-3 text-sm backdrop-blur-md sm:px-6">
+      <div className="flex min-w-0 items-center gap-6">
+        <Link href="/" className="flex shrink-0 items-center gap-1.5 font-semibold tracking-tight">
+          <span className="h-2 w-2 rounded-full bg-brand" />
           Circuit
         </Link>
-        <Link href="/battles" className="text-zinc-500">
-          Battles
-        </Link>
-        <Link href="/ladder" className="text-zinc-500">
-          Ladders
-        </Link>
+        {/* Battles/Ladders live in BottomTabBar on mobile — no squeezed
+            duplicate nav here, per docs/circuit-ui-references.md. */}
+        <nav className="hidden items-center gap-5 sm:flex">
+          <Link href="/battles" className="text-muted transition hover:text-foreground">
+            Battles
+          </Link>
+          <Link href="/ladder" className="text-muted transition hover:text-foreground">
+            Ladders
+          </Link>
+        </nav>
       </div>
-      <div className="flex items-center gap-4">
+      <div className="flex min-w-0 shrink-0 items-center gap-3 sm:gap-4">
         {user ? (
           <>
-            <span className="text-zinc-500">@{user.handle}</span>
+            <span className="hidden truncate text-muted sm:inline">@{user.handle}</span>
             <LogoutButton />
           </>
         ) : (
           <>
-            <Link href="/login" className="font-medium">
+            <Link href="/login" className="font-medium text-muted transition hover:text-foreground">
               Log in
             </Link>
-            <Link href="/signup" className="font-medium">
+            <Link
+              href="/signup"
+              className="rounded-full bg-brand px-4 py-1.5 font-medium text-brand-foreground transition hover:bg-brand-strong"
+            >
               Sign up
             </Link>
           </>
