@@ -115,9 +115,11 @@ export default async function TournamentPage({
         ) : myRegistration?.status === "CONFIRMED" ? (
           <div className="flex flex-col gap-2">
             <p className="text-sm text-zinc-500">You&apos;re registered for this tournament.</p>
-            {now < tournament.registrationCloseAt && (
-              <WithdrawButton registrationId={myRegistration.id} />
-            )}
+            {now < tournament.registrationCloseAt &&
+              tournament.status !== "LIVE" &&
+              tournament.status !== "COMPLETE" && (
+                <WithdrawButton registrationId={myRegistration.id} />
+              )}
           </div>
         ) : myRegistration?.status === "PENDING_PAYMENT" ? (
           <p className="text-sm text-zinc-500">

@@ -52,6 +52,7 @@ export async function POST(
   await prisma.tournament.update({ where: { id }, data: { status: "CANCELLED" } });
 
   const failedRefunds: string[] = [];
+  let refundedCount = 0;
 
   for (const registration of confirmedRegistrations) {
     const paidEntryFeeTxn = registration.escrowTxns.find(
@@ -83,6 +84,7 @@ export async function POST(
           },
         }),
       ]);
+      refundedCount++;
     } catch {
       failedRefunds.push(registration.id);
     }
@@ -90,7 +92,7 @@ export async function POST(
 
   return NextResponse.json({
     ok: true,
-    refunded: confirmedRegistrations.length - failedRefunds.length,
+    refunded: refundedCount,
     failedRegistrationIds: failedRefunds,
   });
 }

@@ -34,6 +34,17 @@ export async function POST(
       { status: 409 }
     );
   }
+  // A bracket can finish well before the registration deadline passes
+  // (byes and fast-resolving matches make this the common case, not an
+  // edge case) — REG-4's own gate is "before registration closes," but
+  // withdrawing after already playing (and possibly winning) a bracket
+  // match makes no sense and was reachable without this check.
+  if (registration.tournament.status === "LIVE" || registration.tournament.status === "COMPLETE") {
+    return NextResponse.json(
+      { error: "This tournament's bracket has already started — you can no longer withdraw." },
+      { status: 409 }
+    );
+  }
 
   // Known gap, accepted for V1: withdrawing a still-PENDING_PAYMENT
   // registration just marks it WITHDRAWN with no refund attempt, since
