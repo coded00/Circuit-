@@ -66,6 +66,11 @@ export function AppSidebar({ user, disputeCount }: { user: NavUser; disputeCount
 
   return (
     <aside className="sticky top-0 hidden h-screen w-full flex-col gap-6 overflow-y-auto border-r border-border px-3 py-6 sm:flex">
+      <Link href="/" className="flex shrink-0 items-center gap-1.5 px-3 font-semibold tracking-tight">
+        <span className="h-2 w-2 rounded-full bg-brand" />
+        Circuit
+      </Link>
+
       <nav className="flex flex-col gap-1">
         {PRIMARY.map((item) => (
           <NavLink key={item.href} item={item} active={isActive(pathname, item.href)} />
