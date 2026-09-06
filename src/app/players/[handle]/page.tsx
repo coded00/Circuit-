@@ -56,10 +56,10 @@ export default async function PlayerProfilePage({
           <img
             src={player.avatarUrl}
             alt=""
-            className="h-16 w-16 rounded-full border border-border object-cover"
+            className="h-16 w-16 rounded-full border-2 border-brand/40 object-cover"
           />
         ) : (
-          <div className="flex h-16 w-16 items-center justify-center rounded-full border border-border bg-surface text-xl font-semibold text-muted">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-brand/40 bg-surface text-xl font-semibold text-muted">
             {player.displayName.slice(0, 1).toUpperCase()}
           </div>
         )}

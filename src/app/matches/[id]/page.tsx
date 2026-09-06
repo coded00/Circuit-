@@ -148,7 +148,7 @@ export default async function MatchPage({
       </div>
 
       {(match.proofARef || match.proofBRef) && (
-        <div className="flex gap-4 text-sm">
+        <div className="flex flex-wrap gap-4 text-sm">
           {match.proofARef && (
             <a
               href={`/api/matches/${match.id}/proof/a`}

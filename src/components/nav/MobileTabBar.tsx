@@ -17,7 +17,6 @@ import {
   Swords,
   Plus,
   MessageSquare,
-  Menu as MenuIcon,
   X,
   Trophy,
   User as UserIcon,
@@ -86,15 +85,15 @@ export function MobileTabBar({ user }: { user: NavUser }) {
         </Link>
         <Link href="/community" className="flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs text-muted">
           <MessageSquare size={18} />
-          Community
+          Social
         </Link>
         <button
           type="button"
           onClick={() => setMenuOpen(true)}
           className="flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs text-muted"
         >
-          <MenuIcon size={18} />
-          Menu
+          <UserIcon size={18} />
+          Profile
         </button>
       </nav>
 

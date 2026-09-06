@@ -41,6 +41,7 @@ type TournamentCard = {
   startAt: Date;
   prizeAmount: number | null;
   prizeText: string | null;
+  format: string;
   _count: { registrations: number };
 };
 
@@ -50,6 +51,17 @@ function formatCardDate(date: Date): string {
 
 function formatNaira(kobo: number): string {
   return `₦ ${(kobo / 100).toLocaleString("en-NG")}`;
+}
+
+/** Tournament.format is a free-text string (V1 is knockout-only, D2) —
+ *  title-cased for display rather than a hardcoded label map, so a future
+ *  V2 format still renders sensibly without a code change here. */
+function formatLabel(format: string): string {
+  return format
+    .toLowerCase()
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }
 
 /** Red is reserved for true LIVE/broadcast indicators and alerts per the
@@ -137,10 +149,15 @@ function TournamentGrid({ tournaments }: { tournaments: TournamentCard[] }) {
                 <Calendar size={12} />
                 {formatCardDate(tournament.startAt)}
               </span>
-              <span className="flex items-center gap-1.5 text-xs text-muted">
-                <Users size={12} />
-                {tournament._count.registrations}/{tournament.participantCap} players
-                {tournament.streamUrl && <Tv size={12} />}
+              <span className="flex items-center justify-between gap-1.5 text-xs text-muted">
+                <span className="flex items-center gap-1.5">
+                  <Users size={12} />
+                  {tournament._count.registrations}/{tournament.participantCap} players
+                  {tournament.streamUrl && <Tv size={12} />}
+                </span>
+                <span className="shrink-0 rounded-full bg-surface-hover px-2 py-0.5 text-[10px] font-medium text-muted">
+                  {formatLabel(tournament.format)}
+                </span>
               </span>
             </div>
           </Link>
@@ -203,6 +220,7 @@ export default async function Home({
     startAt: true,
     prizeAmount: true,
     prizeText: true,
+    format: true,
     _count: { select: { registrations: { where: { status: "CONFIRMED" as const } } } },
   } as const;
 
@@ -281,9 +299,16 @@ export default async function Home({
           "linear-gradient(135deg, #0b0d10, #140f1f 55%, #1a0f24)",
       }}
     >
+      <span className="absolute top-6 right-6 z-10 hidden text-right text-xs font-semibold tracking-[0.2em] text-white/40 uppercase sm:block">
+        Tournaments
+        <br />
+        Battles
+        <br />
+        Payouts
+      </span>
       <div className="relative z-10 flex flex-col items-start gap-4">
         <LiveCounter label="competing right now" count={liveTournamentCount} />
-        <h1 className="max-w-md text-4xl leading-[1.05] font-bold tracking-tight text-white sm:text-5xl">
+        <h1 className="max-w-md text-5xl leading-[1.02] font-bold tracking-tight text-white sm:text-6xl">
           Play.
           <br />
           Compete.
@@ -472,12 +497,38 @@ export default async function Home({
           )}
         </div>
 
-        {/* Right column: Leaderboard (Next Tournament lives in the hero
-            row above; a "Live Now" mini-widget used to duplicate the main
-            content column's own "Live now" section a few pixels to its
-            left — same tournaments, near-identical label — so it's gone,
-            not just restyled). */}
+        {/* Right column: a compact Live Now widget (reference: NEXA's
+            homepage keeps a right-rail Live Now grid alongside the main
+            feed's own "Live now" section — same underlying tournaments,
+            just a denser at-a-glance repeat, so this reuses the already-
+            fetched `liveTournaments` rather than a new query) plus the
+            Leaderboard. Next Tournament lives in the hero row above. */}
         <div className="flex min-w-0 flex-col gap-6">
+          {liveTournaments.length > 0 && (
+            <div className="flex flex-col gap-3">
+              <h2 className="flex items-center gap-2 text-sm font-semibold">
+                <Radio size={15} className="text-muted" />
+                Live Now
+              </h2>
+              <div className="grid grid-cols-2 gap-2">
+                {liveTournaments.slice(0, 2).map((t) => (
+                  <Link
+                    key={t.id}
+                    href={`/tournaments/${t.id}`}
+                    className="flex flex-col overflow-hidden rounded-lg border border-border transition hover:border-border-strong"
+                  >
+                    <GameArtTile game={t.game} className="h-16 w-full">
+                      <span className="absolute top-1 right-1">
+                        <LiveBadge />
+                      </span>
+                    </GameArtTile>
+                    <span className="truncate bg-surface px-2 py-1.5 text-xs font-medium">{t.name}</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
           {topLeaderboard.length > 0 && (
             <div className="flex flex-col gap-3">
               <h2 className="flex items-center gap-2 text-sm font-semibold">

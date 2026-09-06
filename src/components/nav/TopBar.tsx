@@ -12,7 +12,7 @@ export async function TopBar({ user }: { user: User | null }) {
     : 0;
 
   return (
-    <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-background/80 px-4 py-3 backdrop-blur-md sm:px-6">
+    <header className="sticky top-0 z-10 flex items-center gap-4 border-b border-border bg-background/80 px-4 py-4 backdrop-blur-md sm:px-8">
       {/* AppSidebar carries the logo at sm: and up (it's hidden below
           that breakpoint) — mobile has no persistent sidebar, so the
           logo needs its own home here, shown only below sm:. */}
@@ -23,7 +23,7 @@ export async function TopBar({ user }: { user: User | null }) {
 
       <SearchInput className="hidden min-w-0 flex-1 sm:block" />
 
-      <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
+      <div className="ml-auto flex shrink-0 items-center gap-3 sm:gap-4">
         {user ? (
           <>
             <CreateMenu />

@@ -28,6 +28,17 @@ function formatDate(date: Date): string {
   });
 }
 
+/** Tournament.format is a free-text string (V1 is knockout-only, D2) —
+ *  title-cased for display, matching the homepage card's treatment of the
+ *  same field, rather than a hardcoded "Single-elimination knockout" label. */
+function formatLabel(format: string): string {
+  return format
+    .toLowerCase()
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
 export default async function TournamentPage({
   params,
 }: {
@@ -76,7 +87,7 @@ export default async function TournamentPage({
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-6 py-16">
       <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <StatusPill tone={status.tone} pulse={status.pulse}>
             {status.label}
           </StatusPill>
@@ -101,7 +112,12 @@ export default async function TournamentPage({
           )}
         </div>
         <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">{tournament.name}</h1>
-        <p className="text-muted">{tournament.game} · Single-elimination knockout</p>
+        <p className="text-muted">
+          {tournament.game} ·{" "}
+          <span className="rounded-full bg-surface-hover px-2 py-0.5 text-[10px] font-medium text-muted">
+            {formatLabel(tournament.format)}
+          </span>
+        </p>
       </div>
 
       <div className="card grid grid-cols-2 gap-5 sm:grid-cols-4">
@@ -147,7 +163,7 @@ export default async function TournamentPage({
             This tournament has been cancelled. Paid entries have been refunded.
           </p>
         ) : isOrganizer ? (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Link href={`/dashboard/tournaments/${tournament.id}`} className="btn-secondary">
               Manage
             </Link>

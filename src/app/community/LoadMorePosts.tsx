@@ -24,20 +24,20 @@ function PostRow({ post }: { post: Post }) {
     <div className="card-row flex gap-3 p-4">
       {post.author.avatarUrl ? (
         // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs
-        <img src={post.author.avatarUrl} alt="" className="h-9 w-9 shrink-0 rounded-full border border-border object-cover" />
+        <img src={post.author.avatarUrl} alt="" className="h-9 w-9 shrink-0 rounded-full border-2 border-brand/40 object-cover" />
       ) : (
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-sm font-semibold text-muted">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-brand/40 bg-surface text-sm font-semibold text-muted">
           {post.author.displayName.slice(0, 1).toUpperCase()}
         </div>
       )}
-      <div className="flex flex-1 flex-col gap-1">
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex items-baseline gap-2">
-          <span className="font-medium">{post.author.displayName}</span>
-          <span className="text-xs text-muted">
+          <span className="truncate font-medium">{post.author.displayName}</span>
+          <span className="shrink-0 text-xs text-muted">
             @{post.author.handle} · {formatRelative(post.createdAt)}
           </span>
         </div>
-        <p className="text-sm whitespace-pre-wrap">{post.content}</p>
+        <p className="text-sm break-words whitespace-pre-wrap">{post.content}</p>
       </div>
     </div>
   );

@@ -38,12 +38,12 @@ export default async function BattlePage({
   const status = battleStatusInfo(battle.status);
 
   return (
-    <div className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-6 py-16">
+    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-6 py-16">
       <div className="flex flex-col gap-2">
         <StatusPill tone={status.tone} pulse={status.pulse}>
           {status.label}
         </StatusPill>
-        <h1 className="text-2xl font-semibold">{battle.game}</h1>
+        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">{battle.game}</h1>
         <p className="text-muted">
           {battle.format === "BEST_OF_3" ? "Best of 3" : "Single match"} ·{" "}
           {battle.visibility === "TARGETED" ? "Targeted challenge" : "Open to anyone"}
@@ -61,7 +61,7 @@ export default async function BattlePage({
         )}
       </div>
 
-      <div className="card text-sm text-muted">
+      <div className="card break-words text-sm text-muted">
         Opened by <span className="font-medium text-foreground">{battle.creator.displayName}</span> (@
         {battle.creator.handle})
         {battle.targetUser && (
@@ -80,7 +80,7 @@ export default async function BattlePage({
         </Link>
       )}
       {battle.status === "CANCELLED" && (
-        <p className="rounded-lg border border-border bg-surface px-4 py-3 text-sm text-muted">
+        <p className="rounded-lg border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">
           This Battle was cancelled.
         </p>
       )}

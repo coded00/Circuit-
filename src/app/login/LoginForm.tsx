@@ -37,7 +37,10 @@ export default function LoginForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="card flex w-full max-w-sm flex-col gap-4">
+    <form
+      onSubmit={handleSubmit}
+      className="card flex w-full max-w-sm flex-col gap-5 shadow-2xl shadow-black/50"
+    >
       <div className="flex flex-col gap-1.5">
         <label htmlFor="emailOrPhone" className="field-label">
           Email or phone
@@ -70,7 +73,7 @@ export default function LoginForm() {
       <button type="submit" disabled={submitting} className="btn-primary w-full">
         {submitting ? "Logging in…" : "Log in"}
       </button>
-      <Link href={`/signup?next=${encodeURIComponent(next)}`} className="btn-ghost w-full">
+      <Link href={`/signup?next=${encodeURIComponent(next)}`} className="btn-secondary w-full">
         Need an account? Sign up
       </Link>
     </form>

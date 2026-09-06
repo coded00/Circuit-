@@ -6,15 +6,16 @@
  * treatment never drifts between the two places it appears.
  */
 
-import { Gamepad2, Link2 } from "lucide-react";
+import { Gamepad2, Link2, MoreHorizontal } from "lucide-react";
 
 const PLATFORMS = [
   { name: "PlayStation", color: "#0f4fa8" },
   { name: "Xbox", color: "#107C10" },
   { name: "Steam", color: "#1b2838" },
   { name: "Epic Games", color: "#2a2a2a" },
-  { name: "EA", color: "#4a4a4a" },
+  { name: "Riot Games", color: "#c8202e" },
   { name: "Call of Duty", color: "#5a1f1f" },
+  { name: "EA", color: "#4a4a4a" },
   { name: "Nintendo", color: "#c8102e" },
 ];
 
@@ -43,6 +44,17 @@ export function ConnectAccountsRow() {
             <span className="text-[10px] text-muted">{platform.name}</span>
           </button>
         ))}
+        <button
+          type="button"
+          disabled
+          title="More platforms — coming soon"
+          className="flex cursor-not-allowed flex-col items-center gap-1.5 opacity-60"
+        >
+          <span className="flex h-12 w-12 items-center justify-center rounded-full border border-border-strong bg-surface-hover">
+            <MoreHorizontal size={20} className="text-muted" />
+          </span>
+          <span className="text-[10px] text-muted">More</span>
+        </button>
       </div>
     </div>
   );

@@ -67,18 +67,32 @@ export default function AccountForm({
         />
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="avatarUrl" className="field-label">
-          Avatar URL (optional)
-        </label>
-        <input
-          id="avatarUrl"
-          type="url"
-          placeholder="https://…"
-          value={avatarUrl}
-          onChange={(e) => setAvatarUrl(e.target.value)}
-          className="field-input"
-        />
+      <div className="flex items-center gap-4">
+        {avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs
+          <img
+            src={avatarUrl}
+            alt=""
+            className="h-16 w-16 shrink-0 rounded-full border-2 border-brand/40 object-cover"
+          />
+        ) : (
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-2 border-brand/40 bg-surface-hover text-lg font-semibold text-muted">
+            {displayName.slice(0, 1).toUpperCase() || "?"}
+          </div>
+        )}
+        <div className="flex flex-1 flex-col gap-1.5">
+          <label htmlFor="avatarUrl" className="field-label">
+            Avatar URL (optional)
+          </label>
+          <input
+            id="avatarUrl"
+            type="url"
+            placeholder="https://…"
+            value={avatarUrl}
+            onChange={(e) => setAvatarUrl(e.target.value)}
+            className="field-input"
+          />
+        </div>
       </div>
 
       <div className="flex flex-col gap-1.5">

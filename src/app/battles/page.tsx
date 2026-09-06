@@ -59,9 +59,9 @@ export default async function BattleBoardPage({
           {battles.map((battle) => (
             <Link key={battle.id} href={`/battles/${battle.id}`} className="card-row flex items-center gap-3 p-3">
               <GameArtTile game={battle.game} className="h-14 w-14 shrink-0 rounded-lg" />
-              <div className="flex flex-1 flex-col gap-1">
-                <span className="font-medium">{battle.game}</span>
-                <span className="text-muted">
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <span className="truncate font-medium">{battle.game}</span>
+                <span className="truncate text-muted">
                   {battle.format === "BEST_OF_3" ? "Best of 3" : "Single match"} · opened by{" "}
                   {battle.creator.displayName} (@{battle.creator.handle})
                 </span>

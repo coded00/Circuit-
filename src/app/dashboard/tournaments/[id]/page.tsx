@@ -88,7 +88,7 @@ export default async function DashboardTournamentDetailPage({
             <Link
               key={dispute.id}
               href={`/matches/${dispute.matchId}`}
-              className="flex items-center justify-between rounded-lg border border-border bg-surface p-3 text-sm hover:bg-surface-hover"
+              className="card-row flex items-center justify-between p-3"
             >
               <span>
                 {dispute.match.playerA.displayName} vs {dispute.match.playerB.displayName}
@@ -99,7 +99,7 @@ export default async function DashboardTournamentDetailPage({
         </section>
       )}
 
-      <section className="card grid grid-cols-3 gap-4">
+      <section className="card grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div>
           <div className="text-xs text-muted">Entry fees collected</div>
           <div className="font-medium tabular-nums">{formatNaira(collected)}</div>

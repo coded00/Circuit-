@@ -26,7 +26,7 @@ export default async function LadderPage({
 
   if (!game) {
     return (
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-6 py-16">
+      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-6 py-16">
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Ladders</h1>
         {games.length === 0 ? (
           <p className="card text-center text-muted">No completed Battles yet.</p>
@@ -49,10 +49,13 @@ export default async function LadderPage({
 
   const ranked = await gameStandings(game);
 
-  const rankColors = ["#eab308", "#9ca3af", "#b45309"]; // gold, silver, bronze
+  // Rank 1 reuses the shared --gold token (same one prize amounts use)
+  // instead of duplicating its hex value; silver/bronze have no shared
+  // token so stay literal — there's nothing to drift out of sync with.
+  const rankColors = ["var(--color-gold)", "#9ca3af", "#b45309"]; // gold, silver, bronze
 
   return (
-    <div className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-6 py-16">
+    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-6 py-16">
       <div className="flex flex-col gap-1">
         <Link href="/ladder" className="w-fit text-xs text-muted hover:text-foreground">
           ← All games
@@ -64,39 +67,41 @@ export default async function LadderPage({
         <p className="card text-center text-muted">No completed Battles for this game yet.</p>
       ) : (
         <div className="card overflow-hidden p-0">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-muted">
-                <th className="px-4 pt-4 pb-2 font-medium">#</th>
-                <th className="px-4 pt-4 pb-2 font-medium">Player</th>
-                <th className="px-4 pt-4 pb-2 text-right font-medium">W</th>
-                <th className="px-4 pt-4 pb-2 text-right font-medium">L</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ranked.map((s, i) => (
-                <tr key={s.userId} className="border-t border-border">
-                  <td className="px-4 py-3">
-                    {rankColors[i] ? (
-                      <span
-                        className="flex h-5 w-5 items-center justify-center rounded-full font-mono text-xs font-bold tabular-nums text-[#0b0d10]"
-                        style={{ backgroundColor: rankColors[i] }}
-                      >
-                        {i + 1}
-                      </span>
-                    ) : (
-                      <span className="font-mono text-xs tabular-nums text-muted">{i + 1}</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 font-medium">
-                    {s.displayName} <span className="text-muted">(@{s.handle})</span>
-                  </td>
-                  <td className="px-4 py-3 text-right font-mono text-brand tabular-nums">{s.wins}</td>
-                  <td className="px-4 py-3 text-right font-mono text-muted tabular-nums">{s.losses}</td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-muted">
+                  <th className="px-4 pt-4 pb-2 font-medium">#</th>
+                  <th className="px-4 pt-4 pb-2 font-medium">Player</th>
+                  <th className="px-4 pt-4 pb-2 text-right font-medium">W</th>
+                  <th className="px-4 pt-4 pb-2 text-right font-medium">L</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {ranked.map((s, i) => (
+                  <tr key={s.userId} className="border-t border-border">
+                    <td className="px-4 py-3">
+                      {rankColors[i] ? (
+                        <span
+                          className="flex h-5 w-5 items-center justify-center rounded-full font-mono text-xs font-bold tabular-nums text-background"
+                          style={{ backgroundColor: rankColors[i] }}
+                        >
+                          {i + 1}
+                        </span>
+                      ) : (
+                        <span className="font-mono text-xs tabular-nums text-muted">{i + 1}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 font-medium">
+                      {s.displayName} <span className="text-muted">(@{s.handle})</span>
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono text-brand tabular-nums">{s.wins}</td>
+                    <td className="px-4 py-3 text-right font-mono text-muted tabular-nums">{s.losses}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
