@@ -5,8 +5,6 @@
  * here instead of guessed-at real functionality.
  */
 
-import { StatusPill } from "@/components/StatusPill";
-
 export function ComingSoon({
   title,
   description,
@@ -25,7 +23,9 @@ export function ComingSoon({
       )}
       <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
       <p className="text-sm text-muted">{description}</p>
-      <StatusPill tone="neutral">Coming soon</StatusPill>
+      <span className="w-fit rounded-full bg-status-neutral/15 px-2.5 py-1 text-xs font-medium text-status-neutral">
+        Coming soon
+      </span>
     </div>
   );
 }

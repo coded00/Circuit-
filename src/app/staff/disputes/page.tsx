@@ -13,7 +13,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
-import { StatusPill } from "@/components/StatusPill";
 
 function timeSince(date: Date): string {
   const ms = Date.now() - date.getTime();
@@ -66,7 +65,9 @@ export default async function StaffDisputeQueuePage() {
                 <span className="font-medium">
                   {dispute.match.tournament?.name ?? `Battle (${dispute.match.battle?.game})`}
                 </span>
-                <StatusPill tone="attention">Waiting {timeSince(dispute.createdAt)}</StatusPill>
+                <span className="rounded-full bg-status-attention/15 px-2.5 py-1 text-xs font-medium text-status-attention">
+                  Waiting {timeSince(dispute.createdAt)}
+                </span>
               </div>
               <span className="text-sm text-muted">
                 {dispute.match.playerA.displayName} vs {dispute.match.playerB.displayName}

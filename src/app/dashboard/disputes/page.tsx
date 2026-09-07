@@ -7,7 +7,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
-import { StatusPill, disputeStatusInfo } from "@/components/StatusPill";
 
 export default async function DashboardDisputesPage() {
   const user = await getCurrentUser();
@@ -38,22 +37,19 @@ export default async function DashboardDisputesPage() {
         <p className="card text-center text-muted">Nothing needs a ruling right now.</p>
       ) : (
         <div className="flex flex-col gap-3">
-          {disputes.map((dispute) => {
-            const status = disputeStatusInfo(dispute.status);
-            return (
-              <Link key={dispute.id} href={`/matches/${dispute.matchId}`} className="card-row flex items-center justify-between p-4">
-                <div className="flex flex-col gap-1">
-                  <span className="font-medium">{dispute.match.tournament?.name}</span>
-                  <span className="text-muted">
-                    {dispute.match.playerA.displayName} vs {dispute.match.playerB.displayName}
-                  </span>
-                </div>
-                <StatusPill tone={status.tone}>
-                  {dispute.status === "ESCALATED" ? "Escalated to staff" : "Needs your ruling"}
-                </StatusPill>
-              </Link>
-            );
-          })}
+          {disputes.map((dispute) => (
+            <Link key={dispute.id} href={`/matches/${dispute.matchId}`} className="card-row flex items-center justify-between p-4">
+              <div className="flex flex-col gap-1">
+                <span className="font-medium">{dispute.match.tournament?.name}</span>
+                <span className="text-muted">
+                  {dispute.match.playerA.displayName} vs {dispute.match.playerB.displayName}
+                </span>
+              </div>
+              <span className="text-xs text-status-cancelled">
+                {dispute.status === "ESCALATED" ? "Escalated to staff" : "Needs your ruling"}
+              </span>
+            </Link>
+          ))}
         </div>
       )}
     </div>

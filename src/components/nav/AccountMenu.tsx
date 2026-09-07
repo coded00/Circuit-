@@ -31,13 +31,13 @@ export function AccountMenu({ user }: { user: NavUser }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2.5 rounded-full py-1 pr-2 pl-1 transition hover:bg-surface-hover"
+        className="flex items-center gap-2 rounded-full px-2 py-1 transition hover:bg-surface-hover"
       >
         {user.avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs
-          <img src={user.avatarUrl} alt="" className="h-9 w-9 rounded-full border-2 border-brand/40 object-cover" />
+          <img src={user.avatarUrl} alt="" className="h-7 w-7 rounded-full border border-border object-cover" />
         ) : (
-          <div className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-brand/40 bg-surface text-sm font-semibold text-muted">
+          <div className="flex h-7 w-7 items-center justify-center rounded-full border border-border bg-surface text-xs font-semibold text-muted">
             {user.displayName.slice(0, 1).toUpperCase()}
           </div>
         )}

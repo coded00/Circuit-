@@ -37,10 +37,7 @@ export default function SignupForm() {
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="card flex w-full max-w-sm flex-col gap-5 shadow-2xl shadow-black/50"
-    >
+    <form onSubmit={handleSubmit} className="card flex w-full max-w-sm flex-col gap-4">
       <div className="flex flex-col gap-1.5">
         <label htmlFor="emailOrPhone" className="field-label">
           Email or phone
@@ -75,7 +72,7 @@ export default function SignupForm() {
       <button type="submit" disabled={submitting} className="btn-primary w-full">
         {submitting ? "Creating account…" : "Create account"}
       </button>
-      <Link href={`/login?next=${encodeURIComponent(next)}`} className="btn-secondary w-full">
+      <Link href={`/login?next=${encodeURIComponent(next)}`} className="btn-ghost w-full">
         I already have an account
       </Link>
     </form>

@@ -6,7 +6,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
-import { StatusPill } from "@/components/StatusPill";
 import ReportActions from "./ReportActions";
 
 export default async function StaffReportsPage() {
@@ -46,7 +45,11 @@ export default async function StaffReportsPage() {
                 <Link href={`/players/${report.reportedUser.handle}`} className="font-medium hover:underline">
                   {report.reportedUser.displayName} (@{report.reportedUser.handle})
                 </Link>
-                {report.reportedUser.isSuspended && <StatusPill tone="cancelled">Suspended</StatusPill>}
+                {report.reportedUser.isSuspended && (
+                  <span className="rounded-full bg-status-cancelled/15 px-2.5 py-1 text-xs font-medium text-status-cancelled">
+                    Suspended
+                  </span>
+                )}
               </div>
               <p className="text-sm text-muted">
                 Reported by {report.reportedBy.displayName} (@{report.reportedBy.handle})
