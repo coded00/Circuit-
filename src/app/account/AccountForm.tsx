@@ -92,7 +92,7 @@ export default function AccountForm({
           onChange={(e) => setDateOfBirth(e.target.value)}
           className="field-input"
         />
-        <span className="text-xs text-muted">
+        <span className="field-hint">
           Required before any paid registration or prize payout (ACC-3) — never checked for free
           browsing or free tournaments.
         </span>
@@ -109,16 +109,16 @@ export default function AccountForm({
           onChange={(e) => setPayoutMethodRef(e.target.value)}
           className="field-input"
         />
-        <span className="text-xs text-muted">
+        <span className="field-hint">
           Known V1 gap: there&apos;s no UI yet to link a bank account and get a real recipient
           code — this field takes the raw reference directly until that&apos;s built.
         </span>
       </div>
 
-      {error && <p className="text-sm text-danger">{error}</p>}
-      {success && <p className="text-sm text-status-live">Saved.</p>}
+      {error && <p className="field-error">{error}</p>}
+      {success && <p className="text-sm text-success">Saved.</p>}
 
-      <button type="submit" disabled={submitting} className="btn-primary w-full">
+      <button type="submit" disabled={submitting} className="btn-primary self-start">
         {submitting ? "Saving…" : "Save changes"}
       </button>
     </form>

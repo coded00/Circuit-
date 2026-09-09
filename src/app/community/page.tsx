@@ -38,16 +38,16 @@ export default async function CommunityPage() {
   const nextCursor = hasMore ? posts[posts.length - 1].id : null;
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-6 py-16">
+    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 p-6 sm:p-8">
       <Poller />
-      <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Community</h1>
+      <h1 className="text-section-heading text-xl">Community</h1>
 
-      <div className="flex gap-1 border-b border-border">
-        <span className="border-b-2 border-brand px-3 py-2 text-sm font-medium">Global</span>
-        <span className="px-3 py-2 text-sm text-muted" title="Coming soon">
+      <div className="tabs">
+        <span className="tab tab-active">Global</span>
+        <span className="tab tab-disabled" title="Coming soon">
           Friends
         </span>
-        <span className="px-3 py-2 text-sm text-muted" title="Coming soon">
+        <span className="tab tab-disabled" title="Coming soon">
           Teams
         </span>
       </div>
@@ -59,27 +59,27 @@ export default async function CommunityPage() {
       ) : (
         <div className="flex flex-col gap-2">
           {posts.map((post) => (
-            <div key={post.id} className="card-row flex gap-3 p-4">
+            <div key={post.id} className="card-row flex gap-3 p-3">
               {post.author.avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs; next/image's domain allowlist doesn't fit V1 scope
                 <img
                   src={post.author.avatarUrl}
                   alt=""
-                  className="h-9 w-9 shrink-0 rounded-full border border-border object-cover"
+                  className="h-10 w-10 shrink-0 rounded-full border border-border object-cover"
                 />
               ) : (
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-sm font-semibold text-muted">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-surface-elevated font-semibold text-muted">
                   {post.author.displayName.slice(0, 1).toUpperCase()}
                 </div>
               )}
-              <div className="flex flex-1 flex-col gap-1">
-                <div className="flex items-baseline gap-2">
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <div className="flex flex-wrap items-baseline gap-1.5">
                   <span className="font-medium">{post.author.displayName}</span>
-                  <span className="text-xs text-muted">
+                  <span className="text-metadata">
                     @{post.author.handle} · {formatRelative(post.createdAt)}
                   </span>
                 </div>
-                <p className="text-sm whitespace-pre-wrap">{post.content}</p>
+                <p className="text-sm break-words">{post.content}</p>
               </div>
             </div>
           ))}

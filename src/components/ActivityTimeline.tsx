@@ -1,9 +1,7 @@
 /**
- * Circuit — ActivityTimeline (docs/circuit-ui-references.md: Linear's
- * activity timeline — terse, one-line-per-event, oldest to newest. Called
- * out as "close to a direct requirement, not just inspiration" for BRK-5's
- * dispute resolution and BRK-10's auto-accept — an auditable log of what
- * happened and when.
+ * Circuit — ActivityTimeline. Terse, one-line-per-event, oldest to
+ * newest. An auditable log of what happened and when (dispute
+ * resolution, auto-accept).
  */
 
 export type TimelineEvent = {
@@ -25,12 +23,9 @@ export function ActivityTimeline({ events }: { events: TimelineEvent[] }) {
   return (
     <ol className="flex flex-col gap-3">
       {sorted.map((event, i) => (
-        <li key={i} className="flex gap-3 text-sm">
-          <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-border-strong" />
-          <div className="flex flex-1 flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-            <span>{event.label}</span>
-            <span className="shrink-0 font-mono text-xs tabular-nums text-muted">{formatTimestamp(event.at)}</span>
-          </div>
+        <li key={i} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-l-2 border-border pl-3 text-sm">
+          <span>{event.label}</span>
+          <span className="text-metadata shrink-0">{formatTimestamp(event.at)}</span>
         </li>
       ))}
     </ol>

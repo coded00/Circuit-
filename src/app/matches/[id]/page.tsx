@@ -123,23 +123,25 @@ export default async function MatchPage({
   const status = matchStatusInfo(match.status);
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-6 py-16">
+    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-8 px-6 py-10">
       <div className="flex flex-col gap-2">
         <StatusPill tone={status.tone}>{status.label}</StatusPill>
-        <h1 className="text-2xl font-semibold">
+        <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
           {match.tournament ? `${match.tournament.name} — Round ${match.round}` : "Battle match"}
         </h1>
-        <p className="font-mono text-xs text-muted">Match code · {match.matchCode}</p>
+        <p className="text-sm text-muted">
+          Match code · <span className="font-mono">{match.matchCode}</span>
+        </p>
       </div>
 
-      <div className="card grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {[match.playerA, match.playerB].map((p, i) => {
           const isWinner = match.winnerId === p.id;
           return (
-            <div key={i} className="flex flex-col gap-1">
-              <div className="text-xs text-muted">Player {i === 0 ? "A" : "B"}</div>
-              <div className={isWinner ? "flex items-center gap-1.5 font-semibold text-brand" : "font-medium"}>
-                {isWinner && <Trophy size={14} />}
+            <div key={i} className={`card flex flex-col gap-1 ${isWinner ? "border-success/40" : ""}`}>
+              <div className="text-eyebrow">Player {i === 0 ? "A" : "B"}</div>
+              <div className="flex items-center gap-1.5 font-medium">
+                {isWinner && <Trophy size={14} className="shrink-0 text-gold" />}
                 {playerLabel(p)}
               </div>
             </div>
@@ -148,13 +150,13 @@ export default async function MatchPage({
       </div>
 
       {(match.proofARef || match.proofBRef) && (
-        <div className="flex gap-4 text-sm">
+        <div className="flex flex-wrap gap-4">
           {match.proofARef && (
             <a
               href={`/api/matches/${match.id}/proof/a`}
-              className="font-medium text-brand hover:underline"
               target="_blank"
               rel="noreferrer"
+              className="text-sm font-medium text-brand-blue hover:underline"
             >
               View Player A&apos;s proof
             </a>
@@ -162,9 +164,9 @@ export default async function MatchPage({
           {match.proofBRef && (
             <a
               href={`/api/matches/${match.id}/proof/b`}
-              className="font-medium text-brand hover:underline"
               target="_blank"
               rel="noreferrer"
+              className="text-sm font-medium text-brand-blue hover:underline"
             >
               View Player B&apos;s proof
             </a>
@@ -176,14 +178,14 @@ export default async function MatchPage({
         <ResultForm matchId={match.id} playerA={match.playerA} playerB={match.playerB} />
       )}
       {isParticipant && hasSubmitted && match.status === "NEEDS_RESULT" && (
-        <p className="rounded-lg border border-status-attention/30 bg-status-attention/10 px-4 py-3 text-sm text-status-attention">
+        <p className="alert alert-info">
           You&apos;ve submitted your result. Waiting on the other player.
         </p>
       )}
 
       {match.status === "DISPUTED" && match.dispute && (
-        <div className="flex flex-col gap-3 rounded-xl border border-status-cancelled/30 bg-status-cancelled/5 p-4 text-sm">
-          <p className="font-medium text-status-cancelled">This match is under dispute review.</p>
+        <div className="flex flex-col gap-4">
+          <p className="alert alert-warning">This match is under dispute review.</p>
           {canRuleAsOrganizer && match.dispute && (
             <RulingForm
               disputeId={match.dispute.id}
@@ -205,8 +207,8 @@ export default async function MatchPage({
         </div>
       )}
 
-      <div className="flex flex-col gap-2 border-t border-border pt-6">
-        <h2 className="text-lg font-semibold">Activity</h2>
+      <div className="flex flex-col gap-3">
+        <h2 className="text-section-heading">Activity</h2>
         <ActivityTimeline events={buildMatchTimeline(match)} />
       </div>
     </div>

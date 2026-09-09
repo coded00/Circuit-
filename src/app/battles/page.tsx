@@ -1,5 +1,7 @@
 /**
- * Circuit — open Battle board (Build Plan P4-2, maps: BTL-2).
+ * Circuit — open Challenge board (Build Plan P4-2, maps: BTL-2). User-
+ * facing "Challenges" is the existing free `Battle` feature under its
+ * MVP-rework name — same model/route/logic, copy-only rename.
  *
  * Only OPEN-visibility, still-OPEN-status Battles show here — a targeted
  * challenge is invisible to everyone but its target (delivered via
@@ -30,22 +32,22 @@ export default async function BattleBoardPage({
   });
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-6 py-16">
+    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-6 py-8 sm:px-8">
       <Poller />
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Open Battles</h1>
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Open Challenges</h1>
         <Link href="/battles/new" className="btn-primary">
-          Open a Battle
+          Open a Challenge
         </Link>
       </div>
 
-      <form className="flex gap-2">
+      <form className="flex items-center gap-2">
         <input
           type="text"
           name="game"
           defaultValue={game ?? ""}
           placeholder="Filter by game"
-          className="field-input flex-1"
+          className="field-input max-w-xs"
         />
         <button type="submit" className="btn-secondary">
           Filter
@@ -53,22 +55,27 @@ export default async function BattleBoardPage({
       </form>
 
       {battles.length === 0 ? (
-        <p className="card text-center text-muted">No open Battles right now.</p>
+        <p className="card text-center text-muted">No open Challenges right now.</p>
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {battles.map((battle) => (
-            <Link key={battle.id} href={`/battles/${battle.id}`} className="card-row flex items-center gap-3 p-3">
-              <GameArtTile game={battle.game} className="h-14 w-14 shrink-0 rounded-lg" />
-              <div className="flex flex-1 flex-col gap-1">
-                <span className="font-medium">{battle.game}</span>
-                <span className="text-muted">
+            <Link key={battle.id} href={`/battles/${battle.id}`} className="card-media card-hover flex flex-col">
+              <div className="relative h-28 w-full overflow-hidden">
+                <GameArtTile game={battle.game} className="h-full w-full">
+                  <span className="absolute top-2 left-2 z-10">
+                    <StatusPill tone="live" pulse>
+                      Open
+                    </StatusPill>
+                  </span>
+                </GameArtTile>
+              </div>
+              <div className="flex flex-col gap-1 p-3">
+                <span className="text-card-title font-semibold">{battle.game}</span>
+                <span className="truncate text-xs text-muted">
                   {battle.format === "BEST_OF_3" ? "Best of 3" : "Single match"} · opened by{" "}
                   {battle.creator.displayName} (@{battle.creator.handle})
                 </span>
               </div>
-              <StatusPill tone="live" pulse>
-                Open
-              </StatusPill>
             </Link>
           ))}
         </div>

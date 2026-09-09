@@ -25,11 +25,11 @@ export default function CancelBattleButton({ battleId }: { battleId: string }) {
   }
 
   return (
-    <div className="flex flex-col gap-1">
-      <button onClick={handleClick} disabled={submitting} className="btn-danger w-fit">
+    <div className="flex flex-col gap-2">
+      <button onClick={handleClick} disabled={submitting} className="btn-danger">
         {submitting ? "Cancelling…" : "Cancel Battle"}
       </button>
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {error && <p className="field-error">{error}</p>}
     </div>
   );
 }

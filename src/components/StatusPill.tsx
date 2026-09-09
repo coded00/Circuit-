@@ -1,24 +1,19 @@
 /**
- * Circuit — StatusPill (docs/circuit-ui-references.md: FACEIT + start.gg
- * independently converged on "colored pill on a card" for status — used
- * everywhere a Tournament/Registration/Battle/Match/Dispute status shows.
+ * Circuit — StatusPill. Used everywhere a Tournament/Registration/Battle/
+ * Match/Dispute status shows. The tone→label mapping functions below are
+ * real domain logic (not styling) and are unchanged.
  */
 
 export type StatusTone = "live" | "open" | "neutral" | "complete" | "cancelled" | "attention";
 
-const TONE_CLASSES: Record<StatusTone, string> = {
-  live: "bg-status-live/15 text-status-live",
-  open: "bg-status-open/15 text-status-open",
-  neutral: "bg-status-neutral/15 text-status-neutral",
-  complete: "bg-status-complete/15 text-status-complete",
-  cancelled: "bg-status-cancelled/15 text-status-cancelled",
-  attention: "bg-status-attention/15 text-status-attention",
+const TONE_CLASS: Record<StatusTone, string> = {
+  live: "badge-live",
+  open: "badge-open",
+  neutral: "badge-neutral",
+  complete: "badge-complete",
+  cancelled: "badge-cancelled",
+  attention: "badge-attention",
 };
-
-const SIZE_CLASSES = {
-  sm: "px-2.5 py-1 text-xs",
-  md: "px-4 py-2 text-sm",
-} as const;
 
 export function StatusPill({
   tone,
@@ -32,11 +27,9 @@ export function StatusPill({
   size?: "sm" | "md";
 }) {
   return (
-    <span
-      className={`inline-flex w-fit items-center gap-1.5 rounded-full font-medium whitespace-nowrap ${SIZE_CLASSES[size]} ${TONE_CLASSES[tone]}`}
-    >
+    <span className={`badge ${TONE_CLASS[tone]} ${size === "md" ? "badge-md" : ""}`}>
       {pulse && (
-        <span className="relative flex h-1.5 w-1.5">
+        <span className="relative flex h-1.5 w-1.5" aria-hidden>
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-current opacity-75" />
           <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-current" />
         </span>

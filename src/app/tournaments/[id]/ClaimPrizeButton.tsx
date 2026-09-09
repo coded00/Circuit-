@@ -30,7 +30,7 @@ export default function ClaimPrizeButton({ tournamentId }: { tournamentId: strin
 
   if (status) {
     return (
-      <p className="flex items-center gap-1.5 text-sm text-status-live">
+      <p className={`alert ${status === "SUCCESS" ? "alert-success" : "alert-info"}`}>
         {status === "SUCCESS" && <Trophy size={14} />}
         {status === "SUCCESS" ? "Prize payout sent!" : "Prize payout initiated — processing."}
       </p>
@@ -38,12 +38,12 @@ export default function ClaimPrizeButton({ tournamentId }: { tournamentId: strin
   }
 
   return (
-    <div className="flex flex-col gap-1">
-      <button onClick={handleClick} disabled={submitting} className="btn-primary w-fit gap-1.5">
+    <div className="flex flex-col gap-2">
+      <button onClick={handleClick} disabled={submitting} className="btn-primary">
         {!submitting && <Trophy size={14} />}
         {submitting ? "Claiming…" : "Claim prize"}
       </button>
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {error && <p className="field-error">{error}</p>}
     </div>
   );
 }

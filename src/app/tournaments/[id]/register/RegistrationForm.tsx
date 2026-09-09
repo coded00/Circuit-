@@ -37,7 +37,7 @@ export default function RegistrationForm({ tournamentId }: { tournamentId: strin
   }
 
   return (
-    <form onSubmit={handleSubmit} className="card flex flex-col gap-4">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
       <div className="flex flex-col gap-1.5">
         <label htmlFor="inGameId" className="field-label">
           In-game ID
@@ -50,8 +50,8 @@ export default function RegistrationForm({ tournamentId }: { tournamentId: strin
           className="field-input"
         />
       </div>
-      {error && <p className="text-sm text-danger">{error}</p>}
-      <button type="submit" disabled={submitting} className="btn-primary w-full">
+      {error && <p className="field-error">{error}</p>}
+      <button type="submit" disabled={submitting} className="btn-primary">
         {submitting ? "Registering…" : "Register"}
       </button>
     </form>

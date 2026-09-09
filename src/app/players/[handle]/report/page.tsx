@@ -18,8 +18,8 @@ export default async function ReportPlayerPage({
   if (!player) notFound();
 
   return (
-    <div className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-6 py-16">
-      <h1 className="text-2xl font-semibold">Report @{player.handle}</h1>
+    <div className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-6 p-6 sm:p-8">
+      <h1 className="text-section-heading text-xl">Report @{player.handle}</h1>
       <ReportForm reportedHandle={player.handle} />
     </div>
   );

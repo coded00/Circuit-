@@ -81,14 +81,26 @@ export default function EditForm({
         <label htmlFor="name" className="field-label">
           Tournament name
         </label>
-        <input id="name" required value={name} onChange={(e) => setName(e.target.value)} className="field-input" />
+        <input
+          id="name"
+          required
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="field-input"
+        />
       </div>
 
       <div className="flex flex-col gap-1.5">
         <label htmlFor="game" className="field-label">
           Game
         </label>
-        <input id="game" required value={game} onChange={(e) => setGame(e.target.value)} className="field-input" />
+        <input
+          id="game"
+          required
+          value={game}
+          onChange={(e) => setGame(e.target.value)}
+          className="field-input"
+        />
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -107,7 +119,7 @@ export default function EditForm({
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="flex flex-col gap-1.5">
           <label htmlFor="registrationOpenAt" className="field-label">
             Registration opens
@@ -162,16 +174,16 @@ export default function EditForm({
           disabled={moneyFieldsLocked}
           value={entryFeeNaira}
           onChange={(e) => setEntryFeeNaira(e.target.value)}
-          className="field-input disabled:opacity-50"
+          className="field-input"
         />
         {moneyFieldsLocked && (
-          <span className="text-xs text-status-attention">
+          <span className="field-hint">
             Locked — a paid registration already exists for this tournament.
           </span>
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
           <label htmlFor="prizeAmountNaira" className="field-label">
             Prize amount (₦, optional)
@@ -184,7 +196,7 @@ export default function EditForm({
             disabled={moneyFieldsLocked}
             value={prizeAmountNaira}
             onChange={(e) => setPrizeAmountNaira(e.target.value)}
-            className="field-input disabled:opacity-50"
+            className="field-input"
           />
         </div>
         <div className="flex flex-col gap-1.5">
@@ -223,13 +235,13 @@ export default function EditForm({
           rows={5}
           value={rulesText}
           onChange={(e) => setRulesText(e.target.value)}
-          className="field-input"
+          className="field-textarea"
         />
       </div>
 
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {error && <p className="field-error">{error}</p>}
 
-      <button type="submit" disabled={submitting} className="btn-primary w-full">
+      <button type="submit" disabled={submitting} className="btn-primary">
         {submitting ? "Saving…" : "Save changes"}
       </button>
     </form>

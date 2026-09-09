@@ -1,12 +1,20 @@
 "use client";
 
 /**
- * Circuit — mobile primary nav (docs/circuit-ui-references.md: start.gg's
- * bottom tab bar pattern, still the right call on mobile). 5 fixed slots:
- * Home/Battles/Create(elevated)/Community/Menu. Everything that doesn't
- * fit (Ladders, My Profile, Wallet/Marketplace/Rewards, Organize, Staff,
- * Account, Log out) lives in the Menu sheet — NEXA's own "More" catch-all
- * concept, relocated to where the real space constraint actually is.
+ * Circuit — mobile primary nav. 5 fixed slots matching the MVP rework
+ * spec's mobile set exactly: Home / Compete / Challenges / Wallet /
+ * Profile (spec section 44) — Watch/Live are removed-from-MVP and no
+ * longer appear here at all (hidden, not deleted — see /watch's own
+ * route, still on disk).
+ *
+ * Games/Marketplace/Rewards/Organize/Staff/Account (everything that
+ * doesn't fit the primary 5) live in the sheet opened from the Profile
+ * tab — same pattern the desktop sidebar's "More" disclosure uses for
+ * its own overflow.
+ *
+ * Active-state color follows the shared "Volt icon, [dark] text" nav
+ * convention (see AppSidebar.tsx) rather than coloring the label text
+ * volt — volt fails contrast at this text size.
  */
 
 import { useState } from "react";
@@ -14,14 +22,13 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Home,
-  Swords,
-  Plus,
-  MessageSquare,
-  Menu as MenuIcon,
-  X,
   Trophy,
-  User as UserIcon,
+  Swords,
   Wallet,
+  Gamepad2,
+  X,
+  User as UserIcon,
+  Bell,
   ShoppingBag,
   Gift,
   Shield,
@@ -31,16 +38,40 @@ type NavUser = { handle: string; isStaff: boolean } | null;
 
 const DASHBOARD_ITEMS = [
   { href: "/dashboard", label: "Tournaments", icon: Trophy },
-  { href: "/dashboard/battles", label: "Battles", icon: Swords },
+  { href: "/dashboard/battles", label: "Battles queue", icon: Swords },
   { href: "/dashboard/disputes", label: "Disputes", icon: Shield },
   { href: "/dashboard/payouts", label: "Payouts", icon: Wallet },
 ];
+
+function TabLink({
+  href,
+  icon: Icon,
+  label,
+  active,
+}: {
+  href: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  label: string;
+  active: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      aria-current={active ? "page" : undefined}
+      className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs ${active ? "text-foreground" : "text-muted"}`}
+    >
+      <Icon size={18} className={active ? "text-accent-volt" : undefined} />
+      {label}
+    </Link>
+  );
+}
 
 export function MobileTabBar({ user }: { user: NavUser }) {
   const pathname = usePathname();
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const inDashboard = pathname.startsWith("/dashboard");
+  const onProfile = user ? pathname.startsWith(`/players/${user.handle}`) : false;
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -59,9 +90,8 @@ export function MobileTabBar({ user }: { user: NavUser }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium ${
-                  active ? "bg-brand-soft text-brand" : "text-muted"
-                }`}
+                aria-current={active ? "page" : undefined}
+                className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium ${active ? "bg-accent-volt-soft text-foreground" : "text-muted"}`}
               >
                 {item.label}
               </Link>
@@ -71,30 +101,17 @@ export function MobileTabBar({ user }: { user: NavUser }) {
       )}
 
       <nav className="fixed inset-x-0 bottom-0 z-10 flex border-t border-border bg-background/95 backdrop-blur-md sm:hidden">
-        <Link href="/" className="flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs text-muted">
-          <Home size={18} />
-          Home
-        </Link>
-        <Link href="/battles" className="flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs text-muted">
-          <Swords size={18} />
-          Battles
-        </Link>
-        <Link href={user ? "/tournaments/new" : "/signup"} className="flex flex-1 flex-col items-center gap-0.5 py-1.5 text-xs text-muted">
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand text-white shadow-sm shadow-brand/30">
-            <Plus size={18} />
-          </span>
-        </Link>
-        <Link href="/community" className="flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs text-muted">
-          <MessageSquare size={18} />
-          Community
-        </Link>
+        <TabLink href="/" icon={Home} label="Home" active={pathname === "/"} />
+        <TabLink href="/compete" icon={Trophy} label="Compete" active={pathname.startsWith("/compete")} />
+        <TabLink href="/battles" icon={Swords} label="Challenges" active={pathname.startsWith("/battles")} />
+        <TabLink href="/wallet" icon={Wallet} label="Wallet" active={pathname.startsWith("/wallet")} />
         <button
           type="button"
           onClick={() => setMenuOpen(true)}
-          className="flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs text-muted"
+          className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs ${onProfile ? "text-foreground" : "text-muted"}`}
         >
-          <MenuIcon size={18} />
-          Menu
+          <UserIcon size={18} className={onProfile ? "text-accent-volt" : undefined} />
+          Profile
         </button>
       </nav>
 
@@ -102,7 +119,7 @@ export function MobileTabBar({ user }: { user: NavUser }) {
         <div className="fixed inset-0 z-30 flex items-end sm:hidden" onClick={() => setMenuOpen(false)}>
           <div className="absolute inset-0 bg-black/60" />
           <div
-            className="relative z-10 flex max-h-[70vh] w-full flex-col gap-1 overflow-y-auto rounded-t-2xl border-t border-border bg-surface p-4"
+            className="relative z-10 flex max-h-[75vh] w-full flex-col gap-1 overflow-y-auto rounded-t-2xl border-t border-border bg-surface p-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-2 flex items-center justify-between">
@@ -112,9 +129,6 @@ export function MobileTabBar({ user }: { user: NavUser }) {
               </button>
             </div>
 
-            <Link href="/ladder" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
-              <Trophy size={18} /> Ladders
-            </Link>
             {user && (
               <Link
                 href={`/players/${user.handle}`}
@@ -124,10 +138,13 @@ export function MobileTabBar({ user }: { user: NavUser }) {
                 <UserIcon size={18} /> My Profile
               </Link>
             )}
+            <Link href="/ladder" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
+              <Gamepad2 size={18} /> Games
+            </Link>
             {user && (
               <>
-                <Link href="/wallet" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
-                  <Wallet size={18} /> Wallet
+                <Link href="/notifications" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
+                  <Bell size={18} /> Messages
                 </Link>
                 <Link href="/marketplace" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
                   <ShoppingBag size={18} /> Marketplace
@@ -135,7 +152,7 @@ export function MobileTabBar({ user }: { user: NavUser }) {
                 <Link href="/rewards" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
                   <Gift size={18} /> Rewards
                 </Link>
-                <span className="mt-2 px-3 text-xs font-bold tracking-wide text-muted uppercase">Organize</span>
+                <span className="text-eyebrow mt-2 px-3">Organize</span>
                 {DASHBOARD_ITEMS.map((item) => (
                   <Link key={item.href} href={item.href} onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
                     <item.icon size={18} /> {item.label}
@@ -143,7 +160,7 @@ export function MobileTabBar({ user }: { user: NavUser }) {
                 ))}
                 {user.isStaff && (
                   <>
-                    <span className="mt-2 px-3 text-xs font-bold tracking-wide text-muted uppercase">Staff</span>
+                    <span className="text-eyebrow mt-2 px-3">Staff</span>
                     <Link href="/staff/disputes" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
                       <Shield size={18} /> Disputes queue
                     </Link>

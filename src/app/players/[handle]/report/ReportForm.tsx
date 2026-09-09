@@ -45,14 +45,14 @@ export default function ReportForm({ reportedHandle }: { reportedHandle: string 
   }
 
   if (submitted) {
-    return <p className="card text-sm text-status-live">Report filed. Circuit staff will review it.</p>;
+    return <p className="alert alert-success">Report filed. Circuit staff will review it.</p>;
   }
 
   return (
-    <form onSubmit={handleSubmit} className="card flex flex-col gap-4">
-      <div className="flex flex-col gap-2">
+    <form onSubmit={handleSubmit} className="card flex flex-col gap-5">
+      <div className="flex flex-col gap-1.5">
         <span className="field-label">Reason</span>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {REASONS.map((r) => (
             <OptionCard
               key={r.code}
@@ -73,7 +73,7 @@ export default function ReportForm({ reportedHandle }: { reportedHandle: string 
           rows={4}
           value={details}
           onChange={(e) => setDetails(e.target.value)}
-          className="field-input"
+          className="field-textarea"
         />
       </div>
 
@@ -86,13 +86,13 @@ export default function ReportForm({ reportedHandle }: { reportedHandle: string 
           name="evidence"
           type="file"
           accept="image/*,video/*"
-          className="text-sm text-muted file:mr-3 file:rounded-full file:border-0 file:bg-surface-hover file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-foreground"
+          className="field-input"
         />
       </div>
 
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {error && <p className="field-error">{error}</p>}
 
-      <button type="submit" disabled={submitting || !reasonCode} className="btn-primary w-full">
+      <button type="submit" disabled={submitting || !reasonCode} className="btn-primary">
         {submitting ? "Filing report…" : "File report"}
       </button>
     </form>

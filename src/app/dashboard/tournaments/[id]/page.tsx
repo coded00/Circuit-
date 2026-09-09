@@ -1,8 +1,7 @@
 /**
- * Circuit — tournament detail panel (Build Plan P5-2 + P5-4, maps: ORG-2,
- * REG-7, ORG-4). This is the "detail panel" half of the dashboard's
- * sidebar-plus-detail-panel shell (docs/circuit-ui-references.md, Linear)
- * — it renders inside src/app/dashboard/layout.tsx, sidebar always visible.
+ * Circuit — tournament detail panel. This is the "detail panel" half of
+ * the dashboard's sidebar-plus-detail-panel shell — it renders inside
+ * src/app/dashboard/layout.tsx, sidebar always visible.
  */
 
 import Link from "next/link";
@@ -62,65 +61,61 @@ export default async function DashboardTournamentDetailPage({
   const status = tournamentStatusInfo(tournament.status);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-1 flex-col gap-8">
       <div className="flex flex-col gap-2">
         <StatusPill tone={status.tone} pulse={status.pulse}>
           {status.label}
         </StatusPill>
-        <h1 className="text-2xl font-semibold">{tournament.name}</h1>
-        <div className="flex gap-3">
-          <Link href={`/tournaments/${id}`} className="text-sm font-medium text-brand underline">
+        <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">{tournament.name}</h1>
+        <div className="flex flex-wrap gap-4 text-sm">
+          <Link href={`/tournaments/${id}`} className="font-medium text-brand-blue hover:underline">
             Public page →
           </Link>
-          <Link href={`/tournaments/${id}/edit`} className="text-sm font-medium text-brand underline">
+          <Link href={`/tournaments/${id}/edit`} className="font-medium text-brand-blue hover:underline">
             Edit →
           </Link>
         </div>
       </div>
 
       {openDisputes.length > 0 && (
-        <section className="flex flex-col gap-3 rounded-xl border border-status-cancelled/30 bg-status-cancelled/5 p-4">
-          <h2 className="flex items-center gap-2 font-semibold text-status-cancelled">
+        <section className="alert alert-warning flex-col items-stretch gap-3">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-warning">
             <AlertTriangle size={16} />
             Disputes need your ruling
           </h2>
           {openDisputes.map((dispute) => (
-            <Link
-              key={dispute.id}
-              href={`/matches/${dispute.matchId}`}
-              className="flex items-center justify-between rounded-lg border border-border bg-surface p-3 text-sm hover:bg-surface-hover"
-            >
-              <span>
+            <Link key={dispute.id} href={`/matches/${dispute.matchId}`} className="card-row flex items-center justify-between gap-3 p-3">
+              <span className="truncate font-medium">
                 {dispute.match.playerA.displayName} vs {dispute.match.playerB.displayName}
               </span>
-              <span className="text-brand underline">Rule now →</span>
+              <span className="shrink-0 text-sm font-medium text-brand-blue">Rule now →</span>
             </Link>
           ))}
         </section>
       )}
 
-      <section className="card grid grid-cols-3 gap-4">
-        <div>
-          <div className="text-xs text-muted">Entry fees collected</div>
-          <div className="font-medium tabular-nums">{formatNaira(collected)}</div>
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="widget flex flex-col gap-1">
+          <span className="text-eyebrow">Entry fees collected</span>
+          <span className="text-stat text-xl">{formatNaira(collected)}</span>
         </div>
-        <div>
-          <div className="text-xs text-muted">Refunded</div>
-          <div className="font-medium tabular-nums">{formatNaira(refunded)}</div>
+        <div className="widget flex flex-col gap-1">
+          <span className="text-eyebrow">Refunded</span>
+          <span className="text-stat text-xl">{formatNaira(refunded)}</span>
         </div>
-        <div>
-          <div className="text-xs text-muted">Prize payout</div>
-          <div className="font-medium">
+        <div className="widget flex flex-col gap-1">
+          <span className="text-eyebrow">Prize payout</span>
+          <span className="text-stat text-xl">
             {payout ? (payout.status === "COMPLETE" ? "Sent" : "Processing") : "Not yet claimed"}
-          </div>
+          </span>
         </div>
       </section>
 
-      <section className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Bracket</h2>
+      <section className="card flex flex-col gap-2">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold">Bracket</h2>
           {bracket && (
-            <Link href={`/tournaments/${id}/bracket`} className="text-sm font-medium text-brand underline">
+            <Link href={`/tournaments/${id}/bracket`} className="text-sm font-medium text-brand-blue hover:underline">
               View bracket →
             </Link>
           )}
@@ -130,13 +125,13 @@ export default async function DashboardTournamentDetailPage({
         </p>
       </section>
 
-      <section className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">
+      <section className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold">
             Registrants (<span className="font-mono tabular-nums">{registrations.length}</span>)
           </h2>
           {registrations.length > 0 && (
-            <a href={`/api/tournaments/${id}/registrants.csv`} className="text-sm font-medium text-brand underline">
+            <a href={`/api/tournaments/${id}/registrants.csv`} className="text-sm font-medium text-brand-blue hover:underline">
               Export CSV
             </a>
           )}
@@ -144,25 +139,25 @@ export default async function DashboardTournamentDetailPage({
         {registrations.length === 0 ? (
           <p className="card text-center text-muted">No registrants yet.</p>
         ) : (
-          <div className="card overflow-hidden p-0">
-            <table className="w-full text-sm">
+          <div className="table-wrap">
+            <table className="table">
               <thead>
-                <tr className="text-left text-muted">
-                  <th className="px-4 pt-4 pb-2 font-medium">Player</th>
-                  <th className="px-4 pt-4 pb-2 font-medium">In-game ID</th>
-                  <th className="px-4 pt-4 pb-2 text-right font-medium">Status</th>
+                <tr>
+                  <th>Player</th>
+                  <th>In-game ID</th>
+                  <th>Status</th>
                 </tr>
               </thead>
               <tbody>
                 {registrations.map((reg) => {
                   const regStatus = registrationStatusInfo(reg.status);
                   return (
-                    <tr key={reg.id} className="border-t border-border">
-                      <td className="px-4 py-3 font-medium">
+                    <tr key={reg.id}>
+                      <td>
                         {reg.user.displayName} <span className="text-muted">(@{reg.user.handle})</span>
                       </td>
-                      <td className="px-4 py-3 text-muted">{reg.inGameId}</td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="font-mono">{reg.inGameId}</td>
+                      <td>
                         <StatusPill tone={regStatus.tone}>{regStatus.label}</StatusPill>
                       </td>
                     </tr>

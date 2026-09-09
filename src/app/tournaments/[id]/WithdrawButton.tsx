@@ -27,11 +27,11 @@ export default function WithdrawButton({ registrationId }: { registrationId: str
   }
 
   return (
-    <div className="flex flex-col gap-1">
-      <button onClick={handleClick} disabled={submitting} className="btn-secondary w-fit">
+    <div className="flex flex-col gap-2">
+      <button onClick={handleClick} disabled={submitting} className="btn-danger">
         {submitting ? "Withdrawing…" : "Withdraw"}
       </button>
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {error && <p className="field-error">{error}</p>}
     </div>
   );
 }

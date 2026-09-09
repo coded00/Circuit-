@@ -37,7 +37,7 @@ export default function SignupForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="card flex w-full max-w-sm flex-col gap-4">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
         <label htmlFor="emailOrPhone" className="field-label">
           Email or phone
@@ -66,13 +66,16 @@ export default function SignupForm() {
           onChange={(e) => setPassword(e.target.value)}
           className="field-input"
         />
-        <span className="text-xs text-muted">At least 8 characters.</span>
+        <span className="field-hint">At least 8 characters.</span>
       </div>
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {error && <p className="field-error">{error}</p>}
       <button type="submit" disabled={submitting} className="btn-primary w-full">
         {submitting ? "Creating account…" : "Create account"}
       </button>
-      <Link href={`/login?next=${encodeURIComponent(next)}`} className="btn-ghost w-full">
+      <Link
+        href={`/login?next=${encodeURIComponent(next)}`}
+        className="text-center text-sm text-muted transition hover:text-foreground"
+      >
         I already have an account
       </Link>
     </form>

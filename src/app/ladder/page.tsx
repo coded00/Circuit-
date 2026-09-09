@@ -9,6 +9,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { gameStandings } from "@/lib/standings";
+import { GameArtTile } from "@/components/GameArtTile";
 
 export default async function LadderPage({
   searchParams,
@@ -26,19 +27,19 @@ export default async function LadderPage({
 
   if (!game) {
     return (
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-6 py-16">
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Ladders</h1>
+      <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-6 py-10">
+        <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Ladders</h1>
         {games.length === 0 ? (
           <p className="card text-center text-muted">No completed Battles yet.</p>
         ) : (
-          <div className="flex flex-col gap-2">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {games.map((g) => (
               <Link
                 key={g.game}
                 href={`/ladder?game=${encodeURIComponent(g.game)}`}
-                className="card-row px-4 py-3 font-medium"
+                className="card-media card-hover relative block h-32 overflow-hidden"
               >
-                {g.game}
+                <GameArtTile game={g.game} className="h-full w-full" />
               </Link>
             ))}
           </div>
@@ -52,47 +53,50 @@ export default async function LadderPage({
   const rankColors = ["#eab308", "#9ca3af", "#b45309"]; // gold, silver, bronze
 
   return (
-    <div className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-6 py-16">
-      <div className="flex flex-col gap-1">
-        <Link href="/ladder" className="w-fit text-xs text-muted hover:text-foreground">
+    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-6 py-10">
+      <div className="flex flex-col gap-2">
+        <Link href="/ladder" className="text-sm font-medium text-brand-blue hover:underline">
           ← All games
         </Link>
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{game} ladder</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">{game} ladder</h1>
       </div>
 
       {ranked.length === 0 ? (
         <p className="card text-center text-muted">No completed Battles for this game yet.</p>
       ) : (
-        <div className="card overflow-hidden p-0">
-          <table className="w-full text-sm">
+        <div className="table-wrap">
+          <table className="table">
             <thead>
-              <tr className="text-left text-muted">
-                <th className="px-4 pt-4 pb-2 font-medium">#</th>
-                <th className="px-4 pt-4 pb-2 font-medium">Player</th>
-                <th className="px-4 pt-4 pb-2 text-right font-medium">W</th>
-                <th className="px-4 pt-4 pb-2 text-right font-medium">L</th>
+              <tr>
+                <th>#</th>
+                <th>Player</th>
+                <th>W</th>
+                <th>L</th>
               </tr>
             </thead>
             <tbody>
               {ranked.map((s, i) => (
-                <tr key={s.userId} className="border-t border-border">
-                  <td className="px-4 py-3">
+                <tr key={s.userId}>
+                  <td>
                     {rankColors[i] ? (
                       <span
-                        className="flex h-5 w-5 items-center justify-center rounded-full font-mono text-xs font-bold tabular-nums text-[#0b0d10]"
+                        className="flex h-7 w-7 items-center justify-center rounded-full font-mono text-xs font-bold text-black"
                         style={{ backgroundColor: rankColors[i] }}
                       >
                         {i + 1}
                       </span>
                     ) : (
-                      <span className="font-mono text-xs tabular-nums text-muted">{i + 1}</span>
+                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-surface-elevated font-mono text-xs font-semibold text-muted">
+                        {i + 1}
+                      </span>
                     )}
                   </td>
-                  <td className="px-4 py-3 font-medium">
-                    {s.displayName} <span className="text-muted">(@{s.handle})</span>
+                  <td>
+                    <span className="font-medium">{s.displayName}</span>{" "}
+                    <span className="text-muted">(@{s.handle})</span>
                   </td>
-                  <td className="px-4 py-3 text-right font-mono text-brand tabular-nums">{s.wins}</td>
-                  <td className="px-4 py-3 text-right font-mono text-muted tabular-nums">{s.losses}</td>
+                  <td className="font-mono tabular-nums text-success">{s.wins}</td>
+                  <td className="font-mono tabular-nums text-danger">{s.losses}</td>
                 </tr>
               ))}
             </tbody>

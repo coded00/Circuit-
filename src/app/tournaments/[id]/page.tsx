@@ -74,16 +74,16 @@ export default async function TournamentPage({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-6 py-16">
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-2">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 p-6 sm:p-8">
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <StatusPill tone={status.tone} pulse={status.pulse}>
             {status.label}
           </StatusPill>
           {(tournament.status === "LIVE" || tournament.status === "COMPLETE") && (
             <Link
               href={`/tournaments/${tournament.id}/bracket`}
-              className="text-sm font-medium text-brand underline"
+              className="text-sm font-medium text-brand-blue hover:underline"
             >
               View bracket →
             </Link>
@@ -93,47 +93,48 @@ export default async function TournamentPage({
               href={tournament.streamUrl}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-1.5 text-sm font-medium text-brand underline"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-blue hover:underline"
             >
               <Tv size={14} />
               Watch stream
             </a>
           )}
         </div>
-        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">{tournament.name}</h1>
-        <p className="text-muted">{tournament.game} · Single-elimination knockout</p>
+        <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">{tournament.name}</h1>
+        <p className="text-sm text-muted">{tournament.game} · Single-elimination knockout</p>
       </div>
 
-      <div className="card grid grid-cols-2 gap-5 sm:grid-cols-4">
-        <div>
-          <div className="text-xs text-muted">Entry fee</div>
-          <div className="font-medium">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="widget flex flex-col gap-1.5">
+          <span className="text-eyebrow">Entry fee</span>
+          <span className="text-stat text-lg">
             {tournament.entryFee === 0 ? "Free" : formatNaira(tournament.entryFee)}
-          </div>
+          </span>
         </div>
-        <div>
-          <div className="text-xs text-muted">Prize</div>
-          <div className="font-medium">
+        <div className="widget flex flex-col gap-1.5">
+          <span className="text-eyebrow">Prize</span>
+          <span className={`text-stat text-lg ${tournament.prizeAmount ? "text-gold" : ""}`}>
             {tournament.prizeAmount ? formatNaira(tournament.prizeAmount) : (tournament.prizeText ?? "—")}
-          </div>
+          </span>
         </div>
-        <div className="col-span-2 sm:col-span-1">
-          <div className="text-xs text-muted">Registrants</div>
-          <div className="font-medium">
+        <div className="widget flex flex-col gap-1.5">
+          <span className="text-eyebrow">Registrants</span>
+          <span className="text-stat text-lg">
             {registrantCount} / {tournament.participantCap}
-          </div>
-          <div className="mt-1.5 h-1.5 w-full max-w-24 overflow-hidden rounded-full bg-surface-hover">
-            <div className="h-full rounded-full bg-brand transition-all" style={{ width: `${fillPct}%` }} />
+          </span>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-elevated">
+            <div className="h-full rounded-full" style={{ width: `${fillPct}%`, background: "var(--brand-gradient)" }} />
           </div>
         </div>
-        <div>
-          <div className="text-xs text-muted">Starts</div>
-          <div className="font-medium">{formatDate(tournament.startAt)}</div>
+        <div className="widget flex flex-col gap-1.5">
+          <span className="text-eyebrow">Starts</span>
+          <span className="text-stat text-lg">{formatDate(tournament.startAt)}</span>
         </div>
       </div>
 
-      <div className="flex flex-col gap-1 text-sm text-muted">
+      <div className="flex flex-col gap-1 text-sm text-muted sm:flex-row sm:items-center sm:gap-3">
         <span>Registration opens {formatDate(tournament.registrationOpenAt)}</span>
+        <span className="hidden text-muted-strong sm:inline">·</span>
         <span>Registration closes {formatDate(tournament.registrationCloseAt)}</span>
       </div>
 
@@ -141,26 +142,26 @@ export default async function TournamentPage({
         <p className="text-sm text-muted">{tournament.prizeText}</p>
       ) : null}
 
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-3">
         {tournament.status === "CANCELLED" ? (
-          <p className="rounded-lg border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">
+          <p className="alert alert-danger">
             This tournament has been cancelled. Paid entries have been refunded.
           </p>
         ) : isOrganizer ? (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center gap-3">
             <Link href={`/dashboard/tournaments/${tournament.id}`} className="btn-secondary">
               Manage
             </Link>
             {now < tournament.registrationCloseAt && (
-              <Link href={`/tournaments/${tournament.id}/edit`} className="btn-secondary">
+              <Link href={`/tournaments/${tournament.id}/edit`} className="btn-ghost">
                 Edit
               </Link>
             )}
             <CancelButton tournamentId={tournament.id} />
           </div>
         ) : myRegistration?.status === "CONFIRMED" ? (
-          <div className="flex flex-col gap-2">
-            <p className="text-sm text-muted">You&apos;re registered for this tournament.</p>
+          <div className="alert alert-success flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p>You&apos;re registered for this tournament.</p>
             {now < tournament.registrationCloseAt &&
               tournament.status !== "LIVE" &&
               tournament.status !== "COMPLETE" && (
@@ -168,21 +169,21 @@ export default async function TournamentPage({
               )}
           </div>
         ) : myRegistration?.status === "PENDING_PAYMENT" ? (
-          <p className="text-sm text-muted">
+          <p className="alert alert-warning">
             Your payment is processing.{" "}
             <Link
               href={`/tournaments/${tournament.id}/register/callback?ref=${myRegistration.paymentRef}`}
-              className="font-medium text-brand underline"
+              className="font-medium underline"
             >
               Check status
             </Link>
           </p>
         ) : registrationOpen ? (
-          <Link href={`/tournaments/${tournament.id}/register`} className="btn-primary w-fit">
+          <Link href={`/tournaments/${tournament.id}/register`} className="btn-primary w-full sm:w-fit">
             Register
           </Link>
         ) : (
-          <p className="text-sm text-muted">
+          <p className="card text-center text-sm text-muted">
             {now < tournament.registrationOpenAt
               ? "Registration hasn't opened yet."
               : now >= tournament.registrationCloseAt
@@ -195,7 +196,7 @@ export default async function TournamentPage({
       {canClaimPrize && <ClaimPrizeButton tournamentId={tournament.id} />}
 
       <div className="flex flex-col gap-2 border-t border-border pt-6">
-        <h2 className="text-lg font-semibold">Rules</h2>
+        <h2 className="text-section-heading">Rules</h2>
         <p className="whitespace-pre-wrap text-sm text-muted">{tournament.rulesText}</p>
       </div>
     </div>

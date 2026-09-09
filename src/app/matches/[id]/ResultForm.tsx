@@ -45,12 +45,12 @@ export default function ResultForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="card flex flex-col gap-4">
-      <h2 className="text-lg font-semibold">Submit result</h2>
+    <form onSubmit={handleSubmit} className="card flex flex-col gap-5">
+      <h2 className="text-card-title font-semibold">Submit result</h2>
 
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-1.5">
         <span className="field-label">Winner</span>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {[playerA, playerB].map((player) => (
             <OptionCard
               key={player.id}
@@ -87,7 +87,7 @@ export default function ResultForm({
           type="file"
           accept="image/*,video/*"
           required
-          className="text-sm text-muted file:mr-3 file:rounded-full file:border-0 file:bg-surface-hover file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-foreground"
+          className="field-input file:mr-3 file:rounded-[8px] file:border-0 file:bg-surface file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-foreground"
         />
       </div>
 
@@ -97,14 +97,14 @@ export default function ResultForm({
           checked={confirmed}
           onChange={(e) => setConfirmed(e.target.checked)}
           required
-          className="mt-1 accent-brand"
+          className="mt-0.5 h-4 w-4 shrink-0 rounded border-border-strong bg-surface-elevated accent-brand-blue"
         />
         I confirm the match code shown to both players is visible in this proof.
       </label>
 
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {error && <p className="field-error">{error}</p>}
 
-      <button type="submit" disabled={submitting} className="btn-primary w-fit">
+      <button type="submit" disabled={submitting} className="btn-primary">
         {submitting ? "Submitting…" : "Submit result"}
       </button>
     </form>

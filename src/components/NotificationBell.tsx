@@ -77,25 +77,16 @@ export function NotificationBell({ initialUnreadCount = 0 }: { initialUnreadCoun
 
   return (
     <div ref={containerRef} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="relative flex h-9 w-9 items-center justify-center rounded-full text-muted transition hover:bg-surface-hover hover:text-foreground"
-        aria-label="Notifications"
-      >
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-label="Notifications" className="btn-icon relative">
         <Bell size={18} />
-        {unreadCount > 0 && (
-          <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-status-cancelled px-1 font-mono text-[10px] font-semibold tabular-nums text-white">
-            {unreadCount > 9 ? "9+" : unreadCount}
-          </span>
-        )}
+        {unreadCount > 0 && <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-live" />}
       </button>
 
       {open && (
-        <div className="absolute right-0 z-20 mt-2 w-80 rounded-xl border border-border bg-surface shadow-lg">
+        <div className="absolute right-0 z-20 mt-2 w-80 dropdown-panel">
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <span className="text-sm font-semibold">Notifications</span>
-            <button type="button" onClick={markAllRead} className="text-xs font-medium text-brand hover:underline">
+            <button type="button" onClick={markAllRead} className="text-xs font-medium text-accent-blue hover:underline">
               Mark all read
             </button>
           </div>
@@ -108,9 +99,9 @@ export function NotificationBell({ initialUnreadCount = 0 }: { initialUnreadCoun
                   key={n.id}
                   href={n.href}
                   onClick={() => !n.readAt && markRead(n.id)}
-                  className="flex items-start gap-2 border-b border-border px-4 py-3 text-sm last:border-b-0 hover:bg-surface-hover"
+                  className="flex items-start gap-2 border-b border-border px-4 py-3 text-sm last:border-b-0 hover:bg-surface-elevated"
                 >
-                  {!n.readAt && <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand" />}
+                  {!n.readAt && <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent-blue" />}
                   <span className="flex flex-1 flex-col gap-0.5">
                     <span className={n.readAt ? "text-muted" : ""}>{n.message}</span>
                     <span className="text-xs text-muted">{formatRelative(n.createdAt)}</span>
@@ -122,7 +113,7 @@ export function NotificationBell({ initialUnreadCount = 0 }: { initialUnreadCoun
           <Link
             href="/notifications"
             onClick={() => setOpen(false)}
-            className="block border-t border-border px-4 py-2.5 text-center text-sm font-medium text-brand hover:underline"
+            className="block border-t border-border px-4 py-2.5 text-center text-sm font-medium text-accent-blue hover:underline"
           >
             View all
           </Link>

@@ -1,9 +1,7 @@
 /**
- * Circuit — "Connect your accounts" row (NEXA reference: circular platform
- * icon buttons under the hero). UI shell only, disabled — no OAuth exists,
- * that needs real developer credentials per platform this environment
- * doesn't have. Shared between the homepage and /account so the visual
- * treatment never drifts between the two places it appears.
+ * Circuit — "Connect your accounts" row. UI shell only, disabled — no
+ * OAuth exists, that needs real developer credentials per platform this
+ * environment doesn't have. Shared between the homepage and /account.
  */
 
 import { Gamepad2, Link2 } from "lucide-react";
@@ -20,27 +18,27 @@ const PLATFORMS = [
 
 export function ConnectAccountsRow() {
   return (
-    <div className="flex flex-col gap-3">
-      <h2 className="flex items-center gap-2 text-base font-semibold">
-        <Link2 size={17} className="text-muted" />
+    <div className="flex flex-col gap-4">
+      <h2 className="text-section-heading flex items-center gap-2">
+        <Link2 size={17} className="text-brand-blue" />
         Connect Your Accounts
       </h2>
-      <div className="flex flex-wrap gap-4">
+      <div className="flex flex-wrap gap-2">
         {PLATFORMS.map((platform) => (
           <button
             key={platform.name}
             type="button"
             disabled
             title={`${platform.name} — coming soon`}
-            className="flex cursor-not-allowed flex-col items-center gap-1.5 opacity-60"
+            className="flex items-center gap-2 rounded-[10px] border border-border bg-surface-elevated py-2 pr-3.5 pl-2 text-sm font-medium text-muted transition disabled:cursor-not-allowed disabled:opacity-60"
           >
             <span
-              className="flex h-12 w-12 items-center justify-center rounded-full"
+              className="flex h-6 w-6 items-center justify-center rounded-full"
               style={{ backgroundColor: platform.color }}
             >
-              <Gamepad2 size={20} className="text-white" />
+              <Gamepad2 size={13} className="text-white" />
             </span>
-            <span className="text-[10px] text-muted">{platform.name}</span>
+            {platform.name}
           </button>
         ))}
       </div>

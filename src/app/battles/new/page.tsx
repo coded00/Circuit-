@@ -9,8 +9,8 @@ export default async function NewBattlePage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-6 py-16">
-      <h1 className="text-2xl font-semibold">Open a Battle</h1>
+    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-6 py-10">
+      <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Open a Challenge</h1>
       <BattleForm />
     </div>
   );

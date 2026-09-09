@@ -27,10 +27,10 @@ export default async function StaffReportsPage() {
   });
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-6 py-16">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Open reports</h1>
-        <Link href="/staff/disputes" className="text-sm font-medium text-brand underline">
+    <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-6 py-10">
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Open reports</h1>
+        <Link href="/staff/disputes" className="text-sm font-medium text-brand-blue hover:underline">
           Escalated disputes →
         </Link>
       </div>
@@ -40,16 +40,15 @@ export default async function StaffReportsPage() {
       ) : (
         <div className="flex flex-col gap-3">
           {reports.map((report) => (
-            <div key={report.id} className="card-row flex flex-col gap-3 p-4">
-              <div className="flex items-center justify-between">
-                <Link href={`/players/${report.reportedUser.handle}`} className="font-medium hover:underline">
+            <div key={report.id} className="card flex flex-col gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Link
+                  href={`/players/${report.reportedUser.handle}`}
+                  className="font-medium hover:text-brand-blue"
+                >
                   {report.reportedUser.displayName} (@{report.reportedUser.handle})
                 </Link>
-                {report.reportedUser.isSuspended && (
-                  <span className="rounded-full bg-status-cancelled/15 px-2.5 py-1 text-xs font-medium text-status-cancelled">
-                    Suspended
-                  </span>
-                )}
+                {report.reportedUser.isSuspended && <span className="badge badge-cancelled">Suspended</span>}
               </div>
               <p className="text-sm text-muted">
                 Reported by {report.reportedBy.displayName} (@{report.reportedBy.handle})
@@ -60,7 +59,7 @@ export default async function StaffReportsPage() {
                   href={`/api/reports/${report.id}/evidence`}
                   target="_blank"
                   rel="noreferrer"
-                  className="w-fit text-sm font-medium text-brand underline"
+                  className="text-sm font-medium text-brand-blue hover:underline"
                 >
                   View evidence
                 </a>

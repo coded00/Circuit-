@@ -37,46 +37,44 @@ export default async function DashboardPayoutsPage() {
   const totalRefunded = rows.reduce((sum, r) => sum + r.refunded, 0);
 
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">Payouts</h1>
+    <div className="flex flex-1 flex-col gap-6">
+      <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Payouts</h1>
 
-      <div className="card grid grid-cols-2 gap-4">
-        <div>
-          <div className="text-xs text-muted">Total collected</div>
-          <div className="text-lg font-semibold tabular-nums">{formatNaira(totalCollected)}</div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="widget flex flex-col gap-1">
+          <span className="text-eyebrow">Total collected</span>
+          <span className="text-stat text-2xl">{formatNaira(totalCollected)}</span>
         </div>
-        <div>
-          <div className="text-xs text-muted">Total refunded</div>
-          <div className="text-lg font-semibold tabular-nums">{formatNaira(totalRefunded)}</div>
+        <div className="widget flex flex-col gap-1">
+          <span className="text-eyebrow">Total refunded</span>
+          <span className="text-stat text-2xl">{formatNaira(totalRefunded)}</span>
         </div>
       </div>
 
       {rows.length === 0 ? (
         <p className="card text-center text-muted">No money has moved through any of your tournaments yet.</p>
       ) : (
-        <div className="card overflow-hidden p-0">
-          <table className="w-full text-sm">
+        <div className="table-wrap">
+          <table className="table">
             <thead>
-              <tr className="text-left text-muted">
-                <th className="px-4 pt-4 pb-2 font-medium">Tournament</th>
-                <th className="px-4 pt-4 pb-2 text-right font-medium">Collected</th>
-                <th className="px-4 pt-4 pb-2 text-right font-medium">Refunded</th>
-                <th className="px-4 pt-4 pb-2 text-right font-medium">Prize payout</th>
+              <tr>
+                <th>Tournament</th>
+                <th>Collected</th>
+                <th>Refunded</th>
+                <th>Prize payout</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr key={row.tournament.id} className="border-t border-border">
-                  <td className="px-4 py-3 font-medium">
-                    <Link href={`/dashboard/tournaments/${row.tournament.id}`} className="hover:underline">
+                <tr key={row.tournament.id}>
+                  <td>
+                    <Link href={`/dashboard/tournaments/${row.tournament.id}`} className="font-medium hover:text-brand-blue">
                       {row.tournament.name}
                     </Link>
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums">{formatNaira(row.collected)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">{formatNaira(row.refunded)}</td>
-                  <td className="px-4 py-3 text-right text-muted">
-                    {row.payout ? (row.payout.status === "COMPLETE" ? "Sent" : "Processing") : "Not yet claimed"}
-                  </td>
+                  <td className="font-mono tabular-nums">{formatNaira(row.collected)}</td>
+                  <td className="font-mono tabular-nums">{formatNaira(row.refunded)}</td>
+                  <td>{row.payout ? (row.payout.status === "COMPLETE" ? "Sent" : "Processing") : "Not yet claimed"}</td>
                 </tr>
               ))}
             </tbody>

@@ -58,9 +58,9 @@ export default function BattleForm() {
         />
       </div>
 
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-1.5">
         <span className="field-label">Format</span>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <OptionCard
             selected={format === "SINGLE"}
             onSelect={() => setFormat("SINGLE")}
@@ -76,9 +76,24 @@ export default function BattleForm() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-1.5">
+        <span className="field-label">Stake</span>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <OptionCard selected onSelect={() => {}} title="Free" description="No entry fee" />
+          <OptionCard
+            selected={false}
+            onSelect={() => {}}
+            disabled
+            disabledTitle="Paid challenges — coming soon"
+            title="Paid"
+            description="Coming soon"
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
         <span className="field-label">Who can accept</span>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <OptionCard
             selected={visibility === "OPEN"}
             onSelect={() => setVisibility("OPEN")}
@@ -124,10 +139,10 @@ export default function BattleForm() {
         />
       </div>
 
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {error && <p className="field-error">{error}</p>}
 
-      <button type="submit" disabled={submitting} className="btn-primary w-full">
-        {submitting ? "Opening…" : "Open Battle"}
+      <button type="submit" disabled={submitting} className="btn-primary">
+        {submitting ? "Opening…" : "Open Challenge"}
       </button>
     </form>
   );

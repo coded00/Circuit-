@@ -28,8 +28,8 @@ export default async function EditTournamentPage({
     (await prisma.registration.count({ where: { tournamentId: id, status: "CONFIRMED" } })) > 0;
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-6 py-16">
-      <h1 className="text-2xl font-semibold">Edit {tournament.name}</h1>
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-6 sm:p-8">
+      <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Edit {tournament.name}</h1>
       <div className="card">
         <EditForm tournament={tournament} moneyFieldsLocked={hasPaidRegistration} />
       </div>

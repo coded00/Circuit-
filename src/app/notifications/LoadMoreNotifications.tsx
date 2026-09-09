@@ -35,15 +35,18 @@ export default function LoadMoreNotifications({ initialCursor }: { initialCursor
       {rows.length > 0 && (
         <div className="flex flex-col gap-2">
           {rows.map((n) => (
-            <a key={n.id} href={n.href} className="card-row flex items-start justify-between gap-3 p-4">
-              <span className={n.readAt ? "text-muted" : ""}>{n.message}</span>
-              <span className="shrink-0 text-xs text-muted">{formatRelative(n.createdAt)}</span>
+            <a key={n.id} href={n.href} className="card-row flex items-start gap-3 p-3">
+              {!n.readAt && <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-blue" aria-hidden />}
+              <span className="flex flex-1 flex-col gap-0.5">
+                <span className={n.readAt ? "text-sm text-muted" : "text-sm"}>{n.message}</span>
+                <span className="text-metadata">{formatRelative(n.createdAt)}</span>
+              </span>
             </a>
           ))}
         </div>
       )}
       {cursor && (
-        <button type="button" onClick={loadMore} disabled={loading} className="btn-secondary w-fit self-center">
+        <button type="button" onClick={loadMore} disabled={loading} className="btn-secondary self-center">
           {loading ? "Loading…" : "Load more"}
         </button>
       )}

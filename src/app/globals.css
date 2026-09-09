@@ -1,58 +1,171 @@
 @import "tailwindcss";
 
 /*
- * Design tokens — see docs/circuit-ui-references.md for the original
- * sourcing and the NEXA-reference rebuild notes for this palette. One
- * deliberate always-dark theme (not OS-driven, no light mode) — every
- * screen in the reference is dark, so Circuit commits to dark the same
- * way Discord/Linear/most gaming platforms do, rather than toggling.
- * Brand purple replaces the previous green; --status-live keeps green
- * since it's now free of brand-collision and still reads as "active/go."
+ * ============================================================================
+ * CIRCUIT design system — "Light to discover. Dark to compete. Volt to
+ * win." Most of the app renders on the light palette below (:root, the
+ * default); a handful of specific competitive/cinematic surfaces (the
+ * homepage hero, the challenge detail page) opt into the dark override
+ * block via `data-surface="dark"` on a wrapping element. This is CSS
+ * custom-property scoping, not a JS theme toggle: `@theme inline` below
+ * keeps every generated Tailwind color utility (bg-background,
+ * text-foreground, etc.) as a live `var()` reference, so a dark-scoped
+ * wrapper's locally-redeclared --background/--surface/... correctly
+ * cascades into every descendant utility and existing theme-agnostic
+ * component class (.card, .field-input, .btn-secondary, ...) with zero
+ * per-component edits — only classes that hardcoded the old brand-blue/
+ * violet gradient needed changes (see each below).
+ *
+ * Supersedes the prior all-dark "CIRCUIT UI Development Phases" system.
+ * ============================================================================
  */
-:root {
-  --background: #0b0d10;
-  --surface: #14171c;
-  --surface-hover: #1b1f26;
-  --border: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.16);
-  --foreground: #f3f4f6;
-  --muted: #9199a6;
 
-  --brand: #7c3aed;
-  --brand-strong: #6d28d9;
-  --brand-soft: rgba(124, 58, 237, 0.2);
+:root {
+  /* ---- Light palette (the default surface) ---- */
+  --background: #f5f3ee;
+  --surface: #ffffff;
+  --surface-elevated: #eceae4;
+  --sidebar-bg: #ffffff;
+
+  --border: #e5e2dc;
+  --border-hover: rgba(17, 19, 24, 0.16);
+  --border-strong: rgba(17, 19, 24, 0.24);
+
+  --foreground: #111318;
+  --muted: #6b7280;
+  --muted-strong: #9ca3af;
+
+  /* Legacy blue/violet gradient tokens — kept defined (a few files may
+     still reference them mid-migration) but no longer used by any shared
+     component class below; new work should use the accent tokens instead. */
+  --brand-blue: #4f7cff;
+  --brand-violet: #8b5cf6;
+  --brand-cyan: #20d9ff;
+  --brand-gradient: linear-gradient(135deg, #4f7cff, #8b5cf6);
+  --brand-soft: rgba(79, 124, 255, 0.16);
   --brand-foreground: #ffffff;
 
-  --status-live: #10b981;
-  --status-open: #0ea5e9;
+  /* ---- CIRCUIT accent system ---- */
+  /* Volt — primary accent. Reserved for solid fills, icons, dots, and
+     large glyphs only; never small badge/label text (fails contrast at
+     that size on both surfaces). ~5% usage — primary CTAs, active nav,
+     wins, prize highlights. Not a gradient. */
+  --accent-volt: #b8f500;
+  --accent-volt-foreground: #10140a;
+  --accent-volt-soft: rgba(184, 245, 0, 0.14);
+  /* Challenge Orange — challenges, rivalries, competitive matchups. */
+  --accent-orange: #ff5a36;
+  --accent-orange-soft: rgba(255, 90, 54, 0.14);
+  /* Competition Blue — information, upcoming states, tournament metadata. */
+  --accent-blue: #2563eb;
+  --accent-blue-soft: rgba(37, 99, 235, 0.12);
+
+  --live: #ff4d5e;
+  --live-soft: rgba(255, 77, 94, 0.15);
+
+  /* Semantic status — kept from the prior system (real domain meaning,
+     unrelated to the visual rebrand): tournament/registration/battle/
+     dispute lifecycle states. --status-open/--info repointed to
+     Competition Blue (was neon cyan, part of the retired dark-only look). */
+  --status-live: #ff4d5e;
+  --status-open: #2563eb;
   --status-neutral: #6b7280;
-  --status-complete: #14b8a6;
-  --status-cancelled: #ef4444;
+  --status-complete: #22c55e;
+  --status-cancelled: #e5484d;
   --status-attention: #f59e0b;
 
-  --danger: #ef4444;
-  --danger-strong: #dc2626;
+  --danger: #e5484d;
+  --danger-strong: #c7373c;
+  --success: #22c55e;
+  --success-strong: #16a34a;
+  --warning: #f59e0b;
+  --warning-strong: #d97706;
+  --info: #2563eb;
+  --info-strong: #1d4ed8;
 
-  /* Reserved for real prize pools/high-value rewards only — never a
-     general accent. Keeps purple's meaning (brand/CTA/active state)
-     uncluttered by also having to carry "money," per the NEXA design
-     brief's color-atmosphere rules. */
-  --gold: #eab308;
+  --gold: #f4b942;
+
+  color-scheme: light;
+
+  /* ---- Spacing (Phase 1: 12-16 gutters, 20-24 column gaps, 16 card gaps) ---- */
+  --space-xs: 0.375rem;
+  --space-sm: 0.625rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2.5rem;
+  --space-2xl: 4rem;
+
+  /* ---- Radius (Phase 13) ---- */
+  --radius-sm: 8px;
+  --radius-md: 11px;
+  --radius-lg: 15px;
+  --radius-full: 999px;
+
+  /* ---- Layout (Phase 1) ---- */
+  --sidebar-width: 170px;
+  --right-rail-width: 330px;
+}
+
+/* Dark override — "dark to compete." Applied via `data-surface="dark"` on
+   the homepage hero and the challenge detail page this pass; other
+   cinematic surfaces (tournament hero, bracket) can opt in the same way
+   later. Redeclares the same surface/text/border variable names so every
+   theme-agnostic component class picks it up automatically within scope.
+   Explicit `color`/`background` here (not just the custom properties) is
+   load-bearing: `body { color: var(--foreground) }` resolves once at the
+   true document root and that *computed* color is what plain inheritance
+   passes down — an element inside this scope that never sets its own
+   text-color utility (e.g. a bare `<span>{name}</span>`) would otherwise
+   inherit the light-theme color straight through, never re-evaluating
+   `--foreground` at this scope. Re-declaring both here forces that
+   re-evaluation at the scope boundary. */
+[data-surface="dark"] {
+  --background: #101318;
+  --surface: #181c22;
+  --surface-elevated: #222831;
+  --sidebar-bg: #181c22;
+
+  --border: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.16);
+  --border-strong: rgba(255, 255, 255, 0.16);
+
+  --foreground: #f8fafc;
+  --muted: #9ca3af;
+  --muted-strong: #6b7280;
+
+  background: var(--background);
+  color: var(--foreground);
+  color-scheme: dark;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-surface: var(--surface);
-  --color-surface-hover: var(--surface-hover);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-sidebar-bg: var(--sidebar-bg);
   --color-border: var(--border);
+  --color-border-hover: var(--border-hover);
   --color-border-strong: var(--border-strong);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
+  --color-muted-strong: var(--muted-strong);
 
-  --color-brand: var(--brand);
-  --color-brand-strong: var(--brand-strong);
+  --color-brand-blue: var(--brand-blue);
+  --color-brand-violet: var(--brand-violet);
+  --color-brand-cyan: var(--brand-cyan);
   --color-brand-soft: var(--brand-soft);
   --color-brand-foreground: var(--brand-foreground);
+
+  --color-accent-volt: var(--accent-volt);
+  --color-accent-volt-foreground: var(--accent-volt-foreground);
+  --color-accent-volt-soft: var(--accent-volt-soft);
+  --color-accent-orange: var(--accent-orange);
+  --color-accent-orange-soft: var(--accent-orange-soft);
+  --color-accent-blue: var(--accent-blue);
+  --color-accent-blue-soft: var(--accent-blue-soft);
+
+  --color-live: var(--live);
+  --color-live-soft: var(--live-soft);
 
   --color-status-live: var(--status-live);
   --color-status-open: var(--status-open);
@@ -63,10 +176,18 @@
 
   --color-danger: var(--danger);
   --color-danger-strong: var(--danger-strong);
+  --color-success: var(--success);
+  --color-success-strong: var(--success-strong);
+  --color-warning: var(--warning);
+  --color-warning-strong: var(--warning-strong);
+  --color-info: var(--info);
+  --color-info-strong: var(--info-strong);
 
   --color-gold: var(--gold);
 
-  --font-sans: var(--font-geist-sans);
+  /* Phase 14: Inter/Manrope for UI, Space Grotesk for display */
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
   --font-mono: var(--font-geist-mono);
 }
 
@@ -74,81 +195,328 @@
   border-color: var(--border);
 }
 
-html {
-  color-scheme: dark;
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
-  background-image:
-    radial-gradient(ellipse 1100px 600px at 50% -10%, var(--brand-soft), transparent);
-  background-repeat: no-repeat;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
 ::selection {
-  background: var(--brand-soft);
+  background: var(--accent-volt-soft);
   color: var(--foreground);
 }
 
 /*
- * Shared form/button primitives — every form in the app (auth, tournament
- * creation, registration, battle creation, result/ruling submission) was
- * repeating the same input/button Tailwind soup with tiny drifts between
- * copies. One definition here instead of a dozen near-duplicates.
+ * ============================================================================
+ * Phase 14 — typography scale.
+ * ============================================================================
+ */
+@layer components {
+  .text-hero {
+    @apply font-display text-[44px] leading-[0.98] font-bold tracking-tight uppercase sm:text-[60px] lg:text-[72px];
+  }
+
+  .text-section-heading {
+    @apply font-display text-lg font-bold tracking-tight sm:text-xl;
+  }
+
+  .text-card-title {
+    @apply text-sm font-semibold sm:text-base;
+  }
+
+  .text-eyebrow {
+    @apply font-mono text-[11px] font-semibold tracking-[0.14em] text-accent-blue uppercase;
+  }
+
+  .text-metadata {
+    @apply text-[11px] text-muted-strong sm:text-xs;
+  }
+
+  .text-stat {
+    @apply font-mono font-semibold tabular-nums;
+  }
+}
+
+/*
+ * ============================================================================
+ * Phase 13 — global card design system.
+ * ============================================================================
+ */
+@layer components {
+  .card {
+    @apply rounded-[15px] border border-border bg-surface p-5 transition;
+  }
+
+  .card-hover {
+    @apply hover:border-border-hover hover:-translate-y-0.5;
+  }
+
+  .card-row {
+    @apply rounded-[11px] border border-border bg-surface text-sm transition
+      hover:border-border-hover hover:bg-surface-elevated;
+  }
+
+  .card-media {
+    @apply overflow-hidden rounded-[11px] border border-border bg-surface transition
+      hover:border-border-hover;
+  }
+
+  .widget {
+    @apply rounded-[15px] border border-border bg-surface p-4;
+  }
+
+  .surface-elevated {
+    @apply rounded-[11px] border border-border bg-surface-elevated;
+  }
+}
+
+/*
+ * ============================================================================
+ * Buttons — Phase 3 (Go Live/Create), Phase 4 (hero CTAs), Phase 5 (Register
+ * Now), Phase 10 (channel actions), Phase 12 (Circuit+ upgrade).
+ * ============================================================================
+ */
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-[10px] bg-accent-volt px-5 py-2.5
+      text-sm font-semibold text-accent-volt-foreground shadow-sm transition
+      hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-[10px] border border-border-strong
+      bg-transparent px-5 py-2.5 text-sm font-medium text-foreground transition
+      hover:bg-surface-elevated disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-[10px] bg-surface-elevated px-5 py-2.5
+      text-sm font-medium text-muted transition hover:text-foreground
+      disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-[10px] border border-danger/40
+      px-5 py-2.5 text-sm font-medium text-danger transition hover:bg-danger/10
+      disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  /* "Go Live" — streaming is out of MVP scope; this class stays defined
+     only until the last two disabled buttons using it are removed
+     (TopBar, YourChannel) as part of the homepage rework. */
+  .btn-golive {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-[10px] border px-4 py-2 text-sm font-semibold
+      text-foreground transition hover:bg-surface-elevated disabled:cursor-not-allowed disabled:opacity-60;
+    background: var(--surface-elevated);
+    border-color: var(--accent-blue);
+  }
+
+  .btn-icon {
+    @apply inline-flex h-9 w-9 items-center justify-center rounded-full text-muted transition
+      hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  /* Phase 13: a floating panel (dropdown menu, popover) — soft elevation,
+     not Tailwind's default shadow-lg (a flat, fairly heavy black shadow).
+     Consolidates what AccountMenu/CreateMenu/NotificationBell/SearchInput
+     each independently hand-rolled slightly differently. */
+  .dropdown-panel {
+    @apply rounded-[11px] border border-border bg-surface;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  }
+}
+
+/*
+ * ============================================================================
+ * Forms.
+ * ============================================================================
  */
 @layer components {
   .field-label {
     @apply text-sm font-medium;
   }
 
+  .field-hint {
+    @apply text-xs text-muted;
+  }
+
+  .field-error {
+    @apply text-xs text-danger;
+  }
+
   .field-input {
-    @apply w-full rounded-lg border border-border bg-surface px-3.5 py-2.5 text-sm
-      outline-none transition placeholder:text-muted
-      focus:border-brand focus:ring-2 focus:ring-brand-soft;
-  }
-
-  .btn-primary {
-    @apply inline-flex items-center justify-center rounded-full bg-brand px-5 py-2.5
-      text-sm font-medium text-brand-foreground shadow-sm shadow-brand/30 transition
-      hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-50;
-  }
-
-  .btn-secondary {
-    @apply inline-flex items-center justify-center rounded-full border border-border-strong
-      px-5 py-2.5 text-sm font-medium transition hover:bg-surface-hover
+    @apply w-full rounded-[10px] border border-border bg-surface-elevated px-3.5 py-2.5 text-sm
+      outline-none transition placeholder:text-muted-strong
+      focus:border-accent-blue focus:ring-2 focus:ring-accent-blue-soft
       disabled:cursor-not-allowed disabled:opacity-50;
   }
 
-  /* Third visual weight for stacked-pill screens (docs/circuit-ui-references.md:
-     Pinterest's auth pattern — solid/bordered/light-grey signaling
-     primary/secondary/tertiary at a glance). No border at all, unlike
-     .btn-secondary — the lowest-emphasis tier. */
-  .btn-ghost {
-    @apply inline-flex items-center justify-center rounded-full bg-surface-hover px-5 py-2.5
-      text-sm font-medium text-muted transition hover:text-foreground
+  .field-select {
+    @apply w-full appearance-none rounded-[10px] border border-border bg-surface-elevated px-3.5 py-2.5 pr-9
+      text-sm outline-none transition
+      focus:border-accent-blue focus:ring-2 focus:ring-accent-blue-soft
       disabled:cursor-not-allowed disabled:opacity-50;
   }
 
-  .btn-danger {
-    @apply inline-flex items-center justify-center rounded-full border border-danger/40
-      px-5 py-2.5 text-sm font-medium text-danger transition hover:bg-danger/10
+  .field-textarea {
+    @apply w-full resize-y rounded-[10px] border border-border bg-surface-elevated px-3.5 py-2.5 text-sm
+      outline-none transition placeholder:text-muted-strong
+      focus:border-accent-blue focus:ring-2 focus:ring-accent-blue-soft
       disabled:cursor-not-allowed disabled:opacity-50;
   }
+}
 
-  .card {
-    @apply rounded-xl border border-border bg-surface p-5;
+/*
+ * ============================================================================
+ * Badges / pills.
+ * ============================================================================
+ */
+@layer components {
+  .badge {
+    @apply inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium
+      whitespace-nowrap;
   }
 
-  /* The recurring "bordered surface row" — every list item across the
-     battle board, ladder, player profile, dashboard kanban/lists, and
-     staff queues was hand-repeating this. Padding/flex/gap stay
-     per-call-site since they genuinely differ. */
-  .card-row {
-    @apply rounded-xl border border-border bg-surface text-sm
-      transition hover:border-border-strong hover:bg-surface-hover;
+  .badge-md {
+    @apply px-4 py-2 text-sm;
+  }
+
+  .badge-live {
+    @apply bg-live-soft text-live;
+  }
+  .badge-open {
+    @apply bg-status-open/15 text-status-open;
+  }
+  .badge-neutral {
+    @apply bg-status-neutral/15 text-status-neutral;
+  }
+  .badge-complete {
+    @apply bg-status-complete/15 text-status-complete;
+  }
+  .badge-cancelled {
+    @apply bg-status-cancelled/15 text-status-cancelled;
+  }
+  .badge-attention {
+    @apply bg-status-attention/15 text-status-attention;
+  }
+  /* Featured/premium content (real prize pools) — Gold, not Volt: Volt
+     text fails contrast at badge size, and Gold is the spec's own
+     "championships/premium" color. */
+  .badge-brand {
+    @apply bg-gold/15 text-gold;
+  }
+
+  /* Small dark compact key-style element — the ⌘K search hint (Phase 3). */
+  .kbd {
+    @apply rounded-md border border-border-strong bg-surface-elevated px-1.5 py-0.5 font-mono text-[10px] text-muted;
+  }
+}
+
+/*
+ * ============================================================================
+ * Tabs / tables / alerts / empty states — unchanged shape from the prior
+ * system, restyled to the new tokens.
+ * ============================================================================
+ */
+@layer components {
+  .tabs {
+    @apply flex items-center gap-1 border-b border-border;
+  }
+  .tab {
+    @apply border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted transition
+      hover:text-foreground;
+  }
+  .tab-active {
+    @apply border-accent-volt text-foreground;
+  }
+  .tab-disabled {
+    @apply cursor-not-allowed text-muted/50 hover:text-muted/50;
+  }
+
+  .table-wrap {
+    @apply overflow-x-auto rounded-[11px] border border-border;
+  }
+  .table {
+    @apply w-full border-collapse text-sm;
+  }
+  .table th {
+    @apply border-b border-border bg-surface-elevated px-4 py-2.5 text-left text-xs font-medium
+      tracking-wide text-muted uppercase;
+  }
+  .table td {
+    @apply border-b border-border px-4 py-3 align-middle;
+  }
+  .table tbody tr {
+    @apply transition hover:bg-surface-elevated;
+  }
+  .table tbody tr:last-child td {
+    @apply border-b-0;
+  }
+
+  .alert {
+    @apply flex items-start gap-3 rounded-[11px] border p-4 text-sm;
+  }
+  .alert-info {
+    @apply border-info/30 bg-info/10 text-info;
+  }
+  .alert-success {
+    @apply border-success/30 bg-success/10 text-success;
+  }
+  .alert-warning {
+    @apply border-warning/30 bg-warning/10 text-warning;
+  }
+  .alert-danger {
+    @apply border-danger/30 bg-danger/10 text-danger;
+  }
+
+  .state-block {
+    @apply mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-3
+      px-6 py-16 text-center;
+  }
+  .state-icon {
+    @apply flex h-14 w-14 items-center justify-center rounded-full border border-border
+      bg-surface text-muted;
+  }
+  .state-title {
+    @apply text-lg font-semibold tracking-tight;
+  }
+  .state-description {
+    @apply text-sm text-muted;
+  }
+  .skeleton {
+    @apply animate-pulse rounded-lg bg-surface-elevated;
+  }
+}
+
+/*
+ * ============================================================================
+ * Phase 16 — interactions & micro-animations.
+ * ============================================================================
+ */
+@layer components {
+  .live-dot {
+    @apply relative flex h-1.5 w-1.5;
+  }
+  .live-dot::before {
+    content: "";
+    @apply absolute inline-flex h-full w-full animate-ping rounded-full opacity-75;
+    background: var(--live);
+  }
+  .live-dot::after {
+    content: "";
+    @apply relative inline-flex h-1.5 w-1.5 rounded-full;
+    background: var(--live);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

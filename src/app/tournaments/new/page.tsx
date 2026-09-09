@@ -9,9 +9,9 @@ export default async function NewTournamentPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-6 py-16">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold">Create a tournament</h1>
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-6 sm:p-8">
+      <div className="flex flex-col gap-2">
+        <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Create a tournament</h1>
         <p className="text-sm text-muted">
           One form, live in seconds — you&apos;ll get a shareable link before registration even opens.
         </p>

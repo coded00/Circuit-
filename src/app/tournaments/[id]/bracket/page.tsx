@@ -32,9 +32,9 @@ export default async function BracketPage({
   const bracket = await prisma.bracket.findUnique({ where: { tournamentId: id } });
   if (!bracket) {
     return (
-      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 px-6 py-16">
-        <h1 className="text-2xl font-semibold">{tournament.name}</h1>
-        <p className="text-muted">
+      <div className="state-block">
+        <h1 className="state-title">{tournament.name}</h1>
+        <p className="state-description">
           The bracket hasn&apos;t been generated yet — it appears once registration closes.
         </p>
       </div>
@@ -63,13 +63,15 @@ export default async function BracketPage({
   const champion = structure.rounds[structure.totalRounds - 1]?.slots[0]?.winnerId ?? null;
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-6 py-16">
+    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 p-6 sm:p-8">
       <Poller />
-      <div className="flex flex-col gap-3">
-        <Link href={`/tournaments/${id}`} className="w-fit text-sm text-muted hover:text-foreground">
-          ← {tournament.name}
-        </Link>
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Bracket</h1>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <div className="flex flex-col gap-1">
+          <Link href={`/tournaments/${id}`} className="text-sm font-medium text-brand-blue hover:underline">
+            ← {tournament.name}
+          </Link>
+          <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Bracket</h1>
+        </div>
         {champion && (
           <StatusPill tone="complete" size="md">
             <Trophy size={14} />
@@ -78,48 +80,48 @@ export default async function BracketPage({
         )}
       </div>
 
-      <div className="flex gap-6 overflow-x-auto pb-4">
-        {structure.rounds.map((round) => (
-          <div key={round.round} className="flex min-w-[240px] flex-col gap-4">
-            <h2 className="text-xs font-semibold tracking-widest text-muted uppercase">
-              {round.round === structure.totalRounds ? "Final" : `Round ${round.round}`}
-            </h2>
-            <div className="flex flex-1 flex-col justify-around gap-4">
-              {round.slots.map((slot) => (
-                <div key={slot.position} className="card flex flex-col gap-2 p-3 text-sm">
-                  {[
-                    { id: slot.playerAId, isWinner: slot.winnerId === slot.playerAId },
-                    { id: slot.playerBId, isWinner: slot.winnerId === slot.playerBId },
-                  ].map((p, i) => (
-                    <div
-                      key={i}
-                      className={
-                        p.isWinner
-                          ? "flex items-center gap-1.5 font-semibold text-brand"
-                          : slot.winnerId
-                            ? "text-muted line-through decoration-border-strong"
-                            : p.id
-                              ? "text-foreground"
-                              : "text-muted italic"
-                      }
-                    >
-                      {p.isWinner && <Trophy size={13} />}
-                      {label(p.id)}
-                    </div>
-                  ))}
-                  {slot.matchId && (
-                    <Link
-                      href={`/matches/${slot.matchId}`}
-                      className="mt-1 w-fit text-xs font-medium text-brand hover:underline"
-                    >
-                      View match →
-                    </Link>
-                  )}
-                </div>
-              ))}
+      {/* Rounds laid out as columns; each round's matches are spaced with
+          justify-around so a match visually centers between the two
+          feeder matches from the previous round — a lightweight bracket
+          "tree" effect without literal connector lines/SVG. */}
+      <div className="overflow-x-auto pb-4">
+        <div className="flex min-w-max items-stretch gap-6">
+          {structure.rounds.map((round) => (
+            <div key={round.round} className="flex w-56 shrink-0 flex-col gap-4">
+              <h2 className="text-eyebrow text-center">
+                {round.round === structure.totalRounds ? "Final" : `Round ${round.round}`}
+              </h2>
+              <div className="flex flex-1 flex-col justify-around gap-6">
+                {round.slots.map((slot) => (
+                  <div key={slot.position} className="card flex flex-col gap-0 overflow-hidden p-0">
+                    {[
+                      { id: slot.playerAId, isWinner: slot.winnerId === slot.playerAId },
+                      { id: slot.playerBId, isWinner: slot.winnerId === slot.playerBId },
+                    ].map((p, i) => (
+                      <div
+                        key={i}
+                        className={`flex items-center gap-2 px-3 py-2.5 text-sm ${i === 0 ? "border-b border-border" : ""} ${
+                          p.isWinner ? "font-semibold text-foreground" : "text-muted"
+                        }`}
+                      >
+                        {p.isWinner && <Trophy size={13} className="shrink-0 text-gold" />}
+                        <span className="truncate">{label(p.id)}</span>
+                      </div>
+                    ))}
+                    {slot.matchId && (
+                      <Link
+                        href={`/matches/${slot.matchId}`}
+                        className="border-t border-border px-3 py-1.5 text-xs font-medium text-brand-blue hover:underline"
+                      >
+                        View match →
+                      </Link>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   );

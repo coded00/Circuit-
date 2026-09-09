@@ -51,10 +51,10 @@ export default function RulingForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-      <div className="flex flex-col gap-2">
+    <form onSubmit={handleSubmit} className="card flex flex-col gap-5">
+      <div className="flex flex-col gap-3">
         <span className="field-label">Ruling</span>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {[playerA, playerB].map((player) => (
             <OptionCard
               key={player.id}
@@ -83,15 +83,15 @@ export default function RulingForm({
         value={ruling}
         onChange={(e) => setRuling(e.target.value)}
         rows={3}
-        className="field-input"
+        className="field-textarea"
       />
 
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {error && <p className="field-error">{error}</p>}
 
       <button
         type="submit"
         disabled={submitting || (!voidMatch && !winnerId)}
-        className="btn-primary w-fit"
+        className="btn-primary"
       >
         {submitting ? "Submitting ruling…" : "Submit ruling"}
       </button>

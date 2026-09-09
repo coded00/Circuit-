@@ -40,9 +40,9 @@ export default async function NotificationsPage() {
   const nextCursor = hasMore ? page[page.length - 1].id : null;
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-6 py-16">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Notifications</h1>
+    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 p-6 sm:p-8">
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-section-heading text-xl">Notifications</h1>
         <MarkAllReadButton />
       </div>
 
@@ -53,9 +53,12 @@ export default async function NotificationsPage() {
           {page.map((n) => {
             const { message, href } = formatNotification(n.type, n.payload);
             return (
-              <a key={n.id} href={href} className="card-row flex items-start justify-between gap-3 p-4">
-                <span className={n.readAt ? "text-muted" : ""}>{message}</span>
-                <span className="shrink-0 text-xs text-muted">{formatRelative(n.createdAt)}</span>
+              <a key={n.id} href={href} className="card-row flex items-start gap-3 p-3">
+                {!n.readAt && <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-blue" aria-hidden />}
+                <span className="flex flex-1 flex-col gap-0.5">
+                  <span className={n.readAt ? "text-sm text-muted" : "text-sm"}>{message}</span>
+                  <span className="text-metadata">{formatRelative(n.createdAt)}</span>
+                </span>
               </a>
             );
           })}

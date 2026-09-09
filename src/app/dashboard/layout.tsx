@@ -14,5 +14,5 @@ export default async function DashboardLayout({ children }: { children: React.Re
     redirect("/login?next=/dashboard");
   }
 
-  return <div className="mx-auto w-full max-w-5xl flex-1 px-6 py-8">{children}</div>;
+  return <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-6 py-10">{children}</div>;
 }

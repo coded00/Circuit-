@@ -13,6 +13,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
+import { StatusPill, disputeStatusInfo } from "@/components/StatusPill";
 
 function timeSince(date: Date): string {
   const ms = Date.now() - date.getTime();
@@ -47,10 +48,10 @@ export default async function StaffDisputeQueuePage() {
   });
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-6 py-16">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Escalated disputes</h1>
-        <Link href="/staff/reports" className="text-sm font-medium text-brand underline">
+    <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-6 py-10">
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Escalated disputes</h1>
+        <Link href="/staff/reports" className="text-sm font-medium text-brand-blue hover:underline">
           Abuse reports →
         </Link>
       </div>
@@ -58,22 +59,30 @@ export default async function StaffDisputeQueuePage() {
       {disputes.length === 0 ? (
         <p className="card text-center text-muted">No escalated disputes right now.</p>
       ) : (
-        <div className="flex flex-col gap-3">
-          {disputes.map((dispute) => (
-            <Link key={dispute.id} href={`/matches/${dispute.matchId}`} className="card-row flex flex-col gap-1 p-4">
-              <div className="flex items-center justify-between">
-                <span className="font-medium">
-                  {dispute.match.tournament?.name ?? `Battle (${dispute.match.battle?.game})`}
-                </span>
-                <span className="rounded-full bg-status-attention/15 px-2.5 py-1 text-xs font-medium text-status-attention">
-                  Waiting {timeSince(dispute.createdAt)}
-                </span>
-              </div>
-              <span className="text-sm text-muted">
-                {dispute.match.playerA.displayName} vs {dispute.match.playerB.displayName}
-              </span>
-            </Link>
-          ))}
+        <div className="flex flex-col gap-2">
+          {disputes.map((dispute) => {
+            const status = disputeStatusInfo(dispute.status);
+            return (
+              <Link
+                key={dispute.id}
+                href={`/matches/${dispute.matchId}`}
+                className="card-row flex items-center justify-between gap-3 p-4"
+              >
+                <div className="flex min-w-0 flex-col gap-0.5">
+                  <span className="truncate text-xs text-muted">
+                    {dispute.match.tournament?.name ?? `Battle (${dispute.match.battle?.game})`}
+                  </span>
+                  <span className="truncate font-medium">
+                    {dispute.match.playerA.displayName} vs {dispute.match.playerB.displayName}
+                  </span>
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  <StatusPill tone={status.tone}>{status.label}</StatusPill>
+                  <span className="text-metadata">Waiting {timeSince(dispute.createdAt)}</span>
+                </div>
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>

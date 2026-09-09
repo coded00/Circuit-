@@ -1,24 +1,25 @@
 /**
- * Circuit — generated cover-art tile. No Game catalog/cover-art model
- * exists (Tournament.game/Battle.game are free-text), and no real
- * photography or licensing path exists to source real cover art. This
- * renders a deterministic (same game → same look every time, SSR/CSR
- * stable) tinted-vignette treatment with the game name overlaid,
- * evoking an image-led card without any image request.
+ * Circuit — cover-art tile. No Game catalog/cover-art model exists
+ * (Tournament.game/Battle.game are free-text), so there's no real photo
+ * library that could cover an arbitrary, organizer-typed game name.
  *
- * Every entry resolves to near-black — one shared "dark box-art vignette"
- * feel with a different accent tint per game, rather than blending two
- * saturated hues (the two-bright-colors-diagonally trick reads as a
- * generic AI-gradient-generator default, not an intentional card system).
+ * For the small, fixed set of well-known games this UI references by
+ * name elsewhere (see gameImagery.ts), this renders a real, verified
+ * photo. For anything outside that set — which is most tournaments, since
+ * organizers type any game name — it falls back to the same deterministic
+ * gradient-tint treatment as before: no image request, same look every
+ * time for the same name.
  */
 
+import { realGameImage, unsplashUrl } from "@/lib/gameImagery";
+
 const PALETTE: readonly string[] = [
-  "#2f2a5c", // indigo
-  "#3a1f52", // violet
-  "#1e3350", // slate blue
-  "#153f3c", // deep teal
-  "#4a1f3d", // plum
-  "#1f2937", // charcoal blue
+  "#1e3a8a", // deep blue
+  "#4c1d95", // deep violet
+  "#0e5a6b", // deep cyan-teal
+  "#312e81", // indigo
+  "#1e1b4b", // near-black indigo
+  "#164e63", // slate cyan
 ];
 
 function hashGameName(game: string): number {
@@ -36,27 +37,49 @@ export function gameTint(game: string): string {
 export function GameArtTile({
   game,
   className = "",
+  hideLabel = false,
   children,
 }: {
   game: string;
   className?: string;
+  /** For thumbnails too small to fit readable text (e.g. a 36px ranking
+   *  icon) where the game name is already shown as separate text nearby. */
+  hideLabel?: boolean;
   children?: React.ReactNode;
 }) {
+  const photo = realGameImage(game);
   const tint = gameTint(game);
 
   return (
     <div
       className={`relative overflow-hidden ${className}`}
-      style={{ backgroundImage: `linear-gradient(160deg, ${tint}, #0b0d10 85%)` }}
+      style={
+        photo
+          ? undefined
+          : { backgroundImage: `linear-gradient(155deg, ${tint}, var(--surface) 85%)` }
+      }
     >
-      <div
-        aria-hidden
-        className="absolute inset-x-0 bottom-0 h-2/3"
-        style={{ backgroundImage: "linear-gradient(to top, rgba(0,0,0,0.75), transparent)" }}
-      />
-      <span className="absolute bottom-2 left-3 right-3 truncate text-sm font-bold tracking-tight text-white">
-        {game}
-      </span>
+      {photo && (
+        // eslint-disable-next-line @next/next/no-img-element -- external CDN, arbitrary sizes per call site
+        <img
+          src={unsplashUrl(photo, 480)}
+          alt=""
+          aria-hidden
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      )}
+      {!hideLabel && (
+        <>
+          <div
+            aria-hidden
+            className="absolute inset-x-0 bottom-0 h-2/3"
+            style={{ backgroundImage: "linear-gradient(to top, rgba(0,0,0,0.75), transparent)" }}
+          />
+          <span className="absolute right-3 bottom-2 left-3 truncate text-sm font-bold tracking-tight text-white">
+            {game}
+          </span>
+        </>
+      )}
       {children}
     </div>
   );

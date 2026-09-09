@@ -20,6 +20,7 @@ export function SearchInput({ className = "" }: { className?: string }) {
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (query.trim().length < 2) {
@@ -42,6 +43,12 @@ export function SearchInput({ className = "" }: { className?: string }) {
     }
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") setOpen(false);
+      // Real shortcut, not a decorative hint — Cmd/Ctrl+K focuses search
+      // from anywhere on the page, matching the Nexus reference's ⌘K badge.
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        inputRef.current?.focus();
+      }
     }
     document.addEventListener("mousedown", onClickOutside);
     document.addEventListener("keydown", onKeyDown);
@@ -59,17 +66,21 @@ export function SearchInput({ className = "" }: { className?: string }) {
       <div className="relative">
         <Search size={16} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted" />
         <input
+          ref={inputRef}
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => setOpen(true)}
-          placeholder="Search…"
+          placeholder="Search games, players, tournaments…"
           className="field-input min-w-0 truncate pl-9"
         />
+        <kbd className="pointer-events-none absolute top-1/2 right-3 hidden -translate-y-1/2 items-center gap-0.5 rounded-md border border-border-strong bg-surface-elevated px-1.5 py-0.5 font-mono text-[10px] text-muted sm:flex">
+          ⌘K
+        </kbd>
       </div>
 
       {open && hasQuery && (
-        <div className="absolute left-0 z-20 mt-2 w-full min-w-72 rounded-xl border border-border bg-surface shadow-lg">
+        <div className="absolute left-0 z-20 mt-2 w-full min-w-72 dropdown-panel">
           {loading ? (
             <p className="p-4 text-center text-sm text-muted">Searching…</p>
           ) : !hasResults ? (
@@ -78,7 +89,7 @@ export function SearchInput({ className = "" }: { className?: string }) {
             <div className="flex max-h-96 flex-col overflow-y-auto py-2">
               {results.tournaments.length > 0 && (
                 <div className="flex flex-col">
-                  <span className="px-4 py-1 text-xs font-bold tracking-wide text-muted uppercase">Tournaments</span>
+                  <span className="text-eyebrow px-4 py-1">Tournaments</span>
                   {results.tournaments.map((t) => {
                     const status = tournamentStatusInfo(t.status);
                     return (
@@ -86,7 +97,7 @@ export function SearchInput({ className = "" }: { className?: string }) {
                         key={t.id}
                         href={`/tournaments/${t.id}`}
                         onClick={() => setOpen(false)}
-                        className="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-surface-hover"
+                        className="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-surface-elevated"
                       >
                         <span className="truncate">
                           {t.name} <span className="text-muted">· {t.game}</span>
@@ -99,13 +110,13 @@ export function SearchInput({ className = "" }: { className?: string }) {
               )}
               {results.battles.length > 0 && (
                 <div className="flex flex-col">
-                  <span className="px-4 py-1 text-xs font-bold tracking-wide text-muted uppercase">Battles</span>
+                  <span className="text-eyebrow px-4 py-1">Battles</span>
                   {results.battles.map((b) => (
                     <Link
                       key={b.id}
                       href={`/battles/${b.id}`}
                       onClick={() => setOpen(false)}
-                      className="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-surface-hover"
+                      className="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-surface-elevated"
                     >
                       <span className="truncate">{b.game}</span>
                       <span className="text-xs text-muted">{b.format === "BEST_OF_3" ? "Best of 3" : "Single"}</span>
@@ -115,13 +126,13 @@ export function SearchInput({ className = "" }: { className?: string }) {
               )}
               {results.users.length > 0 && (
                 <div className="flex flex-col">
-                  <span className="px-4 py-1 text-xs font-bold tracking-wide text-muted uppercase">Players</span>
+                  <span className="text-eyebrow px-4 py-1">Players</span>
                   {results.users.map((u) => (
                     <Link
                       key={u.id}
                       href={`/players/${u.handle}`}
                       onClick={() => setOpen(false)}
-                      className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-surface-hover"
+                      className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-surface-elevated"
                     >
                       <span className="truncate">{u.displayName}</span>
                       <span className="text-xs text-muted">@{u.handle}</span>

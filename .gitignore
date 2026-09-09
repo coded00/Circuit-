@@ -2,6 +2,10 @@
 
 # dependencies
 /node_modules
+# the run-circuit skill vendors its own local `playwright` (see its
+# SKILL.md Gotchas — Node's ESM loader needs a real node_modules here,
+# not npx's cache), same reasoning as the root ignore above
+.claude/skills/*/node_modules
 /.pnp
 .pnp.*
 .yarn/*

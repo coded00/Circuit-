@@ -17,9 +17,9 @@ export default async function DashboardBattlesPage() {
   });
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Your Battles</h1>
+    <div className="flex flex-1 flex-col gap-6">
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Your Battles</h1>
         <Link href="/battles/new" className="btn-primary">
           Open a Battle
         </Link>
@@ -28,16 +28,14 @@ export default async function DashboardBattlesPage() {
       {battles.length === 0 ? (
         <p className="card text-center text-muted">You haven&apos;t opened any Battles yet.</p>
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2">
           {battles.map((battle) => {
             const status = battleStatusInfo(battle.status);
             return (
-              <Link key={battle.id} href={`/battles/${battle.id}`} className="card-row flex items-center justify-between p-4">
-                <div className="flex flex-col gap-1">
-                  <span className="font-medium">{battle.game}</span>
-                  <span className="text-muted">
-                    {battle.format === "BEST_OF_3" ? "Best of 3" : "Single match"}
-                  </span>
+              <Link key={battle.id} href={`/battles/${battle.id}`} className="card-row flex items-center justify-between gap-3 p-4">
+                <div className="flex min-w-0 flex-col gap-0.5">
+                  <span className="truncate font-medium">{battle.game}</span>
+                  <span className="text-xs text-muted">{battle.format === "BEST_OF_3" ? "Best of 3" : "Single match"}</span>
                 </div>
                 <StatusPill tone={status.tone} pulse={status.pulse}>
                   {status.label}

@@ -3,10 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-const inputClass = "field-input";
-const labelClass = "field-label";
-const fieldClass = "flex flex-col gap-1.5";
-
 function nairaToKobo(value: string): number {
   const naira = Number(value || 0);
   return Math.round(naira * 100);
@@ -70,8 +66,8 @@ export default function TournamentForm() {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-      <div className={fieldClass}>
-        <label htmlFor="name" className={labelClass}>
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="name" className="field-label">
           Tournament name
         </label>
         <input
@@ -79,12 +75,12 @@ export default function TournamentForm() {
           required
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className={inputClass}
+          className="field-input"
         />
       </div>
 
-      <div className={fieldClass}>
-        <label htmlFor="game" className={labelClass}>
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="game" className="field-label">
           Game
         </label>
         <input
@@ -93,19 +89,19 @@ export default function TournamentForm() {
           placeholder="e.g. EA FC 26"
           value={game}
           onChange={(e) => setGame(e.target.value)}
-          className={inputClass}
+          className="field-input"
         />
       </div>
 
-      <div className={fieldClass}>
-        <span className={labelClass}>Format</span>
-        <span className="text-sm text-muted">
+      <div className="flex flex-col gap-1 rounded-[10px] border border-border bg-surface-elevated px-3.5 py-2.5">
+        <span className="text-sm font-medium">Format</span>
+        <span className="field-hint">
           Single-elimination knockout — the only format Circuit supports in V1.
         </span>
       </div>
 
-      <div className={fieldClass}>
-        <label htmlFor="participantCap" className={labelClass}>
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="participantCap" className="field-label">
           Participant cap
         </label>
         <input
@@ -116,13 +112,13 @@ export default function TournamentForm() {
           required
           value={participantCap}
           onChange={(e) => setParticipantCap(e.target.value)}
-          className={inputClass}
+          className="field-input"
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-        <div className={fieldClass}>
-          <label htmlFor="registrationOpenAt" className={labelClass}>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="registrationOpenAt" className="field-label">
             Registration opens
           </label>
           <input
@@ -131,11 +127,11 @@ export default function TournamentForm() {
             required
             value={registrationOpenAt}
             onChange={(e) => setRegistrationOpenAt(e.target.value)}
-            className={inputClass}
+            className="field-input"
           />
         </div>
-        <div className={fieldClass}>
-          <label htmlFor="registrationCloseAt" className={labelClass}>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="registrationCloseAt" className="field-label">
             Registration closes
           </label>
           <input
@@ -144,11 +140,11 @@ export default function TournamentForm() {
             required
             value={registrationCloseAt}
             onChange={(e) => setRegistrationCloseAt(e.target.value)}
-            className={inputClass}
+            className="field-input"
           />
         </div>
-        <div className={fieldClass}>
-          <label htmlFor="startAt" className={labelClass}>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="startAt" className="field-label">
             Start date
           </label>
           <input
@@ -157,13 +153,13 @@ export default function TournamentForm() {
             required
             value={startAt}
             onChange={(e) => setStartAt(e.target.value)}
-            className={inputClass}
+            className="field-input"
           />
         </div>
       </div>
 
-      <div className={fieldClass}>
-        <label htmlFor="entryFeeNaira" className={labelClass}>
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="entryFeeNaira" className="field-label">
           Entry fee (₦, 0 for free)
         </label>
         <input
@@ -174,13 +170,13 @@ export default function TournamentForm() {
           required
           value={entryFeeNaira}
           onChange={(e) => setEntryFeeNaira(e.target.value)}
-          className={inputClass}
+          className="field-input"
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-        <div className={fieldClass}>
-          <label htmlFor="prizeAmountNaira" className={labelClass}>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="prizeAmountNaira" className="field-label">
             Prize amount (₦, optional)
           </label>
           <input
@@ -190,11 +186,11 @@ export default function TournamentForm() {
             step="0.01"
             value={prizeAmountNaira}
             onChange={(e) => setPrizeAmountNaira(e.target.value)}
-            className={inputClass}
+            className="field-input"
           />
         </div>
-        <div className={fieldClass}>
-          <label htmlFor="prizeText" className={labelClass}>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="prizeText" className="field-label">
             Prize description (optional)
           </label>
           <input
@@ -202,13 +198,13 @@ export default function TournamentForm() {
             placeholder="e.g. Winner takes all + bragging rights"
             value={prizeText}
             onChange={(e) => setPrizeText(e.target.value)}
-            className={inputClass}
+            className="field-input"
           />
         </div>
       </div>
 
-      <div className={fieldClass}>
-        <label htmlFor="rulesText" className={labelClass}>
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="rulesText" className="field-label">
           Rules
         </label>
         <textarea
@@ -217,12 +213,12 @@ export default function TournamentForm() {
           rows={5}
           value={rulesText}
           onChange={(e) => setRulesText(e.target.value)}
-          className={inputClass}
+          className="field-textarea"
         />
       </div>
 
-      <div className={fieldClass}>
-        <label htmlFor="streamUrl" className={labelClass}>
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="streamUrl" className="field-label">
           Stream link (optional)
         </label>
         <input
@@ -231,14 +227,14 @@ export default function TournamentForm() {
           placeholder="https://twitch.tv/yourchannel"
           value={streamUrl}
           onChange={(e) => setStreamUrl(e.target.value)}
-          className={inputClass}
+          className="field-input"
         />
-        <span className="text-xs text-muted">Shown as a &quot;Watch stream&quot; link on the tournament page.</span>
+        <span className="field-hint">Shown as a &quot;Watch stream&quot; link on the tournament page.</span>
       </div>
 
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {error && <p className="field-error">{error}</p>}
 
-      <button type="submit" disabled={submitting} className="btn-primary w-full">
+      <button type="submit" disabled={submitting} className="btn-primary">
         {submitting ? "Creating…" : "Create tournament"}
       </button>
     </form>

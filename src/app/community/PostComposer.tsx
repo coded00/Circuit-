@@ -42,17 +42,17 @@ export default function PostComposer() {
         maxLength={MAX_LENGTH}
         rows={3}
         placeholder="Share something with the Circuit community…"
-        className="field-input resize-none"
+        className="field-textarea"
       />
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-muted">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-metadata">
           {content.length}/{MAX_LENGTH}
         </span>
         <button type="submit" disabled={submitting || !content.trim()} className="btn-primary">
           {submitting ? "Posting…" : "Post"}
         </button>
       </div>
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {error && <p className="field-error">{error}</p>}
     </form>
   );
 }

@@ -29,24 +29,24 @@ export default async function RegistrationCallbackPage({
     : null;
 
   return (
-    <div className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-4 px-6 py-16 text-center">
+    <div className="state-block">
       {registration?.status === "CONFIRMED" ? (
         <>
-          <CheckCircle2 size={40} className="text-status-live" />
-          <h1 className="text-2xl font-semibold">You&apos;re in!</h1>
-          <p className="text-muted">Your registration is confirmed.</p>
+          <CheckCircle2 size={40} className="text-success" />
+          <h1 className="state-title">You&apos;re in!</h1>
+          <p className="state-description">Your registration is confirmed.</p>
         </>
       ) : (
         <>
-          <h1 className="text-2xl font-semibold">Payment processing</h1>
-          <p className="text-muted">
+          <h1 className="state-title">Payment processing</h1>
+          <p className="state-description">
             This can take a minute. Refresh this page, or check back on the
             tournament page shortly.
           </p>
         </>
       )}
       {registration && (
-        <Link href={`/tournaments/${registration.tournamentId}`} className="font-medium text-brand underline">
+        <Link href={`/tournaments/${registration.tournamentId}`} className="btn-secondary">
           Back to tournament
         </Link>
       )}

@@ -21,23 +21,27 @@ function formatRelative(dateIso: string): string {
 
 function PostRow({ post }: { post: Post }) {
   return (
-    <div className="card-row flex gap-3 p-4">
+    <div className="card-row flex gap-3 p-3">
       {post.author.avatarUrl ? (
         // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs
-        <img src={post.author.avatarUrl} alt="" className="h-9 w-9 shrink-0 rounded-full border border-border object-cover" />
+        <img
+          src={post.author.avatarUrl}
+          alt=""
+          className="h-10 w-10 shrink-0 rounded-full border border-border object-cover"
+        />
       ) : (
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-sm font-semibold text-muted">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-surface-elevated font-semibold text-muted">
           {post.author.displayName.slice(0, 1).toUpperCase()}
         </div>
       )}
-      <div className="flex flex-1 flex-col gap-1">
-        <div className="flex items-baseline gap-2">
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="flex flex-wrap items-baseline gap-1.5">
           <span className="font-medium">{post.author.displayName}</span>
-          <span className="text-xs text-muted">
+          <span className="text-metadata">
             @{post.author.handle} · {formatRelative(post.createdAt)}
           </span>
         </div>
-        <p className="text-sm whitespace-pre-wrap">{post.content}</p>
+        <p className="text-sm break-words">{post.content}</p>
       </div>
     </div>
   );
@@ -70,7 +74,7 @@ export default function LoadMorePosts({ initialCursor }: { initialCursor: string
         </div>
       )}
       {cursor && (
-        <button type="button" onClick={loadMore} disabled={loading} className="btn-secondary w-fit self-center">
+        <button type="button" onClick={loadMore} disabled={loading} className="btn-secondary self-center">
           {loading ? "Loading…" : "Load more"}
         </button>
       )}

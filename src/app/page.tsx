@@ -1,519 +1,211 @@
 /**
- * Circuit — homepage as a real discovery feed (maps: TRN-6/P1-4, BTL-2),
- * not a marketing page with a preview bolted on. Sectioned by timing and
- * status (start.gg's pattern) — Live Now, Starting Soon, Registration
- * Open, Recently Finished, plus a compact Battles strip. Fully
- * guest-browsable (ACC-1).
- *
- * Laid out stroke-for-stroke against the NEXA reference screenshot: a
- * left-aligned hero banner, a "Connect Your Accounts" row directly below
- * it, a horizontally-scrolling (carousel) card row per section, and a
- * right-hand column with a Next Tournament spotlight, Live Now grid, and
- * Leaderboard widget. The underlying data/sections are Circuit's own
- * (kept exactly as already built) — only the visual structure/positioning
- * matches the reference. Cards use GameArtTile's generated gradient art
- * (no real cover-art/photography source exists).
+ * Circuit — homepage (MVP rework spec sections 11-17). "Light to
+ * discover, dark to compete": a dark cinematic hero, then a light
+ * curated feed — Featured Competitions, Explore by Game, Upcoming
+ * Competitions, Open Challenges, and (logged in) Your Circuit. The
+ * exhaustive, filterable tournament browse experience lives on
+ * `/compete` now; this page shows a curated slice of each, all real
+ * data, no fabrication.
  */
 
 import Link from "next/link";
-import { Calendar, Users, Swords, Radio, Clock, ClipboardList, CheckCircle2, Tv, Trophy, type LucideIcon } from "lucide-react";
-import { getCurrentUser } from "@/lib/session";
+import { Trophy } from "lucide-react";
 import { prisma } from "@/lib/db";
-import { LiveCounter } from "@/components/LiveCounter";
-import { StatusPill, tournamentStatusInfo } from "@/components/StatusPill";
-import { GameArtTile } from "@/components/GameArtTile";
-import { ConnectAccountsRow } from "@/components/ConnectAccountsRow";
-import { HeroCarousel } from "@/components/HeroCarousel";
-import { CardCarousel } from "@/components/CardCarousel";
+import { getCurrentUser } from "@/lib/session";
+import { CircuitHero } from "@/components/CircuitHero";
+import { FeaturedCompetitions } from "@/components/FeaturedCompetitions";
+import { ExploreTheCircuit } from "@/components/ExploreTheCircuit";
+import { OpenChallenges } from "@/components/OpenChallenges";
+import { YourCircuit } from "@/components/YourCircuit";
+import { GAME_ACTIVITY } from "@/lib/circuitActivity";
+import { formatNotification } from "@/lib/notification-format";
 import { globalStandings } from "@/lib/standings";
 
-const STARTING_SOON_WINDOW_MS = 48 * 60 * 60 * 1000;
-const SECTION_LIMIT = 8;
+const cardSelect = {
+  id: true,
+  name: true,
+  game: true,
+  status: true,
+  format: true,
+  entryFee: true,
+  participantCap: true,
+  streamUrl: true,
+  startAt: true,
+  prizeAmount: true,
+  prizeText: true,
+  _count: { select: { registrations: { where: { status: "CONFIRMED" as const } } } },
+} as const;
 
-type TournamentCard = {
-  id: string;
-  name: string;
-  game: string;
-  status: string;
-  entryFee: number;
-  participantCap: number;
-  streamUrl: string | null;
-  startAt: Date;
-  prizeAmount: number | null;
-  prizeText: string | null;
-  _count: { registrations: number };
-};
-
-function formatCardDate(date: Date): string {
-  return date.toLocaleString("en-NG", { dateStyle: "medium" });
-}
-
-function formatNaira(kobo: number): string {
-  return `₦ ${(kobo / 100).toLocaleString("en-NG")}`;
-}
-
-/** Red is reserved for true LIVE/broadcast indicators and alerts per the
- *  NEXA design brief — StatusPill's shared "live" tone stays green
- *  elsewhere (Battles' "Open" status, etc. — a different, non-broadcast
- *  meaning this pass doesn't touch), so this is a local, literal-LIVE-only
- *  badge rather than a change to the shared component's semantics. */
-function LiveBadge() {
-  return (
-    <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-status-cancelled/15 px-2.5 py-1 text-xs font-medium text-status-cancelled">
-      <span className="relative flex h-1.5 w-1.5">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-current opacity-75" />
-        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-current" />
-      </span>
-      Live
-    </span>
-  );
-}
-
-function PrizeOrEntry({ tournament }: { tournament: TournamentCard }) {
-  if (tournament.prizeAmount) {
-    return <span className="text-sm font-bold tabular-nums text-gold">{formatNaira(tournament.prizeAmount)} prize</span>;
-  }
-  return (
-    <span className="text-sm font-bold tabular-nums text-brand">
-      {tournament.entryFee === 0 ? "Free entry" : `${formatNaira(tournament.entryFee)} entry`}
-    </span>
-  );
-}
-
-/** A hero slide for one real live tournament — same cinematic-slide shape
- *  as the brand slide, background swapped for GameArtTile so each slide
- *  still reads as a distinct tournament rather than a repeated banner. */
-function HeroTournamentSlide({ tournament }: { tournament: TournamentCard }) {
-  return (
-    <Link
-      href={`/tournaments/${tournament.id}`}
-      className="relative flex min-h-72 w-full flex-col justify-center overflow-hidden rounded-2xl"
-    >
-      <GameArtTile game={tournament.game} className="absolute inset-0" />
-      <div className="relative z-10 flex flex-col items-start gap-3 p-8">
-        <span className="absolute top-2 right-2">
-          <LiveBadge />
-        </span>
-        <span className="text-xs font-semibold tracking-wide text-white/70 uppercase">{tournament.game}</span>
-        <h2 className="max-w-md text-3xl leading-tight font-bold text-white sm:text-4xl">{tournament.name}</h2>
-        <div className="flex items-center gap-4">
-          <PrizeOrEntry tournament={tournament} />
-          <span className="flex items-center gap-1.5 text-sm text-white/80">
-            <Users size={14} />
-            {tournament._count.registrations}/{tournament.participantCap} players
-          </span>
-        </div>
-        <span className="btn-primary mt-1 whitespace-nowrap">View tournament</span>
-      </div>
-    </Link>
-  );
-}
-
-function TournamentGrid({ tournaments }: { tournaments: TournamentCard[] }) {
-  return (
-    <CardCarousel>
-      {tournaments.map((tournament) => {
-        const status = tournamentStatusInfo(tournament.status);
-        return (
-          <Link
-            key={tournament.id}
-            href={`/tournaments/${tournament.id}`}
-            className="flex w-64 shrink-0 snap-start flex-col gap-2 overflow-hidden rounded-xl border border-border shadow-lg shadow-black/30 transition hover:border-border-strong"
-          >
-            <GameArtTile game={tournament.game} className="h-32 w-full">
-              <span className="absolute top-2 right-2">
-                {tournament.status === "LIVE" ? <LiveBadge /> : (
-                  <StatusPill tone={status.tone} pulse={status.pulse}>
-                    {status.label}
-                  </StatusPill>
-                )}
-              </span>
-            </GameArtTile>
-            <div className="flex flex-col gap-1.5 bg-surface p-3">
-              <span className="truncate font-semibold">{tournament.name}</span>
-              <span className="truncate text-xs text-muted">{tournament.game}</span>
-              <PrizeOrEntry tournament={tournament} />
-              <span className="flex items-center gap-1.5 text-xs text-muted">
-                <Calendar size={12} />
-                {formatCardDate(tournament.startAt)}
-              </span>
-              <span className="flex items-center gap-1.5 text-xs text-muted">
-                <Users size={12} />
-                {tournament._count.registrations}/{tournament.participantCap} players
-                {tournament.streamUrl && <Tv size={12} />}
-              </span>
-            </div>
-          </Link>
-        );
-      })}
-    </CardCarousel>
-  );
-}
-
-function Section({
-  icon: Icon,
-  title,
-  count,
-  viewAllHref,
-  children,
-}: {
-  icon: LucideIcon;
-  title: string;
-  count: number;
-  viewAllHref?: string;
-  children: React.ReactNode;
-}) {
-  if (count === 0) return null;
-  return (
-    <section className="flex min-w-0 flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h2 className="flex items-center gap-2 text-base font-semibold">
-          <Icon size={17} className="text-muted" />
-          {title}
-        </h2>
-        {viewAllHref && (
-          <Link href={viewAllHref} className="text-xs font-medium text-brand hover:underline">
-            View All →
-          </Link>
-        )}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-export default async function Home({
-  searchParams,
-}: {
-  searchParams: Promise<{ game?: string }>;
-}) {
-  const { game } = await searchParams;
-  const gameFilter = game ? { game: { equals: game, mode: "insensitive" as const } } : {};
-  const now = new Date();
-  const soonThreshold = new Date(now.getTime() + STARTING_SOON_WINDOW_MS);
-
-  const cardSelect = {
-    id: true,
-    name: true,
-    game: true,
-    status: true,
-    entryFee: true,
-    participantCap: true,
-    streamUrl: true,
-    startAt: true,
-    prizeAmount: true,
-    prizeText: true,
-    _count: { select: { registrations: { where: { status: "CONFIRMED" as const } } } },
-  } as const;
+export default async function Home() {
+  const user = await getCurrentUser();
 
   const [
-    user,
-    liveTournamentCount,
-    openBattleCount,
-    liveTournaments,
-    startingSoon,
-    registrationOpen,
-    recentlyFinished,
-    battles,
-    nextTournament,
+    featuredTournaments,
+    upcomingTournaments,
+    gameCounts,
+    openBattles,
     leaderboard,
+    upcomingMatches,
+    registeredCompetitions,
+    activeChallenges,
+    recentActivity,
   ] = await Promise.all([
-    getCurrentUser(),
-    prisma.tournament.count({ where: { status: "LIVE", ...gameFilter } }),
-    prisma.battle.count({ where: { status: "OPEN", visibility: "OPEN", ...gameFilter } }),
     prisma.tournament.findMany({
-      where: { status: "LIVE", ...gameFilter },
-      orderBy: { createdAt: "desc" },
-      take: SECTION_LIMIT,
-      select: cardSelect,
-    }),
-    prisma.tournament.findMany({
-      where: { status: "OPEN", startAt: { lte: soonThreshold }, ...gameFilter },
-      orderBy: { startAt: "asc" },
-      take: SECTION_LIMIT,
-      select: cardSelect,
-    }),
-    prisma.tournament.findMany({
-      where: { status: "OPEN", startAt: { gt: soonThreshold }, ...gameFilter },
-      orderBy: { createdAt: "desc" },
-      take: SECTION_LIMIT,
-      select: cardSelect,
-    }),
-    prisma.tournament.findMany({
-      where: { status: "COMPLETE", ...gameFilter },
-      orderBy: { createdAt: "desc" },
-      take: 6,
-      select: cardSelect,
-    }),
-    prisma.battle.findMany({
-      where: { status: "OPEN", visibility: "OPEN", ...gameFilter },
-      orderBy: { createdAt: "desc" },
+      where: { status: { in: ["OPEN", "LIVE"] }, prizeAmount: { not: null } },
+      orderBy: { prizeAmount: "desc" },
       take: 4,
-      include: { creator: { select: { displayName: true } } },
+      select: cardSelect,
     }),
-    prisma.tournament.findFirst({
+    prisma.tournament.findMany({
       where: { status: { in: ["OPEN", "LIVE"] } },
       orderBy: { startAt: "asc" },
+      take: 8,
       select: cardSelect,
     }),
+    Promise.all(
+      GAME_ACTIVITY.map(async (g) => ({
+        name: g.name,
+        activeCompetitions: await prisma.tournament.count({
+          where: { status: { in: ["OPEN", "LIVE"] }, game: { contains: g.name, mode: "insensitive" } },
+        }),
+      })),
+    ),
+    prisma.battle.findMany({
+      where: { status: "OPEN", visibility: "OPEN" },
+      orderBy: { createdAt: "desc" },
+      take: 8,
+      include: { creator: { select: { displayName: true } }, targetUser: { select: { displayName: true } } },
+    }),
     globalStandings(),
+    user
+      ? prisma.match.findMany({
+          where: { OR: [{ playerAId: user.id }, { playerBId: user.id }], status: "UPCOMING" },
+          orderBy: { createdAt: "desc" },
+          take: 3,
+          include: { tournament: { select: { name: true } }, battle: { select: { game: true } } },
+        })
+      : Promise.resolve([]),
+    user
+      ? prisma.registration.findMany({
+          where: { userId: user.id, status: "CONFIRMED" },
+          orderBy: { createdAt: "desc" },
+          take: 3,
+          include: { tournament: { select: { id: true, name: true, game: true } } },
+        })
+      : Promise.resolve([]),
+    user
+      ? prisma.battle.findMany({
+          where: { OR: [{ creatorId: user.id }, { targetUserId: user.id }], status: { in: ["OPEN", "ACCEPTED"] } },
+          orderBy: { createdAt: "desc" },
+          take: 3,
+        })
+      : Promise.resolve([]),
+    user
+      ? prisma.notification.findMany({
+          where: { userId: user.id },
+          orderBy: { createdAt: "desc" },
+          take: 3,
+        })
+      : Promise.resolve([]),
   ]);
-
-  const nothingToShow =
-    liveTournaments.length === 0 &&
-    startingSoon.length === 0 &&
-    registrationOpen.length === 0 &&
-    recentlyFinished.length === 0 &&
-    battles.length === 0;
 
   const topLeaderboard = leaderboard.slice(0, 5);
 
-  // Hero is a carousel: slide 0 is always Circuit's own brand pitch;
-  // additional slides are real LIVE tournaments (capped at 3) rather than
-  // invented promotional content — nothing to show, no extra slides.
-  const heroBrandSlide = (
-    <div
-      className="relative flex min-h-72 w-full flex-col justify-center overflow-hidden rounded-2xl p-8"
-      style={{
-        backgroundImage:
-          "radial-gradient(ellipse 650px 500px at 88% 20%, rgba(124,58,237,0.45), transparent 65%)," +
-          "radial-gradient(ellipse 450px 400px at 15% 90%, rgba(37,42,90,0.5), transparent 70%)," +
-          "linear-gradient(135deg, #0b0d10, #140f1f 55%, #1a0f24)",
-      }}
-    >
-      <div className="relative z-10 flex flex-col items-start gap-4">
-        <LiveCounter label="competing right now" count={liveTournamentCount} />
-        <h1 className="max-w-md text-4xl leading-[1.05] font-bold tracking-tight text-white sm:text-5xl">
-          Play.
-          <br />
-          Compete.
-          <br />
-          Get Paid.
-        </h1>
-        <p className="max-w-xs text-sm text-white/80">
-          Find a tournament. Join a Battle. Skip the WhatsApp chaos.
-        </p>
-        {!user ? (
-          <div className="flex flex-wrap gap-3">
-            <Link href="/signup" className="btn-primary whitespace-nowrap">
-              Sign up
-            </Link>
-            <Link href="/login" className="btn-secondary gap-1.5 bg-white/10 whitespace-nowrap text-white hover:bg-white/20">
-              Log in
-            </Link>
-          </div>
-        ) : (
-          <div className="flex flex-wrap gap-3">
-            <Link href="/tournaments/new" className="btn-primary whitespace-nowrap">
-              Create a tournament
-            </Link>
-            <Link href="/battles/new" className="btn-secondary gap-1.5 bg-white/10 whitespace-nowrap text-white hover:bg-white/20">
-              <Swords size={14} />
-              Open a Battle
-            </Link>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
-  const heroSlides = [
-    heroBrandSlide,
-    ...liveTournaments.slice(0, 3).map((t) => <HeroTournamentSlide key={t.id} tournament={t} />),
-  ];
-
   return (
-    <div className="flex w-full flex-1 flex-col gap-10 px-6 py-10">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-10">
-        {/* Hero row — its own explicit container, exactly two divs:
-            the carousel (80%) and the Next Tournament card (20%), not
-            reliant on the content grid below happening to line up. */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[80%_20%]">
-          <div>
-            <HeroCarousel slides={heroSlides} />
-          </div>
+    <div className="flex w-full flex-1 flex-col gap-8 p-6 sm:p-8">
+      <CircuitHero />
 
-          <div className="flex min-w-0 flex-col gap-3">
-            {nextTournament && (
-              <>
-                <h2 className="flex items-center gap-2 text-sm font-semibold">
-                  <Trophy size={15} className="text-muted" />
-                  Next Tournament
-                </h2>
-                <Link
-                  href={`/tournaments/${nextTournament.id}`}
-                  className="flex flex-col overflow-hidden rounded-xl border border-border shadow-lg shadow-black/30 transition hover:border-border-strong"
-                >
-                  <GameArtTile game={nextTournament.game} className="h-20 w-full shrink-0">
-                    {nextTournament.status === "LIVE" && (
-                      <span className="absolute top-1.5 right-1.5">
-                        <LiveBadge />
-                      </span>
-                    )}
-                  </GameArtTile>
-                  <div className="flex flex-col gap-1.5 bg-surface p-3">
-                    <span className="truncate font-semibold">{nextTournament.name}</span>
-                    <div>
-                      <div className={`text-lg font-bold tabular-nums ${nextTournament.prizeAmount ? "text-gold" : "text-brand"}`}>
-                        {nextTournament.prizeAmount ? formatNaira(nextTournament.prizeAmount) : formatNaira(nextTournament.entryFee)}
-                      </div>
-                      <div className="text-xs text-muted">
-                        {nextTournament.prizeAmount ? "Prize pool" : nextTournament.entryFee === 0 ? "Free entry" : "Entry fee"}
-                      </div>
-                    </div>
-                    <span className="flex items-center gap-1.5 text-xs text-muted">
-                      <Calendar size={12} className="shrink-0" />
-                      <span className="truncate">{formatCardDate(nextTournament.startAt)}</span>
-                    </span>
-                    <span className="flex items-center gap-1.5 text-xs text-muted">
-                      <Users size={12} className="shrink-0" />
-                      <span className="truncate">
-                        {nextTournament._count.registrations}/{nextTournament.participantCap} players
-                      </span>
-                    </span>
-                    <span className="btn-primary mt-1 w-full text-sm">Register Now</span>
-                  </div>
-                </Link>
-              </>
-            )}
-          </div>
-        </div>
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_330px]">
+        <div className="flex min-w-0 flex-col gap-8">
+          <FeaturedCompetitions tournaments={featuredTournaments} />
 
-        {/* Content row — a separate 2-column grid for everything else,
-            independent of the hero row above. */}
-        <div className="grid grid-cols-1 gap-10 lg:grid-cols-[1fr_320px]">
-        <div className="flex min-w-0 flex-col gap-10">
-          <ConnectAccountsRow />
+          <ExploreTheCircuit games={gameCounts} />
 
-          <form className="flex w-full max-w-md gap-2">
-            <input
-              type="text"
-              name="game"
-              defaultValue={game ?? ""}
-              placeholder="Filter everything by game"
-              className="field-input flex-1"
-            />
-            <button type="submit" className="btn-secondary">
-              Filter
-            </button>
-            {game && (
-              <Link href="/" className="btn-secondary">
-                Clear
+          <section className="flex flex-col gap-4">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-section-heading">Upcoming Competitions</h2>
+              <Link href="/compete" className="text-xs font-medium text-accent-blue hover:underline">
+                View All Competitions →
               </Link>
-            )}
-          </form>
-
-          {nothingToShow ? (
-            <p className="card text-center text-muted">
-              {game ? `Nothing live for "${game}" right now.` : "Nothing live right now — be the first."}
-            </p>
-          ) : (
-            <>
-              <Section icon={Radio} title="Live now" count={liveTournaments.length}>
-                <TournamentGrid tournaments={liveTournaments} />
-              </Section>
-
-              <Section icon={Clock} title="Starting soon" count={startingSoon.length}>
-                <TournamentGrid tournaments={startingSoon} />
-              </Section>
-
-              <Section icon={ClipboardList} title="Registration open" count={registrationOpen.length}>
-                <TournamentGrid tournaments={registrationOpen} />
-              </Section>
-
-              <Section icon={CheckCircle2} title="Recently finished" count={recentlyFinished.length}>
-                <TournamentGrid tournaments={recentlyFinished} />
-              </Section>
-
-              {battles.length > 0 && (
-                <section className="flex min-w-0 flex-col gap-4">
-                  <div className="flex items-center justify-between">
-                    <h2 className="flex items-center gap-2 text-base font-semibold">
-                      <Swords size={17} className="text-muted" />
-                      Open Battles
-                    </h2>
-                    <div className="flex items-center gap-3">
-                      <LiveCounter
-                        label={openBattleCount === 1 ? "open Battle" : "open Battles"}
-                        count={openBattleCount}
-                      />
-                      <Link href="/battles" className="text-xs font-medium text-brand hover:underline">
-                        View All →
-                      </Link>
+            </div>
+            {upcomingTournaments.length === 0 ? (
+              <div className="card flex flex-col items-center gap-1 py-10 text-center">
+                <p className="text-sm text-muted">Nothing upcoming right now — be the first.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {upcomingTournaments.map((t) => (
+                  <Link key={t.id} href={`/tournaments/${t.id}`} className="card-media card-hover flex flex-col">
+                    <div className="flex flex-col gap-1 p-3">
+                      <span className="text-card-title truncate font-semibold">{t.name}</span>
+                      <span className="truncate text-xs text-muted">{t.game}</span>
+                      <span className="text-metadata">
+                        {t.startAt.toLocaleString("en-NG", { dateStyle: "medium" })}
+                      </span>
                     </div>
-                  </div>
-                  <CardCarousel>
-                    {battles.map((battle) => (
-                      <Link
-                        key={battle.id}
-                        href={`/battles/${battle.id}`}
-                        className="flex w-64 shrink-0 snap-start flex-col gap-2 overflow-hidden rounded-xl border border-border shadow-lg shadow-black/30 transition hover:border-border-strong"
-                      >
-                        <GameArtTile game={battle.game} className="h-28 w-full">
-                          <span className="absolute top-2 right-2">
-                            <StatusPill tone="live" pulse>
-                              Open
-                            </StatusPill>
-                          </span>
-                        </GameArtTile>
-                        <div className="flex flex-col gap-1.5 bg-surface p-3">
-                          <span className="flex items-center gap-1.5 font-semibold">
-                            {battle.format === "BEST_OF_3" ? "Best of 3" : "Single match"}
-                            {battle.streamUrl && <Tv size={13} className="text-muted" />}
-                          </span>
-                          <span className="text-xs text-muted">opened by {battle.creator.displayName}</span>
-                        </div>
-                      </Link>
-                    ))}
-                  </CardCarousel>
-                </section>
-              )}
-            </>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <OpenChallenges battles={openBattles} />
+
+          {user && (
+            <YourCircuit
+              upcomingMatches={upcomingMatches.map((m) => ({
+                id: m.id,
+                matchCode: m.matchCode,
+                context: m.tournament?.name ?? m.battle?.game ?? "Match",
+              }))}
+              registeredCompetitions={registeredCompetitions.map((r) => ({
+                id: r.id,
+                tournamentId: r.tournament.id,
+                name: r.tournament.name,
+                game: r.tournament.game,
+              }))}
+              activeChallenges={activeChallenges.map((c) => ({ id: c.id, game: c.game, status: c.status }))}
+              recentActivity={recentActivity.map((n) => ({ id: n.id, ...formatNotification(n.type, n.payload) }))}
+            />
           )}
         </div>
 
-        {/* Right column: Leaderboard (Next Tournament lives in the hero
-            row above; a "Live Now" mini-widget used to duplicate the main
-            content column's own "Live now" section a few pixels to its
-            left — same tournaments, near-identical label — so it's gone,
-            not just restyled). */}
         <div className="flex min-w-0 flex-col gap-6">
           {topLeaderboard.length > 0 && (
-            <div className="flex flex-col gap-3">
-              <h2 className="flex items-center gap-2 text-sm font-semibold">
-                <Trophy size={15} className="text-muted" />
+            <div className="card flex flex-col gap-3">
+              <h2 className="text-card-title flex items-center gap-2">
+                <Trophy size={15} className="text-gold" />
                 Leaderboard
               </h2>
-              <div className="flex gap-1 border-b border-border">
-                <span className="border-b-2 border-brand px-2 py-1.5 text-xs font-semibold">Global</span>
-                <span className="px-2 py-1.5 text-xs text-muted" title="Coming soon">
+              <div className="tabs">
+                <span className="tab tab-active">Global</span>
+                <span className="tab tab-disabled" title="Coming soon">
                   Friends
                 </span>
-                <span className="px-2 py-1.5 text-xs text-muted" title="Coming soon">
+                <span className="tab tab-disabled" title="Coming soon">
                   This Month
                 </span>
               </div>
-              <div className="card flex flex-col gap-1 p-3">
+              <div className="flex flex-col gap-1">
                 {topLeaderboard.map((s, i) => (
                   <Link
                     key={s.userId}
                     href={`/players/${s.handle}`}
-                    className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-surface-hover"
+                    className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-surface-elevated"
                   >
-                    <span className="flex items-center gap-2 truncate">
-                      <span className="w-4 font-mono text-xs tabular-nums text-muted">{i + 1}</span>
-                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border bg-surface-hover text-xs font-semibold text-muted">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="w-4 shrink-0 font-mono text-xs text-muted">{i + 1}</span>
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border bg-surface-elevated text-xs font-semibold text-muted">
                         {s.displayName.slice(0, 1).toUpperCase()}
                       </span>
                       <span className="truncate">{s.displayName}</span>
                     </span>
-                    <span className="font-mono text-xs font-semibold tabular-nums text-brand">{s.wins}</span>
+                    <span className="text-stat shrink-0 text-xs text-accent-blue">{s.wins}</span>
                   </Link>
                 ))}
               </div>
             </div>
           )}
-        </div>
         </div>
       </div>
     </div>
