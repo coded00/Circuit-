@@ -6,17 +6,29 @@
 
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { Trophy, Flag } from "lucide-react";
+import { Trophy, Flag, Swords, Wallet, Timer } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { StatusPill, matchStatusInfo } from "@/components/StatusPill";
 import { ActivityTimeline } from "@/components/ActivityTimeline";
 import { buildMatchTimeline } from "@/lib/matchTimeline";
+import { CountdownTimer } from "@/components/CountdownTimer";
+import { Spinner } from "@/components/Spinner";
+import Poller from "@/app/Poller";
 import ResultForm from "./ResultForm";
 import RulingForm from "./RulingForm";
+import EnterMatchButton from "./EnterMatchButton";
 
 function playerLabel(user: { displayName: string; handle: string }): string {
   return `${user.displayName} (@${user.handle})`;
+}
+
+function formatBattleFormat(format: string): string {
+  return format === "BEST_OF_3" ? "Best of 3" : "Single match";
+}
+
+function formatNaira(kobo: number): string {
+  return `₦${(kobo / 100).toLocaleString("en-NG")}`;
 }
 
 /* Deterministic scatter (no Math.random — this renders server-side) for the
@@ -42,7 +54,7 @@ export default async function MatchPage({
       playerB: true,
       winner: true,
       tournament: { select: { id: true, name: true, organizerId: true } },
-      battle: { select: { id: true, game: true } },
+      battle: { select: { id: true, game: true, format: true, stakeAmount: true } },
       dispute: true,
     },
   });
@@ -61,6 +73,22 @@ export default async function MatchPage({
   const status = matchStatusInfo(match.status);
   const wonThisMatch = isParticipant && match.winnerId === user?.id;
   const lostThisMatch = isParticipant && match.winnerId !== null && match.winnerId !== user?.id;
+
+  // The "Enter Match" ready-check only applies to real Challenge (Battle)
+  // matches — tournament matches are reached through registration +
+  // bracket generation, not a sudden Accept click, so there's no
+  // "already ready?" ceremony needed there; they keep showing ResultForm
+  // immediately on UPCOMING exactly as before.
+  const isBattleMatch = match.battleId !== null;
+  const isPlayerA = user?.id === match.playerAId;
+  const myReadyAt = isPlayerA ? match.playerAReadyAt : match.playerBReadyAt;
+  const opponent = isPlayerA ? match.playerB : match.playerA;
+  const bothReady = match.playerAReadyAt !== null && match.playerBReadyAt !== null;
+  const showReadyCheck = isBattleMatch && match.status === "UPCOMING";
+  // Live-refresh while genuinely waiting on something to change — never
+  // once the outcome is settled.
+  const showPoller =
+    (showReadyCheck && !bothReady) || match.status === "NEEDS_RESULT";
   // TRU-2/PRD §19: voiding is only unambiguous for a Battle (no stake,
   // nothing to return) — see MatchError "VOID_UNSUPPORTED" in
   // src/lib/matches.ts. Surfaced here (rather than just omitting the
@@ -71,6 +99,7 @@ export default async function MatchPage({
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-8 px-6 py-10">
+      {showPoller && <Poller />}
       <div className="flex flex-col gap-2">
         <StatusPill tone={status.tone} pulse={status.pulse}>{status.label}</StatusPill>
         <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
@@ -166,13 +195,74 @@ export default async function MatchPage({
         </div>
       )}
 
-      {isParticipant && !hasSubmitted && (match.status === "UPCOMING" || match.status === "NEEDS_RESULT") && (
-        <ResultForm matchId={match.id} playerA={match.playerA} playerB={match.playerB} />
+      {/* Real "Enter Match" ready-check — Battle challenges only. A fresh
+          UPCOMING match used to show the Submit Result form immediately,
+          with nothing acknowledging the challenge was just accepted. */}
+      {showReadyCheck && (
+        <div className="motion-fade-in card flex flex-col gap-3">
+          {!isParticipant ? (
+            <p className="text-sm text-muted">
+              {bothReady ? "Both players are ready — the match is live." : "Waiting for both players to get ready."}
+            </p>
+          ) : bothReady ? (
+            <>
+              <span className="badge badge-open w-fit">Match Live</span>
+              <p className="text-sm text-muted">
+                Both players are in. Go play your match, then come back here to submit your result.
+              </p>
+            </>
+          ) : myReadyAt ? (
+            <div className="flex items-center gap-3">
+              <Spinner size={20} className="shrink-0 text-muted" />
+              <div className="flex flex-col">
+                <span className="font-semibold">Waiting for {opponent.displayName}</span>
+                <span className="text-sm text-muted">
+                  You&apos;re in — this updates on its own once they enter too.
+                </span>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-col gap-1">
+                <span className="text-eyebrow text-accent-volt">Challenge Accepted</span>
+                <span className="font-display text-lg font-bold tracking-tight">{match.battle?.game}</span>
+                <div className="flex flex-wrap items-center gap-3 text-sm text-muted">
+                  {match.battle && (
+                    <span className="flex items-center gap-1">
+                      <Swords size={13} /> {formatBattleFormat(match.battle.format)}
+                    </span>
+                  )}
+                  {match.battle && match.battle.stakeAmount > 0 && (
+                    <span className="flex items-center gap-1 font-semibold text-gold">
+                      <Wallet size={13} />
+                      {formatNaira(match.battle.stakeAmount)} stake · {formatNaira(match.battle.stakeAmount * 2)} to the winner
+                    </span>
+                  )}
+                </div>
+              </div>
+              <p className="text-sm text-muted">
+                You&apos;re matched with {opponent.displayName}. Enter when you&apos;re ready to go play.
+              </p>
+              <EnterMatchButton matchId={match.id} />
+            </>
+          )}
+        </div>
       )}
+
+      {(match.status === "NEEDS_RESULT" || (match.status === "UPCOMING" && (!isBattleMatch || bothReady))) &&
+        isParticipant &&
+        !hasSubmitted && <ResultForm matchId={match.id} playerA={match.playerA} playerB={match.playerB} />}
       {isParticipant && hasSubmitted && match.status === "NEEDS_RESULT" && (
-        <p className="alert alert-info">
-          You&apos;ve submitted your result. Waiting on the other player.
-        </p>
+        <div className="alert alert-info flex-col items-stretch gap-1.5">
+          <p>You&apos;ve submitted your result. Waiting on the other player.</p>
+          {match.reportWindowExpiresAt && (
+            <p className="flex items-center gap-1.5 text-xs">
+              <Timer size={12} />
+              Auto-resolves in{" "}
+              <CountdownTimer target={match.reportWindowExpiresAt.toISOString()} zeroLabel="momentarily" />
+            </p>
+          )}
+        </div>
       )}
 
       {match.status === "DISPUTED" && match.dispute && (

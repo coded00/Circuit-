@@ -26,6 +26,10 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
       return { message: "Your registration is confirmed.", href: `/tournaments/${str(p, "tournamentId")}` };
     case "MATCH_READY":
       return { message: "Your next match is ready.", href: `/matches/${str(p, "matchId")}` };
+    case "MATCH_LIVE":
+      return { message: "Your opponent is ready. Match is live.", href: `/matches/${str(p, "matchId")}` };
+    case "RESULT_SUBMITTED":
+      return { message: "Your opponent submitted a result. Your turn to respond.", href: `/matches/${str(p, "matchId")}` };
     case "MATCH_COMPLETE":
       return { message: "Your match is complete.", href: `/matches/${str(p, "matchId")}` };
     case "RESULT_DISPUTED":

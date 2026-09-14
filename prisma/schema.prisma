@@ -405,6 +405,15 @@ model Match {
   winnerId String?
   winner   User?   @relation("MatchWinner", fields: [winnerId], references: [id])
 
+  /// Battle matches only (see the "Enter Match" flow): when each player
+  /// confirmed they're heading into the actual game. Null/null right
+  /// after acceptance; both non-null means the match is genuinely live.
+  /// UI-only signal — never gates result submission at the API level, so
+  /// a stuck "enter" click can never block someone from actually
+  /// reporting a real result. Meaningless once a result exists.
+  playerAReadyAt DateTime?
+  playerBReadyAt DateTime?
+
   /// BRK-10: silent-side auto-accept deadline once one side has reported.
   reportWindowExpiresAt DateTime?
   createdAt             DateTime  @default(now())

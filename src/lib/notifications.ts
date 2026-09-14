@@ -18,6 +18,8 @@ import { prisma } from "@/lib/db";
 export type NotificationType =
   | "REGISTRATION_CONFIRMED"
   | "MATCH_READY"
+  | "MATCH_LIVE"
+  | "RESULT_SUBMITTED"
   | "MATCH_COMPLETE"
   | "RESULT_DISPUTED"
   | "DISPUTE_RESOLVED"

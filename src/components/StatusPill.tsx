@@ -90,9 +90,9 @@ export function matchStatusInfo(status: string): StatusInfo {
     // urgency the tournament LIVE / battle OPEN pulse already conveys —
     // not decoration, a real outstanding action.
     case "NEEDS_RESULT":
-      return { tone: "attention", label: "Needs result", pulse: true };
+      return { tone: "attention", label: "Awaiting Result", pulse: true };
     case "DISPUTED":
-      return { tone: "cancelled", label: "Disputed", pulse: true };
+      return { tone: "cancelled", label: "Under Review", pulse: true };
     case "COMPLETE":
       return { tone: "complete", label: "Complete" };
     default:

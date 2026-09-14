@@ -43,10 +43,20 @@ function getClockServerSnapshot(): number {
 /**
  * A real, ticking countdown to a real Date — no placeholder digits.
  */
-export function CountdownTimer({ target }: { target: string }) {
+export function CountdownTimer({
+  target,
+  zeroLabel = "Starting now",
+}: {
+  target: string;
+  /** What to show once the countdown hits zero — defaults to the
+   *  original "a real thing is about to start" wording; a caller
+   *  counting down to something else (e.g. an auto-resolve deadline)
+   *  can supply its own. */
+  zeroLabel?: string;
+}) {
   const now = useSyncExternalStore(subscribeToClock, getClockSnapshot, getClockServerSnapshot);
   if (now === 0) return null;
 
   const remaining = new Date(target).getTime() - now;
-  return <span className="font-mono tabular-nums">{remaining <= 0 ? "Starting now" : formatRemaining(remaining)}</span>;
+  return <span className="font-mono tabular-nums">{remaining <= 0 ? zeroLabel : formatRemaining(remaining)}</span>;
 }

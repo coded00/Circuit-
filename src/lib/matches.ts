@@ -461,6 +461,10 @@ async function resolveAfterSubmission(
       where: { id: match.id },
       data: { status: "NEEDS_RESULT", reportWindowExpiresAt: new Date(Date.now() + AUTO_ACCEPT_WINDOW_MS) },
     });
+    // The other side previously had no way to find out a result was even
+    // waiting on them short of revisiting the page themselves.
+    const otherPlayerId = submittingUserId === match.playerAId ? match.playerBId : match.playerAId;
+    await notify(otherPlayerId, "RESULT_SUBMITTED", { matchId: match.id });
     return { match: updated, outcome: "RECORDED" };
   }
 
