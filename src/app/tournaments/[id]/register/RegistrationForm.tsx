@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Wallet } from "lucide-react";
+import { Spinner } from "@/components/Spinner";
 
 export default function RegistrationForm({
   tournamentId,
@@ -93,8 +94,9 @@ export default function RegistrationForm({
         </div>
       )}
 
-      {error && <p className="field-error">{error}</p>}
+      {error && <p className="field-error motion-fade-in">{error}</p>}
       <button type="submit" disabled={submitting} className="btn-primary">
+        {submitting && <Spinner />}
         {submitting ? "Registering…" : "Register"}
       </button>
     </form>

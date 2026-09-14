@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowDownToLine } from "lucide-react";
+import { Spinner } from "@/components/Spinner";
 
 export function WithdrawButton({ hasPayoutMethod }: { hasPayoutMethod: boolean }) {
   const router = useRouter();
@@ -75,13 +76,14 @@ export function WithdrawButton({ hasPayoutMethod }: { hasPayoutMethod: boolean }
           className="field-input w-36"
         />
         <button type="submit" disabled={submitting} className="btn-secondary">
+          {submitting && <Spinner />}
           {submitting ? "Withdrawing…" : "Confirm"}
         </button>
         <button type="button" onClick={() => setOpen(false)} className="btn-ghost">
           Cancel
         </button>
       </div>
-      {error && <p className="field-error">{error}</p>}
+      {error && <p className="field-error motion-fade-in">{error}</p>}
     </form>
   );
 }

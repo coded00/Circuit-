@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { OptionCard } from "@/components/OptionCard";
+import { Spinner } from "@/components/Spinner";
 
 type PlayerOption = { id: string; displayName: string; handle: string };
 
@@ -102,9 +103,10 @@ export default function ResultForm({
         I confirm the match code shown to both players is visible in this proof.
       </label>
 
-      {error && <p className="field-error">{error}</p>}
+      {error && <p className="field-error motion-fade-in">{error}</p>}
 
       <button type="submit" disabled={submitting} className="btn-primary">
+        {submitting && <Spinner />}
         {submitting ? "Submitting…" : "Submit result"}
       </button>
     </form>

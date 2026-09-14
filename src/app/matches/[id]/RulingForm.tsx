@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { OptionCard } from "@/components/OptionCard";
+import { Spinner } from "@/components/Spinner";
 
 type PlayerOption = { id: string; displayName: string; handle: string };
 
@@ -99,13 +100,14 @@ export default function RulingForm({
         className="field-textarea"
       />
 
-      {error && <p className="field-error">{error}</p>}
+      {error && <p className="field-error motion-fade-in">{error}</p>}
 
       <button
         type="submit"
         disabled={submitting || (!voidMatch && !winnerId)}
         className="btn-primary"
       >
+        {submitting && <Spinner />}
         {submitting ? "Submitting ruling…" : "Submit ruling"}
       </button>
     </form>

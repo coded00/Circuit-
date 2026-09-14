@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Spinner } from "@/components/Spinner";
 
 export default function AcceptButton({ battleId }: { battleId: string }) {
   const router = useRouter();
@@ -28,9 +29,10 @@ export default function AcceptButton({ battleId }: { battleId: string }) {
   return (
     <div className="flex flex-col gap-2">
       <button onClick={handleClick} disabled={submitting} className="btn-primary w-full">
+        {submitting && <Spinner />}
         {submitting ? "Accepting…" : "Accept Challenge →"}
       </button>
-      {error && <p className="field-error">{error}</p>}
+      {error && <p className="field-error motion-fade-in">{error}</p>}
     </div>
   );
 }

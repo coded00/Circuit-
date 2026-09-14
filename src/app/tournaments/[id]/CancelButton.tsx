@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Spinner } from "@/components/Spinner";
 
 export default function CancelButton({ tournamentId }: { tournamentId: string }) {
   const router = useRouter();
@@ -29,9 +30,10 @@ export default function CancelButton({ tournamentId }: { tournamentId: string })
   return (
     <div className="flex flex-col gap-2">
       <button onClick={handleClick} disabled={submitting} className="btn-danger">
+        {submitting && <Spinner />}
         {submitting ? "Cancelling…" : "Cancel tournament"}
       </button>
-      {error && <p className="field-error">{error}</p>}
+      {error && <p className="field-error motion-fade-in">{error}</p>}
     </div>
   );
 }

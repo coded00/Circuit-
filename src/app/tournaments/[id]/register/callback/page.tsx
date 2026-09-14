@@ -12,6 +12,8 @@ import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { confirmEntryFeePayment } from "@/lib/payments/confirm";
+import Poller from "@/app/Poller";
+import { Spinner } from "@/components/Spinner";
 
 export default async function RegistrationCallbackPage({
   searchParams,
@@ -28,20 +30,26 @@ export default async function RegistrationCallbackPage({
     ? await prisma.registration.findUnique({ where: { paymentRef: ref } })
     : null;
 
+  const confirmed = registration?.status === "CONFIRMED";
+
   return (
     <div className="state-block">
-      {registration?.status === "CONFIRMED" ? (
+      {/* Only while still waiting on a real ref — no ref means there's
+          nothing that could ever resolve to confirmed, and once confirmed
+          the outcome is already settled either way. */}
+      {ref && !confirmed && <Poller />}
+      {confirmed ? (
         <>
-          <CheckCircle2 size={40} className="text-success" />
+          <CheckCircle2 size={40} className="motion-scale-in text-success" />
           <h1 className="state-title">You&apos;re in!</h1>
           <p className="state-description">Your registration is confirmed.</p>
         </>
       ) : (
         <>
+          <Spinner size={28} className="text-muted" />
           <h1 className="state-title">Payment processing</h1>
           <p className="state-description">
-            This can take a minute. Refresh this page, or check back on the
-            tournament page shortly.
+            This can take a minute — this page will update on its own once it&apos;s confirmed.
           </p>
         </>
       )}
