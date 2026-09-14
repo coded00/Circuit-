@@ -26,6 +26,7 @@ import { getCurrentUser } from "@/lib/session";
 import { StatusPill, tournamentStatusInfo } from "@/components/StatusPill";
 import { GameArtTile } from "@/components/GameArtTile";
 import { ShareButton } from "@/components/ShareButton";
+import { openDueTournaments } from "@/lib/tournaments";
 import TournamentTabs, { type TournamentTab } from "./TournamentTabs";
 import CancelButton from "./CancelButton";
 import WithdrawButton from "./WithdrawButton";
@@ -83,6 +84,7 @@ export default async function TournamentPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  await openDueTournaments();
 
   const tournament = await prisma.tournament.findUnique({ where: { id } });
   if (!tournament) {

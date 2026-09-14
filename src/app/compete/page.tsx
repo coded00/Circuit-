@@ -15,6 +15,7 @@ import type { Prisma, TournamentStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { GameArtTile } from "@/components/GameArtTile";
 import { StatusPill, tournamentStatusInfo } from "@/components/StatusPill";
+import { openDueTournaments } from "@/lib/tournaments";
 
 type SearchParams = {
   q?: string;
@@ -55,6 +56,7 @@ function formatNaira(kobo: number): string {
 }
 
 export default async function CompetePage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  await openDueTournaments();
   const { q, game, status, entry, teamSize } = await searchParams;
 
   const where: Prisma.TournamentWhereInput = {};

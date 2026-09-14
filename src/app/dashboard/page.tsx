@@ -7,6 +7,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
+import { openDueTournaments } from "@/lib/tournaments";
 
 const COLUMNS = [
   { statuses: ["DRAFT"], title: "Draft" },
@@ -17,6 +18,7 @@ const COLUMNS = [
 ] as const;
 
 export default async function DashboardTournamentsPage() {
+  await openDueTournaments();
   const user = await getCurrentUser();
   if (!user) return null; // layout already redirects; satisfies the type checker
 

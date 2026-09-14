@@ -29,6 +29,7 @@ import { formatNotification } from "@/lib/notification-format";
 import { globalStandings } from "@/lib/standings";
 import { getFriendIds } from "@/lib/friends";
 import { getActiveAnnouncement } from "@/lib/announcements";
+import { openDueTournaments } from "@/lib/tournaments";
 import { AnnouncementBanner } from "@/components/AnnouncementBanner";
 
 const RANK_COLORS = ["#eab308", "#9ca3af", "#b45309"]; // gold, silver, bronze — same as ladder/page.tsx
@@ -81,6 +82,7 @@ export default async function Home({
   searchParams: Promise<{ leaderboard?: string }>;
 }) {
   const { leaderboard: leaderboardScope } = await searchParams;
+  await openDueTournaments();
   const user = await getCurrentUser();
   const friendLeaderboardActive = leaderboardScope === "friends" && !!user;
   const friendIds = user ? await getFriendIds(user.id) : [];
