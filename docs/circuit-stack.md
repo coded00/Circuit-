@@ -128,6 +128,19 @@ Upstash Redis (serverless, pay-per-request, so it doesn't violate the
 "minimize moving parts" bias either) is the right upgrade if login volume
 ever makes that query path a real cost — not before.
 
+## Request validation
+
+**zod for new routes only — existing routes are not being retrofitted.**
+The ~45 existing API routes all do manual inline validation (`typeof`
+checks, trimming, hand-written error messages) and it works correctly;
+rewriting all of them for consistency's sake would be a large, purely
+mechanical change with real regression risk against routes that aren't
+broken. Instead: any *new* route from here on validates its input with
+zod (parse the request body against a schema, return the first issue's
+message on failure) instead of hand-rolling the same checks again. The
+two styles will coexist in the codebase indefinitely — that's an accepted
+tradeoff, not a TODO to "finish migrating" later.
+
 ## Observability
 
 - **Errors: Sentry.** Non-negotiable earlier than most of the above,
