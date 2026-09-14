@@ -18,7 +18,7 @@ export function CircuitPulse() {
     <div className="card flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <h2 className="text-section-heading">Circuit Pulse</h2>
-        <Link href="/ladder" className="text-xs font-medium text-brand-blue hover:underline">
+        <Link href="/ladder" className="text-xs font-medium text-accent-blue hover:underline">
           View All
         </Link>
       </div>

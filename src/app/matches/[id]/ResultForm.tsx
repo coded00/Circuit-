@@ -97,7 +97,7 @@ export default function ResultForm({
           checked={confirmed}
           onChange={(e) => setConfirmed(e.target.checked)}
           required
-          className="mt-0.5 h-4 w-4 shrink-0 rounded border-border-strong bg-surface-elevated accent-brand-blue"
+          className="mt-0.5 h-4 w-4 shrink-0 rounded border-border-strong bg-surface-elevated accent-accent-blue"
         />
         I confirm the match code shown to both players is visible in this proof.
       </label>

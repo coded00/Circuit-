@@ -34,9 +34,9 @@ export function YourChannel({ user }: { user: ChannelUser }) {
       <div className="flex items-center gap-3">
         {user.avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs
-          <img src={user.avatarUrl} alt="" className="h-14 w-14 rounded-full border-2 border-brand-blue/50 object-cover" />
+          <img src={user.avatarUrl} alt="" className="h-14 w-14 rounded-full border-2 border-accent-blue/50 object-cover" />
         ) : (
-          <div className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-brand-blue/50 bg-surface-elevated text-lg font-semibold text-muted">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-accent-blue/50 bg-surface-elevated text-lg font-semibold text-muted">
             {user.displayName.slice(0, 1).toUpperCase()}
           </div>
         )}

@@ -30,7 +30,7 @@ export default async function StaffReportsPage() {
     <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-6 py-10">
       <div className="flex items-center justify-between gap-4">
         <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Open reports</h1>
-        <Link href="/staff/disputes" className="text-sm font-medium text-brand-blue hover:underline">
+        <Link href="/staff/disputes" className="text-sm font-medium text-accent-blue hover:underline">
           Escalated disputes →
         </Link>
       </div>
@@ -44,7 +44,7 @@ export default async function StaffReportsPage() {
               <div className="flex flex-wrap items-center gap-2">
                 <Link
                   href={`/players/${report.reportedUser.handle}`}
-                  className="font-medium hover:text-brand-blue"
+                  className="font-medium hover:text-accent-blue"
                 >
                   {report.reportedUser.displayName} (@{report.reportedUser.handle})
                 </Link>
@@ -59,7 +59,7 @@ export default async function StaffReportsPage() {
                   href={`/api/reports/${report.id}/evidence`}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-sm font-medium text-brand-blue hover:underline"
+                  className="text-sm font-medium text-accent-blue hover:underline"
                 >
                   View evidence
                 </a>

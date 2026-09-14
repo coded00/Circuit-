@@ -1,0 +1,54 @@
+name: CI
+
+# Runs on every push and PR: typecheck, lint, and a production build.
+# Uses placeholder env values, not a real database — nothing in this repo
+# performs a build-time DB query (no generateStaticParams, no top-level
+# `dynamic` overrides; every page is request-time dynamic behind a real
+# session cookie check), so `next build` only needs `DATABASE_URL` to be
+# a syntactically valid Postgres URL for Prisma's client to initialize,
+# not a reachable one.
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: "postgresql://ci:ci@localhost:5432/circuit_ci"
+      JWT_SECRET: "ci-placeholder-secret-do-not-use-in-production"
+      NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Generate Next.js route types
+        # tsc alone fails on a fresh checkout without this: `LayoutProps`/
+        # `PageProps` are Next-codegenned ambient types written to
+        # `.next/types/` the first time `next dev` or `next build` runs —
+        # verified by reproducing the failure in a clean worktree with no
+        # prior `.next/` directory.
+        run: npx next typegen
+
+      - name: Typecheck
+        run: npx tsc --noEmit -p tsconfig.json
+
+      - name: Lint
+        run: npx eslint .
+
+      - name: Build
+        run: npm run build

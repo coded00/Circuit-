@@ -81,7 +81,7 @@ const STREAM_LIST: Stream[] = [
 function StreamerAvatar({ name, size = 32 }: { name: string; size?: number }) {
   return (
     <div
-      className="flex shrink-0 items-center justify-center rounded-full border-2 border-brand-blue/40 bg-surface-elevated font-semibold text-muted"
+      className="flex shrink-0 items-center justify-center rounded-full border-2 border-accent-blue/40 bg-surface-elevated font-semibold text-muted"
       style={{ height: size, width: size, fontSize: size * 0.4 }}
     >
       {name.slice(0, 1).toUpperCase()}
@@ -109,9 +109,10 @@ function FeaturedStreamSlide({ stream }: { stream: Stream }) {
 
       {/* Facecam overlay — a real portrait standing in for the streamer's
           webcam feed (the stream itself is illustrative, see this file's
-          header comment). */}
+          header comment). Border uses the real "live" token, matching the
+          LIVE badge right above it, not the retired brand-violet one. */}
       <div
-        className="absolute top-14 right-4 z-10 h-16 w-16 overflow-hidden rounded-lg border-2 border-brand-violet/60 sm:h-20 sm:w-20"
+        className="absolute top-14 right-4 z-10 h-16 w-16 overflow-hidden rounded-lg border-2 border-live/60 sm:h-20 sm:w-20"
         style={{ boxShadow: "0 8px 24px rgba(0,0,0,0.4)" }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- external CDN */}
@@ -123,7 +124,7 @@ function FeaturedStreamSlide({ stream }: { stream: Stream }) {
           <StreamerAvatar name={stream.streamer} />
           <span className="flex items-center gap-1 text-sm font-semibold text-white">
             {stream.streamer}
-            <BadgeCheck size={14} className="text-brand-blue" />
+            <BadgeCheck size={14} className="text-accent-blue" />
           </span>
         </div>
         <span className="text-sm text-white/85">{stream.title}</span>
@@ -148,7 +149,7 @@ export function LiveOnCircuit() {
           </h2>
           <p className="text-metadata">Watch what&apos;s happening across the Circuit right now.</p>
         </div>
-        <Link href="/watch" className="text-xs font-medium text-brand-blue hover:underline">
+        <Link href="/watch" className="text-xs font-medium text-accent-blue hover:underline">
           View All →
         </Link>
       </div>
@@ -186,7 +187,7 @@ export function LiveOnCircuit() {
                   <StreamerAvatar name={stream.streamer} size={20} />
                   <span className="flex items-center gap-1 truncate text-sm font-semibold">
                     {stream.streamer}
-                    <BadgeCheck size={12} className="shrink-0 text-brand-blue" />
+                    <BadgeCheck size={12} className="shrink-0 text-accent-blue" />
                   </span>
                 </div>
                 <span className="truncate text-xs text-muted">{stream.title}</span>

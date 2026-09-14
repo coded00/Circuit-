@@ -13,8 +13,9 @@
  * wrapper's locally-redeclared --background/--surface/... correctly
  * cascades into every descendant utility and existing theme-agnostic
  * component class (.card, .field-input, .btn-secondary, ...) with zero
- * per-component edits — only classes that hardcoded the old brand-blue/
- * violet gradient needed changes (see each below).
+ * per-component edits. The old brand-blue/violet/cyan gradient tokens
+ * this system replaced are gone now too — every caller that hardcoded
+ * them has been migrated onto the accent tokens below.
  *
  * Supersedes the prior all-dark "CIRCUIT UI Development Phases" system.
  * ============================================================================
@@ -34,16 +35,6 @@
   --foreground: #111318;
   --muted: #6b7280;
   --muted-strong: #9ca3af;
-
-  /* Legacy blue/violet gradient tokens — kept defined (a few files may
-     still reference them mid-migration) but no longer used by any shared
-     component class below; new work should use the accent tokens instead. */
-  --brand-blue: #4f7cff;
-  --brand-violet: #8b5cf6;
-  --brand-cyan: #20d9ff;
-  --brand-gradient: linear-gradient(135deg, #4f7cff, #8b5cf6);
-  --brand-soft: rgba(79, 124, 255, 0.16);
-  --brand-foreground: #ffffff;
 
   /* ---- CIRCUIT accent system ---- */
   /* Volt — primary accent. Reserved for solid fills, icons, dots, and
@@ -149,12 +140,6 @@
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-muted-strong: var(--muted-strong);
-
-  --color-brand-blue: var(--brand-blue);
-  --color-brand-violet: var(--brand-violet);
-  --color-brand-cyan: var(--brand-cyan);
-  --color-brand-soft: var(--brand-soft);
-  --color-brand-foreground: var(--brand-foreground);
 
   --color-accent-volt: var(--accent-volt);
   --color-accent-volt-foreground: var(--accent-volt-foreground);

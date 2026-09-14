@@ -217,7 +217,7 @@ export default async function MatchPage({
               href={`/api/matches/${match.id}/proof/a`}
               target="_blank"
               rel="noreferrer"
-              className="text-sm font-medium text-brand-blue hover:underline"
+              className="text-sm font-medium text-accent-blue hover:underline"
             >
               View Player A&apos;s proof
             </a>
@@ -227,7 +227,7 @@ export default async function MatchPage({
               href={`/api/matches/${match.id}/proof/b`}
               target="_blank"
               rel="noreferrer"
-              className="text-sm font-medium text-brand-blue hover:underline"
+              className="text-sm font-medium text-accent-blue hover:underline"
             >
               View Player B&apos;s proof
             </a>

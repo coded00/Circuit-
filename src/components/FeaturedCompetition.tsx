@@ -64,7 +64,7 @@ export function FeaturedCompetition({ tournaments }: { tournaments: Tournament[]
     >
       <div className="flex items-center justify-between px-4 pt-4">
         <span className="text-eyebrow">Featured Competition</span>
-        <Link href="/battles" className="text-xs font-medium text-brand-blue hover:underline">
+        <Link href="/battles" className="text-xs font-medium text-accent-blue hover:underline">
           View All
         </Link>
       </div>
@@ -101,7 +101,7 @@ export function FeaturedCompetition({ tournaments }: { tournaments: Tournament[]
               type="button"
               onClick={() => goTo(i)}
               aria-label={`Go to competition ${i + 1}`}
-              className={`h-1.5 rounded-full transition-all ${i === index ? "w-5 bg-brand-blue" : "w-1.5 bg-surface-elevated"}`}
+              className={`h-1.5 rounded-full transition-all ${i === index ? "w-5 bg-accent-blue" : "w-1.5 bg-surface-elevated"}`}
             />
           ))}
         </div>
@@ -109,7 +109,7 @@ export function FeaturedCompetition({ tournaments }: { tournaments: Tournament[]
 
       <div className="flex flex-col gap-3 p-4">
         <div className="flex flex-col gap-1">
-          <span className="text-eyebrow text-brand-violet">Circuit Championship</span>
+          <span className="text-eyebrow text-gold">Circuit Championship</span>
           <span className="text-card-title font-semibold">{tournament.name}</span>
         </div>
 

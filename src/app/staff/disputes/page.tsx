@@ -51,7 +51,7 @@ export default async function StaffDisputeQueuePage() {
     <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-6 py-10">
       <div className="flex items-center justify-between gap-4">
         <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Escalated disputes</h1>
-        <Link href="/staff/reports" className="text-sm font-medium text-brand-blue hover:underline">
+        <Link href="/staff/reports" className="text-sm font-medium text-accent-blue hover:underline">
           Abuse reports →
         </Link>
       </div>

@@ -113,7 +113,7 @@ export function CompeteOnCircuit({ tournaments }: { tournaments: Tournament[] })
           <h2 className="text-section-heading">Compete on Circuit</h2>
           <p className="text-metadata">Find your next challenge.</p>
         </div>
-        <Link href="/battles" className="text-xs font-medium text-brand-blue hover:underline">
+        <Link href="/battles" className="text-xs font-medium text-accent-blue hover:underline">
           View All →
         </Link>
       </div>

@@ -54,7 +54,7 @@ export default async function NotificationsPage() {
             const { message, href } = formatNotification(n.type, n.payload);
             return (
               <a key={n.id} href={href} className="card-row flex items-start gap-3 p-3">
-                {!n.readAt && <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-blue" aria-hidden />}
+                {!n.readAt && <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent-blue" aria-hidden />}
                 <span className="flex flex-1 flex-col gap-0.5">
                   <span className={n.readAt ? "text-sm text-muted" : "text-sm"}>{message}</span>
                   <span className="text-metadata">{formatRelative(n.createdAt)}</span>

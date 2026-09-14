@@ -20,7 +20,7 @@ export function ConnectAccountsRow() {
   return (
     <div className="flex flex-col gap-4">
       <h2 className="text-section-heading flex items-center gap-2">
-        <Link2 size={17} className="text-brand-blue" />
+        <Link2 size={17} className="text-accent-blue" />
         Connect Your Accounts
       </h2>
       <div className="flex flex-wrap gap-2">
