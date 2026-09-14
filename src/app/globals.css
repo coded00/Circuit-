@@ -295,21 +295,25 @@ body {
  */
 @layer components {
   .card {
-    @apply rounded-[15px] border border-border bg-surface p-5 transition;
+    @apply rounded-[15px] border border-border bg-surface p-5 transition duration-[var(--duration-base)] ease-[var(--ease-standard)];
   }
 
+  /* Level 2 Interactive: hover lift (unchanged from before) plus real
+     press feedback on the same clickable card — .card alone is also used
+     for plain static containers, so the active-state scale lives here,
+     not on .card itself. */
   .card-hover {
-    @apply hover:border-border-hover hover:-translate-y-0.5;
+    @apply hover:border-border-hover hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] active:duration-[var(--duration-instant)];
   }
 
   .card-row {
-    @apply rounded-[11px] border border-border bg-surface text-sm transition
-      hover:border-border-hover hover:bg-surface-elevated
+    @apply rounded-[11px] border border-border bg-surface text-sm transition duration-[var(--duration-base)] ease-[var(--ease-standard)]
+      hover:border-border-hover hover:bg-surface-elevated active:scale-[0.99] active:duration-[var(--duration-instant)]
       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
   }
 
   .card-media {
-    @apply overflow-hidden rounded-[11px] border border-border bg-surface transition
+    @apply overflow-hidden rounded-[11px] border border-border bg-surface transition duration-[var(--duration-base)] ease-[var(--ease-standard)]
       hover:border-border-hover;
   }
 
@@ -336,29 +340,33 @@ body {
      outline, which several of these classes visually crowd out anyway. */
   .btn-primary {
     @apply inline-flex items-center justify-center gap-1.5 rounded-[10px] bg-accent-volt px-5 py-2.5
-      text-sm font-semibold text-accent-volt-foreground shadow-sm transition
-      hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50
+      text-sm font-semibold text-accent-volt-foreground shadow-sm transition duration-[var(--duration-base)] ease-[var(--ease-standard)]
+      hover:brightness-95 active:scale-[0.97] active:brightness-90 active:duration-[var(--duration-instant)]
+      disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100
       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-volt/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
   }
 
   .btn-secondary {
     @apply inline-flex items-center justify-center gap-1.5 rounded-[10px] border border-border-strong
-      bg-transparent px-5 py-2.5 text-sm font-medium text-foreground transition
-      hover:bg-surface-elevated disabled:cursor-not-allowed disabled:opacity-50
+      bg-transparent px-5 py-2.5 text-sm font-medium text-foreground transition duration-[var(--duration-base)] ease-[var(--ease-standard)]
+      hover:bg-surface-elevated active:scale-[0.97] active:duration-[var(--duration-instant)]
+      disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100
       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
   }
 
   .btn-ghost {
     @apply inline-flex items-center justify-center gap-1.5 rounded-[10px] bg-surface-elevated px-5 py-2.5
-      text-sm font-medium text-muted transition hover:text-foreground
-      disabled:cursor-not-allowed disabled:opacity-50
+      text-sm font-medium text-muted transition duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:text-foreground
+      active:scale-[0.97] active:duration-[var(--duration-instant)]
+      disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100
       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
   }
 
   .btn-danger {
     @apply inline-flex items-center justify-center gap-1.5 rounded-[10px] border border-danger/40
-      px-5 py-2.5 text-sm font-medium text-danger transition hover:bg-danger/10
-      disabled:cursor-not-allowed disabled:opacity-50
+      px-5 py-2.5 text-sm font-medium text-danger transition duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:bg-danger/10
+      active:scale-[0.97] active:duration-[var(--duration-instant)]
+      disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100
       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
   }
 
@@ -367,14 +375,17 @@ body {
      (TopBar, YourChannel) as part of the homepage rework. */
   .btn-golive {
     @apply inline-flex items-center justify-center gap-1.5 rounded-[10px] border px-4 py-2 text-sm font-semibold
-      text-foreground transition hover:bg-surface-elevated disabled:cursor-not-allowed disabled:opacity-60;
+      text-foreground transition duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:bg-surface-elevated
+      active:scale-[0.97] active:duration-[var(--duration-instant)]
+      disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100;
     background: var(--surface-elevated);
     border-color: var(--accent-blue);
   }
 
   .btn-icon {
-    @apply inline-flex h-9 w-9 items-center justify-center rounded-full text-muted transition
-      hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50
+    @apply inline-flex h-9 w-9 items-center justify-center rounded-full text-muted transition duration-[var(--duration-base)] ease-[var(--ease-standard)]
+      hover:bg-surface-elevated hover:text-foreground active:scale-90 active:duration-[var(--duration-instant)]
+      disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100
       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
   }
 
@@ -410,7 +421,7 @@ body {
 
   .field-input {
     @apply w-full rounded-[10px] border border-border bg-surface-elevated px-3.5 py-2.5 text-sm
-      outline-none transition placeholder:text-muted-strong
+      outline-none transition duration-[var(--duration-fast)] ease-[var(--ease-standard)] placeholder:text-muted-strong
       focus:border-accent-blue focus:ring-2 focus:ring-accent-blue-soft
       disabled:cursor-not-allowed disabled:opacity-50;
   }
@@ -423,7 +434,7 @@ body {
      app-wide, one fix instead of a per-caller icon overlay. */
   .field-select {
     @apply w-full appearance-none rounded-[10px] border border-border bg-surface-elevated bg-no-repeat px-3.5 py-2.5 pr-9
-      text-sm outline-none transition
+      text-sm outline-none transition duration-[var(--duration-fast)] ease-[var(--ease-standard)]
       focus:border-accent-blue focus:ring-2 focus:ring-accent-blue-soft
       disabled:cursor-not-allowed disabled:opacity-50;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23888f99' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 7.5L10 12.5L15 7.5'/%3E%3C/svg%3E");
@@ -433,7 +444,7 @@ body {
 
   .field-textarea {
     @apply w-full resize-y rounded-[10px] border border-border bg-surface-elevated px-3.5 py-2.5 text-sm
-      outline-none transition placeholder:text-muted-strong
+      outline-none transition duration-[var(--duration-fast)] ease-[var(--ease-standard)] placeholder:text-muted-strong
       focus:border-accent-blue focus:ring-2 focus:ring-accent-blue-soft
       disabled:cursor-not-allowed disabled:opacity-50;
   }
@@ -496,8 +507,8 @@ body {
     @apply flex items-center gap-1 border-b border-border;
   }
   .tab {
-    @apply border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted transition
-      hover:text-foreground
+    @apply border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted transition duration-[var(--duration-fast)] ease-[var(--ease-standard)]
+      hover:text-foreground active:opacity-70
       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
   }
   .tab-active {
@@ -521,7 +532,7 @@ body {
     @apply border-b border-border px-4 py-3 align-middle;
   }
   .table tbody tr {
-    @apply transition hover:bg-surface-elevated;
+    @apply transition duration-[var(--duration-fast)] ease-[var(--ease-standard)] hover:bg-surface-elevated;
   }
   .table tbody tr:last-child td {
     @apply border-b-0;

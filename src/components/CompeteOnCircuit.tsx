@@ -71,11 +71,11 @@ function CompetitionCard({ tournament, index }: { tournament: Tournament; index:
   return (
     <Link
       href={`/tournaments/${tournament.id}`}
-      className="card-media card-hover group flex h-full w-64 flex-col transition-all duration-[220ms] ease-out"
+      className="card-media card-hover group flex h-full w-64 flex-col"
     >
       <div className="relative h-24 w-full overflow-hidden">
         <CompetitionBadge tournament={tournament} index={index} />
-        <div className="h-full w-full transition-transform duration-[220ms] ease-out group-hover:scale-[1.03]">
+        <div className="h-full w-full transition-transform duration-[var(--duration-base)] ease-[var(--ease-standard)] group-hover:scale-[1.03]">
           <GameArtTile game={tournament.game} className="h-full w-full" />
         </div>
       </div>

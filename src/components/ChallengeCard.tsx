@@ -15,6 +15,7 @@
  */
 
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import { GameArtTile } from "@/components/GameArtTile";
 import { StatusPill } from "@/components/StatusPill";
 
@@ -42,7 +43,7 @@ export function ChallengeCard({
     <Link
       href={`/battles/${battle.id}`}
       data-surface="dark"
-      className="relative flex h-full w-full flex-col gap-3 overflow-hidden rounded-[16px] border border-border bg-surface p-4 transition hover:border-border-hover"
+      className="group relative flex h-full w-full flex-col gap-3 overflow-hidden rounded-[16px] border border-border bg-surface p-4 transition duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:border-border-hover hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] active:duration-[var(--duration-instant)]"
     >
       <GameArtTile game={battle.game} className="opacity-[0.12]" fill hideLabel imgWidth={480} />
 
@@ -96,7 +97,10 @@ export function ChallengeCard({
         <span>{formatLabel(battle.format)}</span>
       </div>
 
-      <span className="btn-primary relative z-10 mt-auto w-full text-sm">Accept Challenge →</span>
+      <span className="btn-primary relative z-10 mt-auto w-full text-sm">
+        Accept Challenge
+        <ArrowRight size={14} className="transition-transform duration-[var(--duration-base)] ease-[var(--ease-standard)] group-hover:translate-x-0.5" />
+      </span>
     </Link>
   );
 }
