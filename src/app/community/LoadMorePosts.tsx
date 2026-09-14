@@ -47,7 +47,13 @@ function PostRow({ post }: { post: Post }) {
   );
 }
 
-export default function LoadMorePosts({ initialCursor, scope }: { initialCursor: string | null; scope?: "friends" }) {
+export default function LoadMorePosts({
+  initialCursor,
+  scope,
+}: {
+  initialCursor: string | null;
+  scope?: "friends" | "teams";
+}) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [cursor, setCursor] = useState(initialCursor);
   const [loading, setLoading] = useState(false);

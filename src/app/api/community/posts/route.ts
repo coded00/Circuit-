@@ -1,16 +1,17 @@
 /**
- * Circuit — community feed. Global tab is unfiltered; `?scope=friends`
- * narrows to posts by the caller and their accepted friends (see
- * `src/lib/friends.ts`) — re-derived from the session on every request
- * rather than accepting an id list from the client, so a friend list
- * never has to round-trip through a URL. Teams tab is still UI-only
- * "coming soon" until that model exists.
+ * Circuit — community feed. Global tab is unfiltered; `?scope=friends`/
+ * `?scope=teams` narrow to posts by the caller plus their accepted
+ * friends or teammates (see `src/lib/friends.ts` / `src/lib/teams.ts`) —
+ * re-derived from the session on every request rather than accepting an
+ * id list from the client, so a friend/teammate list never has to
+ * round-trip through a URL.
  */
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { getFriendIds } from "@/lib/friends";
+import { getTeammateIds } from "@/lib/teams";
 import { parseCommunityPostContent } from "@/lib/validation";
 
 const DEFAULT_TAKE = 20;
@@ -23,11 +24,11 @@ export async function GET(request: Request) {
   const scope = searchParams.get("scope");
 
   let authorFilter: { authorId: { in: string[] } } | Record<string, never> = {};
-  if (scope === "friends") {
+  if (scope === "friends" || scope === "teams") {
     const user = await getCurrentUser();
     if (user) {
-      const friendIds = await getFriendIds(user.id);
-      authorFilter = { authorId: { in: [user.id, ...friendIds] } };
+      const otherIds = scope === "friends" ? await getFriendIds(user.id) : await getTeammateIds(user.id);
+      authorFilter = { authorId: { in: [user.id, ...otherIds] } };
     }
   }
 

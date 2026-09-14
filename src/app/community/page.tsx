@@ -1,15 +1,14 @@
 /**
- * Circuit — community feed. Global tab is real (any logged-in user posts,
- * everyone reads); Friends tab is now real too, filtered by `Friendship`
- * (see src/lib/friends.ts). Teams is still shown but disabled — no team
- * model exists yet, same treatment as Wallet/Marketplace/Rewards
- * elsewhere, until that's built.
+ * Circuit — community feed. Global tab is unfiltered; Friends and Teams
+ * both real now too, filtered by `Friendship`/`TeamMembership` (see
+ * src/lib/friends.ts and src/lib/teams.ts).
  */
 
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { getFriendIds } from "@/lib/friends";
+import { getTeammateIds } from "@/lib/teams";
 import Poller from "@/app/Poller";
 import PostComposer from "./PostComposer";
 import LoadMorePosts from "./LoadMorePosts";
@@ -34,10 +33,13 @@ export default async function CommunityPage({
   const { feed } = await searchParams;
   const user = await getCurrentUser();
   const isFriendsFeed = feed === "friends" && !!user;
+  const isTeamsFeed = feed === "teams" && !!user;
 
   const authorFilter = isFriendsFeed
     ? { authorId: { in: [user!.id, ...(await getFriendIds(user!.id))] } }
-    : {};
+    : isTeamsFeed
+      ? { authorId: { in: [user!.id, ...(await getTeammateIds(user!.id))] } }
+      : {};
 
   const rows = await prisma.communityPost.findMany({
     where: authorFilter,
@@ -55,7 +57,7 @@ export default async function CommunityPage({
       <h1 className="text-section-heading text-xl">Community</h1>
 
       <div className="tabs">
-        <Link href="/community" className={`tab ${!isFriendsFeed ? "tab-active" : ""}`}>
+        <Link href="/community" className={`tab ${!isFriendsFeed && !isTeamsFeed ? "tab-active" : ""}`}>
           Global
         </Link>
         {user ? (
@@ -67,9 +69,15 @@ export default async function CommunityPage({
             Friends
           </span>
         )}
-        <span className="tab tab-disabled" title="Coming soon">
-          Teams
-        </span>
+        {user ? (
+          <Link href="/community?feed=teams" className={`tab ${isTeamsFeed ? "tab-active" : ""}`}>
+            Teams
+          </Link>
+        ) : (
+          <span className="tab tab-disabled" title="Log in to see your teammates' posts">
+            Teams
+          </span>
+        )}
       </div>
 
       {user && <PostComposer />}
@@ -79,6 +87,11 @@ export default async function CommunityPage({
           {isFriendsFeed ? (
             <>
               Nothing from your friends yet — <Link href="/friends" className="font-medium text-accent-blue hover:underline">add some</Link>{" "}
+              or check back later.
+            </>
+          ) : isTeamsFeed ? (
+            <>
+              Nothing from your teammates yet — <Link href="/teams" className="font-medium text-accent-blue hover:underline">join or create a team</Link>{" "}
               or check back later.
             </>
           ) : (
@@ -115,7 +128,11 @@ export default async function CommunityPage({
         </div>
       )}
 
-      <LoadMorePosts key={feed ?? "global"} initialCursor={nextCursor} scope={isFriendsFeed ? "friends" : undefined} />
+      <LoadMorePosts
+        key={feed ?? "global"}
+        initialCursor={nextCursor}
+        scope={isFriendsFeed ? "friends" : isTeamsFeed ? "teams" : undefined}
+      />
     </div>
   );
 }
