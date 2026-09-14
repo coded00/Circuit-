@@ -21,6 +21,7 @@ export default async function AdminCompetitionEditPage({ params }: { params: Pro
   const hasPaidRegistration =
     tournament.entryFee > 0 &&
     (await prisma.registration.count({ where: { tournamentId: id, status: "CONFIRMED" } })) > 0;
+  const games = await prisma.game.findMany({ where: { enabled: true }, orderBy: { name: "asc" } });
 
   return (
     <div className="flex flex-1 flex-col gap-6">
@@ -29,7 +30,7 @@ export default async function AdminCompetitionEditPage({ params }: { params: Pro
       </Link>
       <h1 className="font-display text-2xl font-bold tracking-tight">Edit {tournament.name}</h1>
       <div className="card max-w-2xl">
-        <EditForm tournament={tournament} moneyFieldsLocked={hasPaidRegistration} redirectTo={`/admin/competitions/${id}`} />
+        <EditForm tournament={tournament} moneyFieldsLocked={hasPaidRegistration} redirectTo={`/admin/competitions/${id}`} games={games} />
       </div>
     </div>
   );

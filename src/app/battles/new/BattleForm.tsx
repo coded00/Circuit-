@@ -4,9 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { OptionCard } from "@/components/OptionCard";
 
-export default function BattleForm() {
+export default function BattleForm({ games }: { games: { id: string; name: string }[] }) {
   const router = useRouter();
-  const [game, setGame] = useState("");
+  const [game, setGame] = useState(games[0]?.name ?? "");
   const [format, setFormat] = useState<"SINGLE" | "BEST_OF_3">("SINGLE");
   const [visibility, setVisibility] = useState<"OPEN" | "TARGETED">("OPEN");
   const [targetHandle, setTargetHandle] = useState("");
@@ -48,14 +48,14 @@ export default function BattleForm() {
         <label htmlFor="game" className="field-label">
           Game
         </label>
-        <input
-          id="game"
-          required
-          placeholder="e.g. EA FC 26"
-          value={game}
-          onChange={(e) => setGame(e.target.value)}
-          className="field-input"
-        />
+        <select id="game" required value={game} onChange={(e) => setGame(e.target.value)} className="field-input">
+          {games.length === 0 && <option value="">No games available — ask an admin to add one</option>}
+          {games.map((g) => (
+            <option key={g.id} value={g.name}>
+              {g.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="flex flex-col gap-1.5">

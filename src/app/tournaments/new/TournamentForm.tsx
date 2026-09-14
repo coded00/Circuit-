@@ -8,11 +8,17 @@ function nairaToKobo(value: string): number {
   return Math.round(naira * 100);
 }
 
-export default function TournamentForm({ redirectTo }: { redirectTo?: (id: string) => string } = {}) {
+export default function TournamentForm({
+  redirectTo,
+  games,
+}: {
+  redirectTo?: (id: string) => string;
+  games: { id: string; name: string }[];
+} = { games: [] }) {
   const router = useRouter();
 
   const [name, setName] = useState("");
-  const [game, setGame] = useState("");
+  const [game, setGame] = useState(games[0]?.name ?? "");
   const [teamSize, setTeamSize] = useState("1v1");
   const [participantCap, setParticipantCap] = useState("16");
   const [entryFeeNaira, setEntryFeeNaira] = useState("0");
@@ -85,14 +91,14 @@ export default function TournamentForm({ redirectTo }: { redirectTo?: (id: strin
         <label htmlFor="game" className="field-label">
           Game
         </label>
-        <input
-          id="game"
-          required
-          placeholder="e.g. EA FC 26"
-          value={game}
-          onChange={(e) => setGame(e.target.value)}
-          className="field-input"
-        />
+        <select id="game" required value={game} onChange={(e) => setGame(e.target.value)} className="field-input">
+          {games.length === 0 && <option value="">No games available — ask an admin to add one</option>}
+          {games.map((g) => (
+            <option key={g.id} value={g.name}>
+              {g.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="flex flex-col gap-1 rounded-[10px] border border-border bg-surface-elevated px-3.5 py-2.5">

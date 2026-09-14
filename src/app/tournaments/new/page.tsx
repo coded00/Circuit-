@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
+import { prisma } from "@/lib/db";
 import TournamentForm from "./TournamentForm";
 
 export default async function NewTournamentPage() {
@@ -7,6 +8,7 @@ export default async function NewTournamentPage() {
   if (!user) {
     redirect("/login?next=/tournaments/new");
   }
+  const games = await prisma.game.findMany({ where: { enabled: true }, orderBy: { name: "asc" } });
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-6 sm:p-8">
@@ -17,7 +19,7 @@ export default async function NewTournamentPage() {
         </p>
       </div>
       <div className="card">
-        <TournamentForm />
+        <TournamentForm games={games} />
       </div>
     </div>
   );

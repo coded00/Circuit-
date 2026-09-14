@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
+import { prisma } from "@/lib/db";
 import BattleForm from "./BattleForm";
 
 export default async function NewBattlePage() {
@@ -7,11 +8,12 @@ export default async function NewBattlePage() {
   if (!user) {
     redirect("/login?next=/battles/new");
   }
+  const games = await prisma.game.findMany({ where: { enabled: true }, orderBy: { name: "asc" } });
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-6 py-10">
       <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Open a Challenge</h1>
-      <BattleForm />
+      <BattleForm games={games} />
     </div>
   );
 }

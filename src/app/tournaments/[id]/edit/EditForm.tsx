@@ -17,6 +17,7 @@ export default function EditForm({
   tournament,
   moneyFieldsLocked,
   redirectTo,
+  games,
 }: {
   tournament: Tournament;
   moneyFieldsLocked: boolean;
@@ -26,6 +27,7 @@ export default function EditForm({
    *  inside the control center rather than dropping them into the
    *  player-facing app. */
   redirectTo?: string;
+  games: { id: string; name: string }[];
 }) {
   const router = useRouter();
   const [name, setName] = useState(tournament.name);
@@ -103,13 +105,15 @@ export default function EditForm({
         <label htmlFor="game" className="field-label">
           Game
         </label>
-        <input
-          id="game"
-          required
-          value={game}
-          onChange={(e) => setGame(e.target.value)}
-          className="field-input"
-        />
+        <select id="game" required value={game} onChange={(e) => setGame(e.target.value)} className="field-input">
+          {/* The tournament's current game might not be an active catalog entry (renamed/disabled since) — keep it selectable so saving doesn't silently change it. */}
+          {!games.some((g) => g.name === game) && game && <option value={game}>{game}</option>}
+          {games.map((g) => (
+            <option key={g.id} value={g.name}>
+              {g.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="flex flex-col gap-1.5">

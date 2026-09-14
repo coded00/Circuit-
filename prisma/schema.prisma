@@ -103,9 +103,11 @@ model User {
   /// Short public profile tagline (ACC-6 profile edit) — free text,
   /// entirely optional, never used anywhere else in the app.
   bio              String?
-  /// Self-curated list of games shown on the public profile — organizer-
-  /// typed free text, same convention as Tournament.game/Battle.game (no
-  /// Game catalog model exists), not derived from real match history.
+  /// Self-curated list of games shown on the public profile — player-typed
+  /// free text, not derived from real match history and NOT sourced from
+  /// the `Game` catalog the way Tournament.game/Battle.game are: a
+  /// player's "games I play" is a personal claim, not a real competition,
+  /// so it isn't constrained to what organizers can actually host.
   favoriteGames    String[]  @default([])
   dateOfBirth      DateTime?
   ageVerified      Boolean   @default(false)
@@ -234,11 +236,31 @@ model OrganizerProfile {
 }
 
 /// Maps to TRN-1..TRN-6.
+/// Admin-curated catalog of games organizers can pick from when creating a
+/// tournament or challenge (see Tournament.game / Battle.game) — Admin >
+/// Games manages these rows. Deliberately not a foreign key: Tournament.game
+/// and Battle.game stay plain strings so every existing row and every read
+/// site that already treats `game` as a string keeps working unchanged —
+/// this table only constrains what the *creation/edit forms* offer as
+/// options, not what's already stored or how it's queried elsewhere.
+model Game {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  iconUrl   String?
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([enabled])
+}
+
 model Tournament {
   id                  String           @id @default(cuid())
   organizerId         String
   organizer           OrganizerProfile @relation(fields: [organizerId], references: [userId])
   name                String
+  /// Free text, not a foreign key to `Game` — see that model's comment.
+  /// Populated from an admin-curated `Game.name` list via the creation/
+  /// edit form's `<select>`, not hand-typed.
   game                String
   /// V1 is knockout-only (D2). Kept as a string, not an enum, so V2 formats
   /// (round-robin, league) don't require a migration to add.
@@ -248,8 +270,7 @@ model Tournament {
   /// e.g. Call of Duty Mobile alone runs 5v5 in ranked multiplayer but
   /// solo/duo in Tournament Mode — team size is a property of the specific
   /// competition, not the game). Kept as a string, not derived from
-  /// `game`, for the same "no fixed game catalog" reason `game` itself is
-  /// free text.
+  /// `game`, for the same reason `game` itself isn't a hard foreign key.
   /// Real limitation, not silently glossed over: this is a descriptive
   /// label only. `Registration` still links exactly one `User` per row —
   /// Circuit has no team/roster model, so a "5v5" tournament still means
@@ -364,6 +385,8 @@ model Battle {
   id           String           @id @default(cuid())
   creatorId    String
   creator      User             @relation("BattleCreator", fields: [creatorId], references: [id])
+  /// Same "admin-curated `Game.name`, not a foreign key" convention as
+  /// Tournament.game — see that field's comment.
   game         String
   /// "SINGLE" | "BEST_OF_3" — kept as string for the same reason as
   /// Tournament.format above.
