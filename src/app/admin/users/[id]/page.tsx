@@ -157,7 +157,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
                     {outcome ? (
                       <span className={`badge ${outcome === "Won" ? "badge-complete" : "badge-cancelled"}`}>{outcome}</span>
                     ) : (
-                      <StatusPill tone={status.tone}>{status.label}</StatusPill>
+                      <StatusPill tone={status.tone} pulse={status.pulse}>{status.label}</StatusPill>
                     )}
                   </div>
                 );

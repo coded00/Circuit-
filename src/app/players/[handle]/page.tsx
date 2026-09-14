@@ -47,6 +47,7 @@ import { GameArtTile } from "@/components/GameArtTile";
 import { ShareButton } from "@/components/ShareButton";
 import { StatusPill, matchStatusInfo } from "@/components/StatusPill";
 import { FriendButton } from "@/components/FriendButton";
+import { CountUp } from "@/components/CountUp";
 import TournamentTabs, { type TournamentTab } from "@/app/tournaments/[id]/TournamentTabs";
 
 const ACTIVE_MATCH_PRIORITY: Record<string, number> = { DISPUTED: 0, NEEDS_RESULT: 1, UPCOMING: 2 };
@@ -433,7 +434,15 @@ export default async function PlayerProfilePage({
                 <td className="font-mono tabular-nums text-success">{g.wins}</td>
                 <td className="font-mono tabular-nums text-danger">{g.losses}</td>
                 <td className="font-mono tabular-nums">{g.winRate === null ? "—" : `${g.winRate}%`}</td>
-                <td>{g.rank == null ? "—" : <span className="badge badge-brand">#{g.rank}</span>}</td>
+                <td>
+                  {g.rank == null ? (
+                    "—"
+                  ) : (
+                    <span className="badge badge-brand">
+                      #<CountUp value={g.rank} />
+                    </span>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>

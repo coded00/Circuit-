@@ -41,6 +41,7 @@ import { ShareButton } from "@/components/ShareButton";
 import { StatusPill, battleStatusInfo } from "@/components/StatusPill";
 import { gameStandings, type Standing } from "@/lib/standings";
 import { getFriendIds } from "@/lib/friends";
+import { CountUp } from "@/components/CountUp";
 import AcceptButton from "./AcceptButton";
 import CancelBattleButton from "./CancelBattleButton";
 
@@ -119,7 +120,11 @@ function Tag({ children, tone }: { children: React.ReactNode; tone: "volt" | "or
 
 function RankBadge({ rank }: { rank: number | null }) {
   if (rank == null) return null;
-  return <span className="text-xs font-semibold text-gold">Rank #{rank}</span>;
+  return (
+    <span className="text-xs font-semibold text-gold">
+      Rank #<CountUp value={rank} />
+    </span>
+  );
 }
 
 function StatsRow({ standing }: { standing: Standing | undefined }) {

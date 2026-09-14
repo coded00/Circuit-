@@ -72,7 +72,7 @@ export default async function MatchPage({
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-8 px-6 py-10">
       <div className="flex flex-col gap-2">
-        <StatusPill tone={status.tone}>{status.label}</StatusPill>
+        <StatusPill tone={status.tone} pulse={status.pulse}>{status.label}</StatusPill>
         <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
           {match.tournament ? `${match.tournament.name} · Round ${match.round}` : "Battle match"}
         </h1>

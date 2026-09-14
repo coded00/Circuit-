@@ -27,6 +27,7 @@ import { StatusPill, tournamentStatusInfo } from "@/components/StatusPill";
 import { GameArtTile } from "@/components/GameArtTile";
 import { ShareButton } from "@/components/ShareButton";
 import { openDueTournaments } from "@/lib/tournaments";
+import { CapacityBar } from "@/components/CapacityBar";
 import TournamentTabs, { type TournamentTab } from "./TournamentTabs";
 import CancelButton from "./CancelButton";
 import WithdrawButton from "./WithdrawButton";
@@ -116,7 +117,6 @@ export default async function TournamentPage({
     now < tournament.registrationCloseAt &&
     registrantCount < tournament.participantCap;
   const status = tournamentStatusInfo(tournament.status);
-  const fillPct = Math.min(100, Math.round((registrantCount / tournament.participantCap) * 100));
   const formatText = formatLabel(tournament.format);
   const hasBracket = tournament.status === "LIVE" || tournament.status === "COMPLETE";
 
@@ -420,9 +420,7 @@ export default async function TournamentPage({
                   <Link href={`/tournaments/${tournament.id}/register`} className="btn-primary w-full">
                     Register Now →
                   </Link>
-                  <div className="h-1 w-full overflow-hidden rounded-full bg-surface-elevated">
-                    <div className="h-full rounded-full bg-accent-blue" style={{ width: `${fillPct}%` }} />
-                  </div>
+                  <CapacityBar registered={registrantCount} cap={tournament.participantCap} className="h-1" />
                   <p className="flex items-center gap-1.5 text-xs text-muted">
                     <ShieldCheck size={12} className="shrink-0" />
                     {tournament.entryFee === 0

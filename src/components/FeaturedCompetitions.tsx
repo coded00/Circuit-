@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Calendar, Swords, ArrowRight } from "lucide-react";
 import { GameArtTile } from "@/components/GameArtTile";
 import { tournamentStatusInfo } from "@/components/StatusPill";
+import { CapacityBar } from "@/components/CapacityBar";
 
 /**
  * Circuit — "Featured Competitions" homepage section. Tall editorial
@@ -65,7 +66,6 @@ function CapacityBadge({ registered, cap }: { registered: number; cap: number })
 function FeaturedCard({ tournament, showFeaturedBadge = false }: { tournament: Tournament; showFeaturedBadge?: boolean }) {
   const registered = tournament._count.registrations;
   const cap = tournament.participantCap;
-  const fillPct = cap > 0 ? Math.min(100, Math.round((registered / cap) * 100)) : 0;
   const status = tournamentStatusInfo(tournament.status);
 
   return (
@@ -129,9 +129,7 @@ function FeaturedCard({ tournament, showFeaturedBadge = false }: { tournament: T
           <span className="text-[11px] text-muted">
             {registered} / {cap} Players
           </span>
-          <div className="h-[3px] w-full overflow-hidden rounded-full bg-surface-elevated">
-            <div className="h-full rounded-full bg-accent-blue" style={{ width: `${fillPct}%` }} />
-          </div>
+          <CapacityBar registered={registered} cap={cap} />
         </div>
 
         <span className="btn-primary mt-auto flex w-full items-center justify-center gap-1.5 py-2.5 text-sm">

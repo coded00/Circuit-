@@ -61,7 +61,7 @@ export default async function AdminMatchPage({ params }: { params: Promise<{ id:
       </Link>
 
       <div className="flex flex-col gap-2">
-        <StatusPill tone={status.tone}>{status.label}</StatusPill>
+        <StatusPill tone={status.tone} pulse={status.pulse}>{status.label}</StatusPill>
         <h1 className="font-display text-2xl font-bold tracking-tight">
           {match.tournament ? `${match.tournament.name} · Round ${match.round}` : `Challenge · ${match.battle?.game}`}
         </h1>

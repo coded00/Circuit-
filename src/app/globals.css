@@ -868,6 +868,36 @@ body {
   }
 }
 
+/*
+ * ============================================================================
+ * Phase 21 — tournament/competitive HUD language. Motion applied only to
+ * real, already-displayed competitive data (capacity, rank, a match that
+ * needs your attention) — no new fabricated stat, no gaming intensity
+ * added to non-competitive surfaces. See CapacityBar.tsx for the one new
+ * shared component this introduces.
+ * ============================================================================
+ */
+@layer components {
+  /* Animates from empty to the real fill percentage on mount (--fill-pct
+     set inline per instance) — a genuine reveal of real data, not a
+     decorative loop. Final width is set outside the keyframe too, so
+     prefers-reduced-motion (which collapses animation-duration to ~0)
+     still lands on the correct width instead of visually stopping at 0%. */
+  .capacity-fill {
+    width: var(--fill-pct, 0%);
+    animation: capacity-fill-in var(--duration-reveal) var(--ease-reveal) both;
+  }
+}
+
+@keyframes capacity-fill-in {
+  from {
+    width: 0%;
+  }
+  to {
+    width: var(--fill-pct, 0%);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

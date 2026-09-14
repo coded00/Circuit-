@@ -106,7 +106,9 @@ export default async function AdminChallengeDetailPage({ params }: { params: Pro
                   {match.playerB.displayName}
                 </Link>
               </div>
-              <StatusPill tone={matchStatusInfo(match.status).tone}>{matchStatusInfo(match.status).label}</StatusPill>
+              <StatusPill tone={matchStatusInfo(match.status).tone} pulse={matchStatusInfo(match.status).pulse}>
+                {matchStatusInfo(match.status).label}
+              </StatusPill>
             </div>
             <span className="font-mono text-xs text-muted-strong">Match code: {match.matchCode}</span>
             {match.winner && (

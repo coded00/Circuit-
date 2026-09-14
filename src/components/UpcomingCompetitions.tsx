@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Calendar, Swords, Users } from "lucide-react";
 import { GameArtTile } from "@/components/GameArtTile";
 import { StatusPill, tournamentStatusInfo } from "@/components/StatusPill";
+import { CapacityBar } from "@/components/CapacityBar";
 
 /**
  * Circuit — "Upcoming Competitions" homepage section. A static grid, not
@@ -90,6 +91,7 @@ function UpcomingCard({ tournament }: { tournament: Tournament }) {
             {registered} / {tournament.participantCap} Players
           </span>
         </div>
+        <CapacityBar registered={registered} cap={tournament.participantCap} />
 
         <div className="flex flex-col gap-0.5">
           <span className="text-[10px] font-semibold tracking-[0.08em] text-muted-strong uppercase">

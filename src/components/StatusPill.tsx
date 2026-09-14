@@ -76,10 +76,14 @@ export function matchStatusInfo(status: string): StatusInfo {
   switch (status) {
     case "UPCOMING":
       return { tone: "neutral", label: "Upcoming" };
+    // Both pulse: real states where the viewer (or someone ruling on
+    // their behalf) has an action pending right now, the same "needs you"
+    // urgency the tournament LIVE / battle OPEN pulse already conveys —
+    // not decoration, a real outstanding action.
     case "NEEDS_RESULT":
-      return { tone: "attention", label: "Needs result" };
+      return { tone: "attention", label: "Needs result", pulse: true };
     case "DISPUTED":
-      return { tone: "cancelled", label: "Disputed" };
+      return { tone: "cancelled", label: "Disputed", pulse: true };
     case "COMPLETE":
       return { tone: "complete", label: "Complete" };
     default:
