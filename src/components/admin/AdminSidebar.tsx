@@ -41,8 +41,13 @@ function isActive(pathname: string, href: string): boolean {
   return href === "/admin" ? pathname === "/admin" : pathname === href || pathname.startsWith(`${href}/`);
 }
 
+/** Row height (40px) + the nav's own gap-0.5 (2px) — same index-arithmetic
+ *  sliding-indicator approach as AppSidebar.tsx, see that file's comment. */
+const NAV_ROW_STEP = 42;
+
 export function AdminSidebar() {
   const pathname = usePathname();
+  const activeIndex = ITEMS.findIndex((item) => isActive(pathname, item.href));
 
   return (
     <aside className="sticky top-0 flex h-screen w-[220px] shrink-0 flex-col gap-1 border-r border-border bg-background px-3 py-6">
@@ -52,17 +57,24 @@ export function AdminSidebar() {
         <span className="text-eyebrow text-muted-strong">Control Center</span>
       </Link>
 
-      <nav className="flex flex-col gap-0.5">
-        {ITEMS.map((item) => {
-          const active = isActive(pathname, item.href);
+      <nav className="relative flex flex-col gap-0.5">
+        {activeIndex !== -1 && (
+          <span
+            aria-hidden
+            className="absolute inset-x-0 z-0 h-10 rounded-[9px] bg-accent-volt transition-transform duration-[var(--duration-base)] ease-[var(--ease-out)]"
+            style={{ transform: `translateY(${activeIndex * NAV_ROW_STEP}px)` }}
+          />
+        )}
+        {ITEMS.map((item, i) => {
+          const active = i === activeIndex;
           const Icon = item.icon;
           return (
             <Link
               key={item.href}
               href={item.href}
               aria-current={active ? "page" : undefined}
-              className={`flex h-10 items-center gap-3 rounded-[9px] px-3 text-sm font-medium transition ${
-                active ? "bg-accent-volt text-accent-volt-foreground" : "text-muted hover:bg-surface-elevated hover:text-foreground"
+              className={`relative z-10 flex h-10 items-center gap-3 rounded-[9px] px-3 text-sm font-medium transition-colors duration-[var(--duration-fast)] ${
+                active ? "text-accent-volt-foreground" : "text-muted hover:bg-surface-elevated hover:text-foreground"
               }`}
             >
               <Icon size={17} className={active ? "text-accent-volt-foreground" : undefined} />

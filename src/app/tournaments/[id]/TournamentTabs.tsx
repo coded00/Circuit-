@@ -60,7 +60,7 @@ export default function TournamentTabs({
         </div>
         {trailing}
       </div>
-      <div role="tabpanel" id={`tabpanel-${activeTab?.key}`} aria-labelledby={`tab-${activeTab?.key}`}>
+      <div key={activeTab?.key} className="tab-content-enter" role="tabpanel" id={`tabpanel-${activeTab?.key}`} aria-labelledby={`tab-${activeTab?.key}`}>
         {activeTab?.content}
       </div>
     </div>

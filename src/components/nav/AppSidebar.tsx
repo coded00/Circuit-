@@ -54,6 +54,11 @@ function isActive(pathname: string, href: string): boolean {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
 }
 
+/** Row height (46px) + the nav's own gap-1 (4px) — the sliding indicator
+ *  below is positioned by plain index arithmetic against this, not a
+ *  measured DOM rect, since every row in this list is this exact height. */
+const NAV_ROW_STEP = 50;
+
 function NavLink({ item, active, badge }: { item: Item; active: boolean; badge?: number }) {
   const Icon = item.icon;
   return (
@@ -61,10 +66,8 @@ function NavLink({ item, active, badge }: { item: Item; active: boolean; badge?:
       href={item.href}
       aria-current={active ? "page" : undefined}
       title={item.label}
-      className={`relative flex h-[46px] items-center justify-center gap-3 rounded-[9px] px-2 text-sm font-semibold transition lg:justify-start lg:px-4 ${
-        active
-          ? "bg-accent-volt text-accent-volt-foreground"
-          : "text-muted hover:bg-surface-elevated hover:text-foreground"
+      className={`relative z-10 flex h-[46px] items-center justify-center gap-3 rounded-[9px] px-2 text-sm font-semibold transition-colors duration-[var(--duration-fast)] lg:justify-start lg:px-4 ${
+        active ? "text-accent-volt-foreground" : "text-muted hover:bg-surface-elevated hover:text-foreground"
       }`}
     >
       <Icon size={18} className={active ? "text-accent-volt-foreground" : undefined} />
@@ -86,6 +89,13 @@ function NavLink({ item, active, badge }: { item: Item; active: boolean; badge?:
 export function AppSidebar({ user }: { user: NavUser }) {
   const pathname = usePathname();
 
+  const items: Item[] = [
+    ...PRIMARY,
+    ...(user ? [{ href: "/wallet", label: "Wallet", icon: Wallet }] : []),
+    ...(user ? [{ href: `/players/${user.handle}`, label: "Profile", icon: UserIcon }] : []),
+  ];
+  const activeIndex = items.findIndex((item) => isActive(pathname, item.href));
+
   return (
     <aside
       data-surface="dark"
@@ -96,17 +106,17 @@ export function AppSidebar({ user }: { user: NavUser }) {
         <img src="/circuit-logo.png" alt="Circuit" width={700} height={347} className="h-5 w-auto max-w-none lg:h-14" />
       </Link>
 
-      <nav className="flex flex-col gap-1">
-        {PRIMARY.map((item) => (
-          <NavLink key={item.href} item={item} active={isActive(pathname, item.href)} />
-        ))}
-        {user && <NavLink item={{ href: "/wallet", label: "Wallet", icon: Wallet }} active={isActive(pathname, "/wallet")} />}
-        {user && (
-          <NavLink
-            item={{ href: `/players/${user.handle}`, label: "Profile", icon: UserIcon }}
-            active={isActive(pathname, `/players/${user.handle}`)}
+      <nav className="relative flex flex-col gap-1">
+        {activeIndex !== -1 && (
+          <span
+            aria-hidden
+            className="absolute inset-x-0 z-0 h-[46px] rounded-[9px] bg-accent-volt transition-transform duration-[var(--duration-base)] ease-[var(--ease-out)]"
+            style={{ transform: `translateY(${activeIndex * NAV_ROW_STEP}px)` }}
           />
         )}
+        {items.map((item, i) => (
+          <NavLink key={item.href} item={item} active={i === activeIndex} />
+        ))}
       </nav>
 
       {/* Phase 16 (tablet): the promo card and its own login/signup pair

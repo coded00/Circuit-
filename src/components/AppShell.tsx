@@ -62,7 +62,17 @@ export function AppShell({
               replaces that reserved space, matching the header's Phase-3
               spec height (~60px), so content starts right where the
               header visually ends instead of underneath it. */}
-          <main className="flex flex-1 flex-col pt-[60px]">{children}</main>
+          <main className="flex flex-1 flex-col pt-[60px]">
+            {/* Keyed by pathname so React remounts this wrapper on every
+                real navigation, re-triggering .page-transition's entrance
+                — the standard no-library way to get a page-change
+                animation in the App Router. Doesn't apply to in-place
+                content changes (tab switches, search params) since those
+                don't change `pathname`. */}
+            <div key={pathname} className="page-transition flex flex-1 flex-col">
+              {children}
+            </div>
+          </main>
         </div>
       </div>
       {mobileTabBar}

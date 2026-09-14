@@ -59,7 +59,7 @@ function TabLink({
     <Link
       href={href}
       aria-current={active ? "page" : undefined}
-      className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs ${active ? "text-foreground" : "text-muted"}`}
+      className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs transition-colors duration-[var(--duration-fast)] ${active ? "text-foreground" : "text-muted"}`}
     >
       <Icon size={18} className={active ? "text-accent-volt" : undefined} />
       {label}
@@ -92,7 +92,7 @@ export function MobileTabBar({ user }: { user: NavUser }) {
                 key={item.href}
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium ${active ? "bg-accent-volt-soft text-foreground" : "text-muted"}`}
+                className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors duration-[var(--duration-fast)] ${active ? "bg-accent-volt-soft text-foreground" : "text-muted"}`}
               >
                 {item.label}
               </Link>
@@ -109,7 +109,7 @@ export function MobileTabBar({ user }: { user: NavUser }) {
         <button
           type="button"
           onClick={() => setMenuOpen(true)}
-          className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs ${onProfile ? "text-foreground" : "text-muted"}`}
+          className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs transition-colors duration-[var(--duration-fast)] ${onProfile ? "text-foreground" : "text-muted"}`}
         >
           <UserIcon size={18} className={onProfile ? "text-accent-volt" : undefined} />
           Profile
@@ -118,9 +118,9 @@ export function MobileTabBar({ user }: { user: NavUser }) {
 
       {menuOpen && (
         <div className="fixed inset-0 z-30 flex items-end sm:hidden" onClick={() => setMenuOpen(false)}>
-          <div className="absolute inset-0 bg-black/60" />
+          <div className="sheet-backdrop-enter absolute inset-0 bg-black/60" />
           <div
-            className="relative z-10 flex max-h-[75vh] w-full flex-col gap-1 overflow-y-auto rounded-t-2xl border-t border-border bg-surface p-4"
+            className="sheet-panel-enter relative z-10 flex max-h-[75vh] w-full flex-col gap-1 overflow-y-auto rounded-t-2xl border-t border-border bg-surface p-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-2 flex items-center justify-between">

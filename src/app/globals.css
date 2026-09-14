@@ -813,6 +813,50 @@ body {
   }
 }
 
+/*
+ * ============================================================================
+ * Phase 20 — navigation & page transitions. Route changes, tab content
+ * switches, and the one real modal-like surface in the app (the mobile
+ * nav's bottom sheet) all get an entrance now — nothing here changes
+ * layout/structure, only how a change in content arrives.
+ * ============================================================================
+ */
+@layer components {
+  /* Route change — applied to a wrapper keyed by pathname in AppShell, so
+     a fresh key on every navigation re-triggers this on mount. 300ms sits
+     inside the 250–500ms target range, biased toward "fast" per that
+     target's own instruction. */
+  .page-transition {
+    animation: motion-fade-in var(--duration-moderate) var(--ease-out) both;
+  }
+
+  /* Tab content switch (TournamentTabs) — quicker than a full page
+     transition since it's a much smaller change of context. */
+  .tab-content-enter {
+    animation: motion-fade-in var(--duration-fast) var(--ease-standard) both;
+  }
+
+  /* Bottom-sheet modal (MobileTabBar's profile/menu sheet) — the one real
+     modal-shaped overlay in the app today. Backdrop fades; the sheet
+     itself slides up from off-screen rather than just fading, since it's
+     physically anchored to the bottom edge. */
+  .sheet-backdrop-enter {
+    animation: motion-fade-in var(--duration-base) var(--ease-standard) both;
+  }
+  .sheet-panel-enter {
+    animation: motion-sheet-enter var(--duration-moderate) var(--ease-out) both;
+  }
+}
+
+@keyframes motion-sheet-enter {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
