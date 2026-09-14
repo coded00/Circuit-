@@ -44,6 +44,7 @@ const cardSelect = {
   entryFee: true,
   participantCap: true,
   streamUrl: true,
+  registrationOpenAt: true,
   startAt: true,
   prizeAmount: true,
   prizeText: true,
@@ -101,8 +102,15 @@ export default async function Home({
     activeAnnouncement,
   ] = await Promise.all([
     getFeaturedTournaments(3),
+    // "Upcoming" includes DRAFT on purpose (unlike Featured, which stays
+    // OPEN/LIVE-only) — DRAFT here just means "hasn't reached its own
+    // registrationOpenAt yet," not "not real." A tournament announced for
+    // next week should read as upcoming today, not disappear until the
+    // exact moment registration opens. The tournament page itself already
+    // gates the actual Register button on the real date regardless of
+    // status, so this can't let anyone register early.
     prisma.tournament.findMany({
-      where: { status: { in: ["OPEN", "LIVE"] } },
+      where: { status: { in: ["DRAFT", "OPEN", "LIVE"] } },
       orderBy: { startAt: "asc" },
       take: 3,
       select: cardSelect,

@@ -24,6 +24,7 @@ type Tournament = {
   teamSize: string;
   entryFee: number;
   participantCap: number;
+  registrationOpenAt: Date;
   startAt: Date;
   prizeAmount: number | null;
   _count: { registrations: number };
@@ -38,7 +39,12 @@ function formatShortDate(date: Date): string {
 }
 
 function UpcomingCard({ tournament }: { tournament: Tournament }) {
-  const status = tournamentStatusInfo(tournament.status);
+  // "Draft" is correct organizer/admin language (tournamentStatusInfo is
+  // shared with the dashboard/admin, where that's exactly what it means),
+  // but reads as unfinished/internal on a public homepage card — this is
+  // a real, announced tournament that just hasn't reached its own
+  // registration-open date yet, so it gets its own label here only.
+  const status = tournament.status === "DRAFT" ? { tone: "neutral" as const, label: "Announced" } : tournamentStatusInfo(tournament.status);
   const registered = tournament._count.registrations;
 
   return (
@@ -96,10 +102,16 @@ function UpcomingCard({ tournament }: { tournament: Tournament }) {
           </span>
         </div>
 
-        <span className="btn-primary mt-auto flex w-full items-center justify-center gap-1.5 py-2.5 text-sm">
-          Register Now
-          <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" />
-        </span>
+        {tournament.status === "DRAFT" ? (
+          <span className="btn-secondary mt-auto flex w-full items-center justify-center gap-1.5 py-2.5 text-sm">
+            Registration opens {formatShortDate(tournament.registrationOpenAt)}
+          </span>
+        ) : (
+          <span className="btn-primary mt-auto flex w-full items-center justify-center gap-1.5 py-2.5 text-sm">
+            Register Now
+            <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" />
+          </span>
+        )}
       </div>
     </Link>
   );
