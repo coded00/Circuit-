@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Tournament } from "@prisma/client";
+import { ImageUrlField, POSTER_BOUNDS } from "@/components/ImageUrlField";
 
 function toLocalInput(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -41,6 +42,8 @@ export default function EditForm({
   const [prizeText, setPrizeText] = useState(tournament.prizeText ?? "");
   const [rulesText, setRulesText] = useState(tournament.rulesText ?? "");
   const [streamUrl, setStreamUrl] = useState(tournament.streamUrl ?? "");
+  const [posterUrl, setPosterUrl] = useState(tournament.posterUrl ?? "");
+  const [posterBlocked, setPosterBlocked] = useState(false);
   const [registrationOpenAt, setRegistrationOpenAt] = useState(toLocalInput(tournament.registrationOpenAt));
   const [registrationCloseAt, setRegistrationCloseAt] = useState(toLocalInput(tournament.registrationCloseAt));
   const [startAt, setStartAt] = useState(toLocalInput(tournament.startAt));
@@ -49,6 +52,7 @@ export default function EditForm({
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
+    if (posterBlocked) return;
     setError(null);
     setSubmitting(true);
 
@@ -60,6 +64,7 @@ export default function EditForm({
       prizeText: prizeText || null,
       rulesText,
       streamUrl: streamUrl || null,
+      posterUrl: posterUrl || null,
       registrationOpenAt: new Date(registrationOpenAt).toISOString(),
       registrationCloseAt: new Date(registrationCloseAt).toISOString(),
       startAt: new Date(startAt).toISOString(),
@@ -257,6 +262,14 @@ export default function EditForm({
         />
       </div>
 
+      <ImageUrlField
+        label="Tournament poster (optional)"
+        value={posterUrl}
+        onChange={setPosterUrl}
+        onValidityChange={setPosterBlocked}
+        bounds={POSTER_BOUNDS}
+      />
+
       <div className="flex flex-col gap-1.5">
         <label htmlFor="rulesText" className="field-label">
           Rules
@@ -273,7 +286,7 @@ export default function EditForm({
 
       {error && <p className="field-error">{error}</p>}
 
-      <button type="submit" disabled={submitting} className="btn-primary">
+      <button type="submit" disabled={submitting || posterBlocked} className="btn-primary">
         {submitting ? "Saving…" : "Save changes"}
       </button>
     </form>

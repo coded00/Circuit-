@@ -83,6 +83,7 @@ export default async function CompetePage({ searchParams }: { searchParams: Prom
       streamUrl: true,
       startAt: true,
       prizeAmount: true,
+      posterUrl: true,
       _count: { select: { registrations: { where: { status: "CONFIRMED" } } } },
     },
   });
@@ -168,7 +169,7 @@ export default async function CompetePage({ searchParams }: { searchParams: Prom
                 className="card-media card-hover flex h-full flex-col"
               >
                 <div className="relative h-28 w-full overflow-hidden">
-                  <GameArtTile game={tournament.game} className="h-full w-full">
+                  <GameArtTile game={tournament.game} posterUrl={tournament.posterUrl} className="h-full w-full">
                     <span className="absolute top-2 left-2 z-10">
                       <StatusPill tone={statusInfo.tone} pulse={statusInfo.pulse}>
                         {statusInfo.label}

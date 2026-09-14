@@ -114,6 +114,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
             startAt: true,
             prizeAmount: true,
             prizeText: true,
+            posterUrl: true,
             _count: { select: { registrations: { where: { status: "CONFIRMED" as const } } } },
           },
         }),

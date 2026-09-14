@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ImageUrlField, POSTER_BOUNDS } from "@/components/ImageUrlField";
 
 function nairaToKobo(value: string): number {
   const naira = Number(value || 0);
@@ -26,6 +27,8 @@ export default function TournamentForm({
   const [prizeText, setPrizeText] = useState("");
   const [rulesText, setRulesText] = useState("");
   const [streamUrl, setStreamUrl] = useState("");
+  const [posterUrl, setPosterUrl] = useState("");
+  const [posterBlocked, setPosterBlocked] = useState(false);
   const [registrationOpenAt, setRegistrationOpenAt] = useState("");
   const [registrationCloseAt, setRegistrationCloseAt] = useState("");
   const [startAt, setStartAt] = useState("");
@@ -34,6 +37,7 @@ export default function TournamentForm({
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
+    if (posterBlocked) return;
     setError(null);
     setSubmitting(true);
 
@@ -50,6 +54,7 @@ export default function TournamentForm({
         prizeText: prizeText || null,
         rulesText,
         streamUrl: streamUrl || null,
+        posterUrl: posterUrl || null,
         registrationOpenAt: registrationOpenAt
           ? new Date(registrationOpenAt).toISOString()
           : null,
@@ -263,9 +268,17 @@ export default function TournamentForm({
         <span className="field-hint">Shown as a &quot;Watch stream&quot; link on the tournament page.</span>
       </div>
 
+      <ImageUrlField
+        label="Tournament poster (optional)"
+        value={posterUrl}
+        onChange={setPosterUrl}
+        onValidityChange={setPosterBlocked}
+        bounds={POSTER_BOUNDS}
+      />
+
       {error && <p className="field-error">{error}</p>}
 
-      <button type="submit" disabled={submitting} className="btn-primary">
+      <button type="submit" disabled={submitting || posterBlocked} className="btn-primary">
         {submitting ? "Creating…" : "Create tournament"}
       </button>
     </form>

@@ -43,7 +43,7 @@ export function ChallengeCard({
     <Link
       href={`/battles/${battle.id}`}
       data-surface="dark"
-      className="group relative flex h-full w-full flex-col gap-3 overflow-hidden rounded-[16px] border border-border bg-surface p-4 transition duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:border-border-hover hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] active:duration-[var(--duration-instant)]"
+      className="group relative flex h-full w-full flex-col gap-4 overflow-hidden rounded-[16px] border border-border bg-surface p-5 transition duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:border-border-hover hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] active:duration-[var(--duration-instant)]"
     >
       <GameArtTile game={battle.game} className="opacity-[0.12]" fill hideLabel imgWidth={480} />
 
@@ -55,19 +55,19 @@ export function ChallengeCard({
       </div>
 
       <div className="relative z-10 flex items-center justify-center gap-2">
-        <div className="flex flex-1 flex-col items-center gap-1.5">
+        <div className="flex flex-1 flex-col items-center gap-2">
           <span className="text-[10px] font-semibold tracking-wide text-accent-volt uppercase">Host</span>
           {battle.creator.avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs
             <img
               src={battle.creator.avatarUrl}
               alt=""
-              width={44}
-              height={44}
-              className="h-11 w-11 rounded-full border-2 border-accent-volt/50 object-cover"
+              width={48}
+              height={48}
+              className="h-12 w-12 rounded-full border-2 border-accent-volt/50 object-cover"
             />
           ) : (
-            <div className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-accent-volt/50 bg-surface-elevated text-sm font-semibold text-muted">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-accent-volt/50 bg-surface-elevated text-sm font-semibold text-muted">
               {battle.creator.displayName.slice(0, 1).toUpperCase()}
             </div>
           )}
@@ -78,9 +78,9 @@ export function ChallengeCard({
 
         <span className="font-display shrink-0 pb-4 text-sm font-bold text-muted">VS</span>
 
-        <div className="flex flex-1 flex-col items-center gap-1.5">
+        <div className="flex flex-1 flex-col items-center gap-2">
           <span className="text-[10px] font-semibold tracking-wide text-accent-orange uppercase">Open slot</span>
-          <div className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-dashed border-border-strong text-base font-bold text-muted">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-dashed border-border-strong text-base font-bold text-muted">
             ?
           </div>
           <span className="w-full truncate text-center text-xs text-muted">

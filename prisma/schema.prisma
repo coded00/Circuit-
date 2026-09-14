@@ -317,6 +317,13 @@ model Tournament {
   /// Fraud & Trust backlog note on "live proctoring... bundled with the
   /// streaming build-out"); this is the lightweight V1 slice of it.
   streamUrl           String?
+  /// The organizer's own real poster/banner for this specific tournament
+  /// — a pasted URL, not a file upload (Circuit has no object-storage/CDN
+  /// upload pipeline anywhere, same "paste a URL" convention as
+  /// HomepageBanner.imageUrl/User.avatarUrl). Null falls back to
+  /// GameArtTile's generic per-game stock photo/gradient (see that
+  /// component's own comment) rather than a broken image.
+  posterUrl           String?
   participantCap      Int
   registrationOpenAt  DateTime
   registrationCloseAt DateTime

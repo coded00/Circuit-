@@ -28,6 +28,7 @@ type Tournament = {
   registrationOpenAt: Date;
   startAt: Date;
   prizeAmount: number | null;
+  posterUrl: string | null;
   _count: { registrations: number };
 };
 
@@ -55,7 +56,7 @@ function UpcomingCard({ tournament }: { tournament: Tournament }) {
     >
       <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden">
         <div className="h-full w-full transition-transform duration-[var(--duration-base)] ease-[var(--ease-standard)] group-hover:scale-[1.03]">
-          <GameArtTile game={tournament.game} className="h-full w-full" hideLabel imgWidth={500} />
+          <GameArtTile game={tournament.game} posterUrl={tournament.posterUrl} className="h-full w-full" hideLabel imgWidth={500} />
         </div>
         <div
           aria-hidden

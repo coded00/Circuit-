@@ -52,6 +52,7 @@ export async function POST(request: Request) {
   const registrationCloseAt = parseDate(body.registrationCloseAt);
   const startAt = parseDate(body.startAt);
   const streamUrlResult = parseOptionalUrl(body.streamUrl);
+  const posterUrlResult = parseOptionalUrl(body.posterUrl);
 
   // TRN-1: all fields required except prize info.
   if (!name || !game || !rulesText) {
@@ -109,6 +110,12 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
+  if (!posterUrlResult.ok) {
+    return NextResponse.json(
+      { error: "Poster link must be a valid http(s) URL." },
+      { status: 400 }
+    );
+  }
 
   const organizerProfile = await prisma.organizerProfile.upsert({
     where: { userId: user.id },
@@ -133,6 +140,7 @@ export async function POST(request: Request) {
       registrationCloseAt,
       startAt,
       streamUrl: streamUrlResult.url,
+      posterUrl: posterUrlResult.url,
       status,
     },
   });

@@ -3,16 +3,15 @@
  * (Tournament.game/Battle.game are free-text), so there's no real photo
  * library that could cover an arbitrary, organizer-typed game name.
  *
- * For the small, fixed set of well-known games this UI references by
- * name elsewhere (see gameImagery.ts), this renders a real, verified
- * photo. For anything outside that set — which is most tournaments, since
- * organizers type any game name — it falls back to the same deterministic
- * gradient-tint treatment as before: no image request, same look every
- * time for the same name. See gameImagery.ts's own header comment: its
- * one generic cinematic photo is reserved for hero/promo surfaces that
- * don't name a specific game (e.g. CircuitHero), not a per-tile stand-in
- * here — two unrelated tournaments with unrecognized games showing the
- * literal same stock photo reads as a templated placeholder.
+ * A real, organizer-uploaded `posterUrl` (Tournament's own field — see
+ * that model's schema comment) always takes priority when passed: this
+ * is the actual event's own art, not a generic stand-in, so it wins over
+ * everything else below regardless of whether the game name is
+ * recognized. Only once there's no real poster does this fall back to:
+ * for the small, fixed set of well-known games this UI references by
+ * name elsewhere (see gameImagery.ts), a real, verified stock photo; for
+ * anything else, the same deterministic gradient-tint treatment as
+ * before: no image request, same look every time for the same name.
  */
 
 import { realGameImage, unsplashUrl } from "@/lib/gameImagery";
@@ -40,6 +39,7 @@ export function gameTint(game: string): string {
 
 export function GameArtTile({
   game,
+  posterUrl,
   className = "",
   hideLabel = false,
   imgWidth = 480,
@@ -47,6 +47,9 @@ export function GameArtTile({
   children,
 }: {
   game: string;
+  /** A real, organizer-uploaded tournament poster — takes priority over
+   *  the per-game stock photo/gradient fallback below when set. */
+  posterUrl?: string | null;
   className?: string;
   /** For thumbnails too small to fit readable text (e.g. a 36px ranking
    *  icon) where the game name is already shown as separate text nearby. */
@@ -67,22 +70,23 @@ export function GameArtTile({
   fill?: boolean;
   children?: React.ReactNode;
 }) {
-  const photo = realGameImage(game);
+  const stockPhoto = realGameImage(game);
+  const imageSrc = posterUrl || (stockPhoto ? unsplashUrl(stockPhoto, imgWidth) : null);
   const tint = gameTint(game);
 
   return (
     <div
       className={`${fill ? "absolute inset-0" : "relative"} overflow-hidden ${className}`}
       style={
-        photo
+        imageSrc
           ? undefined
           : { backgroundImage: `linear-gradient(155deg, ${tint}, var(--surface) 85%)` }
       }
     >
-      {photo && (
-        // eslint-disable-next-line @next/next/no-img-element -- external CDN, arbitrary sizes per call site
+      {imageSrc && (
+        // eslint-disable-next-line @next/next/no-img-element -- external/arbitrary-host image (Unsplash or an organizer-pasted poster URL), arbitrary sizes per call site
         <img
-          src={unsplashUrl(photo, imgWidth)}
+          src={imageSrc}
           alt=""
           aria-hidden
           className="absolute inset-0 h-full w-full object-cover"

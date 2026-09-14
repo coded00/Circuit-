@@ -33,6 +33,7 @@ type Tournament = {
   participantCap: number;
   startAt: Date;
   prizeAmount: number | null;
+  posterUrl: string | null;
   _count: { registrations: number };
 };
 
@@ -81,7 +82,7 @@ function FeaturedCard({ tournament, showFeaturedBadge = false }: { tournament: T
           </span>
         )}
         <div className="h-full w-full transition-transform duration-[var(--duration-base)] ease-[var(--ease-standard)] group-hover:scale-[1.03]">
-          <GameArtTile game={tournament.game} className="h-full w-full" hideLabel />
+          <GameArtTile game={tournament.game} posterUrl={tournament.posterUrl} className="h-full w-full" hideLabel />
         </div>
         <div
           aria-hidden

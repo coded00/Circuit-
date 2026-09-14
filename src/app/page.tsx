@@ -45,6 +45,7 @@ const cardSelect = {
   participantCap: true,
   streamUrl: true,
   registrationOpenAt: true,
+  posterUrl: true,
   startAt: true,
   prizeAmount: true,
   prizeText: true,

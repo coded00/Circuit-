@@ -130,6 +130,13 @@ export async function PATCH(
     }
     data.streamUrl = streamUrlResult.url;
   }
+  if (body.posterUrl !== undefined) {
+    const posterUrlResult = parseOptionalUrl(body.posterUrl);
+    if (!posterUrlResult.ok) {
+      return NextResponse.json({ error: "Poster link must be a valid http(s) URL." }, { status: 400 });
+    }
+    data.posterUrl = posterUrlResult.url;
+  }
 
   const registrationOpenAt = parseDate(body.registrationOpenAt);
   const registrationCloseAt = parseDate(body.registrationCloseAt);

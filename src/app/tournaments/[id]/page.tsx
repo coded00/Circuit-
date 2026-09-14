@@ -281,7 +281,7 @@ export default async function TournamentPage({
         data-surface="dark"
         className="relative flex min-h-[260px] w-full flex-col justify-end overflow-hidden rounded-[16px] border border-border p-6 sm:min-h-[300px] sm:p-8"
       >
-        <GameArtTile game={tournament.game} fill hideLabel imgWidth={1200} />
+        <GameArtTile game={tournament.game} posterUrl={tournament.posterUrl} fill hideLabel imgWidth={1200} />
         <div
           aria-hidden
           className="absolute inset-0"

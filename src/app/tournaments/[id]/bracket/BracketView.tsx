@@ -47,6 +47,7 @@ type ViewTournament = {
   rulesText: string | null;
   participantCap: number;
   teamSize: string;
+  posterUrl: string | null;
   organizer: { verified: boolean; user: { handle: string } };
 };
 
@@ -361,7 +362,7 @@ export function BracketView({
   return (
     <div className="flex w-full flex-1 flex-col gap-6">
       <div data-surface="dark" className="relative overflow-hidden rounded-[20px] border border-border p-6 sm:p-8">
-        <GameArtTile game={tournament.game} className="opacity-[0.16]" fill hideLabel imgWidth={1400} />
+        <GameArtTile game={tournament.game} posterUrl={tournament.posterUrl} className="opacity-[0.16]" fill hideLabel imgWidth={1400} />
         <div
           aria-hidden
           className="absolute inset-0"
