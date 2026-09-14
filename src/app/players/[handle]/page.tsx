@@ -487,7 +487,7 @@ export default async function PlayerProfilePage({
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="widget flex flex-col gap-1">
-              <span className="text-eyebrow">Entry fees paid</span>
+              <span className="text-eyebrow">Fees &amp; stakes paid</span>
               <span className="text-stat text-xl">{formatNaira(walletActivity.totalPaid)}</span>
             </div>
             <div className="widget flex flex-col gap-1">
@@ -495,7 +495,7 @@ export default async function PlayerProfilePage({
               <span className="text-stat text-xl">{formatNaira(walletActivity.totalRefunded)}</span>
             </div>
             <div className="widget flex flex-col gap-1">
-              <span className="text-eyebrow">Prizes won</span>
+              <span className="text-eyebrow">Winnings</span>
               <span className="text-stat text-xl text-gold">{formatNaira(walletActivity.totalWon)}</span>
             </div>
           </div>

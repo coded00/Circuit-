@@ -7,19 +7,12 @@
  * it (src/lib/wallet.ts, src/app/api/wallet/fund, src/app/api/wallet/
  * withdraw) — never a number invented independently of real rows.
  *
- * Below the balance sits the older "tournament activity statement"
- * (every entry fee, refund, and prize win, regardless of how the entry
- * fee was paid) — still real `EscrowTransaction` history, unchanged.
- *
- * Two things worth noting about what "connects" here:
- * - **Battles never appear** in that statement. `Battle.stakeAmount` can
- *   never be set above zero (V1 Battles are free), so there's no real
- *   money movement to show for them.
- * - **Prize payouts still go straight to your bank** via the existing
- *   claim-prize flow (src/app/api/tournaments/[id]/payout) — winning a
- *   prize does not currently land in this wallet balance. That's a
- *   deliberate scope boundary, not an oversight: rerouting an
- *   already-working payout path wasn't part of this request.
+ * Below the balance sits the broader "activity statement" — every
+ * tournament entry fee/refund/prize AND every Battle stake/payout/
+ * refund, merged into one real `EscrowTransaction`-backed ledger (see
+ * src/lib/wallet.ts's own comment on the one asymmetry: a tournament
+ * prize still pays out externally to your linked payout method, never
+ * landing in this wallet, while a Battle stake payout always does).
  */
 
 import Link from "next/link";
@@ -138,7 +131,7 @@ export default async function WalletPage() {
             <ArrowUpFromLine size={18} />
           </span>
           <div className="flex flex-col">
-            <span className="text-eyebrow">Entry fees paid</span>
+            <span className="text-eyebrow">Fees &amp; stakes paid</span>
             <span className="text-stat text-xl">{formatNaira(totalPaid)}</span>
           </div>
         </div>
@@ -156,7 +149,7 @@ export default async function WalletPage() {
             <Trophy size={18} />
           </span>
           <div className="flex flex-col">
-            <span className="text-eyebrow">Prizes won</span>
+            <span className="text-eyebrow">Winnings</span>
             <span className="text-stat text-xl text-gold">{formatNaira(totalWon)}</span>
           </div>
         </div>
@@ -165,11 +158,11 @@ export default async function WalletPage() {
       <div className="flex flex-col gap-3">
         <h2 className="text-section-heading flex items-center gap-2">
           <ReceiptText size={17} className="text-muted" />
-          Tournament Transaction History
+          Transaction History
         </h2>
         {rows.length === 0 ? (
           <p className="card text-center text-muted">
-            Nothing here yet — entry fees, refunds, and prize payouts will show up once you compete.
+            Nothing here yet — entry fees, Battle stakes, refunds, and payouts will show up once you compete.
           </p>
         ) : (
           <div className="table-wrap">
@@ -177,7 +170,7 @@ export default async function WalletPage() {
               <thead>
                 <tr>
                   <th>Date</th>
-                  <th>Tournament</th>
+                  <th>Context</th>
                   <th>Type</th>
                   <th>Amount</th>
                   <th>Status</th>
@@ -185,16 +178,25 @@ export default async function WalletPage() {
               </thead>
               <tbody>
                 {rows.map((row) => {
-                  const isCredit = row.type === "REFUND" || row.type === "PRIZE_PAYOUT";
-                  const label = row.type === "ENTRY_FEE" ? "Entry fee" : row.type === "REFUND" ? "Refund" : "Prize payout";
+                  const isCredit = row.type === "REFUND" || row.type === "PRIZE_PAYOUT" || row.type === "STAKE_PAYOUT";
+                  const label =
+                    row.type === "ENTRY_FEE"
+                      ? "Entry fee"
+                      : row.type === "REFUND"
+                        ? "Refund"
+                        : row.type === "PRIZE_PAYOUT"
+                          ? "Prize payout"
+                          : row.type === "STAKE"
+                            ? "Stake"
+                            : "Stake payout";
                   return (
                     <tr key={row.id}>
                       <td className="text-metadata whitespace-nowrap">
                         {row.createdAt.toLocaleDateString("en-NG", { dateStyle: "medium" })}
                       </td>
                       <td>
-                        <span className="font-medium">{row.tournamentName}</span>{" "}
-                        <span className="text-muted">· {row.tournamentGame}</span>
+                        <span className="font-medium">{row.contextName}</span>{" "}
+                        <span className="text-muted">· {row.contextGame}</span>
                       </td>
                       <td>{label}</td>
                       <td className={`font-mono tabular-nums ${isCredit ? "text-success" : "text-foreground"}`}>

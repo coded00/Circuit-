@@ -4,13 +4,21 @@
  *
  * Two independent things live here:
  * - `balance` is the real, spendable `User.walletBalance` — funded via
- *   Fund Wallet, spent on entry fees, cashed out via Withdraw. Backed by
- *   the `WalletTransaction` ledger (`fundingHistory`: FUND/WITHDRAWAL
- *   rows only).
- * - `rows`/`totalPaid`/`totalRefunded`/`totalWon`/`net` are the older,
- *   separate "tournament activity statement" (every entry fee, refund,
- *   and prize win, regardless of how the entry fee was paid) — read-only
- *   history derived from `EscrowTransaction`, not itself a balance.
+ *   Fund Wallet, spent on entry fees or Battle stakes, cashed out via
+ *   Withdraw. Backed by the `WalletTransaction` ledger (`fundingHistory`:
+ *   FUND/WITHDRAWAL rows only).
+ * - `rows`/`totalPaid`/`totalRefunded`/`totalWon`/`net` are the broader
+ *   "activity statement" — every tournament entry fee/refund/prize AND
+ *   every Battle stake/payout/refund (see `EscrowType.STAKE`'s schema
+ *   comment), merged into one real ledger derived from
+ *   `EscrowTransaction`, not itself a balance. Most of this already
+ *   moved `walletBalance` directly (a wallet-paid entry fee, any Battle
+ *   stake — Battles have no other way to pay one) — the one exception is
+ *   `totalWon`'s tournament half: a prize claim still pays out
+ *   externally to `payoutMethodRef`, never landing in this wallet, so
+ *   `totalWon` can be real money you never actually see hit `balance`
+ *   above. A Battle stake payout has no such exception — it always
+ *   credits the wallet directly.
  */
 
 import { prisma } from "@/lib/db";
@@ -18,9 +26,10 @@ import { prisma } from "@/lib/db";
 export type WalletRow = {
   id: string;
   createdAt: Date;
-  tournamentName: string;
-  tournamentGame: string;
-  type: "ENTRY_FEE" | "REFUND" | "PRIZE_PAYOUT";
+  /** A tournament name ("Lagos Cup") or a Battle's own label ("Challenge vs @handle"). */
+  contextName: string;
+  contextGame: string;
+  type: "ENTRY_FEE" | "REFUND" | "PRIZE_PAYOUT" | "STAKE" | "STAKE_PAYOUT";
   amount: number;
   status: string;
 };
@@ -104,6 +113,16 @@ export async function getWalletActivity(userId: string): Promise<WalletActivity>
       })
     : [];
 
+  // Battle-stake side: unlike the tournament rows above, these already
+  // carry `userId` directly (no Registration indirection needed — see
+  // `EscrowTransaction.userId`'s own schema comment), so one query covers
+  // every STAKE/STAKE_PAYOUT/REFUND row this user was ever a party to.
+  const battleTxns = await prisma.escrowTransaction.findMany({
+    where: { userId, battleId: { not: null } },
+    include: { battle: { select: { game: true } } },
+    orderBy: { createdAt: "desc" },
+  });
+
   const rows: WalletRow[] = [
     ...entryAndRefundTxns
       .filter((t): t is typeof t & { type: "ENTRY_FEE" | "REFUND" } => t.type === "ENTRY_FEE" || t.type === "REFUND")
@@ -112,8 +131,8 @@ export async function getWalletActivity(userId: string): Promise<WalletActivity>
         return {
           id: t.id,
           createdAt: t.createdAt,
-          tournamentName: tournament?.name ?? "Unknown tournament",
-          tournamentGame: tournament?.game ?? "",
+          contextName: tournament?.name ?? "Unknown tournament",
+          contextGame: tournament?.game ?? "",
           type: t.type,
           amount: t.amount,
           status: t.status,
@@ -122,17 +141,32 @@ export async function getWalletActivity(userId: string): Promise<WalletActivity>
     ...prizeTxns.map((t) => ({
       id: t.id,
       createdAt: t.createdAt,
-      tournamentName: t.tournament?.name ?? "Unknown tournament",
-      tournamentGame: t.tournament?.game ?? "",
+      contextName: t.tournament?.name ?? "Unknown tournament",
+      contextGame: t.tournament?.game ?? "",
       type: "PRIZE_PAYOUT" as const,
+      amount: t.amount,
+      status: t.status,
+    })),
+    ...battleTxns.map((t) => ({
+      id: t.id,
+      createdAt: t.createdAt,
+      contextName: "Challenge",
+      contextGame: t.battle?.game ?? "",
+      type: t.type as "STAKE" | "STAKE_PAYOUT" | "REFUND",
       amount: t.amount,
       status: t.status,
     })),
   ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
-  const totalPaid = entryAndRefundTxns.filter((t) => t.type === "ENTRY_FEE" && t.status === "COMPLETE").reduce((s, t) => s + t.amount, 0);
-  const totalRefunded = entryAndRefundTxns.filter((t) => t.type === "REFUND" && t.status === "COMPLETE").reduce((s, t) => s + t.amount, 0);
-  const totalWon = prizeTxns.filter((t) => t.status === "COMPLETE").reduce((s, t) => s + t.amount, 0);
+  const totalPaid =
+    entryAndRefundTxns.filter((t) => t.type === "ENTRY_FEE" && t.status === "COMPLETE").reduce((s, t) => s + t.amount, 0) +
+    battleTxns.filter((t) => t.type === "STAKE" && t.status === "COMPLETE").reduce((s, t) => s + t.amount, 0);
+  const totalRefunded =
+    entryAndRefundTxns.filter((t) => t.type === "REFUND" && t.status === "COMPLETE").reduce((s, t) => s + t.amount, 0) +
+    battleTxns.filter((t) => t.type === "REFUND" && t.status === "COMPLETE").reduce((s, t) => s + t.amount, 0);
+  const totalWon =
+    prizeTxns.filter((t) => t.status === "COMPLETE").reduce((s, t) => s + t.amount, 0) +
+    battleTxns.filter((t) => t.type === "STAKE_PAYOUT" && t.status === "COMPLETE").reduce((s, t) => s + t.amount, 0);
 
   return {
     balance: user.walletBalance,
