@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ImageUrlField, POSTER_BOUNDS } from "@/components/ImageUrlField";
+import { gameFormatOptions } from "@/lib/gameFormats";
 
 function nairaToKobo(value: string): number {
   const naira = Number(value || 0);
@@ -20,7 +21,8 @@ export default function TournamentForm({
 
   const [name, setName] = useState("");
   const [game, setGame] = useState(games[0]?.name ?? "");
-  const [teamSize, setTeamSize] = useState("1v1");
+  const modeOptions = gameFormatOptions(game);
+  const [teamSize, setTeamSize] = useState(modeOptions[0]);
   const [participantCap, setParticipantCap] = useState("16");
   const [entryFeeNaira, setEntryFeeNaira] = useState("0");
   const [prizeAmountNaira, setPrizeAmountNaira] = useState("");
@@ -96,7 +98,22 @@ export default function TournamentForm({
         <label htmlFor="game" className="field-label">
           Game
         </label>
-        <select id="game" required value={game} onChange={(e) => setGame(e.target.value)} className="field-input">
+        <select
+          id="game"
+          required
+          value={game}
+          onChange={(e) => {
+            const nextGame = e.target.value;
+            setGame(nextGame);
+            // Re-pick a valid mode for the newly-selected game's real
+            // options (e.g. Valorant's 5v5-only modes vs. Fortnite's
+            // BR/Zero Build sizes) — never leaves teamSize holding a
+            // value that isn't actually one of the new game's options.
+            const nextModes = gameFormatOptions(nextGame);
+            if (!nextModes.includes(teamSize)) setTeamSize(nextModes[0]);
+          }}
+          className="field-input"
+        >
           {games.length === 0 && <option value="">No games available — ask an admin to add one</option>}
           {games.map((g) => (
             <option key={g.id} value={g.name}>
@@ -115,7 +132,7 @@ export default function TournamentForm({
 
       <div className="flex flex-col gap-1.5">
         <label htmlFor="teamSize" className="field-label">
-          Team size
+          Game mode
         </label>
         <select
           id="teamSize"
@@ -123,15 +140,14 @@ export default function TournamentForm({
           onChange={(e) => setTeamSize(e.target.value)}
           className="field-input"
         >
-          <option value="1v1">1v1 — solo</option>
-          <option value="2v2">2v2 — duos</option>
-          <option value="3v3">3v3</option>
-          <option value="4v4">4v4</option>
-          <option value="5v5">5v5 — squad</option>
+          {modeOptions.map((mode) => (
+            <option key={mode} value={mode}>
+              {mode}
+            </option>
+          ))}
         </select>
         <span className="field-hint">
-          Players per side in each bracket match — e.g. Call of Duty Mobile runs 5v5 in
-          ranked multiplayer but solo/duo in Tournament Mode. Participants still register
+          The real modes {game || "this game"} actually runs. Participants still register
           individually; coordinate teams outside Circuit.
         </span>
       </div>

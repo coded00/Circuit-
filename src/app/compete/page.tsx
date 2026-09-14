@@ -3,10 +3,13 @@
  * rework spec section 18). Real, schema-backed filters only: search
  * (name/game text match), game, status (Open/Upcoming/Live/Completed —
  * reusing `tournamentStatusInfo`), entry type (Free/Paid, via
- * `entryFee`), and team size (1v1 through 5v5, via `Tournament.
- * teamSize` — the organizer-set players-per-side for that specific
- * competition, since the same game can run different team sizes across
- * different tournaments).
+ * `entryFee`), and game mode (via `Tournament.teamSize` — the
+ * organizer-picked real mode for that specific competition, e.g. "Battle
+ * Royale Duo" vs "Team Deathmatch 5v5" for the same game — see
+ * `gameFormats.ts`). The filter's own options come from a real `distinct`
+ * query against actual tournaments, not a hardcoded list — the set of
+ * real modes in use keeps growing as organizers create tournaments
+ * across more games, so a fixed list would silently go stale.
  */
 
 import Link from "next/link";
@@ -38,15 +41,6 @@ const ENTRY_OPTIONS = [
   { value: "paid", label: "Paid" },
 ] as const;
 
-const TEAM_SIZE_OPTIONS = [
-  { value: "", label: "Any team size" },
-  { value: "1v1", label: "1v1" },
-  { value: "2v2", label: "2v2" },
-  { value: "3v3", label: "3v3" },
-  { value: "4v4", label: "4v4" },
-  { value: "5v5", label: "5v5" },
-] as const;
-
 function formatDate(date: Date): string {
   return date.toLocaleString("en-NG", { dateStyle: "medium" });
 }
@@ -66,6 +60,12 @@ export default async function CompetePage({ searchParams }: { searchParams: Prom
   if (entry === "free") where.entryFee = 0;
   if (entry === "paid") where.entryFee = { gt: 0 };
   if (teamSize) where.teamSize = teamSize;
+
+  const teamSizeRows = await prisma.tournament.findMany({
+    distinct: ["teamSize"],
+    select: { teamSize: true },
+    orderBy: { teamSize: "asc" },
+  });
 
   const tournaments = await prisma.tournament.findMany({
     where,
@@ -134,12 +134,13 @@ export default async function CompetePage({ searchParams }: { searchParams: Prom
         </div>
         <div className="flex min-w-[140px] flex-col gap-1.5">
           <label className="field-label" htmlFor="teamSize">
-            Team size
+            Game mode
           </label>
           <select id="teamSize" name="teamSize" defaultValue={teamSize ?? ""} className="field-select">
-            {TEAM_SIZE_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
+            <option value="">Any mode</option>
+            {teamSizeRows.map((row) => (
+              <option key={row.teamSize} value={row.teamSize}>
+                {row.teamSize}
               </option>
             ))}
           </select>

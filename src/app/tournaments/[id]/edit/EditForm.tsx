@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Tournament } from "@prisma/client";
 import { ImageUrlField, POSTER_BOUNDS } from "@/components/ImageUrlField";
+import { gameFormatOptions } from "@/lib/gameFormats";
 
 function toLocalInput(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -110,7 +111,22 @@ export default function EditForm({
         <label htmlFor="game" className="field-label">
           Game
         </label>
-        <select id="game" required value={game} onChange={(e) => setGame(e.target.value)} className="field-input">
+        <select
+          id="game"
+          required
+          value={game}
+          onChange={(e) => {
+            const nextGame = e.target.value;
+            setGame(nextGame);
+            // Only re-pick a mode here (a real, organizer-driven game
+            // change) — never on initial mount, which would otherwise
+            // clobber this tournament's own already-saved, possibly
+            // now-nonstandard mode the instant the page loads.
+            const nextModes = gameFormatOptions(nextGame);
+            if (!nextModes.includes(teamSize)) setTeamSize(nextModes[0]);
+          }}
+          className="field-input"
+        >
           {/* The tournament's current game might not be an active catalog entry (renamed/disabled since) — keep it selectable so saving doesn't silently change it. */}
           {!games.some((g) => g.name === game) && game && <option value={game}>{game}</option>}
           {games.map((g) => (
@@ -123,7 +139,7 @@ export default function EditForm({
 
       <div className="flex flex-col gap-1.5">
         <label htmlFor="teamSize" className="field-label">
-          Team size
+          Game mode
         </label>
         <select
           id="teamSize"
@@ -131,13 +147,18 @@ export default function EditForm({
           onChange={(e) => setTeamSize(e.target.value)}
           className="field-input"
         >
-          <option value="1v1">1v1 — solo</option>
-          <option value="2v2">2v2 — duos</option>
-          <option value="3v3">3v3</option>
-          <option value="4v4">4v4</option>
-          <option value="5v5">5v5 — squad</option>
+          {/* This tournament might already be running a mode outside the
+              current game's curated list (an older tournament predating
+              this, or the game catalog entry changed since) — keep it
+              selectable rather than silently swapping it out. */}
+          {!gameFormatOptions(game).includes(teamSize) && teamSize && <option value={teamSize}>{teamSize}</option>}
+          {gameFormatOptions(game).map((mode) => (
+            <option key={mode} value={mode}>
+              {mode}
+            </option>
+          ))}
         </select>
-        <span className="field-hint">Players per side in each bracket match.</span>
+        <span className="field-hint">The real modes {game || "this game"} actually runs.</span>
       </div>
 
       <div className="flex flex-col gap-1.5">

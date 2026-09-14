@@ -12,9 +12,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { parseOptionalUrl } from "@/lib/validation";
+import { ALL_TEAM_SIZE_VALUES } from "@/lib/gameFormats";
 
 const MAX_PARTICIPANT_CAP = 128; // D2: V1 bracket ceiling.
-const TEAM_SIZES = ["1v1", "2v2", "3v3", "4v4", "5v5"] as const;
 
 function parseDate(value: unknown): Date | null {
   if (typeof value !== "string") return null;
@@ -61,9 +61,9 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
-  if (!TEAM_SIZES.includes(teamSize as (typeof TEAM_SIZES)[number])) {
+  if (!ALL_TEAM_SIZE_VALUES.includes(teamSize)) {
     return NextResponse.json(
-      { error: "Team size must be one of 1v1, 2v2, 3v3, 4v4, 5v5." },
+      { error: "Game mode isn't a recognized option for this game." },
       { status: 400 }
     );
   }
