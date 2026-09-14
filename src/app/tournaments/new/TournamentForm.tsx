@@ -8,11 +8,12 @@ function nairaToKobo(value: string): number {
   return Math.round(naira * 100);
 }
 
-export default function TournamentForm() {
+export default function TournamentForm({ redirectTo }: { redirectTo?: (id: string) => string } = {}) {
   const router = useRouter();
 
   const [name, setName] = useState("");
   const [game, setGame] = useState("");
+  const [teamSize, setTeamSize] = useState("1v1");
   const [participantCap, setParticipantCap] = useState("16");
   const [entryFeeNaira, setEntryFeeNaira] = useState("0");
   const [prizeAmountNaira, setPrizeAmountNaira] = useState("");
@@ -36,6 +37,7 @@ export default function TournamentForm() {
       body: JSON.stringify({
         name,
         game,
+        teamSize,
         participantCap: Number(participantCap),
         entryFee: nairaToKobo(entryFeeNaira),
         prizeAmount: prizeAmountNaira ? nairaToKobo(prizeAmountNaira) : null,
@@ -60,7 +62,7 @@ export default function TournamentForm() {
       return;
     }
 
-    router.push(`/tournaments/${data.id}`);
+    router.push(redirectTo ? redirectTo(data.id) : `/tournaments/${data.id}`);
     router.refresh();
   }
 
@@ -97,6 +99,29 @@ export default function TournamentForm() {
         <span className="text-sm font-medium">Format</span>
         <span className="field-hint">
           Single-elimination knockout — the only format Circuit supports in V1.
+        </span>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="teamSize" className="field-label">
+          Team size
+        </label>
+        <select
+          id="teamSize"
+          value={teamSize}
+          onChange={(e) => setTeamSize(e.target.value)}
+          className="field-input"
+        >
+          <option value="1v1">1v1 — solo</option>
+          <option value="2v2">2v2 — duos</option>
+          <option value="3v3">3v3</option>
+          <option value="4v4">4v4</option>
+          <option value="5v5">5v5 — squad</option>
+        </select>
+        <span className="field-hint">
+          Players per side in each bracket match — e.g. Call of Duty Mobile runs 5v5 in
+          ranked multiplayer but solo/duo in Tournament Mode. Participants still register
+          individually; coordinate teams outside Circuit.
         </span>
       </div>
 

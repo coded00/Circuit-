@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { LayoutGrid, ArrowRight } from "lucide-react";
 import { GameArtTile } from "@/components/GameArtTile";
 import { AutoScrollRow } from "@/components/AutoScrollRow";
 
@@ -37,10 +37,13 @@ export function ExploreTheCircuit({ games }: { games: GameCount[] }) {
     <Link
       key="view-all"
       href="/ladder"
-      className="card-media flex h-[105px] w-[170px] flex-col items-center justify-center gap-1.5 text-muted transition hover:text-foreground"
+      className="card-media flex h-[105px] w-[170px] flex-col items-center justify-center gap-1 text-muted transition hover:text-foreground"
     >
-      <ArrowRight size={20} />
-      <span className="text-sm font-medium">View All</span>
+      <LayoutGrid size={20} />
+      <span className="text-sm font-semibold text-foreground">More Games</span>
+      <span className="flex items-center gap-1 text-xs font-medium text-accent-blue">
+        Explore All <ArrowRight size={11} />
+      </span>
     </Link>,
   ];
 
@@ -50,6 +53,7 @@ export function ExploreTheCircuit({ games }: { games: GameCount[] }) {
         <h2 className="text-section-heading">Explore by Game</h2>
         <p className="text-metadata">Discover the games and competitions happening now.</p>
       </div>
+      <div className="border-b border-border" />
 
       <AutoScrollRow items={items} ariaLabel="Explore by game" />
     </section>

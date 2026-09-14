@@ -14,6 +14,7 @@ import { getCurrentUser } from "@/lib/session";
 import { parseOptionalUrl } from "@/lib/validation";
 
 const MAX_PARTICIPANT_CAP = 128; // D2: V1 bracket ceiling.
+const TEAM_SIZES = ["1v1", "2v2", "3v3", "4v4", "5v5"] as const;
 
 function parseDate(value: unknown): Date | null {
   if (typeof value !== "string") return null;
@@ -37,6 +38,7 @@ export async function POST(request: Request) {
 
   const name = typeof body.name === "string" ? body.name.trim() : "";
   const game = typeof body.game === "string" ? body.game.trim() : "";
+  const teamSize = typeof body.teamSize === "string" ? body.teamSize.trim() : "1v1";
   const rulesText = typeof body.rulesText === "string" ? body.rulesText.trim() : "";
   const participantCap = Number(body.participantCap);
   const entryFee = Number(body.entryFee);
@@ -55,6 +57,12 @@ export async function POST(request: Request) {
   if (!name || !game || !rulesText) {
     return NextResponse.json(
       { error: "Name, game, and rules are required." },
+      { status: 400 }
+    );
+  }
+  if (!TEAM_SIZES.includes(teamSize as (typeof TEAM_SIZES)[number])) {
+    return NextResponse.json(
+      { error: "Team size must be one of 1v1, 2v2, 3v3, 4v4, 5v5." },
       { status: 400 }
     );
   }
@@ -115,6 +123,7 @@ export async function POST(request: Request) {
       organizerId: organizerProfile.userId,
       name,
       game,
+      teamSize,
       rulesText,
       participantCap,
       entryFee,

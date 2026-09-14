@@ -100,6 +100,13 @@ model User {
   emailOrPhone     String    @unique
   passwordHash     String?
   avatarUrl        String?
+  /// Short public profile tagline (ACC-6 profile edit) — free text,
+  /// entirely optional, never used anywhere else in the app.
+  bio              String?
+  /// Self-curated list of games shown on the public profile — organizer-
+  /// typed free text, same convention as Tournament.game/Battle.game (no
+  /// Game catalog model exists), not derived from real match history.
+  favoriteGames    String[]  @default([])
   dateOfBirth      DateTime?
   ageVerified      Boolean   @default(false)
   /// P0-7: linked payout destination — what REG-6's payout actually pays out to.
@@ -109,27 +116,112 @@ model User {
   /// setting this currently means a direct DB write, which is fine at V1's
   /// staffing size but is itself worth flagging as a gap.
   isStaff          Boolean   @default(false)
+  /// Only meaningful when `isStaff` is true — which of the two fixed
+  /// admin roles this staff account has. Null for an ordinary player.
+  /// See `AdminRole`'s own comment for what each role can actually do.
+  adminRole        AdminRole?
   /// P6-4/TRU-4: blocks registering, paying, or accepting Battles —
   /// checked at those specific write actions, never at login or browsing
   /// (same "don't touch the read path" discipline as the age gate, TRU-5).
   isSuspended      Boolean   @default(false)
   suspensionReason String?
+  /// Real, spendable Circuit balance (kobo) — funded via Fund Wallet,
+  /// spent on entry fees, cashed out via Withdraw. The authoritative
+  /// running total; `WalletTransaction` below is the immutable ledger
+  /// that justifies it, kept in sync in the same DB transaction as every
+  /// balance change so the two can never drift apart.
+  walletBalance    Int       @default(0)
   createdAt        DateTime  @default(now())
 
-  organizerProfile OrganizerProfile?
-  registrations    Registration[]
-  matchesAsPlayerA Match[]           @relation("MatchPlayerA")
-  matchesAsPlayerB Match[]           @relation("MatchPlayerB")
-  matchesWon       Match[]           @relation("MatchWinner")
-  battlesCreated   Battle[]          @relation("BattleCreator")
-  battlesTargeted  Battle[]          @relation("BattleTarget")
-  disputesRaised   Dispute[]         @relation("DisputeRaisedBy")
-  notifications    Notification[]
-  reportsFiled     Report[]          @relation("ReportFiledBy")
-  reportsReceived  Report[]          @relation("ReportAgainstUser")
-  communityPosts   CommunityPost[]   @relation("CommunityPostAuthor")
+  organizerProfile    OrganizerProfile?
+  registrations       Registration[]
+  matchesAsPlayerA    Match[]              @relation("MatchPlayerA")
+  matchesAsPlayerB    Match[]              @relation("MatchPlayerB")
+  matchesWon          Match[]              @relation("MatchWinner")
+  battlesCreated      Battle[]             @relation("BattleCreator")
+  battlesTargeted     Battle[]             @relation("BattleTarget")
+  disputesRaised      Dispute[]            @relation("DisputeRaisedBy")
+  notifications       Notification[]
+  reportsFiled        Report[]             @relation("ReportFiledBy")
+  reportsReceived     Report[]             @relation("ReportAgainstUser")
+  communityPosts      CommunityPost[]      @relation("CommunityPostAuthor")
+  passwordResetTokens PasswordResetToken[]
+  walletTransactions  WalletTransaction[]
+  auditLogEntries     AuditLogEntry[]
 
   @@index([emailOrPhone])
+}
+
+/// The admin dashboard's two fixed roles (no per-permission matrix — a
+/// bigger system than a V1 staffing size of "a handful of people"
+/// justifies). SUPER_ADMIN can do everything MODERATOR can, plus manage
+/// other staff accounts (grant/revoke access, change roles) and toggle
+/// platform-wide settings; MODERATOR covers day-to-day moderation
+/// (suspend/unsuspend users, cancel tournaments, manage homepage content
+/// and the calendar) but can't touch who else has admin access. Checked
+/// in each admin API route directly (see e.g. `/api/admin/settings`),
+/// not via a separate middleware layer.
+enum AdminRole {
+  SUPER_ADMIN
+  MODERATOR
+}
+
+enum WalletTransactionType {
+  /// Real money in, via Paystack/Flutterwave checkout.
+  FUND
+  /// Real money out, via Paystack/Flutterwave transfer to payoutMethodRef.
+  WITHDRAWAL
+  /// A tournament entry fee paid straight from the wallet balance instead
+  /// of a fresh external checkout — internal only, no provider touched
+  /// for this specific transaction (the money already arrived at some
+  /// earlier FUND). A real `EscrowTransaction(type: ENTRY_FEE)` row is
+  /// still created alongside this one, same as an externally-paid entry
+  /// fee, so tournament-side accounting (dashboard/payouts) sees no
+  /// difference in how the fee was funded.
+  ENTRY_FEE_DEBIT
+}
+
+enum WalletTransactionStatus {
+  PENDING
+  COMPLETE
+  FAILED
+}
+
+/// The wallet's immutable ledger. `User.walletBalance` is the derived
+/// running total; every change to it happens in the same DB transaction
+/// as the row here that justifies it.
+model WalletTransaction {
+  id          String                  @id @default(cuid())
+  userId      String
+  user        User                    @relation(fields: [userId], references: [id])
+  type        WalletTransactionType
+  /// Minor currency units (kobo). Always positive — `type` gives direction.
+  amount      Int
+  /// Null for ENTRY_FEE_DEBIT — no external provider is touched for that
+  /// specific transaction.
+  provider    PaymentProviderName?
+  providerRef String?                 @unique
+  status      WalletTransactionStatus @default(PENDING)
+  createdAt   DateTime                @default(now())
+
+  @@index([userId, status])
+}
+
+/// Forgot-password flow. Only `tokenHash` (SHA-256 of the raw token) is
+/// stored — the raw token exists only in the reset link/email, same
+/// "never store the secret itself" discipline as `passwordHash` on User.
+/// Single-use: `usedAt` is set the moment a reset succeeds, and the reset
+/// route rejects any token that's expired, already used, or unknown.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
 }
 
 /// 1:1 with User, created automatically on that user's first tournament (ACC-4).
@@ -151,6 +243,20 @@ model Tournament {
   /// V1 is knockout-only (D2). Kept as a string, not an enum, so V2 formats
   /// (round-robin, league) don't require a migration to add.
   format              String           @default("KNOCKOUT")
+  /// How many players face off per side of a bracket match — "1v1"
+  /// through "5v5". Organizer-set at creation (real match-format research:
+  /// e.g. Call of Duty Mobile alone runs 5v5 in ranked multiplayer but
+  /// solo/duo in Tournament Mode — team size is a property of the specific
+  /// competition, not the game). Kept as a string, not derived from
+  /// `game`, for the same "no fixed game catalog" reason `game` itself is
+  /// free text.
+  /// Real limitation, not silently glossed over: this is a descriptive
+  /// label only. `Registration` still links exactly one `User` per row —
+  /// Circuit has no team/roster model, so a "5v5" tournament still means
+  /// five individual people each register solo and coordinate as a team
+  /// outside the platform. Bracket matches themselves are always a real
+  /// 1-vs-1 `Match` row regardless of teamSize.
+  teamSize            String           @default("1v1")
   /// Minor currency units (kobo), never a float. 0 = free tournament.
   entryFee            Int              @default(0)
   prizeAmount         Int?
@@ -368,4 +474,94 @@ model Report {
   createdAt      DateTime     @default(now())
 
   @@index([reportedUserId, status])
+}
+
+// ---------------------------------------------------------------------------
+// Admin dashboard (Content / Calendar / Settings) — Phase 5.
+// ---------------------------------------------------------------------------
+
+/// One slide in the homepage hero carousel — admin-authored, real content
+/// `CircuitHero` renders alongside its own real tournament-spotlight
+/// slides (see that component's own comment). `imageUrl` is a plain URL
+/// field, not a file upload: Circuit has no object-storage/CDN upload
+/// pipeline anywhere in the codebase (avatarUrl/streamUrl are the same
+/// "paste a URL" shape), and standing one up wasn't part of this request.
+model HomepageBanner {
+  id          String    @id @default(cuid())
+  headline    String
+  description String?
+  imageUrl    String
+  ctaLabel    String?
+  ctaHref     String?
+  /// Lower sorts first. Admin-set via reordering, not auto-computed.
+  order       Int       @default(0)
+  enabled     Boolean   @default(true)
+  /// Null = publish immediately once enabled. In the future = scheduled,
+  /// not yet shown on the real homepage.
+  publishAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([enabled, order])
+}
+
+/// A site-wide notice — real content the homepage renders in a small
+/// dismissible strip when at least one row is enabled (most recent wins;
+/// see `getActiveAnnouncement`). No targeting/scheduling — same "keep it
+/// minimal" instruction the whole admin build follows.
+model Announcement {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([enabled, createdAt])
+}
+
+/// The two categories the player calendar's own "Community"/"Game
+/// Releases" tabs were left disabled for (see src/app/calendar/page.tsx's
+/// header comment) — Tournaments and Challenges are still derived
+/// entirely from real `Tournament`/`Battle` rows, never admin-authored
+/// here, since inventing a "competition" that isn't a real tournament
+/// would break that page's whole real-data discipline.
+enum CalendarEventCategory {
+  COMMUNITY
+  GAME_RELEASE
+}
+
+model CalendarEvent {
+  id        String                @id @default(cuid())
+  title     String
+  category  CalendarEventCategory
+  date      DateTime
+  cancelled Boolean               @default(false)
+  createdAt DateTime              @default(now())
+
+  @@index([category, date])
+}
+
+/// Singleton row (`id` is always "singleton") — real platform-wide
+/// toggles. Deliberately just the one real, meaningful setting
+/// (maintenance mode) rather than a grab-bag of unused fields invented to
+/// look complete; see `/admin/settings`'s own comment.
+model PlatformSetting {
+  id              String  @id @default("singleton")
+  maintenanceMode Boolean @default(false)
+}
+
+/// Every real write an admin makes anywhere in `/admin` appends one row
+/// here — Settings > Audit Log reads this back, nothing else. `metadata`
+/// is intentionally loose (Json) since each action logs different
+/// details (a suspension reason, a role change's before/after, etc.).
+model AuditLogEntry {
+  id         String   @id @default(cuid())
+  actorId    String
+  actor      User     @relation(fields: [actorId], references: [id])
+  action     String
+  targetType String?
+  targetId   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
 }

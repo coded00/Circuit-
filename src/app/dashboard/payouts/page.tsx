@@ -68,7 +68,7 @@ export default async function DashboardPayoutsPage() {
               {rows.map((row) => (
                 <tr key={row.tournament.id}>
                   <td>
-                    <Link href={`/dashboard/tournaments/${row.tournament.id}`} className="font-medium hover:text-brand-blue">
+                    <Link href={`/dashboard/tournaments/${row.tournament.id}`} className="font-medium hover:text-accent-blue">
                       {row.tournament.name}
                     </Link>
                   </td>

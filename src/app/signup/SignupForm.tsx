@@ -7,8 +7,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 export default function SignupForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") || "/tournaments/new";
+  const next = searchParams.get("next") || "/";
 
+  const [handle, setHandle] = useState("");
   const [emailOrPhone, setEmailOrPhone] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -22,7 +23,7 @@ export default function SignupForm() {
     const res = await fetch("/api/auth/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ emailOrPhone, password }),
+      body: JSON.stringify({ handle, emailOrPhone, password }),
     });
 
     if (!res.ok) {
@@ -38,6 +39,25 @@ export default function SignupForm() {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="handle" className="field-label">
+          Username
+        </label>
+        <input
+          id="handle"
+          type="text"
+          required
+          minLength={3}
+          maxLength={20}
+          pattern="[a-zA-Z0-9_]+"
+          autoComplete="nickname"
+          value={handle}
+          onChange={(e) => setHandle(e.target.value)}
+          className="field-input"
+          placeholder="e.g. tobiking"
+        />
+        <span className="field-hint">3-20 characters — letters, numbers, and underscores only.</span>
+      </div>
       <div className="flex flex-col gap-1.5">
         <label htmlFor="emailOrPhone" className="field-label">
           Email or phone

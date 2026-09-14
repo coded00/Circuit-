@@ -14,6 +14,7 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { getPaymentProvider } from "@/lib/payments";
 import { notify } from "@/lib/notifications";
+import { logAdminAction } from "@/lib/auditLog";
 
 export async function POST(
   request: Request,
@@ -29,7 +30,7 @@ export async function POST(
   if (!tournament) {
     return NextResponse.json({ error: "Tournament not found." }, { status: 404 });
   }
-  if (tournament.organizerId !== user.id) {
+  if (tournament.organizerId !== user.id && !user.isStaff) {
     return NextResponse.json(
       { error: "Only the organizer can cancel this tournament." },
       { status: 403 }
@@ -98,6 +99,19 @@ export async function POST(
     } catch {
       failedRefunds.push(registration.id);
     }
+  }
+
+  // Only an admin acting on someone else's tournament is a real "admin
+  // action" worth auditing — an organizer cancelling their own event is
+  // routine self-service, not something Settings > Audit Log should log.
+  if (user.isStaff && tournament.organizerId !== user.id) {
+    await logAdminAction({
+      actorId: user.id,
+      action: "tournament.cancel",
+      targetType: "Tournament",
+      targetId: id,
+      metadata: { name: tournament.name, refunded: refundedCount },
+    });
   }
 
   return NextResponse.json({

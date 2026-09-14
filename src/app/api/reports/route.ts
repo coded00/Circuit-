@@ -6,6 +6,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { proofStorage } from "@/lib/storage";
+import { notifyStaff } from "@/lib/notifications";
 
 const MAX_EVIDENCE_BYTES = 10 * 1024 * 1024;
 const VALID_REASON_CODES = ["MULTI_ACCOUNTING", "CHEATING", "HARASSMENT", "PAYMENT_FRAUD", "OTHER"];
@@ -46,6 +47,7 @@ export async function POST(request: Request) {
   const report = await prisma.report.create({
     data: { reportedUserId: reportedUser.id, reportedById: user.id, reason },
   });
+  await notifyStaff("REPORT_FILED", { reportId: report.id });
 
   if (evidence instanceof File && evidence.size > 0) {
     if (evidence.size > MAX_EVIDENCE_BYTES) {

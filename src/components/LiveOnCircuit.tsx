@@ -96,7 +96,7 @@ function StreamTag({ children }: { children: React.ReactNode }) {
 function FeaturedStreamSlide({ stream }: { stream: Stream }) {
   return (
     <Link href="/watch" className="card-media relative flex h-72 w-full flex-col justify-end">
-      <GameArtTile game={stream.game} className="absolute inset-0 h-full w-full" />
+      <GameArtTile game={stream.game} fill imgWidth={900} />
 
       <span className="badge badge-live absolute top-3 left-3 z-10">
         <span className="live-dot" aria-hidden />

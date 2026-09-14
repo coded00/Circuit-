@@ -14,6 +14,7 @@
 
 import { SignJWT, jwtVerify } from "jose";
 import bcrypt from "bcryptjs";
+import { createHash, randomBytes } from "crypto";
 
 const SESSION_COOKIE_NAME = "circuit_session";
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days — see PRD open question on session length if this needs revisiting.
@@ -73,6 +74,24 @@ export async function verifySessionToken(
   } catch {
     return null;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Password reset tokens
+// ---------------------------------------------------------------------------
+
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+/** Raw token goes in the reset link/email; only its hash is ever persisted
+ *  (`PasswordResetToken.tokenHash`) — same "never store the secret itself"
+ *  discipline as passwordHash above. */
+export function generatePasswordResetToken(): { raw: string; hash: string; expiresAt: Date } {
+  const raw = randomBytes(32).toString("hex");
+  return { raw, hash: hashPasswordResetToken(raw), expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS) };
+}
+
+export function hashPasswordResetToken(raw: string): string {
+  return createHash("sha256").update(raw).digest("hex");
 }
 
 export const sessionCookie = {

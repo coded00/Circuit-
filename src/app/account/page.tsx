@@ -28,6 +28,8 @@ export default async function AccountPage() {
         initialAvatarUrl={user.avatarUrl ?? ""}
         initialPayoutMethodRef={user.payoutMethodRef ?? ""}
         initialDateOfBirth={user.dateOfBirth ? user.dateOfBirth.toISOString().slice(0, 10) : ""}
+        initialBio={user.bio ?? ""}
+        initialFavoriteGames={user.favoriteGames}
       />
 
       <div className="card flex flex-col gap-4">

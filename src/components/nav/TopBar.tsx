@@ -6,6 +6,7 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { CreateMenu } from "./CreateMenu";
 import { AccountMenu } from "./AccountMenu";
 import { MobileSearchToggle } from "./MobileSearchToggle";
+import { WalletBalanceChip } from "./WalletBalanceChip";
 
 /**
  * Circuit — top header. ~60px, integrated into the page rather than a
@@ -32,16 +33,16 @@ import { MobileSearchToggle } from "./MobileSearchToggle";
  * is gone, `.btn-golive`'s two remaining disabled usages elsewhere are
  * being retired in the same pass).
  */
-export async function TopBar({ user }: { user: User | null }) {
+export async function TopBar({ user, disputeCount = 0 }: { user: User | null; disputeCount?: number }) {
   const unreadCount = user
     ? await prisma.notification.count({ where: { userId: user.id, readAt: null } })
     : 0;
 
   return (
     <header className="fixed inset-x-0 top-0 z-30 flex h-[60px] items-center gap-4 border-b border-border bg-background/85 px-5 backdrop-blur-md sm:left-[72px] sm:px-8 lg:left-[180px]">
-      <Link href="/" className="flex shrink-0 items-center gap-1.5 font-display font-bold tracking-wide sm:hidden">
-        <span className="h-2 w-2 rounded-full bg-accent-volt" />
-        CIRCUIT
+      <Link href="/" className="flex shrink-0 items-center sm:hidden">
+        {/* eslint-disable-next-line @next/next/no-img-element -- local /public asset, no next/image usage elsewhere in this codebase */}
+        <img src="/circuit-logo.png" alt="Circuit" width={700} height={347} className="h-12 w-auto max-w-none" />
       </Link>
 
       <SearchInput className="hidden min-w-0 flex-1 sm:block sm:max-w-[430px]" />
@@ -50,6 +51,7 @@ export async function TopBar({ user }: { user: User | null }) {
         <MobileSearchToggle />
         {user ? (
           <>
+            <WalletBalanceChip balance={user.walletBalance} />
             <NotificationBell initialUnreadCount={unreadCount} />
             <CreateMenu />
             <AccountMenu
@@ -59,6 +61,7 @@ export async function TopBar({ user }: { user: User | null }) {
                 avatarUrl: user.avatarUrl,
                 isStaff: user.isStaff,
               }}
+              disputeCount={disputeCount}
             />
           </>
         ) : (

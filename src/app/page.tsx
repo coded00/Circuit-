@@ -5,21 +5,32 @@
  * Competitions, Open Challenges, and (logged in) Your Circuit. The
  * exhaustive, filterable tournament browse experience lives on
  * `/compete` now; this page shows a curated slice of each, all real
- * data, no fabrication.
+ * data, no fabrication — including the sidebar's `GamerNews` widget,
+ * which is real, live gaming-outlet RSS content (src/lib/gamerNews.ts),
+ * wrapped in its own Suspense boundary so a slow external feed can't
+ * hold up the rest of this page's render.
  */
 
+import { Suspense } from "react";
 import Link from "next/link";
-import { Trophy } from "lucide-react";
+import { Trophy, Crown } from "lucide-react";
+import { CountUp } from "@/components/CountUp";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { CircuitHero } from "@/components/CircuitHero";
 import { FeaturedCompetitions } from "@/components/FeaturedCompetitions";
 import { ExploreTheCircuit } from "@/components/ExploreTheCircuit";
 import { OpenChallenges } from "@/components/OpenChallenges";
+import { UpcomingCompetitions } from "@/components/UpcomingCompetitions";
+import { GamerNews } from "@/components/GamerNews";
 import { YourCircuit } from "@/components/YourCircuit";
 import { GAME_ACTIVITY } from "@/lib/circuitActivity";
 import { formatNotification } from "@/lib/notification-format";
 import { globalStandings } from "@/lib/standings";
+import { getActiveAnnouncement } from "@/lib/announcements";
+import { AnnouncementBanner } from "@/components/AnnouncementBanner";
+
+const RANK_COLORS = ["#eab308", "#9ca3af", "#b45309"]; // gold, silver, bronze — same as ladder/page.tsx
 
 const cardSelect = {
   id: true,
@@ -27,6 +38,7 @@ const cardSelect = {
   game: true,
   status: true,
   format: true,
+  teamSize: true,
   entryFee: true,
   participantCap: true,
   streamUrl: true,
@@ -35,6 +47,32 @@ const cardSelect = {
   prizeText: true,
   _count: { select: { registrations: { where: { status: "CONFIRMED" as const } } } },
 } as const;
+
+/**
+ * Real prize pools first (what "Featured" is supposed to mean), then
+ * top up with other real OPEN/LIVE tournaments by soonest start date —
+ * otherwise this row shows just one card whenever the dev/early-traffic
+ * data happens to have only one prize-backed tournament, which reads as
+ * broken rather than "not much on Circuit yet." Every card is still a
+ * real tournament; nothing here is invented.
+ */
+async function getFeaturedTournaments(limit: number) {
+  const prized = await prisma.tournament.findMany({
+    where: { status: { in: ["OPEN", "LIVE"] }, prizeAmount: { not: null } },
+    orderBy: { prizeAmount: "desc" },
+    take: limit,
+    select: cardSelect,
+  });
+  if (prized.length >= limit) return prized;
+
+  const filler = await prisma.tournament.findMany({
+    where: { status: { in: ["OPEN", "LIVE"] }, id: { notIn: prized.map((t) => t.id) } },
+    orderBy: { startAt: "asc" },
+    take: limit - prized.length,
+    select: cardSelect,
+  });
+  return [...prized, ...filler];
+}
 
 export default async function Home() {
   const user = await getCurrentUser();
@@ -49,17 +87,14 @@ export default async function Home() {
     registeredCompetitions,
     activeChallenges,
     recentActivity,
+    homepageBanners,
+    activeAnnouncement,
   ] = await Promise.all([
-    prisma.tournament.findMany({
-      where: { status: { in: ["OPEN", "LIVE"] }, prizeAmount: { not: null } },
-      orderBy: { prizeAmount: "desc" },
-      take: 4,
-      select: cardSelect,
-    }),
+    getFeaturedTournaments(3),
     prisma.tournament.findMany({
       where: { status: { in: ["OPEN", "LIVE"] } },
       orderBy: { startAt: "asc" },
-      take: 8,
+      take: 3,
       select: cardSelect,
     }),
     Promise.all(
@@ -73,8 +108,11 @@ export default async function Home() {
     prisma.battle.findMany({
       where: { status: "OPEN", visibility: "OPEN" },
       orderBy: { createdAt: "desc" },
-      take: 8,
-      include: { creator: { select: { displayName: true } }, targetUser: { select: { displayName: true } } },
+      take: 6,
+      include: {
+        creator: { select: { displayName: true, avatarUrl: true } },
+        targetUser: { select: { displayName: true } },
+      },
     }),
     globalStandings(),
     user
@@ -107,13 +145,21 @@ export default async function Home() {
           take: 3,
         })
       : Promise.resolve([]),
+    prisma.homepageBanner.findMany({
+      where: { enabled: true, OR: [{ publishAt: null }, { publishAt: { lte: new Date() } }] },
+      orderBy: { order: "asc" },
+    }),
+    getActiveAnnouncement(),
   ]);
 
   const topLeaderboard = leaderboard.slice(0, 5);
+  const openChallengesPreview = openBattles.slice(0, 3);
 
   return (
     <div className="flex w-full flex-1 flex-col gap-8 p-6 sm:p-8">
-      <CircuitHero />
+      {activeAnnouncement && <AnnouncementBanner title={activeAnnouncement.title} body={activeAnnouncement.body} />}
+
+      <CircuitHero tournaments={featuredTournaments} banners={homepageBanners} />
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_330px]">
         <div className="flex min-w-0 flex-col gap-8">
@@ -121,35 +167,9 @@ export default async function Home() {
 
           <ExploreTheCircuit games={gameCounts} />
 
-          <section className="flex flex-col gap-4">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-section-heading">Upcoming Competitions</h2>
-              <Link href="/compete" className="text-xs font-medium text-accent-blue hover:underline">
-                View All Competitions →
-              </Link>
-            </div>
-            {upcomingTournaments.length === 0 ? (
-              <div className="card flex flex-col items-center gap-1 py-10 text-center">
-                <p className="text-sm text-muted">Nothing upcoming right now — be the first.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {upcomingTournaments.map((t) => (
-                  <Link key={t.id} href={`/tournaments/${t.id}`} className="card-media card-hover flex flex-col">
-                    <div className="flex flex-col gap-1 p-3">
-                      <span className="text-card-title truncate font-semibold">{t.name}</span>
-                      <span className="truncate text-xs text-muted">{t.game}</span>
-                      <span className="text-metadata">
-                        {t.startAt.toLocaleString("en-NG", { dateStyle: "medium" })}
-                      </span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </section>
+          <OpenChallenges battles={openChallengesPreview} />
 
-          <OpenChallenges battles={openBattles} />
+          <UpcomingCompetitions tournaments={upcomingTournaments} />
 
           {user && (
             <YourCircuit
@@ -173,10 +193,16 @@ export default async function Home() {
         <div className="flex min-w-0 flex-col gap-6">
           {topLeaderboard.length > 0 && (
             <div className="card flex flex-col gap-3">
-              <h2 className="text-card-title flex items-center gap-2">
-                <Trophy size={15} className="text-gold" />
-                Leaderboard
-              </h2>
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-card-title flex items-center gap-2">
+                  <Trophy size={15} className="text-gold" />
+                  Leaderboard
+                </h2>
+                <Link href="/ladder" className="text-xs font-medium text-accent-blue hover:underline">
+                  View All →
+                </Link>
+              </div>
+              <div className="border-b border-border" />
               <div className="tabs">
                 <span className="tab tab-active">Global</span>
                 <span className="tab tab-disabled" title="Coming soon">
@@ -187,25 +213,69 @@ export default async function Home() {
                 </span>
               </div>
               <div className="flex flex-col gap-1">
-                {topLeaderboard.map((s, i) => (
-                  <Link
-                    key={s.userId}
-                    href={`/players/${s.handle}`}
-                    className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-surface-elevated"
-                  >
-                    <span className="flex min-w-0 items-center gap-2">
-                      <span className="w-4 shrink-0 font-mono text-xs text-muted">{i + 1}</span>
-                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border bg-surface-elevated text-xs font-semibold text-muted">
-                        {s.displayName.slice(0, 1).toUpperCase()}
+                {topLeaderboard.map((s, i) => {
+                  const medal = RANK_COLORS[i];
+                  const isFirst = i === 0;
+                  return (
+                    <Link
+                      key={s.userId}
+                      href={`/players/${s.handle}`}
+                      style={{ "--i": i } as React.CSSProperties}
+                      className={`rank-row flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm transition hover:translate-x-0.5 hover:bg-surface-elevated ${
+                        isFirst ? "rank-first" : ""
+                      }`}
+                    >
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="w-3.5 shrink-0 text-center font-mono text-[11px] text-muted">{i + 1}</span>
+                        <span className="relative shrink-0">
+                          <span
+                            className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
+                              medal ? "text-black" : "border border-border bg-surface-elevated text-muted"
+                            }`}
+                            style={medal ? { backgroundColor: medal } : undefined}
+                          >
+                            {s.displayName.slice(0, 1).toUpperCase()}
+                          </span>
+                          {isFirst && (
+                            <Crown
+                              size={12}
+                              className="crown-bounce absolute -top-2 left-1/2 -translate-x-1/2 text-gold"
+                            />
+                          )}
+                        </span>
+                        <span className="truncate">{s.displayName}</span>
                       </span>
-                      <span className="truncate">{s.displayName}</span>
-                    </span>
-                    <span className="text-stat shrink-0 text-xs text-accent-blue">{s.wins}</span>
-                  </Link>
-                ))}
+                      <span className="text-stat shrink-0 text-xs text-accent-blue">
+                        <CountUp value={s.wins} />
+                      </span>
+                    </Link>
+                  );
+                })}
               </div>
             </div>
           )}
+
+          <Suspense
+            fallback={
+              <div className="card flex flex-col gap-3">
+                <div className="skeleton h-4 w-28" />
+                <div className="flex flex-col gap-3">
+                  {[0, 1, 2].map((i) => (
+                    <div key={i} className="flex items-start gap-3">
+                      <div className="skeleton h-14 w-14 shrink-0 rounded-[8px]" />
+                      <div className="flex flex-1 flex-col gap-1.5 pt-1">
+                        <div className="skeleton h-3 w-20" />
+                        <div className="skeleton h-4 w-full" />
+                        <div className="skeleton h-3 w-3/4" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            }
+          >
+            <GamerNews />
+          </Suspense>
         </div>
       </div>
     </div>

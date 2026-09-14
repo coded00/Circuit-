@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { confirmEntryFeePayment } from "@/lib/payments/confirm";
+import { confirmEntryFeePayment, confirmWalletFunding } from "@/lib/payments/confirm";
 import { verifyPaystackSignature } from "@/lib/payments/webhookVerification";
 
 export async function POST(request: Request) {
@@ -13,8 +13,12 @@ export async function POST(request: Request) {
   const event = JSON.parse(rawBody);
   const reference = event?.data?.reference;
 
+  // Both confirm functions are no-ops for a reference they don't own (a
+  // Registration lookup miss, or a WalletTransaction lookup miss) — safe
+  // to try both rather than parsing the reference's own prefix to decide.
   if (event?.event === "charge.success" && typeof reference === "string") {
     await confirmEntryFeePayment(reference);
+    await confirmWalletFunding(reference);
   }
 
   // Always 200 once the signature checks out — anything else makes

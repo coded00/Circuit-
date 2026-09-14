@@ -26,6 +26,8 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
       return { message: "Your registration is confirmed.", href: `/tournaments/${str(p, "tournamentId")}` };
     case "MATCH_READY":
       return { message: "Your next match is ready.", href: `/matches/${str(p, "matchId")}` };
+    case "MATCH_COMPLETE":
+      return { message: "Your match is complete.", href: `/matches/${str(p, "matchId")}` };
     case "RESULT_DISPUTED":
       return { message: "A match result was disputed.", href: `/matches/${str(p, "matchId")}` };
     case "DISPUTE_NEEDS_RULING":
@@ -40,11 +42,20 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
         message: "A tournament you registered for was cancelled.",
         href: `/tournaments/${str(p, "tournamentId")}`,
       };
+    case "TOURNAMENT_COMPLETE":
+      return {
+        message: p.isOrganizer ? "Your tournament is complete." : "Your tournament is complete. Claim your prize.",
+        href: p.isOrganizer
+          ? `/dashboard/tournaments/${str(p, "tournamentId")}`
+          : `/tournaments/${str(p, "tournamentId")}`,
+      };
     case "BATTLE_CHALLENGE":
       return { message: "You've been challenged to a Battle.", href: `/battles/${str(p, "battleId")}` };
+    case "BATTLE_ACCEPTED":
+      return { message: "Your Challenge was accepted.", href: `/battles/${str(p, "battleId")}` };
     case "REGISTRATION_CAP_FILLED":
       return {
-        message: "Registration filled — bracket generated.",
+        message: "Registration filled. Bracket generated.",
         href: `/dashboard/tournaments/${str(p, "tournamentId")}`,
       };
     case "REGISTRATION_CLOSED":
@@ -52,6 +63,10 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
         message: "Registration closed for your tournament.",
         href: `/dashboard/tournaments/${str(p, "tournamentId")}`,
       };
+    case "DISPUTE_ESCALATED":
+      return { message: "A dispute was escalated to staff.", href: "/staff/disputes" };
+    case "REPORT_FILED":
+      return { message: "A new abuse report was filed.", href: "/staff/reports" };
     default:
       return { message: "You have a new notification.", href: "/notifications" };
   }

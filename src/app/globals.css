@@ -191,8 +191,16 @@
   --font-mono: var(--font-geist-mono);
 }
 
-* {
-  border-color: var(--border);
+/* @layer base, not a bare rule: unlayered CSS always wins over ANY
+   layered rule regardless of specificity (CSS Cascade Layers spec) — and
+   Tailwind's own utilities (border-accent-volt/25 etc.) live in
+   `@layer utilities`. A bare `* { border-color }` here would silently
+   beat every color-specific border utility in the app, no matter how
+   specific, which is exactly the bug this layer wrapping avoids. */
+@layer base {
+  * {
+    border-color: var(--border);
+  }
 }
 
 body {
@@ -214,8 +222,12 @@ body {
  * ============================================================================
  */
 @layer components {
+  /* Only used by the homepage hero carousel (a ~340px-tall banner, not a
+     full page header) — sized to comfortably fit two lines of headline
+     plus an eyebrow, a line of copy, and a button inside that box at
+     every breakpoint, never crowding the edges. */
   .text-hero {
-    @apply font-display text-[44px] leading-[0.98] font-bold tracking-tight uppercase sm:text-[60px] lg:text-[72px];
+    @apply font-display text-[28px] leading-[1.08] font-bold tracking-tight uppercase sm:text-[38px] lg:text-[46px];
   }
 
   .text-section-heading {
@@ -255,7 +267,8 @@ body {
 
   .card-row {
     @apply rounded-[11px] border border-border bg-surface text-sm transition
-      hover:border-border-hover hover:bg-surface-elevated;
+      hover:border-border-hover hover:bg-surface-elevated
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
   }
 
   .card-media {
@@ -279,28 +292,37 @@ body {
  * ============================================================================
  */
 @layer components {
+  /* Every interactive class below shares one focus ring recipe (Volt,
+     the app's one primary accent, at a strength that reads on both the
+     light default surface and any dark-scoped one) — keyboard users get
+     a real focus indicator instead of relying on the browser's default
+     outline, which several of these classes visually crowd out anyway. */
   .btn-primary {
     @apply inline-flex items-center justify-center gap-1.5 rounded-[10px] bg-accent-volt px-5 py-2.5
       text-sm font-semibold text-accent-volt-foreground shadow-sm transition
-      hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50;
+      hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-volt/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
   }
 
   .btn-secondary {
     @apply inline-flex items-center justify-center gap-1.5 rounded-[10px] border border-border-strong
       bg-transparent px-5 py-2.5 text-sm font-medium text-foreground transition
-      hover:bg-surface-elevated disabled:cursor-not-allowed disabled:opacity-50;
+      hover:bg-surface-elevated disabled:cursor-not-allowed disabled:opacity-50
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
   }
 
   .btn-ghost {
     @apply inline-flex items-center justify-center gap-1.5 rounded-[10px] bg-surface-elevated px-5 py-2.5
       text-sm font-medium text-muted transition hover:text-foreground
-      disabled:cursor-not-allowed disabled:opacity-50;
+      disabled:cursor-not-allowed disabled:opacity-50
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
   }
 
   .btn-danger {
     @apply inline-flex items-center justify-center gap-1.5 rounded-[10px] border border-danger/40
       px-5 py-2.5 text-sm font-medium text-danger transition hover:bg-danger/10
-      disabled:cursor-not-allowed disabled:opacity-50;
+      disabled:cursor-not-allowed disabled:opacity-50
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
   }
 
   /* "Go Live" — streaming is out of MVP scope; this class stays defined
@@ -315,7 +337,8 @@ body {
 
   .btn-icon {
     @apply inline-flex h-9 w-9 items-center justify-center rounded-full text-muted transition
-      hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50;
+      hover:bg-surface-elevated hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
   }
 
   /* Phase 13: a floating panel (dropdown menu, popover) — soft elevation,
@@ -353,11 +376,20 @@ body {
       disabled:cursor-not-allowed disabled:opacity-50;
   }
 
+  /* `appearance-none` drops the native dropdown arrow with nothing to
+     replace it, which left every `<select>` in the app looking like a
+     plain text box rather than a control — this SVG chevron (currentColor
+     via a fixed muted-gray hex, since background-image can't reference
+     CSS custom properties as a color keyword) restores it consistently,
+     app-wide, one fix instead of a per-caller icon overlay. */
   .field-select {
-    @apply w-full appearance-none rounded-[10px] border border-border bg-surface-elevated px-3.5 py-2.5 pr-9
+    @apply w-full appearance-none rounded-[10px] border border-border bg-surface-elevated bg-no-repeat px-3.5 py-2.5 pr-9
       text-sm outline-none transition
       focus:border-accent-blue focus:ring-2 focus:ring-accent-blue-soft
       disabled:cursor-not-allowed disabled:opacity-50;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23888f99' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 7.5L10 12.5L15 7.5'/%3E%3C/svg%3E");
+    background-position: right 0.75rem center;
+    background-size: 16px 16px;
   }
 
   .field-textarea {
@@ -426,7 +458,8 @@ body {
   }
   .tab {
     @apply border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted transition
-      hover:text-foreground;
+      hover:text-foreground
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
   }
   .tab-active {
     @apply border-accent-volt text-foreground;
@@ -508,6 +541,119 @@ body {
     content: "";
     @apply relative inline-flex h-1.5 w-1.5 rounded-full;
     background: var(--live);
+  }
+}
+
+/*
+ * ============================================================================
+ * Phase 18 — leaderboard & celebration moments. Motion for real moments (an
+ * actual rank, an actual match result) rather than decoration for its own
+ * sake — every element these classes touch is still real data, just given
+ * a more playful presentation.
+ * ============================================================================
+ */
+@layer components {
+  .rank-row {
+    animation: rank-row-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: calc(var(--i, 0) * 70ms);
+  }
+
+  /* Spotlight on rank #1 only — a slow breathing glow, not a hard border. */
+  .rank-first {
+    position: relative;
+    background: linear-gradient(90deg, color-mix(in srgb, var(--gold) 14%, transparent), transparent 70%);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 30%, transparent);
+    animation:
+      rank-row-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both,
+      rank-first-glow 2.4s ease-in-out infinite;
+  }
+
+  .crown-bounce {
+    animation: crown-bounce 2.4s ease-in-out infinite;
+  }
+
+  .trophy-pop {
+    animation: trophy-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+
+  .celebrate-fade {
+    animation: celebrate-fade-in 0.5s ease-out both;
+  }
+
+  .confetti-burst {
+    @apply pointer-events-none absolute inset-0 overflow-hidden;
+  }
+  .confetti-piece {
+    @apply absolute top-0 h-2 w-1.5 rounded-[1px];
+    animation: confetti-fall 1.1s ease-in both;
+  }
+}
+
+@keyframes rank-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes rank-first-glow {
+  0%,
+  100% {
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 30%, transparent);
+  }
+  50% {
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 55%, transparent);
+  }
+}
+
+@keyframes crown-bounce {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-2px) rotate(-4deg);
+  }
+}
+
+@keyframes trophy-pop {
+  0% {
+    transform: scale(0) rotate(-10deg);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.15) rotate(4deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes celebrate-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(90px) rotate(320deg);
+    opacity: 0;
   }
 }
 

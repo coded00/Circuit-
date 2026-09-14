@@ -1,15 +1,14 @@
 import { Suspense } from "react";
+import { AuthSplitLayout } from "@/components/auth/AuthSplitLayout";
 import SignupForm from "./SignupForm";
 
 export default function SignupPage() {
   return (
-    <div className="flex flex-1 items-center justify-center px-6 py-16">
-      <div className="card w-full max-w-sm flex flex-col gap-6">
+    <AuthSplitLayout>
+      <div className="card flex w-full flex-col gap-6">
         <div className="flex flex-col items-center gap-3 text-center">
-          <span className="flex items-center gap-1.5 font-display text-xl font-bold tracking-wide">
-            <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundImage: "var(--brand-gradient)" }} />
-            CIRCUIT
-          </span>
+          {/* eslint-disable-next-line @next/next/no-img-element -- local /public asset, no next/image usage elsewhere in this codebase */}
+          <img src="/circuit-logo.png" alt="Circuit" width={700} height={347} className="h-12 w-auto max-w-none lg:hidden" />
           <div className="flex flex-col gap-1">
             <h1 className="text-section-heading">Create your Circuit account</h1>
             <p className="text-sm text-muted">Two fields, no payment info. Start playing in seconds.</p>
@@ -19,6 +18,6 @@ export default function SignupPage() {
           <SignupForm />
         </Suspense>
       </div>
-    </div>
+    </AuthSplitLayout>
   );
 }

@@ -2,15 +2,15 @@
  * Circuit — Compete: the main tournament discovery/search page (MVP
  * rework spec section 18). Real, schema-backed filters only: search
  * (name/game text match), game, status (Open/Upcoming/Live/Completed —
- * reusing `tournamentStatusInfo`), and entry type (Free/Paid, via
- * `entryFee`). The spec's "Filter by Format: 1v1/Team/Battle Royale" is
- * intentionally omitted — Circuit's real `Tournament.format` field
- * encodes bracket structure (e.g. "single elimination"), not a
- * team-size taxonomy; there's no data to back that filter honestly.
+ * reusing `tournamentStatusInfo`), entry type (Free/Paid, via
+ * `entryFee`), and team size (1v1 through 5v5, via `Tournament.
+ * teamSize` — the organizer-set players-per-side for that specific
+ * competition, since the same game can run different team sizes across
+ * different tournaments).
  */
 
 import Link from "next/link";
-import { Calendar, Users, Tv } from "lucide-react";
+import { Calendar, Users, Tv, Swords } from "lucide-react";
 import type { Prisma, TournamentStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { GameArtTile } from "@/components/GameArtTile";
@@ -21,6 +21,7 @@ type SearchParams = {
   game?: string;
   status?: string;
   entry?: string;
+  teamSize?: string;
 };
 
 const STATUS_OPTIONS: { value: TournamentStatus | ""; label: string }[] = [
@@ -36,6 +37,15 @@ const ENTRY_OPTIONS = [
   { value: "paid", label: "Paid" },
 ] as const;
 
+const TEAM_SIZE_OPTIONS = [
+  { value: "", label: "Any team size" },
+  { value: "1v1", label: "1v1" },
+  { value: "2v2", label: "2v2" },
+  { value: "3v3", label: "3v3" },
+  { value: "4v4", label: "4v4" },
+  { value: "5v5", label: "5v5" },
+] as const;
+
 function formatDate(date: Date): string {
   return date.toLocaleString("en-NG", { dateStyle: "medium" });
 }
@@ -45,7 +55,7 @@ function formatNaira(kobo: number): string {
 }
 
 export default async function CompetePage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const { q, game, status, entry } = await searchParams;
+  const { q, game, status, entry, teamSize } = await searchParams;
 
   const where: Prisma.TournamentWhereInput = {};
   if (q) where.name = { contains: q, mode: "insensitive" };
@@ -53,6 +63,7 @@ export default async function CompetePage({ searchParams }: { searchParams: Prom
   if (status) where.status = status as TournamentStatus;
   if (entry === "free") where.entryFee = 0;
   if (entry === "paid") where.entryFee = { gt: 0 };
+  if (teamSize) where.teamSize = teamSize;
 
   const tournaments = await prisma.tournament.findMany({
     where,
@@ -64,6 +75,7 @@ export default async function CompetePage({ searchParams }: { searchParams: Prom
       game: true,
       status: true,
       format: true,
+      teamSize: true,
       entryFee: true,
       participantCap: true,
       streamUrl: true,
@@ -117,10 +129,22 @@ export default async function CompetePage({ searchParams }: { searchParams: Prom
             ))}
           </select>
         </div>
+        <div className="flex min-w-[140px] flex-col gap-1.5">
+          <label className="field-label" htmlFor="teamSize">
+            Team size
+          </label>
+          <select id="teamSize" name="teamSize" defaultValue={teamSize ?? ""} className="field-select">
+            {TEAM_SIZE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
         <button type="submit" className="btn-primary">
           Apply
         </button>
-        {(q || game || status || entry) && (
+        {(q || game || status || entry || teamSize) && (
           <Link href="/compete" className="text-xs font-medium text-accent-blue hover:underline">
             Clear filters
           </Link>
@@ -152,7 +176,13 @@ export default async function CompetePage({ searchParams }: { searchParams: Prom
                 </div>
                 <div className="flex flex-col gap-1 p-3">
                   <span className="text-card-title truncate font-semibold">{tournament.name}</span>
-                  <span className="truncate text-xs text-muted">{tournament.game}</span>
+                  <span className="flex items-center gap-1.5 truncate text-xs text-muted">
+                    {tournament.game}
+                    <span className="flex items-center gap-0.5 text-[10px] font-medium text-muted-strong">
+                      <Swords size={10} />
+                      {tournament.teamSize}
+                    </span>
+                  </span>
                   <span className="text-stat text-sm text-gold">
                     {tournament.prizeAmount
                       ? formatNaira(tournament.prizeAmount)

@@ -30,3 +30,12 @@ export function getPaymentProvider(
 export function getDefaultPaymentProvider(): PaymentProviderClient {
   return providers.PAYSTACK;
 }
+
+/** ACC-2 allows phone-only signup, but both payment providers' hosted
+ *  checkout requires an email. Not a real email inbox — just a stable,
+ *  provider-acceptable placeholder tied to the account. Shared by every
+ *  flow that opens a hosted checkout (tournament entry fees, wallet
+ *  funding). */
+export function toCheckoutEmail(emailOrPhone: string, userId: string): string {
+  return emailOrPhone.includes("@") ? emailOrPhone : `${userId}@users.circuit.ng`;
+}

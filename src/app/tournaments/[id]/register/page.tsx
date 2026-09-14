@@ -32,7 +32,7 @@ export default async function RegisterPage({
         </p>
       </div>
       <div className="card">
-        <RegistrationForm tournamentId={tournament.id} />
+        <RegistrationForm tournamentId={tournament.id} entryFee={tournament.entryFee} walletBalance={user.walletBalance} />
       </div>
     </div>
   );

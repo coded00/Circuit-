@@ -10,13 +10,17 @@ export default function RulingForm({
   endpoint,
   playerA,
   playerB,
-  allowVoid,
+  voidUnsupportedReason,
 }: {
   disputeId: string;
   endpoint: string;
   playerA: PlayerOption;
   playerB: PlayerOption;
-  allowVoid: boolean;
+  /** Undefined = voiding is available (Battle disputes only). A string
+   *  here means voiding isn't supported for this match (any tournament
+   *  bracket match) — shown disabled with this explanation rather than
+   *  omitted, so the ruler sees the option exists and why it's blocked. */
+  voidUnsupportedReason?: string;
 }) {
   const router = useRouter();
   const [winnerId, setWinnerId] = useState("");
@@ -67,7 +71,16 @@ export default function RulingForm({
             />
           ))}
         </div>
-        {allowVoid && (
+        {voidUnsupportedReason ? (
+          <OptionCard
+            selected={false}
+            onSelect={() => {}}
+            title="Void this match"
+            description={voidUnsupportedReason}
+            disabled
+            disabledTitle={voidUnsupportedReason}
+          />
+        ) : (
           <OptionCard
             selected={voidMatch}
             onSelect={() => setVoidMatch(true)}

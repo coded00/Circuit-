@@ -3,22 +3,31 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+const MAX_FAVORITE_GAMES = 6;
+const MAX_BIO_LENGTH = 160;
+
 export default function AccountForm({
   initialDisplayName,
   initialAvatarUrl,
   initialPayoutMethodRef,
   initialDateOfBirth,
+  initialBio,
+  initialFavoriteGames,
 }: {
   initialDisplayName: string;
   initialAvatarUrl: string;
   initialPayoutMethodRef: string;
   initialDateOfBirth: string;
+  initialBio: string;
+  initialFavoriteGames: string[];
 }) {
   const router = useRouter();
   const [displayName, setDisplayName] = useState(initialDisplayName);
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl);
   const [payoutMethodRef, setPayoutMethodRef] = useState(initialPayoutMethodRef);
   const [dateOfBirth, setDateOfBirth] = useState(initialDateOfBirth);
+  const [bio, setBio] = useState(initialBio);
+  const [favoriteGames, setFavoriteGames] = useState(initialFavoriteGames.join(", "));
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -37,6 +46,12 @@ export default function AccountForm({
         avatarUrl: avatarUrl || null,
         payoutMethodRef: payoutMethodRef || null,
         dateOfBirth: dateOfBirth || null,
+        bio: bio || null,
+        favoriteGames: favoriteGames
+          .split(",")
+          .map((g) => g.trim())
+          .filter(Boolean)
+          .slice(0, MAX_FAVORITE_GAMES),
       }),
     });
     const data = await res.json().catch(() => null);
@@ -79,6 +94,37 @@ export default function AccountForm({
           onChange={(e) => setAvatarUrl(e.target.value)}
           className="field-input"
         />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="bio" className="field-label">
+          Bio (optional)
+        </label>
+        <input
+          id="bio"
+          maxLength={MAX_BIO_LENGTH}
+          placeholder="A short line shown on your public profile."
+          value={bio}
+          onChange={(e) => setBio(e.target.value)}
+          className="field-input"
+        />
+        <span className="field-hint">
+          {bio.length}/{MAX_BIO_LENGTH}
+        </span>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="favoriteGames" className="field-label">
+          Favorite games (optional)
+        </label>
+        <input
+          id="favoriteGames"
+          placeholder="e.g. EA FC 25, Call of Duty, Valorant"
+          value={favoriteGames}
+          onChange={(e) => setFavoriteGames(e.target.value)}
+          className="field-input"
+        />
+        <span className="field-hint">Comma-separated, up to {MAX_FAVORITE_GAMES} games — shown on your public profile.</span>
       </div>
 
       <div className="flex flex-col gap-1.5">

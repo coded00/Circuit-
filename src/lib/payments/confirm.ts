@@ -61,3 +61,32 @@ export async function confirmEntryFeePayment(reference: string): Promise<void> {
 
   await maybeGenerateBracketOnCapFill(registration.tournamentId); // BRK-1's cap-fill path
 }
+
+/**
+ * Wallet-funding confirmation — same shape and same discipline as
+ * confirmEntryFeePayment above: never trusts the webhook payload, always
+ * re-verifies by reference against the provider, and only acts while the
+ * transaction is still PENDING (idempotent against webhook replays and
+ * the best-effort redirect callback both landing on the same reference).
+ */
+export async function confirmWalletFunding(reference: string): Promise<void> {
+  const txn = await prisma.walletTransaction.findUnique({ where: { providerRef: reference } });
+  if (!txn || txn.type !== "FUND" || txn.status !== "PENDING") {
+    return;
+  }
+
+  const provider = getPaymentProvider(txn.provider!);
+  const result = await provider.verifyCharge(reference);
+
+  if (result.status !== "SUCCESS" || result.amount !== txn.amount) {
+    if (result.status === "FAILED") {
+      await prisma.walletTransaction.update({ where: { id: txn.id }, data: { status: "FAILED" } });
+    }
+    return;
+  }
+
+  await prisma.$transaction([
+    prisma.walletTransaction.update({ where: { id: txn.id }, data: { status: "COMPLETE" } }),
+    prisma.user.update({ where: { id: txn.userId }, data: { walletBalance: { increment: txn.amount } } }),
+  ]);
+}

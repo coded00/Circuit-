@@ -16,13 +16,21 @@ function nairaToKobo(value: string): number {
 export default function EditForm({
   tournament,
   moneyFieldsLocked,
+  redirectTo,
 }: {
   tournament: Tournament;
   moneyFieldsLocked: boolean;
+  /** Where a successful save sends the editor — defaults to the public
+   *  tournament page (the organizer's own flow). The admin edit page
+   *  passes its own detail page instead, so a save keeps the admin
+   *  inside the control center rather than dropping them into the
+   *  player-facing app. */
+  redirectTo?: string;
 }) {
   const router = useRouter();
   const [name, setName] = useState(tournament.name);
   const [game, setGame] = useState(tournament.game);
+  const [teamSize, setTeamSize] = useState(tournament.teamSize);
   const [participantCap, setParticipantCap] = useState(String(tournament.participantCap));
   const [entryFeeNaira, setEntryFeeNaira] = useState(String(tournament.entryFee / 100));
   const [prizeAmountNaira, setPrizeAmountNaira] = useState(
@@ -45,6 +53,7 @@ export default function EditForm({
     const body: Record<string, unknown> = {
       name,
       game,
+      teamSize,
       participantCap: Number(participantCap),
       prizeText: prizeText || null,
       rulesText,
@@ -71,7 +80,7 @@ export default function EditForm({
       return;
     }
 
-    router.push(`/tournaments/${tournament.id}`);
+    router.push(redirectTo ?? `/tournaments/${tournament.id}`);
     router.refresh();
   }
 
@@ -101,6 +110,25 @@ export default function EditForm({
           onChange={(e) => setGame(e.target.value)}
           className="field-input"
         />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="teamSize" className="field-label">
+          Team size
+        </label>
+        <select
+          id="teamSize"
+          value={teamSize}
+          onChange={(e) => setTeamSize(e.target.value)}
+          className="field-input"
+        >
+          <option value="1v1">1v1 — solo</option>
+          <option value="2v2">2v2 — duos</option>
+          <option value="3v3">3v3</option>
+          <option value="4v4">4v4</option>
+          <option value="5v5">5v5 — squad</option>
+        </select>
+        <span className="field-hint">Players per side in each bracket match.</span>
       </div>
 
       <div className="flex flex-col gap-1.5">

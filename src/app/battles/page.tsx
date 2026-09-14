@@ -5,14 +5,17 @@
  *
  * Only OPEN-visibility, still-OPEN-status Battles show here — a targeted
  * challenge is invisible to everyone but its target (delivered via
- * notification, BTL-3), not a variant of this board.
+ * notification, BTL-3), not a variant of this board. Every Battle here is
+ * still waiting for an opponent, so every card is the same `ChallengeCard`
+ * the homepage's Open Challenges carousel renders — see that component's
+ * own header comment for what's real vs. deliberately not invented (no
+ * prize pool, no rating number, no countdown).
  */
 
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import Poller from "@/app/Poller";
-import { StatusPill } from "@/components/StatusPill";
-import { GameArtTile } from "@/components/GameArtTile";
+import { ChallengeCard } from "@/components/ChallengeCard";
 
 export default async function BattleBoardPage({
   searchParams,
@@ -28,7 +31,7 @@ export default async function BattleBoardPage({
       ...(game ? { game: { equals: game, mode: "insensitive" } } : {}),
     },
     orderBy: { createdAt: "desc" },
-    include: { creator: { select: { displayName: true, handle: true } } },
+    include: { creator: { select: { displayName: true, avatarUrl: true } } },
   });
 
   return (
@@ -59,24 +62,7 @@ export default async function BattleBoardPage({
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {battles.map((battle) => (
-            <Link key={battle.id} href={`/battles/${battle.id}`} className="card-media card-hover flex flex-col">
-              <div className="relative h-28 w-full overflow-hidden">
-                <GameArtTile game={battle.game} className="h-full w-full">
-                  <span className="absolute top-2 left-2 z-10">
-                    <StatusPill tone="live" pulse>
-                      Open
-                    </StatusPill>
-                  </span>
-                </GameArtTile>
-              </div>
-              <div className="flex flex-col gap-1 p-3">
-                <span className="text-card-title font-semibold">{battle.game}</span>
-                <span className="truncate text-xs text-muted">
-                  {battle.format === "BEST_OF_3" ? "Best of 3" : "Single match"} · opened by{" "}
-                  {battle.creator.displayName} (@{battle.creator.handle})
-                </span>
-              </div>
-            </Link>
+            <ChallengeCard key={battle.id} battle={battle} />
           ))}
         </div>
       )}

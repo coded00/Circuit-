@@ -32,9 +32,14 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 export function AutoScrollRow({
   items,
   ariaLabel,
+  showDots = false,
 }: {
   items: React.ReactNode[];
   ariaLabel: string;
+  /** Dot pagination below the row, in addition to the hover arrows —
+   *  off by default so existing callers (ExploreTheCircuit,
+   *  OpenChallenges) keep their current look. */
+  showDots?: boolean;
 }) {
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -68,6 +73,7 @@ export function AutoScrollRow({
   }, [count]);
 
   return (
+    <div className="flex flex-col gap-3">
     <div className="group relative" role="region" aria-label={ariaLabel}>
       <div
         ref={scrollerRef}
@@ -115,6 +121,22 @@ export function AutoScrollRow({
           </button>
         </>
       )}
+    </div>
+    {showDots && count > 1 && (
+      <div className="flex items-center justify-center gap-1.5" role="tablist" aria-label={`${ariaLabel} pages`}>
+        {items.map((_, i) => (
+          <button
+            key={i}
+            type="button"
+            role="tab"
+            aria-selected={i === index}
+            aria-label={`Go to item ${i + 1}`}
+            onClick={() => goTo(i)}
+            className={`h-1.5 rounded-full transition-all ${i === index ? "w-5 bg-accent-volt" : "w-1.5 bg-border-strong"}`}
+          />
+        ))}
+      </div>
+    )}
     </div>
   );
 }

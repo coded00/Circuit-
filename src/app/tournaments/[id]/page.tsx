@@ -5,14 +5,28 @@
  * No login required to view — every field here must be visible to a
  * guest, per TRN-3's acceptance criteria. Viewer-specific actions
  * (register, withdraw, cancel) only render once we know who's looking.
+ *
+ * Redesigned around a photo hero + tab shell (Overview/Brackets/Rules/
+ * Prizes/Participants) with a sticky registration card, per a supplied
+ * reference layout — but every value on the page is still a real
+ * Tournament field or a real query, including `teamSize` (players per
+ * side, organizer-set — e.g. Call of Duty Mobile runs 5v5 in ranked
+ * multiplayer but solo/duo in Tournament Mode). One thing the reference
+ * implied that Circuit has no data for is deliberately not invented: a
+ * "Platform/Mode/Map" game-details block (no such fields on Tournament —
+ * organizer-typed game name only, nothing more granular).
  */
 
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Tv } from "lucide-react";
+import { Tv, Calendar, Users, Layers, Swords, Trophy, Wallet, ShieldCheck } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { StatusPill, tournamentStatusInfo } from "@/components/StatusPill";
+import { GameArtTile } from "@/components/GameArtTile";
+import { ShareButton } from "@/components/ShareButton";
+import TournamentTabs, { type TournamentTab } from "./TournamentTabs";
 import CancelButton from "./CancelButton";
 import WithdrawButton from "./WithdrawButton";
 import ClaimPrizeButton from "./ClaimPrizeButton";
@@ -22,10 +36,45 @@ function formatNaira(kobo: number): string {
 }
 
 function formatDate(date: Date): string {
-  return date.toLocaleString("en-NG", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
+  return date.toLocaleString("en-NG", { dateStyle: "medium", timeStyle: "short" });
+}
+
+function formatShortDate(date: Date): string {
+  return date.toLocaleDateString("en-NG", { dateStyle: "medium" });
+}
+
+function formatLabel(format: string): string {
+  return format
+    .toLowerCase()
+    .split("_")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+function FactCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="widget flex items-center gap-3">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-blue-soft text-accent-blue">
+        {icon}
+      </span>
+      <div className="flex min-w-0 flex-col">
+        <span className="text-eyebrow">{label}</span>
+        <span className="truncate text-sm font-semibold">{value}</span>
+      </div>
+    </div>
+  );
+}
+
+function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 text-sm">
+      <span className="flex items-center gap-2 text-muted">
+        {icon}
+        {label}
+      </span>
+      <span className="truncate font-medium">{value}</span>
+    </div>
+  );
 }
 
 export default async function TournamentPage({
@@ -40,9 +89,15 @@ export default async function TournamentPage({
     notFound();
   }
 
-  const [registrantCount, user] = await Promise.all([
+  const [registrantCount, user, participants] = await Promise.all([
     prisma.registration.count({ where: { tournamentId: tournament.id, status: "CONFIRMED" } }),
     getCurrentUser(),
+    prisma.registration.findMany({
+      where: { tournamentId: tournament.id, status: "CONFIRMED" },
+      orderBy: { createdAt: "asc" },
+      take: 50,
+      include: { user: { select: { displayName: true, handle: true } } },
+    }),
   ]);
 
   const myRegistration = user
@@ -60,6 +115,8 @@ export default async function TournamentPage({
     registrantCount < tournament.participantCap;
   const status = tournamentStatusInfo(tournament.status);
   const fillPct = Math.min(100, Math.round((registrantCount / tournament.participantCap) * 100));
+  const formatText = formatLabel(tournament.format);
+  const hasBracket = tournament.status === "LIVE" || tournament.status === "COMPLETE";
 
   let canClaimPrize = false;
   if (user && tournament.status === "COMPLETE" && tournament.prizeAmount && tournament.prizeAmount > 0) {
@@ -73,131 +130,329 @@ export default async function TournamentPage({
     canClaimPrize = finalMatch?.winnerId === user.id && !existingPayout;
   }
 
-  return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 p-6 sm:p-8">
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <StatusPill tone={status.tone} pulse={status.pulse}>
-            {status.label}
-          </StatusPill>
-          {(tournament.status === "LIVE" || tournament.status === "COMPLETE") && (
-            <Link
-              href={`/tournaments/${tournament.id}/bracket`}
-              className="text-sm font-medium text-brand-blue hover:underline"
-            >
-              View bracket →
-            </Link>
-          )}
-          {tournament.streamUrl && (
-            <a
-              href={tournament.streamUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-blue hover:underline"
-            >
-              <Tv size={14} />
-              Watch stream
-            </a>
-          )}
-        </div>
-        <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">{tournament.name}</h1>
-        <p className="text-sm text-muted">{tournament.game} · Single-elimination knockout</p>
-      </div>
+  const aboutText = `Join ${tournament.name}, a ${formatText.toLowerCase()} tournament for ${tournament.game}. ${
+    tournament.prizeAmount
+      ? `Compete for a ${formatNaira(tournament.prizeAmount)} prize pool.`
+      : tournament.entryFee === 0
+        ? "Free to enter, no cost to compete."
+        : `${formatNaira(tournament.entryFee)} entry fee.`
+  }`;
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="widget flex flex-col gap-1.5">
-          <span className="text-eyebrow">Entry fee</span>
-          <span className="text-stat text-lg">
-            {tournament.entryFee === 0 ? "Free" : formatNaira(tournament.entryFee)}
-          </span>
-        </div>
-        <div className="widget flex flex-col gap-1.5">
-          <span className="text-eyebrow">Prize</span>
-          <span className={`text-stat text-lg ${tournament.prizeAmount ? "text-gold" : ""}`}>
-            {tournament.prizeAmount ? formatNaira(tournament.prizeAmount) : (tournament.prizeText ?? "—")}
-          </span>
-        </div>
-        <div className="widget flex flex-col gap-1.5">
-          <span className="text-eyebrow">Registrants</span>
-          <span className="text-stat text-lg">
-            {registrantCount} / {tournament.participantCap}
-          </span>
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-elevated">
-            <div className="h-full rounded-full" style={{ width: `${fillPct}%`, background: "var(--brand-gradient)" }} />
+  const tabs: TournamentTab[] = [
+    {
+      key: "overview",
+      label: "Overview",
+      content: (
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-2">
+            <h2 className="text-section-heading">About This Tournament</h2>
+            <p className="text-sm text-muted">{aboutText}</p>
+            <p className="text-metadata">
+              Registration {now < tournament.registrationOpenAt ? "opens" : "opened"}{" "}
+              {formatDate(tournament.registrationOpenAt)} · closes {formatDate(tournament.registrationCloseAt)}
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <FactCard icon={<Layers size={16} />} label="Format" value={formatText} />
+            <FactCard icon={<Swords size={16} />} label="Team Size" value={tournament.teamSize} />
+            <FactCard
+              icon={<Users size={16} />}
+              label="Registration"
+              value={`${registrantCount} / ${tournament.participantCap} players`}
+            />
+            <FactCard
+              icon={<Trophy size={16} />}
+              label={tournament.prizeAmount ? "Prize Pool" : "Entry"}
+              value={
+                tournament.prizeAmount
+                  ? formatNaira(tournament.prizeAmount)
+                  : tournament.entryFee === 0
+                    ? "Free"
+                    : formatNaira(tournament.entryFee)
+              }
+            />
+          </div>
+          <div className="flex flex-col gap-3 border-t border-border pt-6">
+            <h2 className="text-section-heading">Game</h2>
+            <div className="card flex items-center gap-4">
+              <GameArtTile game={tournament.game} className="h-20 w-20 shrink-0 rounded-[10px]" hideLabel />
+              <div className="flex min-w-0 flex-col">
+                <span className="text-card-title truncate">{tournament.game}</span>
+                <p className="text-metadata">
+                  {formatText} · {tournament.teamSize} tournament
+                </p>
+              </div>
+            </div>
           </div>
         </div>
-        <div className="widget flex flex-col gap-1.5">
-          <span className="text-eyebrow">Starts</span>
-          <span className="text-stat text-lg">{formatDate(tournament.startAt)}</span>
+      ),
+    },
+    {
+      key: "brackets",
+      label: "Brackets",
+      content: (
+        <div className="card flex flex-col items-center gap-3 py-12 text-center">
+          {hasBracket ? (
+            <>
+              <Trophy size={28} className="text-gold" />
+              <p className="max-w-sm text-sm text-muted">
+                The bracket is live. Follow every round as results come in.
+              </p>
+              <Link href={`/tournaments/${tournament.id}/bracket`} className="btn-primary">
+                View Full Bracket →
+              </Link>
+            </>
+          ) : (
+            <>
+              <Layers size={28} className="text-muted" />
+              <p className="max-w-sm text-sm text-muted">
+                The bracket will be generated once registration closes and players are seeded.
+              </p>
+            </>
+          )}
         </div>
-      </div>
+      ),
+    },
+    {
+      key: "rules",
+      label: "Rules",
+      content: (
+        <div className="card">
+          {tournament.rulesText ? (
+            <p className="text-sm whitespace-pre-wrap text-muted">{tournament.rulesText}</p>
+          ) : (
+            <p className="text-sm text-muted">The organizer hasn&apos;t published rules for this tournament yet.</p>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "prizes",
+      label: "Prizes",
+      content: (
+        <div className="card flex flex-col gap-3">
+          {tournament.prizeAmount ? (
+            <>
+              <span className="text-eyebrow">Prize Pool</span>
+              <span className="font-display text-3xl font-bold text-gold">{formatNaira(tournament.prizeAmount)}</span>
+              {tournament.prizeText && <p className="text-sm text-muted">{tournament.prizeText}</p>}
+            </>
+          ) : tournament.prizeText ? (
+            <p className="text-sm text-muted">{tournament.prizeText}</p>
+          ) : (
+            <p className="text-sm text-muted">No cash prize for this tournament: bragging rights only.</p>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "participants",
+      label: "Participants",
+      content:
+        participants.length === 0 ? (
+          <p className="card text-center text-sm text-muted">No one has registered yet. Be the first.</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {participants.map((p) => (
+              <Link
+                key={p.userId}
+                href={`/players/${p.user.handle}`}
+                className="card-row flex items-center gap-3 p-3"
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-surface-elevated text-xs font-semibold text-muted">
+                  {p.user.displayName.slice(0, 1).toUpperCase()}
+                </span>
+                <div className="flex min-w-0 flex-col">
+                  <span className="truncate text-sm font-medium">{p.user.displayName}</span>
+                  <span className="text-metadata truncate">@{p.user.handle}</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        ),
+    },
+  ];
 
-      <div className="flex flex-col gap-1 text-sm text-muted sm:flex-row sm:items-center sm:gap-3">
-        <span>Registration opens {formatDate(tournament.registrationOpenAt)}</span>
-        <span className="hidden text-muted-strong sm:inline">·</span>
-        <span>Registration closes {formatDate(tournament.registrationCloseAt)}</span>
-      </div>
-
-      {tournament.prizeText && tournament.prizeAmount ? (
-        <p className="text-sm text-muted">{tournament.prizeText}</p>
-      ) : null}
-
-      <div className="flex flex-col gap-3">
-        {tournament.status === "CANCELLED" ? (
-          <p className="alert alert-danger">
-            This tournament has been cancelled. Paid entries have been refunded.
-          </p>
-        ) : isOrganizer ? (
+  return (
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-6 sm:p-8">
+      <div
+        data-surface="dark"
+        className="relative flex min-h-[260px] w-full flex-col justify-end overflow-hidden rounded-[16px] border border-border p-6 sm:min-h-[300px] sm:p-8"
+      >
+        <GameArtTile game={tournament.game} fill hideLabel imgWidth={1200} />
+        <div
+          aria-hidden
+          className="absolute inset-0"
+          style={{ backgroundImage: "linear-gradient(0deg, var(--background) 12%, transparent 65%)" }}
+        />
+        <div className="relative z-10 flex flex-col gap-3">
           <div className="flex flex-wrap items-center gap-3">
-            <Link href={`/dashboard/tournaments/${tournament.id}`} className="btn-secondary">
-              Manage
-            </Link>
-            {now < tournament.registrationCloseAt && (
-              <Link href={`/tournaments/${tournament.id}/edit`} className="btn-ghost">
-                Edit
+            <StatusPill tone={status.tone} pulse={status.pulse}>
+              {status.label}
+            </StatusPill>
+            {hasBracket && (
+              <Link
+                href={`/tournaments/${tournament.id}/bracket`}
+                className="text-sm font-medium text-accent-blue hover:underline"
+              >
+                View bracket →
               </Link>
             )}
-            <CancelButton tournamentId={tournament.id} />
+            {tournament.streamUrl && (
+              <a
+                href={tournament.streamUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-accent-blue hover:underline"
+              >
+                <Tv size={14} />
+                Watch stream
+              </a>
+            )}
           </div>
-        ) : myRegistration?.status === "CONFIRMED" ? (
-          <div className="alert alert-success flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p>You&apos;re registered for this tournament.</p>
-            {now < tournament.registrationCloseAt &&
-              tournament.status !== "LIVE" &&
-              tournament.status !== "COMPLETE" && (
-                <WithdrawButton registrationId={myRegistration.id} />
-              )}
+          <h1 className="font-display text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+            {tournament.name}
+          </h1>
+          <p className="text-sm text-foreground/70">{tournament.game}</p>
+          <div className="flex flex-wrap gap-2 pt-1">
+            <span className="badge badge-neutral bg-surface-elevated/80 text-foreground">
+              <Layers size={12} />
+              {formatText}
+            </span>
+            <span className="badge badge-neutral bg-surface-elevated/80 text-foreground">
+              <Swords size={12} />
+              {tournament.teamSize}
+            </span>
+            <span className="badge badge-neutral bg-surface-elevated/80 text-foreground">
+              <Calendar size={12} />
+              {formatShortDate(tournament.startAt)}
+            </span>
+            <span className="badge badge-neutral bg-surface-elevated/80 text-foreground">
+              <Users size={12} />
+              {registrantCount} / {tournament.participantCap} Players
+            </span>
+            <span className="badge badge-neutral bg-surface-elevated/80 text-foreground">
+              <Trophy size={12} />
+              {tournament.prizeAmount
+                ? `${formatNaira(tournament.prizeAmount)} Prize Pool`
+                : tournament.entryFee === 0
+                  ? "Free Entry"
+                  : `${formatNaira(tournament.entryFee)} Entry`}
+            </span>
           </div>
-        ) : myRegistration?.status === "PENDING_PAYMENT" ? (
-          <p className="alert alert-warning">
-            Your payment is processing.{" "}
-            <Link
-              href={`/tournaments/${tournament.id}/register/callback?ref=${myRegistration.paymentRef}`}
-              className="font-medium underline"
-            >
-              Check status
-            </Link>
-          </p>
-        ) : registrationOpen ? (
-          <Link href={`/tournaments/${tournament.id}/register`} className="btn-primary w-full sm:w-fit">
-            Register
-          </Link>
-        ) : (
-          <p className="card text-center text-sm text-muted">
-            {now < tournament.registrationOpenAt
-              ? "Registration hasn't opened yet."
-              : now >= tournament.registrationCloseAt
-                ? "Registration is closed."
-                : "Registration is full."}
-          </p>
-        )}
+        </div>
       </div>
 
-      {canClaimPrize && <ClaimPrizeButton tournamentId={tournament.id} />}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_340px]">
+        <Suspense fallback={null}>
+          <TournamentTabs tabs={tabs} />
+        </Suspense>
 
-      <div className="flex flex-col gap-2 border-t border-border pt-6">
-        <h2 className="text-section-heading">Rules</h2>
-        <p className="whitespace-pre-wrap text-sm text-muted">{tournament.rulesText}</p>
+        <aside className="flex h-fit flex-col gap-4 lg:sticky lg:top-[76px]">
+          <div className="card flex flex-col gap-4">
+            <div className="flex items-center gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gold/15 text-gold">
+                <Trophy size={20} />
+              </span>
+              <div className="flex min-w-0 flex-1 flex-col">
+                <h2 className="text-card-title">Register for Tournament</h2>
+                <p className="text-metadata">Secure your spot and be part of the action.</p>
+              </div>
+              <ShareButton
+                variant="compact"
+                title={`${tournament.name} on Circuit`}
+                url={`${process.env.NEXT_PUBLIC_APP_URL}/tournaments/${tournament.id}`}
+              />
+            </div>
+
+            <div className="flex flex-col gap-2.5 border-t border-border pt-4">
+              <InfoRow icon={<Trophy size={14} />} label="Tournament" value={tournament.name} />
+              <InfoRow icon={<Layers size={14} />} label="Game" value={tournament.game} />
+              <InfoRow icon={<Calendar size={14} />} label="Date" value={formatShortDate(tournament.startAt)} />
+              <InfoRow icon={<Layers size={14} />} label="Format" value={formatText} />
+              <InfoRow icon={<Swords size={14} />} label="Team Size" value={tournament.teamSize} />
+              <InfoRow icon={<Users size={14} />} label="Players" value={`${tournament.participantCap} max`} />
+              <InfoRow
+                icon={<Wallet size={14} />}
+                label="Entry Fee"
+                value={tournament.entryFee === 0 ? "Free" : formatNaira(tournament.entryFee)}
+              />
+            </div>
+
+            <div className="flex flex-col gap-3 border-t border-border pt-4">
+              {tournament.status === "CANCELLED" ? (
+                <p className="alert alert-danger">
+                  This tournament has been cancelled. Paid entries have been refunded.
+                </p>
+              ) : isOrganizer ? (
+                <div className="flex flex-col gap-2">
+                  <Link href={`/dashboard/tournaments/${tournament.id}`} className="btn-secondary w-full">
+                    Manage
+                  </Link>
+                  {now < tournament.registrationCloseAt && (
+                    <Link href={`/tournaments/${tournament.id}/edit`} className="btn-ghost w-full">
+                      Edit
+                    </Link>
+                  )}
+                  <CancelButton tournamentId={tournament.id} />
+                </div>
+              ) : myRegistration?.status === "CONFIRMED" ? (
+                <div className="alert alert-success flex-col items-stretch gap-3">
+                  <p>You&apos;re registered for this tournament.</p>
+                  {now < tournament.registrationCloseAt &&
+                    tournament.status !== "LIVE" &&
+                    tournament.status !== "COMPLETE" && <WithdrawButton registrationId={myRegistration.id} />}
+                </div>
+              ) : myRegistration?.status === "PENDING_PAYMENT" ? (
+                <p className="alert alert-warning">
+                  Your payment is processing.{" "}
+                  <Link
+                    href={`/tournaments/${tournament.id}/register/callback?ref=${myRegistration.paymentRef}`}
+                    className="font-medium underline"
+                  >
+                    Check status
+                  </Link>
+                </p>
+              ) : registrationOpen ? (
+                <>
+                  <Link href={`/tournaments/${tournament.id}/register`} className="btn-primary w-full">
+                    Register Now →
+                  </Link>
+                  <div className="h-1 w-full overflow-hidden rounded-full bg-surface-elevated">
+                    <div className="h-full rounded-full bg-accent-blue" style={{ width: `${fillPct}%` }} />
+                  </div>
+                  <p className="flex items-center gap-1.5 text-xs text-muted">
+                    <ShieldCheck size={12} className="shrink-0" />
+                    {tournament.entryFee === 0
+                      ? "No payment required, free to enter."
+                      : "Secure payment via Paystack or Flutterwave."}
+                  </p>
+                </>
+              ) : (
+                <p className="text-center text-sm text-muted">
+                  {now < tournament.registrationOpenAt
+                    ? "Registration hasn't opened yet."
+                    : now >= tournament.registrationCloseAt
+                      ? "Registration is closed."
+                      : "Registration is full."}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {canClaimPrize && <ClaimPrizeButton tournamentId={tournament.id} />}
+
+          <div className="card flex items-start gap-3 bg-surface-elevated">
+            <ShieldCheck size={18} className="mt-0.5 shrink-0 text-accent-blue" />
+            <div className="flex flex-col gap-0.5">
+              <span className="text-card-title">Fair Play Guaranteed</span>
+              <p className="text-metadata">
+                Results are reported by both players and verified. Disputes go to the organizer, then Circuit
+                staff.
+              </p>
+            </div>
+          </div>
+        </aside>
       </div>
     </div>
   );

@@ -11,8 +11,10 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { parseOptionalUrl } from "@/lib/validation";
+import { logAdminAction } from "@/lib/auditLog";
 
 const MAX_PARTICIPANT_CAP = 128;
+const TEAM_SIZES = ["1v1", "2v2", "3v3", "4v4", "5v5"] as const;
 
 function parseDate(value: unknown): Date | null | undefined {
   if (value === undefined) return undefined;
@@ -35,7 +37,7 @@ export async function PATCH(
   if (!tournament) {
     return NextResponse.json({ error: "Tournament not found." }, { status: 404 });
   }
-  if (tournament.organizerId !== user.id) {
+  if (tournament.organizerId !== user.id && !user.isStaff) {
     return NextResponse.json({ error: "Only the organizer can edit this tournament." }, { status: 403 });
   }
   if (new Date() >= tournament.registrationCloseAt) {
@@ -75,6 +77,16 @@ export async function PATCH(
     const game = typeof body.game === "string" ? body.game.trim() : "";
     if (!game) return NextResponse.json({ error: "Game can't be empty." }, { status: 400 });
     data.game = game;
+  }
+  if (body.teamSize !== undefined) {
+    const teamSize = typeof body.teamSize === "string" ? body.teamSize.trim() : "";
+    if (!TEAM_SIZES.includes(teamSize as (typeof TEAM_SIZES)[number])) {
+      return NextResponse.json(
+        { error: "Team size must be one of 1v1, 2v2, 3v3, 4v4, 5v5." },
+        { status: 400 }
+      );
+    }
+    data.teamSize = teamSize;
   }
   if (body.rulesText !== undefined) {
     const rulesText = typeof body.rulesText === "string" ? body.rulesText.trim() : "";
@@ -142,6 +154,16 @@ export async function PATCH(
   if (startAt !== undefined) data.startAt = startAt;
 
   const updated = await prisma.tournament.update({ where: { id }, data });
+
+  if (user.isStaff && tournament.organizerId !== user.id) {
+    await logAdminAction({
+      actorId: user.id,
+      action: "tournament.edit",
+      targetType: "Tournament",
+      targetId: id,
+      metadata: { fields: Object.keys(data) },
+    });
+  }
 
   return NextResponse.json({ id: updated.id });
 }

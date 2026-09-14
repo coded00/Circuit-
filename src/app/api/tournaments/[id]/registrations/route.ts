@@ -6,6 +6,12 @@
  * and handed a hosted-checkout URL — it only ever becomes CONFIRMED via
  * confirmEntryFeePayment (the webhook path), never directly in this route.
  *
+ * A third path, `payFrom: "wallet"`, confirms immediately too — like the
+ * free path, there's no external payment to wait on, since the money
+ * already left the user's Circuit wallet balance in the same DB
+ * transaction that confirms the registration (see src/lib/wallet.ts and
+ * the WalletTransaction model for that ledger).
+ *
  * REG-3's auto-close is enforced live here (deadline or cap) rather than
  * via a background sweep updating Tournament.status — see
  * docs/circuit-stack.md's Scheduled work section for why a periodic sweep
@@ -18,16 +24,11 @@ import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
-import { getDefaultPaymentProvider } from "@/lib/payments";
+import { getDefaultPaymentProvider, toCheckoutEmail } from "@/lib/payments";
 import { maybeGenerateBracketOnCapFill } from "@/lib/matches";
 import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
 
-function toCheckoutEmail(emailOrPhone: string, userId: string): string {
-  // ACC-2 allows phone-only signup, but both payment providers' hosted
-  // checkout requires an email. Not a real email inbox — just a stable,
-  // provider-acceptable placeholder tied to the account.
-  return emailOrPhone.includes("@") ? emailOrPhone : `${userId}@users.circuit.ng`;
-}
+class InsufficientWalletBalanceError extends Error {}
 
 export async function POST(
   request: Request,
@@ -128,6 +129,69 @@ export async function POST(
       );
     }
     throw err;
+  }
+
+  const payFromWallet = body?.payFrom === "wallet";
+
+  if (payFromWallet) {
+    const reference = `wallet_entry_${randomUUID().slice(0, 12)}`;
+    const provider = getDefaultPaymentProvider();
+
+    try {
+      const registration = await prisma.$transaction(async (tx) => {
+        // Atomic guard: a single conditional UPDATE, not a read-then-write —
+        // two concurrent registration attempts can't both pass this check
+        // and overdraw the balance.
+        const debited = await tx.user.updateMany({
+          where: { id: user.id, walletBalance: { gte: tournament.entryFee } },
+          data: { walletBalance: { decrement: tournament.entryFee } },
+        });
+        if (debited.count === 0) throw new InsufficientWalletBalanceError();
+
+        const reg = existing
+          ? await tx.registration.update({
+              where: { id: existing.id },
+              data: { inGameId, status: "CONFIRMED", paymentRef: reference },
+            })
+          : await tx.registration.create({
+              data: { tournamentId, userId: user.id, inGameId, status: "CONFIRMED", paymentRef: reference },
+            });
+
+        await tx.escrowTransaction.create({
+          data: {
+            tournamentId,
+            registrationId: reg.id,
+            type: "ENTRY_FEE",
+            // `provider` here reflects Circuit's configured provider, not
+            // that it was actually charged for this transaction — see
+            // WalletTransactionType.ENTRY_FEE_DEBIT's own schema comment.
+            provider: provider.name,
+            amount: tournament.entryFee,
+            providerRef: reference,
+            status: "COMPLETE",
+          },
+        });
+        await tx.walletTransaction.create({
+          data: {
+            userId: user.id,
+            type: "ENTRY_FEE_DEBIT",
+            amount: tournament.entryFee,
+            providerRef: reference,
+            status: "COMPLETE",
+          },
+        });
+
+        return reg;
+      });
+
+      await maybeGenerateBracketOnCapFill(tournamentId); // BRK-1's cap-fill path
+      return NextResponse.json({ id: registration.id, status: "CONFIRMED" }, { status: 201 });
+    } catch (err) {
+      if (err instanceof InsufficientWalletBalanceError) {
+        return NextResponse.json({ error: "Insufficient wallet balance." }, { status: 402 });
+      }
+      throw err;
+    }
   }
 
   const registration = existing

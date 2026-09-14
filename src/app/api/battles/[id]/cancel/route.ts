@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
+import { logAdminAction } from "@/lib/auditLog";
 
 export async function POST(
   request: Request,
@@ -20,7 +21,7 @@ export async function POST(
   if (!battle) {
     return NextResponse.json({ error: "Battle not found." }, { status: 404 });
   }
-  if (battle.creatorId !== user.id) {
+  if (battle.creatorId !== user.id && !user.isStaff) {
     return NextResponse.json({ error: "Only the Battle's creator can cancel it." }, { status: 403 });
   }
 
@@ -33,6 +34,10 @@ export async function POST(
       { error: "This Battle has already been accepted or cancelled." },
       { status: 409 }
     );
+  }
+
+  if (user.isStaff && battle.creatorId !== user.id) {
+    await logAdminAction({ actorId: user.id, action: "challenge.cancel", targetType: "Battle", targetId: id, metadata: { game: battle.game } });
   }
 
   return NextResponse.json({ ok: true });

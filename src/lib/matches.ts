@@ -19,7 +19,7 @@
 import { Prisma } from "@prisma/client";
 import type { Dispute, Match } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { notify } from "@/lib/notifications";
+import { notify, notifyStaff } from "@/lib/notifications";
 import { proofStorage } from "@/lib/storage";
 
 export class MatchError extends Error {
@@ -178,6 +178,7 @@ export async function generateBracket(tournamentId: string): Promise<void> {
   // winners (no Match row — playerAId/playerBId can't be null).
   const round1 = structure.rounds[0];
   const byeAdvances: { position: number; winnerId: string }[] = [];
+  const createdMatches: { id: string; playerAId: string; playerBId: string }[] = [];
 
   for (let position = 0; position < round1.slots.length; position++) {
     const playerA = seeded[position * 2];
@@ -194,6 +195,7 @@ export async function generateBracket(tournamentId: string): Promise<void> {
         playerBId: playerB,
       });
       slot.matchId = match.id;
+      createdMatches.push({ id: match.id, playerAId: playerA, playerBId: playerB });
     } else {
       const byeWinner = playerA ?? playerB;
       if (byeWinner) {
@@ -216,6 +218,7 @@ export async function generateBracket(tournamentId: string): Promise<void> {
         playerBId: readyMatch.playerBId,
       });
       setSlotMatchId(structure, readyMatch.round, readyMatch.position, match.id);
+      createdMatches.push({ id: match.id, playerAId: readyMatch.playerAId, playerBId: readyMatch.playerBId });
     }
   }
 
@@ -235,10 +238,20 @@ export async function generateBracket(tournamentId: string): Promise<void> {
     // constraint stops a duplicate Bracket row — the loser's already-created
     // Match rows above become orphaned (no Bracket slot references them)
     // rather than a 500, since generateBracket is meant to be a safe,
-    // idempotent call from either trigger.
+    // idempotent call from either trigger. Not notifying players of an
+    // orphaned match is the correct behavior here — skip notification too.
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") return;
     throw err;
   }
+
+  // Only notify once the Bracket/Tournament rows actually committed —
+  // real, playable matches now, not the orphaned-race case above.
+  await Promise.all(
+    createdMatches.flatMap((match) => [
+      notify(match.playerAId, "MATCH_READY", { matchId: match.id }),
+      notify(match.playerBId, "MATCH_READY", { matchId: match.id }),
+    ])
+  );
 }
 
 /** Records a winner into its slot and propagates into the next round's
@@ -307,6 +320,9 @@ const ADVANCEMENT_MAX_RETRIES = 3;
  *  silently clobbering the first's advancement and losing a winner. */
 async function applyWinnerAdvancement(tournamentId: string, matchId: string, winnerId: string): Promise<void> {
   for (let attempt = 0; attempt < ADVANCEMENT_MAX_RETRIES; attempt++) {
+    let createdMatch: { id: string; playerAId: string; playerBId: string } | null = null;
+    let completedTournament: { organizerId: string } | null = null;
+
     try {
       await prisma.$transaction(
         async (tx) => {
@@ -331,6 +347,7 @@ async function applyWinnerAdvancement(tournamentId: string, matchId: string, win
               tx
             );
             setSlotMatchId(structure, readyMatch.round, readyMatch.position, match.id);
+            createdMatch = { id: match.id, playerAId: readyMatch.playerAId, playerBId: readyMatch.playerBId };
           }
 
           await tx.bracket.update({
@@ -338,11 +355,31 @@ async function applyWinnerAdvancement(tournamentId: string, matchId: string, win
             data: { structure: structure as unknown as Prisma.InputJsonValue },
           });
           if (isFinal) {
-            await tx.tournament.update({ where: { id: tournamentId }, data: { status: "COMPLETE" } });
+            completedTournament = await tx.tournament.update({
+              where: { id: tournamentId },
+              data: { status: "COMPLETE" },
+              select: { organizerId: true },
+            });
           }
         },
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
       );
+
+      // Only notify once the transaction actually committed.
+      if (createdMatch) {
+        const match: { id: string; playerAId: string; playerBId: string } = createdMatch;
+        await Promise.all([
+          notify(match.playerAId, "MATCH_READY", { matchId: match.id }),
+          notify(match.playerBId, "MATCH_READY", { matchId: match.id }),
+        ]);
+      }
+      if (completedTournament) {
+        const tournament: { organizerId: string } = completedTournament;
+        await Promise.all([
+          notify(winnerId, "TOURNAMENT_COMPLETE", { tournamentId, isOrganizer: false }),
+          notify(tournament.organizerId, "TOURNAMENT_COMPLETE", { tournamentId, isOrganizer: true }),
+        ]);
+      }
       return;
     } catch (err) {
       const isSerializationFailure =
@@ -456,8 +493,8 @@ async function completeMatch(match: Match, winnerId: string): Promise<Match> {
   }
 
   await Promise.all([
-    notify(match.playerAId, "MATCH_READY", { matchId: match.id, resolved: true }),
-    notify(match.playerBId, "MATCH_READY", { matchId: match.id, resolved: true }),
+    notify(match.playerAId, "MATCH_COMPLETE", { matchId: match.id }),
+    notify(match.playerBId, "MATCH_COMPLETE", { matchId: match.id }),
   ]);
 
   return updated;
@@ -497,6 +534,8 @@ async function openDispute(match: Match, raisedById: string): Promise<Match> {
   ]);
   if (!skipsOrganizerReview && tournament) {
     await notify(tournament.organizerId, "DISPUTE_NEEDS_RULING", { matchId: match.id });
+  } else if (skipsOrganizerReview) {
+    await notifyStaff("DISPUTE_ESCALATED", { matchId: match.id });
   }
 
   return updated;
@@ -675,6 +714,7 @@ export async function runScheduledSweep(): Promise<{
   });
   for (const dispute of overdueDisputes) {
     await prisma.dispute.update({ where: { id: dispute.id }, data: { status: "ESCALATED" } });
+    await notifyStaff("DISPUTE_ESCALATED", { matchId: dispute.matchId });
   }
 
   return {

@@ -24,11 +24,16 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
+  const MAX_FAVORITE_GAMES = 6;
+  const MAX_BIO_LENGTH = 160;
+
   const data: {
     displayName?: string;
     avatarUrl?: string | null;
     payoutMethodRef?: string | null;
     dateOfBirth?: Date | null;
+    bio?: string | null;
+    favoriteGames?: string[];
   } = {};
 
   if (body.displayName !== undefined) {
@@ -37,6 +42,25 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Display name can't be empty." }, { status: 400 });
     }
     data.displayName = displayName;
+  }
+
+  if (body.bio !== undefined) {
+    const bio = typeof body.bio === "string" ? body.bio.trim() : "";
+    if (bio.length > MAX_BIO_LENGTH) {
+      return NextResponse.json({ error: `Bio must be ${MAX_BIO_LENGTH} characters or fewer.` }, { status: 400 });
+    }
+    data.bio = bio || null;
+  }
+
+  if (body.favoriteGames !== undefined) {
+    if (!Array.isArray(body.favoriteGames) || body.favoriteGames.some((g: unknown) => typeof g !== "string")) {
+      return NextResponse.json({ error: "Favorite games must be a list of names." }, { status: 400 });
+    }
+    const games: string[] = [...new Set((body.favoriteGames as string[]).map((g) => g.trim()).filter(Boolean))];
+    if (games.length > MAX_FAVORITE_GAMES) {
+      return NextResponse.json({ error: `Pick up to ${MAX_FAVORITE_GAMES} games.` }, { status: 400 });
+    }
+    data.favoriteGames = games;
   }
 
   if (body.avatarUrl !== undefined) {
@@ -78,5 +102,7 @@ export async function PATCH(request: Request) {
     avatarUrl: updated.avatarUrl,
     payoutMethodRef: updated.payoutMethodRef,
     dateOfBirth: updated.dateOfBirth,
+    bio: updated.bio,
+    favoriteGames: updated.favoriteGames,
   });
 }

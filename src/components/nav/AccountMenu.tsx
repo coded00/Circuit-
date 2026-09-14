@@ -3,11 +3,44 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, ShoppingBag, Gift, Trophy, Swords, Shield, Wallet } from "lucide-react";
 
 type NavUser = { handle: string; displayName: string; avatarUrl: string | null; isStaff: boolean };
 
-export function AccountMenu({ user }: { user: NavUser }) {
+function MenuLink({
+  href,
+  icon: Icon,
+  children,
+  badge,
+  onClick,
+}: {
+  href: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  children: React.ReactNode;
+  badge?: number;
+  onClick: () => void;
+}) {
+  return (
+    <Link
+      href={href}
+      onClick={onClick}
+      className="flex items-center gap-2.5 px-4 py-2 text-sm hover:bg-surface-elevated"
+    >
+      <Icon size={15} className="shrink-0 text-muted" />
+      <span className="flex-1">{children}</span>
+      {!!badge && badge > 0 && <span className="badge badge-cancelled">{badge > 9 ? "9+" : badge}</span>}
+    </Link>
+  );
+}
+
+/**
+ * Circuit — account dropdown. Also home to everything that used to live
+ * behind the sidebar's "More" disclosure (Marketplace/Rewards/Organize/
+ * Staff — see AppSidebar.tsx's own comment on why that was removed):
+ * real destinations, not new ones, just relocated so the primary rail
+ * stays a fixed, always-fits-without-scrolling list.
+ */
+export function AccountMenu({ user, disputeCount = 0 }: { user: NavUser; disputeCount?: number }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -52,18 +85,51 @@ export function AccountMenu({ user }: { user: NavUser }) {
       </button>
 
       {open && (
-        <div className="absolute right-0 z-20 mt-2 w-48 dropdown-panel py-1">
+        <div className="absolute right-0 z-20 mt-2 w-56 dropdown-panel py-1">
           <Link href={`/players/${user.handle}`} onClick={() => setOpen(false)} className="block px-4 py-2 text-sm hover:bg-surface-elevated">
             My Profile
           </Link>
           <Link href="/account" onClick={() => setOpen(false)} className="block px-4 py-2 text-sm hover:bg-surface-elevated">
             Account settings
           </Link>
+
+          <div className="my-1 border-t border-border" />
+          <MenuLink href="/marketplace" icon={ShoppingBag} onClick={() => setOpen(false)}>
+            Marketplace
+          </MenuLink>
+          <MenuLink href="/rewards" icon={Gift} onClick={() => setOpen(false)}>
+            Rewards
+          </MenuLink>
+
+          <div className="my-1 border-t border-border" />
+          <span className="text-eyebrow block px-4 py-1">Organize</span>
+          <MenuLink href="/dashboard" icon={Trophy} onClick={() => setOpen(false)}>
+            Tournaments
+          </MenuLink>
+          <MenuLink href="/dashboard/battles" icon={Swords} onClick={() => setOpen(false)}>
+            Battles queue
+          </MenuLink>
+          <MenuLink href="/dashboard/disputes" icon={Shield} badge={disputeCount} onClick={() => setOpen(false)}>
+            Disputes
+          </MenuLink>
+          <MenuLink href="/dashboard/payouts" icon={Wallet} onClick={() => setOpen(false)}>
+            Payouts
+          </MenuLink>
+
           {user.isStaff && (
-            <Link href="/staff/reports" onClick={() => setOpen(false)} className="block px-4 py-2 text-sm hover:bg-surface-elevated">
-              Staff tools
-            </Link>
+            <>
+              <div className="my-1 border-t border-border" />
+              <span className="text-eyebrow block px-4 py-1">Staff</span>
+              <MenuLink href="/staff/disputes" icon={Shield} onClick={() => setOpen(false)}>
+                Disputes queue
+              </MenuLink>
+              <MenuLink href="/staff/reports" icon={Shield} onClick={() => setOpen(false)}>
+                Reports
+              </MenuLink>
+            </>
           )}
+
+          <div className="my-1 border-t border-border" />
           <button
             type="button"
             onClick={handleLogout}

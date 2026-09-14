@@ -5,7 +5,8 @@
  */
 
 import { notFound } from "next/navigation";
-import { Trophy } from "lucide-react";
+import Link from "next/link";
+import { Trophy, Flag } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { StatusPill, matchStatusInfo } from "@/components/StatusPill";
@@ -16,6 +17,15 @@ import RulingForm from "./RulingForm";
 function playerLabel(user: { displayName: string; handle: string }): string {
   return `${user.displayName} (@${user.handle})`;
 }
+
+/* Deterministic scatter (no Math.random — this renders server-side) for the
+ * win banner's confetti burst. Purely decorative; carries no data. */
+const CONFETTI_COLORS = ["var(--accent-volt)", "var(--accent-orange)", "var(--accent-blue)", "var(--gold)"];
+const CONFETTI_PIECES = Array.from({ length: 10 }, (_, i) => ({
+  left: (i * 37 + 5) % 96,
+  color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+  delayMs: (i % 5) * 80,
+}));
 
 type ResultPayload = { winnerId: string; score: string; submittedAt: string };
 
@@ -59,21 +69,21 @@ function buildMatchTimeline(match: {
   }
 
   if (match.dispute) {
-    events.push({ at: match.dispute.createdAt, label: "Dispute opened — reports conflicted" });
+    events.push({ at: match.dispute.createdAt, label: "Dispute opened: reports conflicted" });
     if (match.dispute.ruledAt) {
       events.push({
         at: match.dispute.ruledAt,
         label:
           match.dispute.status === "VOID"
-            ? `Ruling: match voided${match.dispute.ruling ? ` — ${match.dispute.ruling}` : ""}`
-            : `Ruling: ${match.winner?.displayName ?? "winner"} confirmed${match.dispute.ruling ? ` — ${match.dispute.ruling}` : ""}`,
+            ? `Ruling: match voided${match.dispute.ruling ? ` (${match.dispute.ruling})` : ""}`
+            : `Ruling: ${match.winner?.displayName ?? "winner"} confirmed${match.dispute.ruling ? ` (${match.dispute.ruling})` : ""}`,
       });
     }
   } else if (match.status === "COMPLETE" && resultA && resultB) {
     const completedAt = new Date(
       Math.max(new Date(resultA.submittedAt).getTime(), new Date(resultB.submittedAt).getTime())
     );
-    events.push({ at: completedAt, label: `Match auto-completed — ${match.winner?.displayName ?? "winner"} advances` });
+    events.push({ at: completedAt, label: `Match auto-completed: ${match.winner?.displayName ?? "winner"} advances` });
   } else if (match.status === "COMPLETE" && (resultA || resultB)) {
     // BRK-10: the silent side never reported, so the sweep auto-accepted
     // sometime after the window expired — reportWindowExpiresAt gets
@@ -83,7 +93,7 @@ function buildMatchTimeline(match: {
     const lastIndex = events.length - 1;
     events[lastIndex] = {
       ...events[lastIndex],
-      label: `${events[lastIndex].label} — later auto-accepted after the other side didn't respond`,
+      label: `${events[lastIndex].label}. Later auto-accepted after the other side didn't respond.`,
     };
   }
 
@@ -121,13 +131,22 @@ export default async function MatchPage({
     isOrganizer && match.dispute?.status === "ORGANIZER_REVIEW" && !isParticipant;
   const canRuleAsStaff = user?.isStaff === true && match.dispute?.status === "ESCALATED";
   const status = matchStatusInfo(match.status);
+  const wonThisMatch = isParticipant && match.winnerId === user?.id;
+  const lostThisMatch = isParticipant && match.winnerId !== null && match.winnerId !== user?.id;
+  // TRU-2/PRD §19: voiding is only unambiguous for a Battle (no stake,
+  // nothing to return) — see MatchError "VOID_UNSUPPORTED" in
+  // src/lib/matches.ts. Surfaced here (rather than just omitting the
+  // option) so whoever's ruling sees why, not a silently missing choice.
+  const voidUnsupportedReason = match.tournamentId
+    ? "Voiding a tournament bracket match isn't supported yet."
+    : undefined;
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-8 px-6 py-10">
       <div className="flex flex-col gap-2">
         <StatusPill tone={status.tone}>{status.label}</StatusPill>
         <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
-          {match.tournament ? `${match.tournament.name} — Round ${match.round}` : "Battle match"}
+          {match.tournament ? `${match.tournament.name} · Round ${match.round}` : "Battle match"}
         </h1>
         <p className="text-sm text-muted">
           Match code · <span className="font-mono">{match.matchCode}</span>
@@ -139,15 +158,57 @@ export default async function MatchPage({
           const isWinner = match.winnerId === p.id;
           return (
             <div key={i} className={`card flex flex-col gap-1 ${isWinner ? "border-success/40" : ""}`}>
-              <div className="text-eyebrow">Player {i === 0 ? "A" : "B"}</div>
-              <div className="flex items-center gap-1.5 font-medium">
-                {isWinner && <Trophy size={14} className="shrink-0 text-gold" />}
-                {playerLabel(p)}
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-eyebrow">Player {i === 0 ? "A" : "B"}</div>
+                {user && user.id !== p.id && (
+                  <Link
+                    href={`/players/${p.handle}/report`}
+                    className="flex items-center gap-1 text-xs text-muted hover:text-foreground"
+                  >
+                    <Flag size={12} />
+                    Report
+                  </Link>
+                )}
               </div>
+              <Link href={`/players/${p.handle}`} className="flex items-center gap-1.5 font-medium hover:underline">
+                {isWinner && (
+                  <>
+                    <Trophy size={14} className="shrink-0 text-gold" aria-hidden="true" />
+                    <span className="sr-only">Winner: </span>
+                  </>
+                )}
+                {playerLabel(p)}
+              </Link>
             </div>
           );
         })}
       </div>
+
+      {wonThisMatch && (
+        <div className="celebrate-fade relative overflow-hidden rounded-[14px] border border-gold/30 bg-gold/10 px-5 py-4">
+          <div className="confetti-burst" aria-hidden>
+            {CONFETTI_PIECES.map((p, i) => (
+              <span
+                key={i}
+                className="confetti-piece"
+                style={{ left: `${p.left}%`, backgroundColor: p.color, animationDelay: `${p.delayMs}ms` }}
+              />
+            ))}
+          </div>
+          <div className="relative z-10 flex items-center gap-3">
+            <Trophy size={28} className="trophy-pop shrink-0 text-gold" aria-hidden="true" />
+            <div className="flex flex-col">
+              <span className="font-display text-lg font-bold tracking-tight">You won!</span>
+              <span className="text-sm text-muted">Nice one. This counts toward your ladder rank.</span>
+            </div>
+          </div>
+        </div>
+      )}
+      {lostThisMatch && (
+        <div className="celebrate-fade card flex items-center gap-3">
+          <span className="text-sm text-muted">GG, this one didn&apos;t go your way. Next one&apos;s yours.</span>
+        </div>
+      )}
 
       {(match.proofARef || match.proofBRef) && (
         <div className="flex flex-wrap gap-4">
@@ -192,7 +253,7 @@ export default async function MatchPage({
               endpoint={`/api/disputes/${match.dispute.id}/rule`}
               playerA={match.playerA}
               playerB={match.playerB}
-              allowVoid={false}
+              voidUnsupportedReason={voidUnsupportedReason}
             />
           )}
           {canRuleAsStaff && match.dispute && (
@@ -201,7 +262,7 @@ export default async function MatchPage({
               endpoint={`/api/staff/disputes/${match.dispute.id}/rule`}
               playerA={match.playerA}
               playerB={match.playerB}
-              allowVoid={!match.tournamentId}
+              voidUnsupportedReason={voidUnsupportedReason}
             />
           )}
         </div>

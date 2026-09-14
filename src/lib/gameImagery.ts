@@ -15,7 +15,7 @@
 export const GAME_IMAGES: Record<string, string> = {
   "call of duty": "https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf",
   valorant: "https://images.unsplash.com/photo-1644560286950-1807431fc64f",
-  "ea fc 25": "https://images.unsplash.com/photo-1745997645080-941f962f1392",
+  "ea fc": "https://images.unsplash.com/photo-1745997645080-941f962f1392",
   fortnite: "https://images.unsplash.com/photo-1750274077417-8765b230e311",
   "gta v": "https://images.unsplash.com/photo-1616063971315-5500225a0aaf",
 };

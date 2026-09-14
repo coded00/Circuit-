@@ -18,13 +18,18 @@ import { prisma } from "@/lib/db";
 export type NotificationType =
   | "REGISTRATION_CONFIRMED"
   | "MATCH_READY"
+  | "MATCH_COMPLETE"
   | "RESULT_DISPUTED"
   | "DISPUTE_RESOLVED"
   | "TOURNAMENT_CANCELLED"
+  | "TOURNAMENT_COMPLETE"
   | "BATTLE_CHALLENGE"
+  | "BATTLE_ACCEPTED"
   | "REGISTRATION_CAP_FILLED"
   | "REGISTRATION_CLOSED"
-  | "DISPUTE_NEEDS_RULING";
+  | "DISPUTE_NEEDS_RULING"
+  | "DISPUTE_ESCALATED"
+  | "REPORT_FILED";
 
 export interface NotificationChannel {
   send(userId: string, type: NotificationType, payload: Record<string, unknown>): Promise<void>;
@@ -63,4 +68,18 @@ export async function notify(
   payload: Record<string, unknown> = {}
 ): Promise<void> {
   await Promise.all(channels.map((channel) => channel.send(userId, type, payload)));
+}
+
+/**
+ * Fan-out to every staff account — there's no single "staff" inbox, so an
+ * event staff need to see (a new report, a dispute escalation) goes to each
+ * of them individually, same shape as TOURNAMENT_CANCELLED's registrant
+ * fan-out in src/lib/matches.ts.
+ */
+export async function notifyStaff(
+  type: NotificationType,
+  payload: Record<string, unknown> = {}
+): Promise<void> {
+  const staff = await prisma.user.findMany({ where: { isStaff: true }, select: { id: true } });
+  await Promise.all(staff.map((s) => notify(s.id, type, payload)));
 }

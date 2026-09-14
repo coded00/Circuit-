@@ -16,7 +16,7 @@ export default async function EditTournamentPage({
 
   const tournament = await prisma.tournament.findUnique({ where: { id } });
   if (!tournament) notFound();
-  if (tournament.organizerId !== user.id) {
+  if (tournament.organizerId !== user.id && !user.isStaff) {
     redirect(`/tournaments/${id}`);
   }
   if (new Date() >= tournament.registrationCloseAt) {

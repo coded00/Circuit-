@@ -1,56 +1,156 @@
 /**
  * Circuit — Challenge detail page (Build Plan P4-1/P4-4/P4-6; user-facing
  * "Challenges" is this same underlying `Battle` feature, just renamed —
- * no schema/logic changes). The one other dark, "arena" environment
- * besides the homepage hero: a large Challenger/Opponent VS composition
- * (Volt vs Orange), real player avatars where set, and no card boxing
- * the info around it — plain text rows with real spacing instead, per
- * the refined visual system's "avoid unnecessary cards around the VS
- * composition... minimal interface chrome."
+ * no schema/logic changes).
+ *
+ * Built around "you are here to challenge someone": the two real
+ * competitors are the hero, not the game's title. A full-bleed dark arena
+ * canvas (not a card floating on a light page) puts the host on one side
+ * and either the real opponent (matched), the real invited player (a
+ * still-open targeted challenge), or an honest dashed empty slot (open to
+ * anyone) on the other — never a filled-in stranger. A persistent sidebar
+ * (Match Details / How It Works / Share) turns this into a real two-column
+ * layout instead of a single centered form.
+ *
+ * A few things a supplied reference design showed that Circuit has no real
+ * data for are deliberately not invented:
+ * - **No prize pool.** Battles are free in V1 (`Battle.stakeAmount` can
+ *   never be set above zero — see that field's own schema comment); the
+ *   header's stat slot shows the real "Free" entry instead of a cash
+ *   figure, and Match Details lists "Entry Fee" rather than "Prize Pool".
+ * - **No "Level" chip.** `AccountMenu.tsx` already ships one narrow,
+ *   explicitly-decided decorative "Level 24" (Circuit has no Level/XP
+ *   system); this page doesn't extend that exception further.
+ * - **No formal "Challenge Rules" document.** There's no rules page or
+ *   Code of Conduct route to link to, and no per-Battle rules text field.
+ *   "How It Works" states three real, verifiable facts about the actual
+ *   Match/Dispute engine (src/lib/matches.ts) instead.
+ * - **Win/Loss/Win Rate ARE real** — `gameStandings(game)`, the same
+ *   aggregation the ladder and public profile pages already use — shown
+ *   only for a side that has actually completed matches in this game.
  */
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Tv } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Tv, Zap } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
+import { GameArtTile } from "@/components/GameArtTile";
+import { ShareButton } from "@/components/ShareButton";
 import { StatusPill, battleStatusInfo } from "@/components/StatusPill";
+import { gameStandings, type Standing } from "@/lib/standings";
 import AcceptButton from "./AcceptButton";
 import CancelBattleButton from "./CancelBattleButton";
 
-type SidePlayer = { displayName: string; avatarUrl: string | null } | null;
+const relativeTime = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+function formatRelative(date: Date): string {
+  const diffMin = Math.round((date.getTime() - Date.now()) / 60000);
+  if (Math.abs(diffMin) < 60) return relativeTime.format(diffMin, "minute");
+  const diffHour = Math.round(diffMin / 60);
+  if (Math.abs(diffHour) < 24) return relativeTime.format(diffHour, "hour");
+  return relativeTime.format(Math.round(diffHour / 24), "day");
+}
 
-function Side({
-  label,
-  player,
-  fallbackName,
-  accent,
+function formatLabel(format: string): string {
+  return format === "BEST_OF_3" ? "Best of 3" : "Single match";
+}
+
+function Avatar({
+  avatarUrl,
+  name,
+  ringClass,
+  size,
 }: {
-  label: string;
-  player: SidePlayer;
-  fallbackName: string;
-  accent: "volt" | "orange";
+  avatarUrl: string | null;
+  name: string;
+  ringClass: string;
+  size: number;
 }) {
-  const name = player?.displayName ?? fallbackName;
-  const accentClass = accent === "volt" ? "text-accent-volt" : "text-accent-orange";
-  const ringClass = accent === "volt" ? "border-accent-volt/40" : "border-accent-orange/40";
-  return (
-    <div className="flex flex-1 flex-col items-center gap-3 text-center">
-      {player?.avatarUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs
-        <img src={player.avatarUrl} alt="" className={`h-16 w-16 rounded-full border-2 object-cover ${ringClass}`} />
-      ) : (
-        <div className={`flex h-16 w-16 items-center justify-center rounded-full border-2 bg-surface text-xl font-semibold text-muted ${ringClass}`}>
-          {name.slice(0, 1).toUpperCase()}
-        </div>
-      )}
-      <div className="flex flex-col gap-1">
-        <span className={`text-eyebrow ${accentClass}`}>{label}</span>
-        <span className="font-display text-xl font-bold tracking-tight sm:text-2xl">{name}</span>
-      </div>
+  const px = `${size}px`;
+  return avatarUrl ? (
+    // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs
+    <img
+      src={avatarUrl}
+      alt=""
+      style={{ height: px, width: px }}
+      className={`rounded-full border-2 object-cover ${ringClass}`}
+    />
+  ) : (
+    <div
+      style={{ height: px, width: px }}
+      className={`flex items-center justify-center rounded-full border-2 bg-surface text-2xl font-semibold text-muted ${ringClass}`}
+    >
+      {name.slice(0, 1).toUpperCase()}
     </div>
   );
 }
+
+function EmptySlot({ size }: { size: number }) {
+  const px = `${size}px`;
+  return (
+    <div
+      style={{ height: px, width: px }}
+      className="flex items-center justify-center rounded-full border-2 border-dashed border-border-strong text-3xl font-bold text-muted"
+    >
+      ?
+    </div>
+  );
+}
+
+function Tag({ children, tone }: { children: React.ReactNode; tone: "volt" | "orange" | "neutral" }) {
+  const toneClass =
+    tone === "volt"
+      ? "border-accent-volt/50 text-accent-volt"
+      : tone === "orange"
+        ? "border-accent-orange/50 text-accent-orange"
+        : "border-border-strong text-muted";
+  return (
+    <span className={`rounded-full border px-3 py-1 text-[11px] font-bold tracking-wide uppercase ${toneClass}`}>
+      {children}
+    </span>
+  );
+}
+
+function RankBadge({ rank }: { rank: number | null }) {
+  if (rank == null) return null;
+  return <span className="text-xs font-semibold text-gold">Rank #{rank}</span>;
+}
+
+function StatsRow({ standing }: { standing: Standing | undefined }) {
+  if (!standing) return null;
+  const played = standing.wins + standing.losses;
+  if (played === 0) return null;
+  const winRate = Math.round((standing.wins / played) * 100);
+  return (
+    <div className="flex items-center gap-4">
+      {[
+        { label: "Wins", value: standing.wins },
+        { label: "Losses", value: standing.losses },
+        { label: "Win Rate", value: `${winRate}%` },
+      ].map((s) => (
+        <div key={s.label} className="flex flex-col items-center">
+          <span className="text-sm font-bold text-foreground">{s.value}</span>
+          <span className="text-[10px] tracking-wide text-muted uppercase">{s.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between py-2.5 text-sm">
+      <span className="text-muted">{label}</span>
+      <span className="font-semibold text-foreground">{value}</span>
+    </div>
+  );
+}
+
+const HOW_IT_WORKS = [
+  "Both players submit their result — matching reports settle the match instantly.",
+  "Reports don't match? Circuit staff step in to review and rule.",
+  "Free to enter — no stakes, no entry fee.",
+];
 
 export default async function BattlePage({
   params,
@@ -64,7 +164,16 @@ export default async function BattlePage({
     include: {
       creator: { select: { displayName: true, handle: true, avatarUrl: true } },
       targetUser: { select: { displayName: true, handle: true, avatarUrl: true } },
-      matches: { select: { id: true }, orderBy: { createdAt: "desc" }, take: 1 },
+      matches: {
+        select: {
+          id: true,
+          createdAt: true,
+          playerA: { select: { id: true, displayName: true, handle: true, avatarUrl: true } },
+          playerB: { select: { id: true, displayName: true, handle: true, avatarUrl: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
     },
   });
   if (!battle) notFound();
@@ -76,60 +185,234 @@ export default async function BattlePage({
     !isCreator &&
     battle.status === "OPEN" &&
     (battle.visibility === "OPEN" || battle.targetUserId === user.id);
+
+  // A real Match row is the only thing that means "matched" — targetUserId
+  // being set just means someone was *invited*, not that they've accepted
+  // (a prior version of this page conflated the two, which made a still-
+  // open targeted challenge render as if it were already underway).
+  const realMatch = battle.matches[0] ?? null;
+  const matchOpponent = realMatch ? (realMatch.playerA.id === battle.creatorId ? realMatch.playerB : realMatch.playerA) : null;
+  const isMatched = battle.status === "ACCEPTED" || battle.status === "COMPLETE" || Boolean(realMatch);
+  const isTargetedOpen = !isMatched && battle.visibility === "TARGETED" && Boolean(battle.targetUser);
+  const cancelled = battle.status === "CANCELLED";
+
+  const opponent = matchOpponent ?? (isTargetedOpen ? battle.targetUser : null);
+  const opponentId = matchOpponent?.id ?? (isTargetedOpen ? battle.targetUserId : null) ?? null;
+
+  // One real aggregation covers rank AND win/loss/win-rate for both sides —
+  // the same `gameStandings` the ladder and public profile pages use.
+  const standings = await gameStandings(battle.game);
+  const creatorIndex = standings.findIndex((s) => s.userId === battle.creatorId);
+  const creatorRank = creatorIndex === -1 ? null : creatorIndex + 1;
+  const creatorStanding = creatorIndex === -1 ? undefined : standings[creatorIndex];
+  const opponentIndex = opponentId ? standings.findIndex((s) => s.userId === opponentId) : -1;
+  const opponentRank = opponentIndex === -1 ? null : opponentIndex + 1;
+  const opponentStanding = opponentIndex === -1 ? undefined : standings[opponentIndex];
+
   const status = battleStatusInfo(battle.status);
+  const formatText = formatLabel(battle.format);
+
+  // Only a viewer who could personally accept an open-to-anyone slot right
+  // now gets framed as "You" — a logged-out guest or the creator viewing
+  // their own post still see the honest "Any Challenger" empty slot.
+  const viewerIsInvitee = canAccept && !opponent;
+
+  const rightName = opponent ? opponent.displayName : viewerIsInvitee ? "You" : "Any Challenger";
+  const rightAvatarUrl = opponent?.avatarUrl ?? (viewerIsInvitee ? (user?.avatarUrl ?? null) : null);
+  const rightIsEmpty = !opponent && !rightAvatarUrl;
+  const rightTag = isMatched ? "Opponent" : isTargetedOpen ? "Invited" : viewerIsInvitee ? "Challenger" : "Open Slot";
+  const rightRank = isMatched ? opponentRank : null;
+
+  const caption = isMatched
+    ? null
+    : isTargetedOpen
+      ? `Waiting for @${battle.targetUser!.handle} to accept`
+      : viewerIsInvitee
+        ? "Think you can take them down?"
+        : "Waiting for a challenger";
 
   return (
-    <div data-surface="dark">
-      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center gap-8 px-6 py-14 text-center">
-        <div className="flex flex-col items-center gap-3">
-          <StatusPill tone={status.tone} pulse={status.pulse}>
-            {status.label}
-          </StatusPill>
-          <span className="text-eyebrow">{battle.game}</span>
+    <div data-surface="dark" className="w-full flex-1 bg-background">
+      <div className="mx-auto grid w-full max-w-[1400px] gap-6 px-6 py-8 sm:px-8 sm:py-10 lg:grid-cols-[1fr_340px] lg:items-start">
+        <div className="flex flex-col gap-6">
+          <div className="flex items-center justify-between gap-3">
+            <Link
+              href="/battles"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-muted transition hover:text-foreground"
+            >
+              <ArrowLeft size={15} />
+              Back to Challenges
+            </Link>
+            <StatusPill tone={status.tone} pulse={status.pulse}>
+              {battle.status === "OPEN" ? (
+                <>
+                  <Zap size={13} />
+                  Open Challenge
+                </>
+              ) : (
+                status.label
+              )}
+            </StatusPill>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <GameArtTile game={battle.game} hideLabel className="h-16 w-16 shrink-0 rounded-[14px]" />
+              <div className="flex flex-col gap-1.5">
+                <h1 className="font-display text-3xl leading-none font-bold tracking-tight uppercase sm:text-4xl">
+                  {battle.game}
+                </h1>
+                <div className="flex flex-wrap gap-2">
+                  <Tag tone="neutral">1v1</Tag>
+                  <Tag tone="neutral">{formatText}</Tag>
+                </div>
+              </div>
+            </div>
+            <div className="flex shrink-0 flex-col items-end gap-0.5">
+              <span className="text-eyebrow text-muted">Entry</span>
+              <span className="font-display text-2xl font-bold text-foreground">Free</span>
+            </div>
+          </div>
+
+          <div className="relative overflow-hidden rounded-[20px] border border-border bg-surface p-6 sm:p-10">
+            <GameArtTile game={battle.game} className="opacity-[0.18]" fill hideLabel imgWidth={1200} />
+            <div
+              aria-hidden
+              className="absolute inset-0"
+              style={{ backgroundImage: "linear-gradient(180deg, transparent, var(--surface) 78%)" }}
+            />
+
+            <div className="relative z-10 flex flex-col items-center gap-6">
+              <div className="flex w-full items-start justify-center gap-4 sm:gap-12">
+                <div className="flex flex-1 flex-col items-center gap-3">
+                  <Tag tone="volt">Host</Tag>
+                  <Avatar
+                    avatarUrl={battle.creator.avatarUrl}
+                    name={battle.creator.displayName}
+                    ringClass="border-accent-volt/60"
+                    size={104}
+                  />
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="font-display text-xl font-bold tracking-tight sm:text-2xl">
+                      {battle.creator.displayName}
+                    </span>
+                    <span className="text-xs text-muted">@{battle.creator.handle}</span>
+                    <RankBadge rank={creatorRank} />
+                  </div>
+                  <StatsRow standing={creatorStanding} />
+                </div>
+
+                <span className="font-display shrink-0 pt-10 text-2xl font-bold text-muted">VS</span>
+
+                <div className="flex flex-1 flex-col items-center gap-3">
+                  <Tag tone={isMatched ? "orange" : "neutral"}>{rightTag}</Tag>
+                  {rightIsEmpty ? (
+                    <EmptySlot size={104} />
+                  ) : (
+                    <Avatar avatarUrl={rightAvatarUrl} name={rightName} ringClass="border-accent-orange/60" size={104} />
+                  )}
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="font-display text-xl font-bold tracking-tight sm:text-2xl">{rightName}</span>
+                    {opponent && <span className="text-xs text-muted">@{opponent.handle}</span>}
+                    <RankBadge rank={rightRank} />
+                  </div>
+                  {opponentStanding ? (
+                    <StatsRow standing={opponentStanding} />
+                  ) : (
+                    <p className="max-w-[160px] rounded-[10px] bg-surface-elevated px-3 py-2 text-center text-xs text-muted">
+                      {viewerIsInvitee ? "Your stats could show here." : "Stats will show here once matched."}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {caption && <p className="text-sm text-muted">{caption}</p>}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            {battle.streamUrl && (
+              <a href={battle.streamUrl} target="_blank" rel="noreferrer" className="btn-secondary">
+                <Tv size={14} />
+                Watch stream
+              </a>
+            )}
+            <ShareButton
+              title={`${battle.creator.displayName}'s ${battle.game} Challenge on Circuit`}
+              url={`${process.env.NEXT_PUBLIC_APP_URL}/battles/${battle.id}`}
+            />
+          </div>
+
+          {cancelled && <p className="alert alert-danger">This Challenge was cancelled.</p>}
+
+          <div className="flex flex-col items-center gap-2">
+            {isMatched && realMatch && (
+              <Link href={`/matches/${realMatch.id}`} className="btn-primary w-full sm:w-fit">
+                {battle.status === "COMPLETE" ? "View Result →" : "View Matchup →"}
+              </Link>
+            )}
+            {isCreator && battle.status === "OPEN" && <CancelBattleButton battleId={battle.id} />}
+            {canAccept && (
+              <>
+                <AcceptButton battleId={battle.id} />
+                <p className="text-xs text-muted">By accepting, you&apos;re locked into this match.</p>
+              </>
+            )}
+            {!user && battle.status === "OPEN" && (
+              <>
+                <Link href={`/login?next=${encodeURIComponent(`/battles/${battle.id}`)}`} className="btn-primary w-full sm:w-fit">
+                  Log in to accept →
+                </Link>
+                <p className="text-xs text-muted">
+                  Don&apos;t have an account?{" "}
+                  <Link href="/signup" className="font-medium text-accent-blue hover:underline">
+                    Sign up free
+                  </Link>
+                </p>
+              </>
+            )}
+          </div>
         </div>
 
-        <div className="flex w-full items-center gap-6">
-          <Side label="Challenger" player={battle.creator} fallbackName={battle.creator.displayName} accent="volt" />
-          <span className="font-display text-lg font-bold text-muted">VS</span>
-          <Side
-            label={battle.targetUser ? "Opponent" : "Open Challenge"}
-            player={battle.targetUser}
-            fallbackName="Anyone"
-            accent="orange"
-          />
-        </div>
+        <aside className="flex flex-col gap-4">
+          <div className="widget flex flex-col gap-1">
+            <h2 className="text-xs font-semibold tracking-wide text-muted uppercase">Match Details</h2>
+            <div className="flex flex-col divide-y divide-border">
+              <DetailRow label="Players" value={isMatched ? "2 / 2" : "1 / 2"} />
+              <DetailRow label="Format" value={formatText} />
+              <DetailRow label="Game Mode" value="1v1" />
+              <DetailRow label="Entry Fee" value="Free" />
+              <DetailRow
+                label={battle.status === "ACCEPTED" ? "Matched" : "Opened"}
+                value={formatRelative(realMatch?.createdAt ?? battle.createdAt)}
+              />
+            </div>
+          </div>
 
-        <div className="flex flex-col items-center gap-1.5 text-sm text-muted">
-          <span>
-            <span className="text-foreground">{battle.format === "BEST_OF_3" ? "Best of 3" : "Single match"}</span>
-            {" · "}
-            {battle.visibility === "TARGETED" ? "Targeted challenge" : "Open to anyone"}
-            {" · "}
-            <span className="text-foreground">Free</span> — no entry fee
-          </span>
-          <span className="text-xs">
-            Opened by @{battle.creator.handle}
-            {battle.targetUser && <> — challenging @{battle.targetUser.handle}</>}
-          </span>
-        </div>
+          <div className="widget flex flex-col gap-3">
+            <h2 className="text-xs font-semibold tracking-wide text-muted uppercase">How It Works</h2>
+            <ul className="flex flex-col gap-2.5">
+              {HOW_IT_WORKS.map((line) => (
+                <li key={line} className="flex items-start gap-2 text-sm text-muted">
+                  <CheckCircle2 size={15} className="mt-0.5 shrink-0 text-accent-blue" />
+                  {line}
+                </li>
+              ))}
+            </ul>
+          </div>
 
-        {battle.streamUrl && (
-          <a href={battle.streamUrl} target="_blank" rel="noreferrer" className="btn-secondary w-fit">
-            <Tv size={14} />
-            Watch stream
-          </a>
-        )}
-
-        {battle.status === "ACCEPTED" && battle.matches[0] && (
-          <Link href={`/matches/${battle.matches[0].id}`} className="btn-primary w-fit">
-            View match →
-          </Link>
-        )}
-        {battle.status === "CANCELLED" && <p className="alert alert-danger">This Challenge was cancelled.</p>}
-        <div className="flex flex-wrap justify-center gap-3">
-          {isCreator && battle.status === "OPEN" && <CancelBattleButton battleId={battle.id} />}
-          {canAccept && <AcceptButton battleId={battle.id} />}
-        </div>
+          <div className="widget flex flex-col gap-3">
+            <div className="flex flex-col gap-0.5">
+              <h2 className="text-xs font-semibold tracking-wide text-muted uppercase">Share Challenge</h2>
+              <p className="text-metadata">Get more contenders.</p>
+            </div>
+            <ShareButton
+              variant="inline"
+              title={`${battle.creator.displayName}'s ${battle.game} Challenge on Circuit`}
+              url={`${process.env.NEXT_PUBLIC_APP_URL}/battles/${battle.id}`}
+            />
+          </div>
+        </aside>
       </div>
     </div>
   );

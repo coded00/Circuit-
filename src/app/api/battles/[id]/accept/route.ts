@@ -6,6 +6,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { createBattleMatch } from "@/lib/matches";
+import { notify } from "@/lib/notifications";
 
 export async function POST(
   request: Request,
@@ -52,6 +53,11 @@ export async function POST(
 
   try {
     const match = await createBattleMatch(battle, user.id);
+    await Promise.all([
+      notify(battle.creatorId, "BATTLE_ACCEPTED", { battleId: battle.id }),
+      notify(battle.creatorId, "MATCH_READY", { matchId: match.id }),
+      notify(user.id, "MATCH_READY", { matchId: match.id }),
+    ]);
     return NextResponse.json({ matchId: match.id }, { status: 201 });
   } catch (err) {
     // Don't leave the Battle stuck ACCEPTED with no Match behind it.

@@ -7,23 +7,30 @@
 
 import { prisma } from "@/lib/db";
 
-export type Standing = { userId: string; displayName: string; handle: string; wins: number; losses: number };
+export type Standing = {
+  userId: string;
+  displayName: string;
+  handle: string;
+  avatarUrl: string | null;
+  wins: number;
+  losses: number;
+};
 
 type StandingMatch = {
   winnerId: string | null;
   playerAId: string;
   playerBId: string;
-  playerA: { displayName: string; handle: string };
-  playerB: { displayName: string; handle: string };
+  playerA: { displayName: string; handle: string; avatarUrl: string | null };
+  playerB: { displayName: string; handle: string; avatarUrl: string | null };
 };
 
 /** Pure aggregation — pass in whatever COMPLETE matches should count. */
 export function computeStandings(matches: StandingMatch[]): Standing[] {
   const standings = new Map<string, Standing>();
-  function ensure(userId: string, displayName: string, handle: string): Standing {
+  function ensure(userId: string, player: StandingMatch["playerA"]): Standing {
     let s = standings.get(userId);
     if (!s) {
-      s = { userId, displayName, handle, wins: 0, losses: 0 };
+      s = { userId, displayName: player.displayName, handle: player.handle, avatarUrl: player.avatarUrl, wins: 0, losses: 0 };
       standings.set(userId, s);
     }
     return s;
@@ -31,8 +38,8 @@ export function computeStandings(matches: StandingMatch[]): Standing[] {
 
   for (const match of matches) {
     if (!match.winnerId) continue; // shouldn't happen for COMPLETE, defensive
-    const a = ensure(match.playerAId, match.playerA.displayName, match.playerA.handle);
-    const b = ensure(match.playerBId, match.playerB.displayName, match.playerB.handle);
+    const a = ensure(match.playerAId, match.playerA);
+    const b = ensure(match.playerBId, match.playerB);
     if (match.winnerId === match.playerAId) {
       a.wins++;
       b.losses++;
@@ -45,32 +52,37 @@ export function computeStandings(matches: StandingMatch[]): Standing[] {
   return [...standings.values()].sort((x, y) => y.wins - x.wins || x.losses - y.losses);
 }
 
-/** Per-game ladder standings — same query the ladder page runs. */
-export async function gameStandings(game: string): Promise<Standing[]> {
+const standingSelect = {
+  winnerId: true,
+  playerAId: true,
+  playerBId: true,
+  playerA: { select: { displayName: true, handle: true, avatarUrl: true } },
+  playerB: { select: { displayName: true, handle: true, avatarUrl: true } },
+} as const;
+
+/** Per-game ladder standings — same query the ladder page runs. `since`
+ *  scopes to matches created on/after that date (e.g. "this month"). */
+export async function gameStandings(game: string, since?: Date): Promise<Standing[]> {
   const matches = await prisma.match.findMany({
-    where: { status: "COMPLETE", battle: { game, status: "COMPLETE" } },
-    select: {
-      winnerId: true,
-      playerAId: true,
-      playerBId: true,
-      playerA: { select: { displayName: true, handle: true } },
-      playerB: { select: { displayName: true, handle: true } },
+    where: {
+      status: "COMPLETE",
+      battle: { game, status: "COMPLETE" },
+      ...(since ? { createdAt: { gte: since } } : {}),
     },
+    select: standingSelect,
   });
   return computeStandings(matches);
 }
 
 /** Cross-game standings — every completed Battle match, regardless of game. */
-export async function globalStandings(): Promise<Standing[]> {
+export async function globalStandings(since?: Date): Promise<Standing[]> {
   const matches = await prisma.match.findMany({
-    where: { status: "COMPLETE", battle: { status: "COMPLETE" } },
-    select: {
-      winnerId: true,
-      playerAId: true,
-      playerBId: true,
-      playerA: { select: { displayName: true, handle: true } },
-      playerB: { select: { displayName: true, handle: true } },
+    where: {
+      status: "COMPLETE",
+      battle: { status: "COMPLETE" },
+      ...(since ? { createdAt: { gte: since } } : {}),
     },
+    select: standingSelect,
   });
   return computeStandings(matches);
 }

@@ -28,7 +28,7 @@ export default async function DashboardTournamentDetailPage({
 
   const tournament = await prisma.tournament.findUnique({ where: { id } });
   if (!tournament) notFound();
-  if (tournament.organizerId !== user.id) {
+  if (tournament.organizerId !== user.id && !user.isStaff) {
     redirect(`/tournaments/${id}`);
   }
 
@@ -68,10 +68,10 @@ export default async function DashboardTournamentDetailPage({
         </StatusPill>
         <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">{tournament.name}</h1>
         <div className="flex flex-wrap gap-4 text-sm">
-          <Link href={`/tournaments/${id}`} className="font-medium text-brand-blue hover:underline">
+          <Link href={`/tournaments/${id}`} className="font-medium text-accent-blue hover:underline">
             Public page →
           </Link>
-          <Link href={`/tournaments/${id}/edit`} className="font-medium text-brand-blue hover:underline">
+          <Link href={`/tournaments/${id}/edit`} className="font-medium text-accent-blue hover:underline">
             Edit →
           </Link>
         </div>
@@ -88,7 +88,7 @@ export default async function DashboardTournamentDetailPage({
               <span className="truncate font-medium">
                 {dispute.match.playerA.displayName} vs {dispute.match.playerB.displayName}
               </span>
-              <span className="shrink-0 text-sm font-medium text-brand-blue">Rule now →</span>
+              <span className="shrink-0 text-sm font-medium text-accent-blue">Rule now →</span>
             </Link>
           ))}
         </section>
@@ -115,7 +115,7 @@ export default async function DashboardTournamentDetailPage({
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-sm font-semibold">Bracket</h2>
           {bracket && (
-            <Link href={`/tournaments/${id}/bracket`} className="text-sm font-medium text-brand-blue hover:underline">
+            <Link href={`/tournaments/${id}/bracket`} className="text-sm font-medium text-accent-blue hover:underline">
               View bracket →
             </Link>
           )}
@@ -131,7 +131,7 @@ export default async function DashboardTournamentDetailPage({
             Registrants (<span className="font-mono tabular-nums">{registrations.length}</span>)
           </h2>
           {registrations.length > 0 && (
-            <a href={`/api/tournaments/${id}/registrants.csv`} className="text-sm font-medium text-brand-blue hover:underline">
+            <a href={`/api/tournaments/${id}/registrants.csv`} className="text-sm font-medium text-accent-blue hover:underline">
               Export CSV
             </a>
           )}

@@ -8,7 +8,11 @@
  * photo. For anything outside that set — which is most tournaments, since
  * organizers type any game name — it falls back to the same deterministic
  * gradient-tint treatment as before: no image request, same look every
- * time for the same name.
+ * time for the same name. See gameImagery.ts's own header comment: its
+ * one generic cinematic photo is reserved for hero/promo surfaces that
+ * don't name a specific game (e.g. CircuitHero), not a per-tile stand-in
+ * here — two unrelated tournaments with unrecognized games showing the
+ * literal same stock photo reads as a templated placeholder.
  */
 
 import { realGameImage, unsplashUrl } from "@/lib/gameImagery";
@@ -38,6 +42,8 @@ export function GameArtTile({
   game,
   className = "",
   hideLabel = false,
+  imgWidth = 480,
+  fill = false,
   children,
 }: {
   game: string;
@@ -45,6 +51,20 @@ export function GameArtTile({
   /** For thumbnails too small to fit readable text (e.g. a 36px ranking
    *  icon) where the game name is already shown as separate text nearby. */
   hideLabel?: boolean;
+  /** Source width to request from Unsplash — the default suits every
+   *  small/medium tile (grid cards, thumbnails). Bump this for a
+   *  full-width banner use (e.g. a tournament page hero), otherwise a
+   *  480px source gets visibly upscaled/soft stretched across a much
+   *  wider container. */
+  imgWidth?: number;
+  /** Root positions itself with `absolute inset-0` (to fill an
+   *  already-positioned ancestor, e.g. a hero banner) instead of the
+   *  default `relative`. A plain `className="absolute inset-0"` can't do
+   *  this reliably — Tailwind resolves the `relative`/`absolute`
+   *  conflict by generated CSS order, not by which class was passed
+   *  last, so the hardcoded `relative` below can silently win and leave
+   *  the tile unpositioned (and invisible) inside a hero. */
+  fill?: boolean;
   children?: React.ReactNode;
 }) {
   const photo = realGameImage(game);
@@ -52,7 +72,7 @@ export function GameArtTile({
 
   return (
     <div
-      className={`relative overflow-hidden ${className}`}
+      className={`${fill ? "absolute inset-0" : "relative"} overflow-hidden ${className}`}
       style={
         photo
           ? undefined
@@ -62,7 +82,7 @@ export function GameArtTile({
       {photo && (
         // eslint-disable-next-line @next/next/no-img-element -- external CDN, arbitrary sizes per call site
         <img
-          src={unsplashUrl(photo, 480)}
+          src={unsplashUrl(photo, imgWidth)}
           alt=""
           aria-hidden
           className="absolute inset-0 h-full w-full object-cover"
