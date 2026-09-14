@@ -402,7 +402,7 @@ export function BracketView({
           <div data-surface="dark" className="card flex flex-col items-center gap-3 overflow-hidden p-6 text-center">
             {/* Reveal only when there's a real champion to crown — the
                 "still to be decided" placeholder has nothing to celebrate. */}
-            <Crown size={20} className={champion ? "trophy-pop text-gold" : "text-muted"} />
+            <Crown size={20} aria-hidden className={champion ? "trophy-pop text-gold" : "text-muted"} />
             <div className="relative flex items-center justify-center py-1">
               <Leaf size={26} className={`-rotate-[100deg] ${champion ? "text-gold/70" : "text-muted/40"}`} />
               <div

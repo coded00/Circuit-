@@ -656,6 +656,11 @@ body {
   }
   .confetti-piece {
     @apply absolute top-0 h-2 w-1.5 rounded-[1px];
+    /* A literal duration/easing, not a --duration-N or --ease-N token —
+       this is a physical fall simulation, not a UI interaction timing,
+       and no token on the generic scale represents that; forcing it onto
+       one (e.g. --duration-celebration's 600ms) would just make the
+       piece vanish before it's fallen anywhere. */
     animation: confetti-fall 1.1s ease-in both;
   }
 }
@@ -880,21 +885,25 @@ body {
 @layer components {
   /* Animates from empty to the real fill percentage on mount (--fill-pct
      set inline per instance) — a genuine reveal of real data, not a
-     decorative loop. Final width is set outside the keyframe too, so
-     prefers-reduced-motion (which collapses animation-duration to ~0)
-     still lands on the correct width instead of visually stopping at 0%. */
+     decorative loop. Width itself is always the real, final value (not
+     animated) — the reveal is a transform: scaleX() on top of that real
+     width, so the animation never triggers layout/reflow, only
+     compositing. Reduced-motion (which collapses animation-duration to
+     ~0) still lands on the correct, undistorted width instantly instead
+     of visually stopping at 0%. */
   .capacity-fill {
     width: var(--fill-pct, 0%);
+    transform-origin: left;
     animation: capacity-fill-in var(--duration-reveal) var(--ease-reveal) both;
   }
 }
 
 @keyframes capacity-fill-in {
   from {
-    width: 0%;
+    transform: scaleX(0);
   }
   to {
-    width: var(--fill-pct, 0%);
+    transform: scaleX(1);
   }
 }
 
@@ -909,9 +918,16 @@ body {
   /* Applied by StatusPill whenever tone === "open" (registration open, a
      battle in progress, ...) — a slow, ambient ring, deliberately much
      quieter than the pulse-dot reserved for LIVE/urgent states, since
-     "you can act, no rush" is a different real state than "act now." */
+     "you can act, no rush" is a different real state than "act now."
+     Capped at 6 breaths (~14s), not infinite — an "open" state can
+     legitimately sit on screen for days (a registration window, an
+     accepted battle), and every badge instance runs its own independent
+     animation, so an uncapped loop is a real, indefinite CPU/battery
+     cost across every list/card that shows one. .badge-open itself has
+     no box-shadow, so settling after the last breath is a clean fade to
+     nothing, not an abrupt cut to a mismatched resting state. */
   .badge-open-glow {
-    animation: badge-open-breathe var(--duration-ambient) ease-in-out infinite;
+    animation: badge-open-breathe var(--duration-ambient) ease-in-out 6;
   }
 
   /* Applied by CapacityBar when its own `registered` prop actually

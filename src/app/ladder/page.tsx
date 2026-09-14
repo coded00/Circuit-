@@ -127,7 +127,7 @@ function PodiumCard({ standing, rank, order }: { standing: Standing; rank: numbe
       } as React.CSSProperties}
     >
       <div className="flex items-center gap-1.5">
-        {rank === 1 && <Crown size={16} className="trophy-pop" style={{ color }} />}
+        {rank === 1 && <Crown size={16} aria-hidden className="trophy-pop" style={{ color }} />}
         <span className="font-display text-2xl font-bold" style={{ color }}>
           #{rank}
         </span>

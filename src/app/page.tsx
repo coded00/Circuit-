@@ -277,6 +277,7 @@ export default async function Home({
                           {isFirst && (
                             <Crown
                               size={12}
+                              aria-hidden
                               className="crown-bounce absolute -top-2 left-1/2 -translate-x-1/2 text-gold"
                             />
                           )}

@@ -59,7 +59,7 @@ export default function ClaimPrizeButton({ tournamentId }: { tournamentId: strin
             ))}
           </div>
         )}
-        {success && <Trophy size={14} className="trophy-pop" />}
+        {success && <Trophy size={14} aria-hidden className="trophy-pop" />}
         {success ? "Prize payout sent!" : "Prize payout initiated — processing."}
       </div>
     );
@@ -68,7 +68,7 @@ export default function ClaimPrizeButton({ tournamentId }: { tournamentId: strin
   return (
     <div className="flex flex-col gap-2">
       <button onClick={handleClick} disabled={submitting} className="btn-primary">
-        {submitting ? <Spinner /> : <Trophy size={14} />}
+        {submitting ? <Spinner /> : <Trophy size={14} aria-hidden />}
         {submitting ? "Claiming…" : "Claim prize"}
       </button>
       {error && <p className="field-error motion-fade-in">{error}</p>}

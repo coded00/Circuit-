@@ -97,7 +97,10 @@ function AchievementBadge({ achievement, order = 0 }: { achievement: Achievement
           achievement.unlocked ? "border-accent-volt/50 bg-accent-volt-soft text-accent-volt" : "border-border bg-surface-elevated text-muted"
         }`}
       >
-        {achievement.unlocked ? <Star size={22} className="trophy-pop" /> : <Lock size={18} />}
+        {/* Locked/unlocked was only ever conveyed by which icon renders —
+            invisible to a screen reader without this. */}
+        <span className="sr-only">{achievement.unlocked ? "Unlocked: " : "Locked: "}</span>
+        {achievement.unlocked ? <Star size={22} aria-hidden className="trophy-pop" /> : <Lock size={18} aria-hidden />}
       </span>
       <div className="flex flex-col">
         <span className="text-xs font-semibold">{achievement.label}</span>
@@ -271,7 +274,7 @@ export default async function PlayerProfilePage({
       <div className="card flex flex-col gap-3">
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-card-title flex items-center gap-2">
-            <Star size={15} className="text-gold" />
+            <Star size={15} aria-hidden className="text-gold" />
             Achievements
           </h2>
         </div>
