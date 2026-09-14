@@ -54,6 +54,12 @@ enum EscrowType {
   ENTRY_FEE
   REFUND
   PRIZE_PAYOUT
+  /// One row per player, created the moment their side of a Battle's
+  /// stake is locked (creator at Battle creation, accepter at accept).
+  STAKE
+  /// Created once, to the match winner, for the full pot (both players'
+  /// STAKE amounts) when a staked Battle's match completes.
+  STAKE_PAYOUT
 }
 
 enum EscrowStatus {
@@ -68,8 +74,13 @@ enum PaymentProviderName {
 }
 
 enum BattleVisibility {
+  /// Visible to everyone on the open Challenge board.
   OPEN
+  /// Visible only to one named player (`Battle.targetUserId`).
   TARGETED
+  /// Visible only to the creator's accepted friends (`Friendship`) — any
+  /// of them can accept, not just one. See `src/lib/friends.ts`.
+  FRIENDS
 }
 
 enum BattleStatus {
@@ -154,6 +165,7 @@ model User {
   friendshipsReceived Friendship[]         @relation("FriendshipAddressee")
   teamsCaptained      Team[]               @relation("TeamCaptain")
   teamMemberships     TeamMembership[]
+  escrowTransactions  EscrowTransaction[]
 
   @@index([emailOrPhone])
 }
@@ -185,6 +197,19 @@ enum WalletTransactionType {
   /// fee, so tournament-side accounting (dashboard/payouts) sees no
   /// difference in how the fee was funded.
   ENTRY_FEE_DEBIT
+  /// A Battle stake locked from the wallet balance — see `EscrowType.STAKE`.
+  /// Always wallet-only, same "no provider touched" reasoning as
+  /// ENTRY_FEE_DEBIT: a stake can only ever be funded from an existing
+  /// wallet balance, never a fresh external checkout.
+  STAKE_DEBIT
+  /// Any wallet credit that resolves a Battle stake — winning the pot
+  /// (`EscrowType.STAKE_PAYOUT`) or getting a stake back from a voided
+  /// match (`EscrowType.REFUND`). One wallet-ledger type for both; the
+  /// paired `EscrowTransaction.type` is what distinguishes why. Unlike a
+  /// tournament prize (paid out externally via `payoutMethodRef`), a
+  /// Battle stake always resolves straight back into the wallet — no
+  /// organizer/claim flow for a peer-to-peer pot.
+  STAKE_CREDIT
 }
 
 enum WalletTransactionStatus {
@@ -398,8 +423,11 @@ model Battle {
   visibility   BattleVisibility @default(OPEN)
   targetUserId String?
   targetUser   User?            @relation("BattleTarget", fields: [targetUserId], references: [id])
-  /// Field exists so the ladder/stake model doesn't need a migration later,
-  /// but D1/BTL-1 mean no V1 UI path may ever set this above zero.
+  /// Kobo. 0 = free (still the vast majority of Battles). Above zero,
+  /// this is locked from the creator's wallet at creation and matched
+  /// from the accepter's at accept — see `EscrowType.STAKE`. Core escrow
+  /// mechanics only (see `EscrowTransaction`'s own comment on what's
+  /// deliberately not built yet).
   stakeAmount  Int              @default(0)
   /// Same lightweight link-only field as Tournament.streamUrl — see that
   /// field's comment.
@@ -407,7 +435,8 @@ model Battle {
   status       BattleStatus     @default(OPEN)
   createdAt    DateTime         @default(now())
 
-  matches Match[]
+  matches    Match[]
+  escrowTxns EscrowTransaction[]
 
   @@index([game, status])
 }
@@ -433,23 +462,43 @@ model Dispute {
   @@index([status])
 }
 
-/// Belongs to a Tournament, optionally a Registration. Maps to REG-2, REG-5,
-/// REG-6, ORG-4.
+/// Belongs to a Tournament (with an optional Registration) OR a Battle
+/// (with a User) — exactly one of tournamentId/battleId is set, same
+/// app-layer-enforced "exactly one owner" convention as Match's own
+/// tournamentId/battleId pair (no DB CHECK constraint). Maps to REG-2,
+/// REG-5, REG-6, ORG-4 (tournament side) and BTL-1..BTL-6 (Battle stake
+/// side — core escrow mechanics only: no per-account stake limits,
+/// collusion detection, or self-exclusion tooling yet, so this does not
+/// meet the bar docs/circuit-strategy.md sets for a launched, legally-
+/// reviewed staked-Battles feature. Shipped as the underlying mechanism
+/// only, per explicit product decision.)
 model EscrowTransaction {
-  id             String              @id @default(cuid())
-  tournamentId   String
-  tournament     Tournament          @relation(fields: [tournamentId], references: [id])
+  id             String               @id @default(cuid())
+  tournamentId   String?
+  tournament     Tournament?          @relation(fields: [tournamentId], references: [id])
   registrationId String?
-  registration   Registration?       @relation(fields: [registrationId], references: [id])
+  registration   Registration?        @relation(fields: [registrationId], references: [id])
+  /// Set only for a Battle-stake row (STAKE/STAKE_PAYOUT/REFUND on a
+  /// Battle) — who paid a STAKE or received a STAKE_PAYOUT/REFUND. Always
+  /// null on the tournament side, where `registration.userId` already
+  /// answers this.
+  battleId       String?
+  battle         Battle?              @relation(fields: [battleId], references: [id])
+  userId         String?
+  user           User?                @relation(fields: [userId], references: [id])
   type           EscrowType
   /// Minor currency units (kobo).
   amount         Int
-  provider       PaymentProviderName
+  /// Null for a Battle-stake row — wallet-balance-only, no external
+  /// provider touched (same reasoning as `WalletTransactionType.
+  /// STAKE_DEBIT`/`STAKE_PAYOUT_CREDIT`).
+  provider       PaymentProviderName?
   providerRef    String?
-  status         EscrowStatus        @default(PENDING)
-  createdAt      DateTime            @default(now())
+  status         EscrowStatus         @default(PENDING)
+  createdAt      DateTime             @default(now())
 
   @@index([tournamentId, type])
+  @@index([battleId, type])
 }
 
 /// Belongs to a User. Maps to NOT-1..NOT-4.

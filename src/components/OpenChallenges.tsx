@@ -4,18 +4,19 @@ import { AutoScrollRow } from "@/components/AutoScrollRow";
 import { ChallengeCard } from "@/components/ChallengeCard";
 
 /**
- * Circuit — "Open Challenges" homepage section. Real, free `Battle` data
- * (the existing `/battles` feature, now user-facing as "Challenges") — the
+ * Circuit — "Open Challenges" homepage section. Real `Battle` data (the
+ * existing `/battles` feature, now user-facing as "Challenges") — the
  * exact same `ChallengeCard` the full `/battles` board renders, at
  * carousel scale. See that component's own header comment for what's real
- * vs. deliberately not invented (no prize pool, no rating number, no
- * countdown).
+ * vs. deliberately not invented (no rating number, no countdown).
  */
 
 type Battle = {
   id: string;
   game: string;
   format: string;
+  visibility: string;
+  stakeAmount: number;
   creator: { displayName: string; avatarUrl: string | null };
 };
 

@@ -122,8 +122,8 @@ export async function getWalletActivity(userId: string): Promise<WalletActivity>
     ...prizeTxns.map((t) => ({
       id: t.id,
       createdAt: t.createdAt,
-      tournamentName: t.tournament.name,
-      tournamentGame: t.tournament.game,
+      tournamentName: t.tournament?.name ?? "Unknown tournament",
+      tournamentGame: t.tournament?.game ?? "",
       type: "PRIZE_PAYOUT" as const,
       amount: t.amount,
       status: t.status,

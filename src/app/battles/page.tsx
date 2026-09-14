@@ -3,17 +3,21 @@
  * facing "Challenges" is the existing free `Battle` feature under its
  * MVP-rework name — same model/route/logic, copy-only rename.
  *
- * Only OPEN-visibility, still-OPEN-status Battles show here — a targeted
- * challenge is invisible to everyone but its target (delivered via
- * notification, BTL-3), not a variant of this board. Every Battle here is
- * still waiting for an opponent, so every card is the same `ChallengeCard`
- * the homepage's Open Challenges carousel renders — see that component's
- * own header comment for what's real vs. deliberately not invented (no
- * prize pool, no rating number, no countdown).
+ * Still-OPEN-status Battles show here, OPEN-visibility to everyone or
+ * FRIENDS-visibility to a viewer who's actually a friend of the creator
+ * (see src/lib/friends.ts) — a TARGETED challenge is invisible to
+ * everyone but its target (delivered via notification, BTL-3), not a
+ * variant of this board. Every Battle here is still waiting for an
+ * opponent, so every card is the same `ChallengeCard` the homepage's Open
+ * Challenges carousel renders — see that component's own header comment
+ * for what's real vs. deliberately not invented (no rating number, no
+ * countdown).
  */
 
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { getCurrentUser } from "@/lib/session";
+import { getFriendIds } from "@/lib/friends";
 import Poller from "@/app/Poller";
 import { ChallengeCard } from "@/components/ChallengeCard";
 
@@ -23,11 +27,13 @@ export default async function BattleBoardPage({
   searchParams: Promise<{ game?: string }>;
 }) {
   const { game } = await searchParams;
+  const user = await getCurrentUser();
+  const friendIds = user ? await getFriendIds(user.id) : [];
 
   const battles = await prisma.battle.findMany({
     where: {
       status: "OPEN",
-      visibility: "OPEN",
+      OR: [{ visibility: "OPEN" }, ...(friendIds.length ? [{ visibility: "FRIENDS" as const, creatorId: { in: friendIds } }] : [])],
       ...(game ? { game: { equals: game, mode: "insensitive" } } : {}),
     },
     orderBy: { createdAt: "desc" },

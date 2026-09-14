@@ -72,7 +72,7 @@ export async function POST(
     if (!paidEntryFeeTxn) continue; // free registration — nothing to refund
 
     try {
-      const provider = getPaymentProvider(paidEntryFeeTxn.provider);
+      const provider = getPaymentProvider(paidEntryFeeTxn.provider!); // always set for an ENTRY_FEE row
       const refund = await provider.refundCharge(
         paidEntryFeeTxn.providerRef!,
         paidEntryFeeTxn.amount

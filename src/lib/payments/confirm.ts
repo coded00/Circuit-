@@ -31,7 +31,7 @@ export async function confirmEntryFeePayment(reference: string): Promise<void> {
   );
   if (!escrowTxn) return;
 
-  const provider = getPaymentProvider(escrowTxn.provider);
+  const provider = getPaymentProvider(escrowTxn.provider!); // always set for an ENTRY_FEE row
   const result = await provider.verifyCharge(reference);
 
   if (result.status !== "SUCCESS" || result.amount !== registration.tournament.entryFee) {

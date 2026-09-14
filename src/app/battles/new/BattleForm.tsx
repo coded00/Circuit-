@@ -4,11 +4,26 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { OptionCard } from "@/components/OptionCard";
 
-export default function BattleForm({ games }: { games: { id: string; name: string }[] }) {
+function nairaToKobo(value: string): number {
+  const naira = Number(value || 0);
+  return Math.round(naira * 100);
+}
+
+type Friend = { handle: string; displayName: string };
+
+export default function BattleForm({
+  games,
+  friends,
+}: {
+  games: { id: string; name: string }[];
+  friends: Friend[];
+}) {
   const router = useRouter();
   const [game, setGame] = useState(games[0]?.name ?? "");
   const [format, setFormat] = useState<"SINGLE" | "BEST_OF_3">("SINGLE");
-  const [visibility, setVisibility] = useState<"OPEN" | "TARGETED">("OPEN");
+  const [staked, setStaked] = useState(false);
+  const [stakeNaira, setStakeNaira] = useState("");
+  const [visibility, setVisibility] = useState<"OPEN" | "TARGETED" | "FRIENDS">("OPEN");
   const [targetHandle, setTargetHandle] = useState("");
   const [streamUrl, setStreamUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -28,6 +43,7 @@ export default function BattleForm({ games }: { games: { id: string; name: strin
         visibility,
         targetHandle: visibility === "TARGETED" ? targetHandle : undefined,
         streamUrl: streamUrl || null,
+        stakeAmount: staked ? nairaToKobo(stakeNaira) : 0,
       }),
     });
     const data = await res.json().catch(() => null);
@@ -79,26 +95,50 @@ export default function BattleForm({ games }: { games: { id: string; name: strin
       <div className="flex flex-col gap-1.5">
         <span className="field-label">Stake</span>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <OptionCard selected onSelect={() => {}} title="Free" description="No entry fee" />
+          <OptionCard selected={!staked} onSelect={() => setStaked(false)} title="Free" description="No entry fee" />
           <OptionCard
-            selected={false}
-            onSelect={() => {}}
-            disabled
-            disabledTitle="Paid challenges — coming soon"
-            title="Paid"
-            description="Coming soon"
+            selected={staked}
+            onSelect={() => setStaked(true)}
+            title="Staked"
+            description="Winner takes the pot"
           />
         </div>
+        {staked && (
+          <div className="mt-1 flex flex-col gap-1.5">
+            <label htmlFor="stakeNaira" className="field-label">
+              Stake per player (₦)
+            </label>
+            <input
+              id="stakeNaira"
+              type="number"
+              min={1}
+              step="0.01"
+              required
+              value={stakeNaira}
+              onChange={(e) => setStakeNaira(e.target.value)}
+              className="field-input"
+            />
+            <span className="field-hint">
+              Locked from your wallet now. Your opponent matches it to accept — the winner takes both.
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col gap-1.5">
         <span className="field-label">Who can accept</span>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <OptionCard
             selected={visibility === "OPEN"}
             onSelect={() => setVisibility("OPEN")}
             title="Anyone"
             description="Posted to the open board"
+          />
+          <OptionCard
+            selected={visibility === "FRIENDS"}
+            onSelect={() => setVisibility("FRIENDS")}
+            title="My friends"
+            description="Only your friend list sees it"
           />
           <OptionCard
             selected={visibility === "TARGETED"}
@@ -114,6 +154,20 @@ export default function BattleForm({ games }: { games: { id: string; name: strin
           <label htmlFor="targetHandle" className="field-label">
             Their handle
           </label>
+          {friends.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {friends.map((f) => (
+                <button
+                  key={f.handle}
+                  type="button"
+                  onClick={() => setTargetHandle(f.handle)}
+                  className={`badge ${targetHandle === f.handle ? "badge-brand" : "badge-neutral"}`}
+                >
+                  @{f.handle}
+                </button>
+              ))}
+            </div>
+          )}
           <input
             id="targetHandle"
             required

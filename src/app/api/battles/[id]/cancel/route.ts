@@ -1,5 +1,9 @@
 /**
  * Circuit — cancel an open Battle (Build Plan P4-6, maps: BTL-6).
+ *
+ * Only cancellable while still OPEN (before accept — see the atomic
+ * compare-and-swap below), so the only stake ever locked at this point
+ * is the creator's own, from creation. Refunded here if present.
  */
 
 import { NextResponse } from "next/server";
@@ -34,6 +38,21 @@ export async function POST(
       { error: "This Battle has already been accepted or cancelled." },
       { status: 409 }
     );
+  }
+
+  if (battle.stakeAmount > 0) {
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: battle.creatorId },
+        data: { walletBalance: { increment: battle.stakeAmount } },
+      }),
+      prisma.escrowTransaction.create({
+        data: { battleId: battle.id, userId: battle.creatorId, type: "REFUND", amount: battle.stakeAmount, status: "COMPLETE" },
+      }),
+      prisma.walletTransaction.create({
+        data: { userId: battle.creatorId, type: "STAKE_CREDIT", amount: battle.stakeAmount, status: "COMPLETE" },
+      }),
+    ]);
   }
 
   if (user.isStaff && battle.creatorId !== user.id) {

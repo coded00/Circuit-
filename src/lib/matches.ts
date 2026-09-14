@@ -3,11 +3,17 @@
  *
  * Build note from the Build Plan itself: P3-1..P3-8 is "the engine."
  * Battles (Phase 4) is a second front door onto these exact same Match and
- * Dispute entities, with tournamentId left null and no escrow step — if a
- * Battle ever needs its own reporting/dispute code path, that's a sign
- * this file wasn't built generic enough. Every function here already
- * branches on `match.tournamentId` being present, not on "is this a
- * tournament match" as a separate concept.
+ * Dispute entities, with tournamentId left null — if a Battle ever needs
+ * its own reporting/dispute code path, that's a sign this file wasn't
+ * built generic enough. Every function here already branches on
+ * `match.tournamentId` being present, not on "is this a tournament match"
+ * as a separate concept. A staked Battle's escrow settlement (pay the
+ * winner on complete, refund both on void) is the one genuinely
+ * Battle-only piece of money-moving logic here — see
+ * `settleBattleOnComplete` and `ruleDispute`'s void branch — because
+ * tournaments settle money through a completely different path (prize
+ * claim via `payoutMethodRef`, entry-fee refund via the payment
+ * provider), not because this file forked unnecessarily.
  *
  * TRU-2's open product question (PRD §19): voiding a bracket match — free
  * or paid — has no agreed-on answer yet (replay? split the round? leave it
@@ -488,8 +494,9 @@ async function completeMatch(match: Match, winnerId: string): Promise<Match> {
   } else if (match.battleId) {
     // P4-5/BTL-5: the ladder counts wins from completed Battles — nothing
     // else in this file ever flips Battle.status, so without this the
-    // ladder query would never find anything to count.
-    await prisma.battle.update({ where: { id: match.battleId }, data: { status: "COMPLETE" } });
+    // ladder query would never find anything to count. Also settles any
+    // stake — see settleBattleOnComplete's own comment.
+    await settleBattleOnComplete(match.battleId, winnerId);
   }
 
   await Promise.all([
@@ -498,6 +505,39 @@ async function completeMatch(match: Match, winnerId: string): Promise<Match> {
   ]);
 
   return updated;
+}
+
+/**
+ * Flips a Battle to COMPLETE and, if it was staked, pays the full pot
+ * (both players' locked stakes — see `EscrowType.STAKE`, created at
+ * Battle creation and matched at accept) to the winner, all in one
+ * transaction so the status flip and the payout can't succeed/fail
+ * independently. Core escrow mechanics only — see `EscrowTransaction`'s
+ * own schema comment on what's deliberately not built yet (stake limits,
+ * collusion detection, self-exclusion, legal review) before this is a
+ * launch-ready staked-Battles feature.
+ */
+async function settleBattleOnComplete(battleId: string, winnerId: string): Promise<void> {
+  const battle = await prisma.battle.findUniqueOrThrow({ where: { id: battleId } });
+
+  const writes: Prisma.PrismaPromise<unknown>[] = [
+    prisma.battle.update({ where: { id: battleId }, data: { status: "COMPLETE" } }),
+  ];
+
+  if (battle.stakeAmount > 0) {
+    const pot = battle.stakeAmount * 2;
+    writes.push(
+      prisma.user.update({ where: { id: winnerId }, data: { walletBalance: { increment: pot } } }),
+      prisma.escrowTransaction.create({
+        data: { battleId, userId: winnerId, type: "STAKE_PAYOUT", amount: pot, status: "COMPLETE" },
+      }),
+      prisma.walletTransaction.create({
+        data: { userId: winnerId, type: "STAKE_CREDIT", amount: pot, status: "COMPLETE" },
+      })
+    );
+  }
+
+  await prisma.$transaction(writes);
 }
 
 async function openDispute(match: Match, raisedById: string): Promise<Match> {
@@ -558,7 +598,7 @@ export type RulingInput = {
 export async function ruleDispute(input: RulingInput): Promise<Dispute> {
   const dispute = await prisma.dispute.findUnique({
     where: { id: input.disputeId },
-    include: { match: { include: { tournament: true } } },
+    include: { match: { include: { tournament: true, battle: true } } },
   });
   if (!dispute) throw new MatchError("NOT_FOUND", "Dispute not found.");
   if (dispute.status === "RESOLVED" || dispute.status === "VOID") {
@@ -588,10 +628,11 @@ export async function ruleDispute(input: RulingInput): Promise<Dispute> {
   }
 
   if (input.voidMatch) {
-    // TRU-2 + PRD §19: voiding is only unambiguous for a Battle (no
-    // stake, nothing to return). A bracket match — free or paid — has no
-    // agreed-on void behavior (replay? split the round? organizer's
-    // call?), so refuse rather than pick one silently.
+    // TRU-2 + PRD §19: voiding is only unambiguous for a Battle — a free
+    // Battle has nothing to return, and a staked one has an unambiguous
+    // answer too (return both stakes, see below). A bracket match — free
+    // or paid — has no agreed-on void behavior (replay? split the round?
+    // organizer's call?), so refuse rather than pick one silently.
     if (dispute.match.tournamentId) {
       throw new MatchError(
         "VOID_UNSUPPORTED",
@@ -600,7 +641,7 @@ export async function ruleDispute(input: RulingInput): Promise<Dispute> {
     }
 
     // Only reachable for a Battle match (the check above refuses any
-    // match with a tournamentId), so battleId is guaranteed here.
+    // match with a tournamentId), so battleId/battle are guaranteed here.
     const writes: Prisma.PrismaPromise<unknown>[] = [
       prisma.dispute.update({
         where: { id: dispute.id },
@@ -616,10 +657,27 @@ export async function ruleDispute(input: RulingInput): Promise<Dispute> {
         data: { status: "COMPLETE", reportWindowExpiresAt: null },
       }),
     ];
-    if (dispute.match.battleId) {
+    if (dispute.match.battleId && dispute.match.battle) {
       writes.push(
         prisma.battle.update({ where: { id: dispute.match.battleId }, data: { status: "COMPLETE" } })
       );
+      // Both sides' locked stakes go back — a void means nobody won,
+      // not that the pot is up for grabs. Same amount each, since accept
+      // requires matching the creator's stake exactly.
+      const stake = dispute.match.battle.stakeAmount;
+      if (stake > 0) {
+        for (const playerId of [dispute.match.playerAId, dispute.match.playerBId]) {
+          writes.push(
+            prisma.user.update({ where: { id: playerId }, data: { walletBalance: { increment: stake } } }),
+            prisma.escrowTransaction.create({
+              data: { battleId: dispute.match.battleId, userId: playerId, type: "REFUND", amount: stake, status: "COMPLETE" },
+            }),
+            prisma.walletTransaction.create({
+              data: { userId: playerId, type: "STAKE_CREDIT", amount: stake, status: "COMPLETE" },
+            })
+          );
+        }
+      }
     }
     const [updatedDispute] = (await prisma.$transaction(writes)) as [Dispute, ...unknown[]];
     await Promise.all([

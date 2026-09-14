@@ -8,9 +8,10 @@
  * been accepted never reaches either list; the Challenge detail page is
  * the only place a real, filled-in matchup ever renders.
  *
- * No prize pool shown — Battles are free in V1 (see the Challenge detail
- * page's own header comment for the full reasoning); the footer states
- * that plainly instead of inventing stakes.
+ * Stake shown when the Battle is real staked money (`Battle.stakeAmount`
+ * > 0, escrowed at creation — see the creation route's own comment);
+ * otherwise the footer says "Free entry" plainly, same as before staking
+ * existed.
  */
 
 import Link from "next/link";
@@ -21,6 +22,10 @@ function formatLabel(format: string): string {
   return format === "BEST_OF_3" ? "Best of 3" : "Single match";
 }
 
+function formatNaira(kobo: number): string {
+  return `₦${(kobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 0 })}`;
+}
+
 export function ChallengeCard({
   battle,
 }: {
@@ -28,6 +33,8 @@ export function ChallengeCard({
     id: string;
     game: string;
     format: string;
+    visibility: string;
+    stakeAmount: number;
     creator: { displayName: string; avatarUrl: string | null };
   };
 }) {
@@ -75,12 +82,16 @@ export function ChallengeCard({
           <div className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-dashed border-border-strong text-base font-bold text-muted">
             ?
           </div>
-          <span className="w-full truncate text-center text-xs text-muted">Anyone</span>
+          <span className="w-full truncate text-center text-xs text-muted">
+            {battle.visibility === "FRIENDS" ? "Friends only" : "Anyone"}
+          </span>
         </div>
       </div>
 
       <div className="relative z-10 flex items-center justify-center gap-2 text-[11px] text-muted">
-        <span>Free entry</span>
+        <span className={battle.stakeAmount > 0 ? "font-semibold text-gold" : undefined}>
+          {battle.stakeAmount > 0 ? `${formatNaira(battle.stakeAmount)} stake` : "Free entry"}
+        </span>
         <span aria-hidden>·</span>
         <span>{formatLabel(battle.format)}</span>
       </div>

@@ -58,7 +58,7 @@ export async function POST(
   );
 
   if (registration.status === "CONFIRMED" && paidEntryFeeTxn) {
-    const provider = getPaymentProvider(paidEntryFeeTxn.provider);
+    const provider = getPaymentProvider(paidEntryFeeTxn.provider!); // always set for an ENTRY_FEE row
     const refund = await provider.refundCharge(paidEntryFeeTxn.providerRef!, paidEntryFeeTxn.amount);
 
     await prisma.$transaction([

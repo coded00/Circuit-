@@ -2,8 +2,9 @@
  * Circuit — age gate (Build Plan task P0-3).
  *
  * A single reusable check that every cash-touching action calls before it
- * completes: paid registration, Battle accept (once staked Battles exist,
- * post-V1), and payout claim. Maps to ACC-3 and TRU-5.
+ * completes: paid registration, opening/accepting a staked Battle (core
+ * escrow mechanics only — see `EscrowType.STAKE`'s schema comment), and
+ * payout claim. Maps to ACC-3 and TRU-5.
  *
  * Deliberately NOT wired into browsing, the Battle board, or any read path —
  * TRU-5 requires that general browsing stays available to an underage

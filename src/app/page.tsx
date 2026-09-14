@@ -83,6 +83,7 @@ export default async function Home({
   const { leaderboard: leaderboardScope } = await searchParams;
   const user = await getCurrentUser();
   const friendLeaderboardActive = leaderboardScope === "friends" && !!user;
+  const friendIds = user ? await getFriendIds(user.id) : [];
 
   const [
     featuredTournaments,
@@ -96,7 +97,6 @@ export default async function Home({
     recentActivity,
     homepageBanners,
     activeAnnouncement,
-    friendIdsForLeaderboard,
   ] = await Promise.all([
     getFeaturedTournaments(3),
     prisma.tournament.findMany({
@@ -114,7 +114,10 @@ export default async function Home({
       })),
     ),
     prisma.battle.findMany({
-      where: { status: "OPEN", visibility: "OPEN" },
+      where: {
+        status: "OPEN",
+        OR: [{ visibility: "OPEN" }, ...(friendIds.length ? [{ visibility: "FRIENDS" as const, creatorId: { in: friendIds } }] : [])],
+      },
       orderBy: { createdAt: "desc" },
       take: 6,
       include: {
@@ -158,11 +161,10 @@ export default async function Home({
       orderBy: { order: "asc" },
     }),
     getActiveAnnouncement(),
-    friendLeaderboardActive ? getFriendIds(user!.id) : Promise.resolve([] as string[]),
   ]);
 
   const scopedLeaderboard = friendLeaderboardActive
-    ? leaderboard.filter((s) => s.userId === user!.id || friendIdsForLeaderboard.includes(s.userId))
+    ? leaderboard.filter((s) => s.userId === user!.id || friendIds.includes(s.userId))
     : leaderboard;
   const topLeaderboard = scopedLeaderboard.slice(0, 5);
   const openChallengesPreview = openBattles.slice(0, 3);

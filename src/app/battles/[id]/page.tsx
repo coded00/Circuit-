@@ -12,12 +12,13 @@
  * (Match Details / How It Works / Share) turns this into a real two-column
  * layout instead of a single centered form.
  *
+ * Stake is real when set (`Battle.stakeAmount` > 0, escrowed at creation
+ * and matched at accept — see the creation/accept routes' own comments)
+ * — the header's stat slot and Match Details' "Entry Fee" row both show
+ * the real amount instead of a hardcoded "Free".
+ *
  * A few things a supplied reference design showed that Circuit has no real
  * data for are deliberately not invented:
- * - **No prize pool.** Battles are free in V1 (`Battle.stakeAmount` can
- *   never be set above zero — see that field's own schema comment); the
- *   header's stat slot shows the real "Free" entry instead of a cash
- *   figure, and Match Details lists "Entry Fee" rather than "Prize Pool".
  * - **No "Level" chip.** `AccountMenu.tsx` already ships one narrow,
  *   explicitly-decided decorative "Level 24" (Circuit has no Level/XP
  *   system); this page doesn't extend that exception further.
@@ -39,8 +40,13 @@ import { GameArtTile } from "@/components/GameArtTile";
 import { ShareButton } from "@/components/ShareButton";
 import { StatusPill, battleStatusInfo } from "@/components/StatusPill";
 import { gameStandings, type Standing } from "@/lib/standings";
+import { getFriendIds } from "@/lib/friends";
 import AcceptButton from "./AcceptButton";
 import CancelBattleButton from "./CancelBattleButton";
+
+function formatNaira(kobo: number): string {
+  return `₦${(kobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 0 })}`;
+}
 
 const relativeTime = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
 function formatRelative(date: Date): string {
@@ -146,11 +152,15 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-const HOW_IT_WORKS = [
-  "Both players submit their result — matching reports settle the match instantly.",
-  "Reports don't match? Circuit staff step in to review and rule.",
-  "Free to enter — no stakes, no entry fee.",
-];
+function howItWorks(stakeAmount: number): string[] {
+  return [
+    "Both players submit their result — matching reports settle the match instantly.",
+    "Reports don't match? Circuit staff step in to review and rule.",
+    stakeAmount > 0
+      ? `Staked ${formatNaira(stakeAmount)} each — the winner takes the full ${formatNaira(stakeAmount * 2)} pot. A voided dispute returns both stakes.`
+      : "Free to enter — no stakes, no entry fee.",
+  ];
+}
 
 export default async function BattlePage({
   params,
@@ -180,11 +190,13 @@ export default async function BattlePage({
 
   const user = await getCurrentUser();
   const isCreator = user !== null && user.id === battle.creatorId;
+  const isFriendOfCreator =
+    user !== null && battle.visibility === "FRIENDS" ? (await getFriendIds(battle.creatorId)).includes(user.id) : false;
   const canAccept =
     user !== null &&
     !isCreator &&
     battle.status === "OPEN" &&
-    (battle.visibility === "OPEN" || battle.targetUserId === user.id);
+    (battle.visibility === "OPEN" || battle.targetUserId === user.id || isFriendOfCreator);
 
   // A real Match row is the only thing that means "matched" — targetUserId
   // being set just means someone was *invited*, not that they've accepted
@@ -265,12 +277,15 @@ export default async function BattlePage({
                 <div className="flex flex-wrap gap-2">
                   <Tag tone="neutral">1v1</Tag>
                   <Tag tone="neutral">{formatText}</Tag>
+                  {battle.visibility === "FRIENDS" && <Tag tone="volt">Friends Only</Tag>}
                 </div>
               </div>
             </div>
             <div className="flex shrink-0 flex-col items-end gap-0.5">
-              <span className="text-eyebrow text-muted">Entry</span>
-              <span className="font-display text-2xl font-bold text-foreground">Free</span>
+              <span className="text-eyebrow text-muted">{battle.stakeAmount > 0 ? "Stake" : "Entry"}</span>
+              <span className="font-display text-2xl font-bold text-foreground">
+                {battle.stakeAmount > 0 ? formatNaira(battle.stakeAmount) : "Free"}
+              </span>
             </div>
           </div>
 
@@ -355,7 +370,11 @@ export default async function BattlePage({
             {canAccept && (
               <>
                 <AcceptButton battleId={battle.id} />
-                <p className="text-xs text-muted">By accepting, you&apos;re locked into this match.</p>
+                <p className="text-xs text-muted">
+                  {battle.stakeAmount > 0
+                    ? `By accepting, ${formatNaira(battle.stakeAmount)} is locked from your wallet and you're committed to this match.`
+                    : "By accepting, you're locked into this match."}
+                </p>
               </>
             )}
             {!user && battle.status === "OPEN" && (
@@ -381,7 +400,7 @@ export default async function BattlePage({
               <DetailRow label="Players" value={isMatched ? "2 / 2" : "1 / 2"} />
               <DetailRow label="Format" value={formatText} />
               <DetailRow label="Game Mode" value="1v1" />
-              <DetailRow label="Entry Fee" value="Free" />
+              <DetailRow label={battle.stakeAmount > 0 ? "Stake (each)" : "Entry Fee"} value={battle.stakeAmount > 0 ? formatNaira(battle.stakeAmount) : "Free"} />
               <DetailRow
                 label={battle.status === "ACCEPTED" ? "Matched" : "Opened"}
                 value={formatRelative(realMatch?.createdAt ?? battle.createdAt)}
@@ -392,7 +411,7 @@ export default async function BattlePage({
           <div className="widget flex flex-col gap-3">
             <h2 className="text-xs font-semibold tracking-wide text-muted uppercase">How It Works</h2>
             <ul className="flex flex-col gap-2.5">
-              {HOW_IT_WORKS.map((line) => (
+              {howItWorks(battle.stakeAmount).map((line) => (
                 <li key={line} className="flex items-start gap-2 text-sm text-muted">
                   <CheckCircle2 size={15} className="mt-0.5 shrink-0 text-accent-blue" />
                   {line}
