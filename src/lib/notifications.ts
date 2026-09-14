@@ -29,7 +29,10 @@ export type NotificationType =
   | "REGISTRATION_CLOSED"
   | "DISPUTE_NEEDS_RULING"
   | "DISPUTE_ESCALATED"
-  | "REPORT_FILED";
+  | "REPORT_FILED"
+  | "FRIEND_REQUEST"
+  | "FRIEND_ACCEPTED"
+  | "TEAM_INVITE";
 
 export interface NotificationChannel {
   send(userId: string, type: NotificationType, payload: Record<string, unknown>): Promise<void>;

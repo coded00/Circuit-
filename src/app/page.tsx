@@ -27,6 +27,7 @@ import { YourCircuit } from "@/components/YourCircuit";
 import { GAME_ACTIVITY } from "@/lib/circuitActivity";
 import { formatNotification } from "@/lib/notification-format";
 import { globalStandings } from "@/lib/standings";
+import { getFriendIds } from "@/lib/friends";
 import { getActiveAnnouncement } from "@/lib/announcements";
 import { AnnouncementBanner } from "@/components/AnnouncementBanner";
 
@@ -74,8 +75,14 @@ async function getFeaturedTournaments(limit: number) {
   return [...prized, ...filler];
 }
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ leaderboard?: string }>;
+}) {
+  const { leaderboard: leaderboardScope } = await searchParams;
   const user = await getCurrentUser();
+  const friendLeaderboardActive = leaderboardScope === "friends" && !!user;
 
   const [
     featuredTournaments,
@@ -89,6 +96,7 @@ export default async function Home() {
     recentActivity,
     homepageBanners,
     activeAnnouncement,
+    friendIdsForLeaderboard,
   ] = await Promise.all([
     getFeaturedTournaments(3),
     prisma.tournament.findMany({
@@ -150,9 +158,13 @@ export default async function Home() {
       orderBy: { order: "asc" },
     }),
     getActiveAnnouncement(),
+    friendLeaderboardActive ? getFriendIds(user!.id) : Promise.resolve([] as string[]),
   ]);
 
-  const topLeaderboard = leaderboard.slice(0, 5);
+  const scopedLeaderboard = friendLeaderboardActive
+    ? leaderboard.filter((s) => s.userId === user!.id || friendIdsForLeaderboard.includes(s.userId))
+    : leaderboard;
+  const topLeaderboard = scopedLeaderboard.slice(0, 5);
   const openChallengesPreview = openBattles.slice(0, 3);
 
   return (
@@ -191,7 +203,7 @@ export default async function Home() {
         </div>
 
         <div className="flex min-w-0 flex-col gap-6">
-          {topLeaderboard.length > 0 && (
+          {(topLeaderboard.length > 0 || friendLeaderboardActive) && (
             <div className="card flex flex-col gap-3">
               <div className="flex items-center justify-between gap-2">
                 <h2 className="text-card-title flex items-center gap-2">
@@ -204,14 +216,27 @@ export default async function Home() {
               </div>
               <div className="border-b border-border" />
               <div className="tabs">
-                <span className="tab tab-active">Global</span>
-                <span className="tab tab-disabled" title="Coming soon">
-                  Friends
-                </span>
+                <Link href="/" className={`tab ${!friendLeaderboardActive ? "tab-active" : ""}`}>
+                  Global
+                </Link>
+                {user ? (
+                  <Link href="/?leaderboard=friends" className={`tab ${friendLeaderboardActive ? "tab-active" : ""}`}>
+                    Friends
+                  </Link>
+                ) : (
+                  <span className="tab tab-disabled" title="Log in to see your friends' ranking">
+                    Friends
+                  </span>
+                )}
                 <span className="tab tab-disabled" title="Coming soon">
                   This Month
                 </span>
               </div>
+              {friendLeaderboardActive && topLeaderboard.length === 0 ? (
+                <p className="py-4 text-center text-sm text-muted">
+                  None of your friends have a completed Challenge yet.
+                </p>
+              ) : (
               <div className="flex flex-col gap-1">
                 {topLeaderboard.map((s, i) => {
                   const medal = RANK_COLORS[i];
@@ -252,6 +277,7 @@ export default async function Home() {
                   );
                 })}
               </div>
+              )}
             </div>
           )}
 

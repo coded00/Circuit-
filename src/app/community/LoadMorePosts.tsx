@@ -47,7 +47,7 @@ function PostRow({ post }: { post: Post }) {
   );
 }
 
-export default function LoadMorePosts({ initialCursor }: { initialCursor: string | null }) {
+export default function LoadMorePosts({ initialCursor, scope }: { initialCursor: string | null; scope?: "friends" }) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [cursor, setCursor] = useState(initialCursor);
   const [loading, setLoading] = useState(false);
@@ -55,7 +55,7 @@ export default function LoadMorePosts({ initialCursor }: { initialCursor: string
   async function loadMore() {
     if (!cursor) return;
     setLoading(true);
-    const res = await fetch(`/api/community/posts?cursor=${cursor}`);
+    const res = await fetch(`/api/community/posts?cursor=${cursor}${scope ? `&scope=${scope}` : ""}`);
     if (res.ok) {
       const data = await res.json();
       setPosts((prev) => [...prev, ...data.posts]);

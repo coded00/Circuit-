@@ -42,9 +42,11 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { playerRankInGame } from "@/lib/standings";
 import { getWalletActivity } from "@/lib/wallet";
+import { friendStatusBetween } from "@/lib/friends";
 import { GameArtTile } from "@/components/GameArtTile";
 import { ShareButton } from "@/components/ShareButton";
 import { StatusPill, matchStatusInfo } from "@/components/StatusPill";
+import { FriendButton } from "@/components/FriendButton";
 import TournamentTabs, { type TournamentTab } from "@/app/tournaments/[id]/TournamentTabs";
 
 const ACTIVE_MATCH_PRIORITY: Record<string, number> = { DISPUTED: 0, NEEDS_RESULT: 1, UPCOMING: 2 };
@@ -111,6 +113,7 @@ export default async function PlayerProfilePage({
 
   const viewer = await getCurrentUser();
   const isOwnProfile = viewer?.id === player.id;
+  const friendStatus = viewer && !isOwnProfile ? await friendStatusBetween(viewer.id, player.id) : null;
 
   const [activeMatches, activeRegistrations, openBattles, allRegistrations, walletActivity] = await Promise.all([
     isOwnProfile
@@ -571,10 +574,13 @@ export default async function PlayerProfilePage({
               </Link>
             ) : (
               viewer && (
-                <Link href={`/players/${player.handle}/report`} className="btn-secondary">
-                  <Flag size={13} />
-                  Report
-                </Link>
+                <>
+                  {friendStatus && <FriendButton targetHandle={player.handle} status={friendStatus} />}
+                  <Link href={`/players/${player.handle}/report`} className="btn-secondary">
+                    <Flag size={13} />
+                    Report
+                  </Link>
+                </>
               )
             )}
           </div>

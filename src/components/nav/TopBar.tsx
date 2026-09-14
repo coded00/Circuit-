@@ -34,9 +34,12 @@ import { WalletBalanceChip } from "./WalletBalanceChip";
  * being retired in the same pass).
  */
 export async function TopBar({ user, disputeCount = 0 }: { user: User | null; disputeCount?: number }) {
-  const unreadCount = user
-    ? await prisma.notification.count({ where: { userId: user.id, readAt: null } })
-    : 0;
+  const [unreadCount, friendRequestCount] = user
+    ? await Promise.all([
+        prisma.notification.count({ where: { userId: user.id, readAt: null } }),
+        prisma.friendship.count({ where: { addresseeId: user.id, accepted: false } }),
+      ])
+    : [0, 0];
 
   return (
     <header className="fixed inset-x-0 top-0 z-30 flex h-[60px] items-center gap-4 border-b border-border bg-background/85 px-5 backdrop-blur-md sm:left-[72px] sm:px-8 lg:left-[180px]">
@@ -62,6 +65,7 @@ export async function TopBar({ user, disputeCount = 0 }: { user: User | null; di
                 isStaff: user.isStaff,
               }}
               disputeCount={disputeCount}
+              friendRequestCount={friendRequestCount}
             />
           </>
         ) : (

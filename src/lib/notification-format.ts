@@ -67,6 +67,12 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
       return { message: "A dispute was escalated to staff.", href: "/staff/disputes" };
     case "REPORT_FILED":
       return { message: "A new abuse report was filed.", href: "/staff/reports" };
+    case "FRIEND_REQUEST":
+      return { message: "You have a new friend request.", href: "/friends" };
+    case "FRIEND_ACCEPTED":
+      return { message: "Your friend request was accepted.", href: "/friends" };
+    case "TEAM_INVITE":
+      return { message: "You've been invited to a team.", href: `/teams/${str(p, "teamId")}` };
     default:
       return { message: "You have a new notification.", href: "/notifications" };
   }

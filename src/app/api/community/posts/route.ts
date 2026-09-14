@@ -1,13 +1,16 @@
 /**
- * Circuit — community feed (Global tab). Public read, auth-required
- * write. Friends/Teams tabs are UI-only "coming soon" (src/app/community/
- * page.tsx) — no follow-graph or team model exists, and building either
- * was never part of this rebuild's scope.
+ * Circuit — community feed. Global tab is unfiltered; `?scope=friends`
+ * narrows to posts by the caller and their accepted friends (see
+ * `src/lib/friends.ts`) — re-derived from the session on every request
+ * rather than accepting an id list from the client, so a friend list
+ * never has to round-trip through a URL. Teams tab is still UI-only
+ * "coming soon" until that model exists.
  */
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
+import { getFriendIds } from "@/lib/friends";
 import { parseCommunityPostContent } from "@/lib/validation";
 
 const DEFAULT_TAKE = 20;
@@ -17,8 +20,19 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const cursor = searchParams.get("cursor");
   const take = Math.min(MAX_TAKE, Math.max(1, Number(searchParams.get("take")) || DEFAULT_TAKE));
+  const scope = searchParams.get("scope");
+
+  let authorFilter: { authorId: { in: string[] } } | Record<string, never> = {};
+  if (scope === "friends") {
+    const user = await getCurrentUser();
+    if (user) {
+      const friendIds = await getFriendIds(user.id);
+      authorFilter = { authorId: { in: [user.id, ...friendIds] } };
+    }
+  }
 
   const rows = await prisma.communityPost.findMany({
+    where: authorFilter,
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: take + 1,
     ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),

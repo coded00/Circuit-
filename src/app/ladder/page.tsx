@@ -33,7 +33,9 @@
 import Link from "next/link";
 import { ArrowDown, ArrowUp, Crown, Gamepad2, Swords, Users } from "lucide-react";
 import { prisma } from "@/lib/db";
+import { getCurrentUser } from "@/lib/session";
 import { gameStandings, globalStandings, type Standing } from "@/lib/standings";
+import { getFriendIds } from "@/lib/friends";
 import { GameArtTile } from "@/components/GameArtTile";
 
 const RANK_COLORS = ["#eab308", "#9ca3af", "#b45309"]; // gold, silver, bronze — same as homepage leaderboard
@@ -154,12 +156,14 @@ export default async function LadderPage({
 }) {
   const { game, scope } = await searchParams;
   const isMonth = scope === "month";
+  const isFriends = scope === "friends";
   const now = new Date();
   const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const since = isMonth ? startOfThisMonth : undefined;
 
-  const [games, standings, totalUsersNow, totalUsersLastMonth, matchesNow, matchesLastMonth, participatedNow, participatedLastMonth] =
+  const [user, games, allStandings, totalUsersNow, totalUsersLastMonth, matchesNow, matchesLastMonth, participatedNow, participatedLastMonth] =
     await Promise.all([
+      getCurrentUser(),
       prisma.battle.findMany({ where: { status: "COMPLETE" }, select: { game: true }, distinct: ["game"], orderBy: { game: "asc" } }),
       game ? gameStandings(game, since) : globalStandings(since),
       prisma.user.count(),
@@ -169,6 +173,10 @@ export default async function LadderPage({
       distinctParticipants(),
       distinctParticipants(startOfThisMonth),
     ]);
+
+  const friendScopeActive = isFriends && !!user;
+  const friendIds = friendScopeActive ? new Set([user!.id, ...(await getFriendIds(user!.id))]) : null;
+  const standings = friendIds ? allStandings.filter((s) => friendIds.has(s.userId)) : allStandings;
 
   const podium = standings.slice(0, 3);
   const rest = standings.slice(3);
@@ -209,7 +217,10 @@ export default async function LadderPage({
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="tabs">
-          <Link href={`/ladder${game ? `?game=${encodeURIComponent(game)}` : ""}`} className={`tab ${!isMonth ? "tab-active" : ""}`}>
+          <Link
+            href={`/ladder${game ? `?game=${encodeURIComponent(game)}` : ""}`}
+            className={`tab ${!isMonth && !isFriends ? "tab-active" : ""}`}
+          >
             Global
           </Link>
           <Link
@@ -218,9 +229,18 @@ export default async function LadderPage({
           >
             This Month
           </Link>
-          <span className="tab tab-disabled" title="Needs a friend graph — not built yet">
-            Friends
-          </span>
+          {user ? (
+            <Link
+              href={`/ladder?scope=friends${game ? `&game=${encodeURIComponent(game)}` : ""}`}
+              className={`tab ${friendScopeActive ? "tab-active" : ""}`}
+            >
+              Friends
+            </Link>
+          ) : (
+            <span className="tab tab-disabled" title="Log in to see your friends' ranking">
+              Friends
+            </span>
+          )}
         </div>
 
         <form method="get" className="flex items-center gap-2">
@@ -240,7 +260,11 @@ export default async function LadderPage({
       </div>
 
       {rest.length === 0 && podium.length === 0 ? (
-        <p className="card text-center text-muted">No completed Challenges yet{game ? ` for ${game}` : ""}.</p>
+        <p className="card text-center text-muted">
+          {friendScopeActive
+            ? "None of your friends have a completed Challenge yet."
+            : `No completed Challenges yet${game ? ` for ${game}` : ""}.`}
+        </p>
       ) : rest.length > 0 ? (
         <div className="table-wrap">
           <table className="table">

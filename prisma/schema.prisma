@@ -150,6 +150,10 @@ model User {
   passwordResetTokens PasswordResetToken[]
   walletTransactions  WalletTransaction[]
   auditLogEntries     AuditLogEntry[]
+  friendshipsSent     Friendship[]         @relation("FriendshipRequester")
+  friendshipsReceived Friendship[]         @relation("FriendshipAddressee")
+  teamsCaptained      Team[]               @relation("TeamCaptain")
+  teamMemberships     TeamMembership[]
 
   @@index([emailOrPhone])
 }
@@ -464,9 +468,8 @@ model Notification {
 /// Belongs to a User. New for the community-feed rebuild (not in the
 /// original PRD's requirement numbering) — a public, unmoderated-beyond-
 /// Report post feed. No likes/comments yet (deferred as a smaller,
-/// separately-scoped follow-up); no following/team scope (Friends/Teams
-/// tabs are UI-only "coming soon" until that's its own explicit decision,
-/// same treatment as Wallet/Marketplace/Rewards).
+/// separately-scoped follow-up). The feed's Friends/Teams tabs filter
+/// this same table by `Friendship`/`TeamMembership` — see those models.
 model CommunityPost {
   id        String   @id @default(cuid())
   authorId  String
@@ -479,6 +482,63 @@ model CommunityPost {
   createdAt DateTime @default(now())
 
   @@index([createdAt])
+}
+
+/// Belongs to two Users (directed: requester → addressee). One row covers
+/// the whole lifecycle — a pending request becomes `accepted: true` on
+/// acceptance; declining a request, cancelling one you sent, or
+/// unfriending an accepted one all just delete the row, so there's no
+/// separate DECLINED state to reason about or clean up later. Powers the
+/// Friends tabs on the community feed, ladder, and homepage leaderboard —
+/// see `src/lib/friends.ts`.
+model Friendship {
+  id          String   @id @default(cuid())
+  requesterId String
+  requester   User     @relation("FriendshipRequester", fields: [requesterId], references: [id])
+  addresseeId String
+  addressee   User     @relation("FriendshipAddressee", fields: [addresseeId], references: [id])
+  accepted    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@unique([requesterId, addresseeId])
+  @@index([addresseeId, accepted])
+  @@index([requesterId, accepted])
+}
+
+/// A persistent squad — name, optional tag, a roster, one captain.
+/// Deliberately NOT wired into tournament/challenge registration:
+/// `Registration` stays one row per individual `User` (see that model's
+/// own comment) — a `Team` here is a social grouping only, not a new
+/// registration unit. The captain leaves by disbanding the team (there's
+/// no captaincy-transfer flow); anyone else just leaves their own
+/// `TeamMembership` row.
+model Team {
+  id        String           @id @default(cuid())
+  name      String           @unique
+  tag       String?
+  captainId String
+  captain   User             @relation("TeamCaptain", fields: [captainId], references: [id])
+  createdAt DateTime         @default(now())
+
+  members TeamMembership[]
+}
+
+/// One row per (team, user) pair, including the captain's own membership
+/// (created alongside the `Team`). `accepted: false` is a pending invite
+/// the invited user hasn't responded to yet — same "no separate DECLINED
+/// state" convention as `Friendship`: declining an invite, leaving, and
+/// being removed all just delete the row.
+model TeamMembership {
+  id        String   @id @default(cuid())
+  teamId    String
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  accepted  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@unique([teamId, userId])
+  @@index([userId, accepted])
 }
 
 /// Belongs to a reported User. Maps to TRU-3.

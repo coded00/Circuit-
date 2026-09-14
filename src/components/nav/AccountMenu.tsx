@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ShoppingBag, Gift, Trophy, Swords, Shield, Wallet } from "lucide-react";
+import { ChevronDown, ShoppingBag, Gift, Trophy, Swords, Shield, Wallet, Users, UsersRound } from "lucide-react";
 
 type NavUser = { handle: string; displayName: string; avatarUrl: string | null; isStaff: boolean };
 
@@ -40,7 +40,15 @@ function MenuLink({
  * real destinations, not new ones, just relocated so the primary rail
  * stays a fixed, always-fits-without-scrolling list.
  */
-export function AccountMenu({ user, disputeCount = 0 }: { user: NavUser; disputeCount?: number }) {
+export function AccountMenu({
+  user,
+  disputeCount = 0,
+  friendRequestCount = 0,
+}: {
+  user: NavUser;
+  disputeCount?: number;
+  friendRequestCount?: number;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -92,6 +100,14 @@ export function AccountMenu({ user, disputeCount = 0 }: { user: NavUser; dispute
           <Link href="/account" onClick={() => setOpen(false)} className="block px-4 py-2 text-sm hover:bg-surface-elevated">
             Account settings
           </Link>
+
+          <div className="my-1 border-t border-border" />
+          <MenuLink href="/friends" icon={Users} badge={friendRequestCount} onClick={() => setOpen(false)}>
+            Friends
+          </MenuLink>
+          <MenuLink href="/teams" icon={UsersRound} onClick={() => setOpen(false)}>
+            Teams
+          </MenuLink>
 
           <div className="my-1 border-t border-border" />
           <MenuLink href="/marketplace" icon={ShoppingBag} onClick={() => setOpen(false)}>
