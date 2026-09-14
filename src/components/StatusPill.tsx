@@ -26,8 +26,17 @@ export function StatusPill({
   pulse?: boolean;
   size?: "sm" | "md";
 }) {
+  // Two tone-driven treatments, not per-status flags — any "open" tone
+  // (registration open, a battle in progress, ...) means the same real
+  // thing everywhere it's used ("active, no rush"), and any "complete"
+  // tone means the same real thing too (a resolved state, worth a
+  // one-time settle-in reveal rather than the ongoing pulse an urgent
+  // state gets).
+  const glow = tone === "open" ? "badge-open-glow" : "";
+  const settle = tone === "complete" ? "motion-scale-in" : "";
+
   return (
-    <span className={`badge ${TONE_CLASS[tone]} ${size === "md" ? "badge-md" : ""}`}>
+    <span className={`badge ${TONE_CLASS[tone]} ${size === "md" ? "badge-md" : ""} ${glow} ${settle}`}>
       {pulse && (
         <span className="pulse-dot" aria-hidden />
       )}

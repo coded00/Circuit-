@@ -20,7 +20,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Tv, Calendar, Users, Layers, Swords, Trophy, Wallet, ShieldCheck } from "lucide-react";
+import { Tv, Calendar, Users, Layers, Swords, Trophy, Wallet, ShieldCheck, Timer } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { StatusPill, tournamentStatusInfo } from "@/components/StatusPill";
@@ -28,6 +28,9 @@ import { GameArtTile } from "@/components/GameArtTile";
 import { ShareButton } from "@/components/ShareButton";
 import { openDueTournaments } from "@/lib/tournaments";
 import { CapacityBar } from "@/components/CapacityBar";
+import { CountdownTimer } from "@/components/CountdownTimer";
+import { isStartingSoon } from "@/lib/tournamentTiming";
+import Poller from "@/app/Poller";
 import TournamentTabs, { type TournamentTab } from "./TournamentTabs";
 import CancelButton from "./CancelButton";
 import WithdrawButton from "./WithdrawButton";
@@ -119,6 +122,10 @@ export default async function TournamentPage({
   const status = tournamentStatusInfo(tournament.status);
   const formatText = formatLabel(tournament.format);
   const hasBracket = tournament.status === "LIVE" || tournament.status === "COMPLETE";
+  // A real countdown only makes sense before the bracket actually starts —
+  // once it's LIVE/COMPLETE/CANCELLED, "starting in" is no longer true.
+  const startingSoon =
+    !hasBracket && tournament.status !== "CANCELLED" && isStartingSoon(tournament.startAt, now);
 
   let canClaimPrize = false;
   if (user && tournament.status === "COMPLETE" && tournament.prizeAmount && tournament.prizeAmount > 0) {
@@ -277,6 +284,11 @@ export default async function TournamentPage({
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-6 sm:p-8">
+      {/* Real "live" page — a Poller-driven refresh is what makes the
+          capacity flash, FULL state, and status pill above genuinely
+          respond to someone else registering while this page is open,
+          not just on the next full page load. */}
+      <Poller />
       <div
         data-surface="dark"
         className="relative flex min-h-[260px] w-full flex-col justify-end overflow-hidden rounded-[16px] border border-border p-6 sm:min-h-[300px] sm:p-8"
@@ -292,6 +304,12 @@ export default async function TournamentPage({
             <StatusPill tone={status.tone} pulse={status.pulse}>
               {status.label}
             </StatusPill>
+            {startingSoon && (
+              <span className="badge badge-attention">
+                <Timer size={11} />
+                Starting in <CountdownTimer target={tournament.startAt.toISOString()} />
+              </span>
+            )}
             {hasBracket && (
               <Link
                 href={`/tournaments/${tournament.id}/bracket`}
@@ -428,13 +446,19 @@ export default async function TournamentPage({
                       : "Secure payment via Paystack or Flutterwave."}
                   </p>
                 </>
+              ) : now >= tournament.registrationOpenAt &&
+                now < tournament.registrationCloseAt &&
+                registrantCount >= tournament.participantCap ? (
+                <div className="alert alert-warning flex-col items-stretch gap-2">
+                  <p className="flex items-center gap-1.5 font-semibold">
+                    <Users size={14} className="shrink-0" />
+                    Registration is full — {tournament.participantCap}/{tournament.participantCap} players.
+                  </p>
+                  <CapacityBar registered={registrantCount} cap={tournament.participantCap} className="h-1" />
+                </div>
               ) : (
                 <p className="text-center text-sm text-muted">
-                  {now < tournament.registrationOpenAt
-                    ? "Registration hasn't opened yet."
-                    : now >= tournament.registrationCloseAt
-                      ? "Registration is closed."
-                      : "Registration is full."}
+                  {now < tournament.registrationOpenAt ? "Registration hasn't opened yet." : "Registration is closed."}
                 </p>
               )}
             </div>

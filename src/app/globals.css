@@ -898,6 +898,52 @@ body {
   }
 }
 
+/*
+ * ============================================================================
+ * Phase 22 — live tournament states. Motion that responds to real state
+ * (a real refresh bringing a real changed value, a real status), never a
+ * decorative loop invented to look "alive."
+ * ============================================================================
+ */
+@layer components {
+  /* Applied by StatusPill whenever tone === "open" (registration open, a
+     battle in progress, ...) — a slow, ambient ring, deliberately much
+     quieter than the pulse-dot reserved for LIVE/urgent states, since
+     "you can act, no rush" is a different real state than "act now." */
+  .badge-open-glow {
+    animation: badge-open-breathe var(--duration-ambient) ease-in-out infinite;
+  }
+
+  /* Applied by CapacityBar when its own `registered` prop actually
+     changes value between renders (a real Poller-driven refresh brought
+     a real new number) — a brief highlight, not a continuous effect. */
+  .capacity-flash {
+    animation: capacity-flash-pulse var(--duration-celebration) var(--ease-out) both;
+  }
+}
+
+@keyframes badge-open-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--status-open) 22%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--status-open) 0%, transparent);
+  }
+}
+
+@keyframes capacity-flash-pulse {
+  0% {
+    filter: brightness(1);
+  }
+  35% {
+    filter: brightness(1.6);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
