@@ -95,6 +95,58 @@
   /* ---- Layout (Phase 1) ---- */
   --sidebar-width: 170px;
   --right-rail-width: 330px;
+
+  /* ---- Motion (Phase 19) ----
+     Circuit's motion hierarchy — every new animation should be built from
+     these tokens, not a fresh literal duration/easing. Four levels, from
+     quietest to most expressive:
+
+       Level 1 Quiet        — general UI (color/opacity swaps, focus rings).
+                               --duration-fast + --ease-standard.
+       Level 2 Interactive   — buttons, cards, user-driven actions (hover
+                               lift, press feedback, CTA movement).
+                               --duration-base + --ease-out (enter) /
+                               --ease-standard (hover) / --duration-instant
+                               for the press-down itself.
+       Level 3 Competitive   — tournament/live state (capacity bars, status
+                               changes, bracket/leaderboard motion, content
+                               reveal). --duration-reveal + --ease-reveal.
+       Level 4 Celebration   — wins, achievements, major rewards.
+                               --duration-celebration + --ease-spring.
+       (Ambient loops — a slow breathing/idle animation that just keeps
+       running, not a state transition — are a separate category:
+       --duration-ambient, not tied to a specific level.)
+
+     None of the values below are new inventions except --duration-instant
+     (nothing currently needs press-feedback timing) and --duration-fast
+     (names what bare Tailwind `transition` already defaults to) — every
+     other token is the exact existing literal already live in production
+     today, just named: --duration-base/--duration-moderate match the two
+     card hover-zoom durations already in use (CompeteOnCircuit/
+     FeaturedCompetitions), --duration-reveal matches the existing
+     rank-row-in and celebrate-fade-in entrances, --duration-celebration
+     matches trophy-pop, --duration-ambient matches crown-bounce/
+     rank-first-glow, --ease-reveal and --ease-spring are rank-row-in's and
+     trophy-pop's exact curves. The Phase 18 keyframes below are updated to
+     reference these tokens instead of repeating the numbers — zero visual
+     change, just one source of truth going forward. */
+  --duration-instant: 100ms;
+  --duration-fast: 150ms;
+  --duration-base: 220ms;
+  --duration-moderate: 300ms;
+  --duration-reveal: 500ms;
+  --duration-celebration: 600ms;
+  --duration-ambient: 2.4s;
+  /* Per-item delay multiplier for a staggered group — pair with an --i
+     custom property set inline per item (style={{ "--i": index }}), same
+     convention .rank-row already established. */
+  --stagger-step: 70ms;
+
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-reveal: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /* Dark override — "dark to compete." Applied via `data-surface="dark"` on
@@ -333,6 +385,8 @@ body {
   .dropdown-panel {
     @apply rounded-[11px] border border-border bg-surface;
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+    animation: motion-panel-enter var(--duration-base) var(--ease-out) both;
+    transform-origin: top right;
   }
 }
 
@@ -514,18 +568,39 @@ body {
  * ============================================================================
  */
 @layer components {
+  /* Two pulsing-dot implementations used to exist independently here
+     (.live-dot, hardcoded red) and inline inside StatusPill (currentColor,
+     so it matches whatever tone the badge is). Consolidated on one
+     `--pulse-color` variable convention — .live-dot still defaults to the
+     same red it always has (zero visual change at its 4 existing call
+     sites), and the new .pulse-dot below is what StatusPill now uses,
+     inheriting the badge's own color via `currentColor`. */
   .live-dot {
     @apply relative flex h-1.5 w-1.5;
   }
   .live-dot::before {
     content: "";
     @apply absolute inline-flex h-full w-full animate-ping rounded-full opacity-75;
-    background: var(--live);
+    background: var(--pulse-color, var(--live));
   }
   .live-dot::after {
     content: "";
     @apply relative inline-flex h-1.5 w-1.5 rounded-full;
-    background: var(--live);
+    background: var(--pulse-color, var(--live));
+  }
+
+  .pulse-dot {
+    @apply relative inline-flex h-1.5 w-1.5;
+  }
+  .pulse-dot::before {
+    content: "";
+    @apply absolute inline-flex h-full w-full animate-ping rounded-full opacity-75;
+    background: var(--pulse-color, currentColor);
+  }
+  .pulse-dot::after {
+    content: "";
+    @apply relative inline-flex h-1.5 w-1.5 rounded-full;
+    background: var(--pulse-color, currentColor);
   }
 }
 
@@ -539,8 +614,8 @@ body {
  */
 @layer components {
   .rank-row {
-    animation: rank-row-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
-    animation-delay: calc(var(--i, 0) * 70ms);
+    animation: rank-row-in var(--duration-reveal) var(--ease-reveal) both;
+    animation-delay: calc(var(--i, 0) * var(--stagger-step));
   }
 
   /* Spotlight on rank #1 only — a slow breathing glow, not a hard border. */
@@ -549,20 +624,20 @@ body {
     background: linear-gradient(90deg, color-mix(in srgb, var(--gold) 14%, transparent), transparent 70%);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 30%, transparent);
     animation:
-      rank-row-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both,
-      rank-first-glow 2.4s ease-in-out infinite;
+      rank-row-in var(--duration-reveal) var(--ease-reveal) both,
+      rank-first-glow var(--duration-ambient) ease-in-out infinite;
   }
 
   .crown-bounce {
-    animation: crown-bounce 2.4s ease-in-out infinite;
+    animation: crown-bounce var(--duration-ambient) ease-in-out infinite;
   }
 
   .trophy-pop {
-    animation: trophy-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    animation: trophy-pop var(--duration-celebration) var(--ease-spring) both;
   }
 
   .celebrate-fade {
-    animation: celebrate-fade-in 0.5s ease-out both;
+    animation: celebrate-fade-in var(--duration-reveal) var(--ease-out) both;
   }
 
   .confetti-burst {
@@ -639,6 +714,102 @@ body {
   100% {
     transform: translateY(90px) rotate(320deg);
     opacity: 0;
+  }
+}
+
+/*
+ * ============================================================================
+ * Phase 19 — motion foundation. Small, generic primitives built from the
+ * tokens above — Level 1 (Quiet) and Level 2 (Interactive) only. Nothing
+ * here is applied broadly to existing cards/buttons yet (that's its own
+ * later pass); .motion-panel-enter on .dropdown-panel below is the one
+ * concrete application in this pass, since a popover with zero enter
+ * motion was a real, narrow gap (not a redesign of anything else).
+ * ============================================================================
+ */
+@layer components {
+  /* Reveal primitives — mount-in only (no exit animation without JS-timed
+     unmounting, which is out of scope for a CSS-only foundation). Apply
+     directly, or alongside .motion-stagger for a staggered group. */
+  .motion-fade-in {
+    animation: motion-fade-in var(--duration-base) var(--ease-out) both;
+  }
+  .motion-slide-up {
+    animation: motion-slide-up var(--duration-base) var(--ease-out) both;
+  }
+  .motion-scale-in {
+    animation: motion-scale-in var(--duration-base) var(--ease-out) both;
+  }
+  /* Pair with an inline --i custom property per item, same convention
+     .rank-row already established (style={{ "--i": index }}). */
+  .motion-stagger {
+    animation-delay: calc(var(--i, 0) * var(--stagger-step));
+  }
+
+  /* Hover/press feedback for anything clickable. Generic — not yet applied
+     to .card/.btn-* (a broader interaction pass decides where these land;
+     this phase only establishes that they exist and work). */
+  .motion-lift {
+    transition:
+      transform var(--duration-base) var(--ease-out),
+      border-color var(--duration-base) var(--ease-standard);
+  }
+  .motion-lift:hover {
+    transform: translateY(-2px);
+  }
+  .motion-press {
+    transition: transform var(--duration-instant) var(--ease-standard);
+  }
+  .motion-press:active {
+    transform: scale(0.97);
+  }
+
+  /* Modal/overlay/dropdown enter. Applied to .dropdown-panel below. */
+  .motion-panel-enter {
+    animation: motion-panel-enter var(--duration-base) var(--ease-out) both;
+    transform-origin: top right;
+  }
+}
+
+@keyframes motion-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes motion-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes motion-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes motion-panel-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
   }
 }
 
