@@ -274,7 +274,7 @@ export default async function LadderPage({
       </div>
 
       {rest.length === 0 && podium.length === 0 ? (
-        <p className="card text-center text-muted">
+        <p className="card motion-fade-in text-center text-muted">
           {friendScopeActive
             ? "None of your friends have a completed Challenge yet."
             : `No completed Challenges yet${game ? ` for ${game}` : ""}.`}

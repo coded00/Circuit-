@@ -29,7 +29,11 @@ export default async function BracketPage({
   const bracket = await prisma.bracket.findUnique({ where: { tournamentId: id } });
   if (!bracket) {
     return (
-      <div className="state-block">
+      <div className="state-block motion-fade-in">
+        {/* Same live-page treatment as once the bracket exists below —
+            no reason a viewer waiting for registration to close should
+            need a manual refresh to see it appear. */}
+        <Poller />
         <h1 className="state-title">{tournament.name}</h1>
         <p className="state-description">
           The bracket hasn&apos;t been generated yet — it appears once registration closes.

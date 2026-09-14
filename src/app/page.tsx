@@ -246,7 +246,7 @@ export default async function Home({
                 </span>
               </div>
               {friendLeaderboardActive && topLeaderboard.length === 0 ? (
-                <p className="py-4 text-center text-sm text-muted">
+                <p className="motion-fade-in py-4 text-center text-sm text-muted">
                   None of your friends have a completed Challenge yet.
                 </p>
               ) : (

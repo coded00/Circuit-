@@ -30,7 +30,7 @@ export default async function AdminBracketPage({ params }: { params: Promise<{ i
         <Link href={`/admin/competitions/${id}`} className="w-fit text-sm font-medium text-muted transition hover:text-foreground">
           ← Back
         </Link>
-        <div className="state-block">
+        <div className="state-block motion-fade-in">
           <h1 className="state-title">{tournament.name}</h1>
           <p className="state-description">The bracket hasn&apos;t been generated yet — it appears once registration closes.</p>
         </div>

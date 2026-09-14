@@ -364,7 +364,22 @@ export default async function TournamentPage({
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_340px]">
-        <Suspense fallback={null}>
+        {/* Reserves real space so the tab bar + content pane resolving
+            (TournamentTabs needs a boundary for useSearchParams) doesn't
+            shift everything below it down — fallback={null} had nothing
+            to reserve with. */}
+        <Suspense
+          fallback={
+            <div className="flex min-w-0 flex-col gap-6">
+              <div className="flex items-center gap-2">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="skeleton h-8 w-24 rounded-[8px]" />
+                ))}
+              </div>
+              <div className="skeleton h-64 w-full rounded-[12px]" />
+            </div>
+          }
+        >
           <TournamentTabs tabs={tabs} />
         </Suspense>
 

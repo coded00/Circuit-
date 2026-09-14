@@ -11,6 +11,8 @@ import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { confirmWalletFunding } from "@/lib/payments/confirm";
+import Poller from "@/app/Poller";
+import { Spinner } from "@/components/Spinner";
 
 export default async function FundWalletCallbackPage({
   searchParams,
@@ -24,12 +26,15 @@ export default async function FundWalletCallbackPage({
   }
 
   const txn = ref ? await prisma.walletTransaction.findUnique({ where: { providerRef: ref } }) : null;
+  // COMPLETE and FAILED are both settled outcomes — nothing left to poll for.
+  const settled = txn?.status === "COMPLETE" || txn?.status === "FAILED";
 
   return (
     <div className="state-block">
+      {ref && !settled && <Poller />}
       {txn?.status === "COMPLETE" ? (
         <>
-          <CheckCircle2 size={40} className="text-success" />
+          <CheckCircle2 size={40} className="motion-scale-in text-success" />
           <h1 className="state-title">Wallet funded</h1>
           <p className="state-description">
             ₦{(txn.amount / 100).toLocaleString("en-NG")} has been added to your Circuit wallet.
@@ -42,8 +47,9 @@ export default async function FundWalletCallbackPage({
         </>
       ) : (
         <>
+          <Spinner size={28} className="text-muted" />
           <h1 className="state-title">Payment processing</h1>
-          <p className="state-description">This can take a minute. Refresh this page, or check your wallet shortly.</p>
+          <p className="state-description">This can take a minute — this page will update on its own once it&apos;s confirmed.</p>
         </>
       )}
       <Link href="/wallet" className="btn-secondary">
