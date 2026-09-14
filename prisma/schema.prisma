@@ -565,3 +565,19 @@ model AuditLogEntry {
 
   @@index([createdAt])
 }
+
+/// V1 rate limiting (ACC-5) — a small attempts table queried per request,
+/// not Redis; see docs/circuit-stack.md's Rate limiting section for why
+/// ("does the same job at V1's actual traffic without standing up a new
+/// service" — Upstash Redis is the named upgrade path if that ever stops
+/// being true). `key` scopes an attempt to both the action and the
+/// identifier it's against (e.g. "login:user@example.com"), so this one
+/// table covers every rate-limited route without a migration per route.
+/// Self-cleaning, not swept by a cron job — see src/lib/rateLimit.ts.
+model RateLimitAttempt {
+  id        String   @id @default(cuid())
+  key       String
+  createdAt DateTime @default(now())
+
+  @@index([key, createdAt])
+}
