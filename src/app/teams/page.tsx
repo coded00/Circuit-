@@ -20,7 +20,10 @@ export default async function TeamsPage() {
   const [captained, memberships, invites] = await Promise.all([
     prisma.team.findMany({ where: { captainId: user.id }, orderBy: { createdAt: "desc" } }),
     prisma.teamMembership.findMany({
-      where: { userId: user.id, accepted: true },
+      // Excludes teams this user captains — their own membership row for
+      // those already comes back via `captained` above, and without this
+      // filter a captained team would be listed twice on this page.
+      where: { userId: user.id, accepted: true, team: { captainId: { not: user.id } } },
       include: { team: true },
       orderBy: { createdAt: "desc" },
     }),

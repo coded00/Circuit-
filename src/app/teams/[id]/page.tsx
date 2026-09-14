@@ -39,6 +39,9 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ id:
 
   const acceptedMembers = team.members.filter((m) => m.accepted && m.userId !== team.captainId);
   const pendingMembers = team.members.filter((m) => !m.accepted);
+  // `team.members` already includes the captain's own membership row
+  // (created alongside the team), so its length alone is the real total.
+  const totalMembers = team.members.length;
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 p-6 sm:p-8">
@@ -47,7 +50,7 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ id:
           {team.name}
           {team.tag && <span className="text-muted"> [{team.tag}]</span>}
         </h1>
-        <p className="text-sm text-muted">{team.members.length + 1} member{team.members.length === 0 ? "" : "s"}</p>
+        <p className="text-sm text-muted">{totalMembers} member{totalMembers === 1 ? "" : "s"}</p>
       </div>
 
       {isInvited && <TeamInviteBanner teamId={id} viewerId={user.id} />}
