@@ -1,9 +1,11 @@
 /**
  * Circuit — Admin Competitions (Phase 2). Every real Tournament, with
  * admin-capable actions on top of the same real routes the organizer
- * dashboard already uses (Edit, Manage Players, View Bracket, Cancel) —
- * their auth gates now also accept staff, not just each tournament's own
- * organizer, rather than duplicating that logic here.
+ * dashboard already uses (Edit, Manage Players, Cancel) — their auth
+ * gates now also accept staff, not just each tournament's own organizer,
+ * rather than duplicating that logic here. Bracket is admin-native
+ * (`/admin/competitions/[id]/bracket`, same `BracketView` the
+ * player-facing page renders).
  */
 
 import Link from "next/link";
@@ -159,8 +161,8 @@ export default async function AdminCompetitionsPage({ searchParams }: { searchPa
                         <Link href={`/admin/competitions/${t.id}`} className="text-xs font-medium text-accent-blue hover:underline">
                           Manage
                         </Link>
-                        <Link href={`/tournaments/${t.id}/bracket`} target="_blank" className="text-xs font-medium text-accent-blue hover:underline">
-                          Bracket ↗
+                        <Link href={`/admin/competitions/${t.id}/bracket`} className="text-xs font-medium text-accent-blue hover:underline">
+                          Bracket
                         </Link>
                         {cancellable && <CancelTournamentButton tournamentId={t.id} />}
                       </div>

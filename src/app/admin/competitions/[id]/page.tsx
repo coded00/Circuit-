@@ -5,8 +5,10 @@
  * redirect out to that page, or to the public `/tournaments/[id]`: an
  * admin clicking something in the control center should stay in the
  * control center, not land back in the player-facing app's own chrome.
- * "View public page" is the one explicit, clearly-labeled exception —
- * opens in a new tab.
+ * Bracket and dispute ruling are both admin-native now too
+ * (`/admin/competitions/[id]/bracket`, `/admin/matches/[id]`). "View
+ * public page" is the one remaining explicit, clearly-labeled exception
+ * — opens in a new tab.
  */
 
 import Link from "next/link";
@@ -80,11 +82,11 @@ export default async function AdminCompetitionDetailPage({ params }: { params: P
             Disputes need a ruling
           </h2>
           {openDisputes.map((dispute) => (
-            <Link key={dispute.id} href={`/matches/${dispute.matchId}`} target="_blank" className="card-row flex items-center justify-between gap-3 p-3">
+            <Link key={dispute.id} href={`/admin/matches/${dispute.matchId}`} className="card-row flex items-center justify-between gap-3 p-3">
               <span className="truncate font-medium">
                 {dispute.match.playerA.displayName} vs {dispute.match.playerB.displayName}
               </span>
-              <span className="shrink-0 text-sm font-medium text-accent-blue">Rule now ↗</span>
+              <span className="shrink-0 text-sm font-medium text-accent-blue">Rule now →</span>
             </Link>
           ))}
         </section>
@@ -109,8 +111,8 @@ export default async function AdminCompetitionDetailPage({ params }: { params: P
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-card-title">Bracket</h2>
           {bracket && (
-            <Link href={`/tournaments/${id}/bracket`} target="_blank" className="text-sm font-medium text-accent-blue hover:underline">
-              View bracket ↗
+            <Link href={`/admin/competitions/${id}/bracket`} className="text-sm font-medium text-accent-blue hover:underline">
+              View bracket →
             </Link>
           )}
         </div>

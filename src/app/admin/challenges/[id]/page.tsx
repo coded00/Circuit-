@@ -2,10 +2,8 @@
  * Circuit — admin challenge detail, native to the admin shell. Real
  * `Battle` data plus its linked `Match` (if accepted) — same real
  * relations `/admin/challenges`'s list page reads, just at the per-item
- * level. The one deliberate external link is "View match ↗" for an
- * escalated dispute, which opens the real staff ruling form on
- * `/matches/[id]` — that page already supports staff rulings; duplicating
- * that whole flow natively here wasn't what was asked for.
+ * level. "View match" is native too, at `/admin/matches/[id]` — the same
+ * `RulingForm` the player-facing match page uses, just hosted here.
  */
 
 import Link from "next/link";
@@ -124,8 +122,8 @@ export default async function AdminChallengeDetailPage({ params }: { params: Pro
                   </StatusPill>
                   <span className="text-sm text-warning">Dispute raised</span>
                 </div>
-                <Link href={`/matches/${match.id}`} target="_blank" className="text-sm font-medium text-accent-blue hover:underline">
-                  View match ↗
+                <Link href={`/admin/matches/${match.id}`} className="text-sm font-medium text-accent-blue hover:underline">
+                  View match →
                 </Link>
               </div>
             )}

@@ -1,23 +1,20 @@
 /**
- * Circuit — live bracket view (Build Plan P3-9, maps: BRK-7). Thin
- * data-fetcher; the real tab shell (Bracket / Matches / Standings /
- * About) and Champion sidebar live in `BracketView.tsx`, shared with the
- * admin-native bracket page at `/admin/competitions/[id]/bracket` — see
- * that file's own header comment for what's real vs. deliberately not
- * invented (round names, standings, no per-match score split, etc.).
+ * Circuit — admin bracket view, native to the admin shell. Replaces the
+ * "View bracket ↗"/"Bracket ↗" links out to the player-facing
+ * `/tournaments/[id]/bracket` — same real `BracketView` render (see that
+ * file's own header comment for what's real vs. deliberately not
+ * invented), just with admin-appropriate links: back to the admin
+ * competition page, matches open in the admin match/dispute page, and
+ * standings link to the admin user page instead of the public profile.
  */
 
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
-import Poller from "@/app/Poller";
 import { playerRankInGame } from "@/lib/standings";
-import { BracketView, type BracketStructure } from "./BracketView";
+import { BracketView, type BracketStructure } from "@/app/tournaments/[id]/bracket/BracketView";
 
-export default async function BracketPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function AdminBracketPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
   const tournament = await prisma.tournament.findUnique({
@@ -29,11 +26,14 @@ export default async function BracketPage({
   const bracket = await prisma.bracket.findUnique({ where: { tournamentId: id } });
   if (!bracket) {
     return (
-      <div className="state-block">
-        <h1 className="state-title">{tournament.name}</h1>
-        <p className="state-description">
-          The bracket hasn&apos;t been generated yet — it appears once registration closes.
-        </p>
+      <div className="flex flex-1 flex-col gap-6">
+        <Link href={`/admin/competitions/${id}`} className="w-fit text-sm font-medium text-muted transition hover:text-foreground">
+          ← Back
+        </Link>
+        <div className="state-block">
+          <h1 className="state-title">{tournament.name}</h1>
+          <p className="state-description">The bracket hasn&apos;t been generated yet — it appears once registration closes.</p>
+        </div>
       </div>
     );
   }
@@ -64,20 +64,15 @@ export default async function BracketPage({
   const championRank = champion ? await playerRankInGame(tournament.game, champion) : null;
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 p-6 sm:p-8">
-      <Poller />
-      <BracketView
-        tournament={tournament}
-        structure={structure}
-        users={users}
-        matches={matches}
-        championRank={championRank}
-        backHref={`/tournaments/${id}`}
-        matchHref={(matchId) => `/matches/${matchId}`}
-        playerHref={(_userId, handle) => `/players/${handle}`}
-        tournamentHref={`/tournaments/${id}`}
-        shareUrl={`${process.env.NEXT_PUBLIC_APP_URL}/tournaments/${id}/bracket`}
-      />
-    </div>
+    <BracketView
+      tournament={tournament}
+      structure={structure}
+      users={users}
+      matches={matches}
+      championRank={championRank}
+      backHref={`/admin/competitions/${id}`}
+      matchHref={(matchId) => `/admin/matches/${matchId}`}
+      playerHref={(userId) => `/admin/users/${userId}`}
+    />
   );
 }
