@@ -84,15 +84,20 @@ function StatTile({
 
 type Achievement = { key: string; label: string; description: string; unlocked: boolean };
 
-function AchievementBadge({ achievement }: { achievement: Achievement }) {
+function AchievementBadge({ achievement, order = 0 }: { achievement: Achievement; order?: number }) {
   return (
-    <div className="flex flex-col items-center gap-2 text-center">
+    <div
+      style={{ "--i": order } as React.CSSProperties}
+      // Only real, already-earned badges get the reveal — an unearned one
+      // has nothing to celebrate, so it stays static.
+      className={`flex flex-col items-center gap-2 text-center ${achievement.unlocked ? "motion-fade-in motion-stagger" : ""}`}
+    >
       <span
         className={`flex h-14 w-14 items-center justify-center rounded-[12px] border ${
           achievement.unlocked ? "border-accent-volt/50 bg-accent-volt-soft text-accent-volt" : "border-border bg-surface-elevated text-muted"
         }`}
       >
-        {achievement.unlocked ? <Star size={22} /> : <Lock size={18} />}
+        {achievement.unlocked ? <Star size={22} className="trophy-pop" /> : <Lock size={18} />}
       </span>
       <div className="flex flex-col">
         <span className="text-xs font-semibold">{achievement.label}</span>
@@ -271,8 +276,8 @@ export default async function PlayerProfilePage({
           </h2>
         </div>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          {achievements.map((a) => (
-            <AchievementBadge key={a.key} achievement={a} />
+          {achievements.map((a, i) => (
+            <AchievementBadge key={a.key} achievement={a} order={i} />
           ))}
         </div>
       </div>
@@ -403,8 +408,8 @@ export default async function PlayerProfilePage({
   const achievementsContent = (
     <div className="card flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
-        {achievements.map((a) => (
-          <AchievementBadge key={a.key} achievement={a} />
+        {achievements.map((a, i) => (
+          <AchievementBadge key={a.key} achievement={a} order={i} />
         ))}
       </div>
     </div>
