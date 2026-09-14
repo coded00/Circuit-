@@ -15,6 +15,7 @@ import { GameArtTile } from "@/components/GameArtTile";
 import { ShareButton } from "@/components/ShareButton";
 import { StatusPill, matchStatusInfo } from "@/components/StatusPill";
 import TournamentTabs, { type TournamentTab } from "../TournamentTabs";
+import { BracketSlotSide } from "./BracketSlotSide";
 
 export type BracketSlot = {
   position: number;
@@ -26,7 +27,7 @@ export type BracketSlot = {
 export type BracketRound = { round: number; slots: BracketSlot[] };
 export type BracketStructure = { bracketSize: number; totalRounds: number; rounds: BracketRound[] };
 
-type Player = { id: string; displayName: string; handle: string; avatarUrl: string | null };
+export type Player = { id: string; displayName: string; handle: string; avatarUrl: string | null };
 
 type ViewMatch = {
   id: string;
@@ -63,7 +64,7 @@ function roundName(round: number, totalRounds: number): string {
   return `Round ${round}`;
 }
 
-function Avatar({ player, size, ringClass }: { player: Player | null; size: number; ringClass: string }) {
+export function Avatar({ player, size, ringClass }: { player: Player | null; size: number; ringClass: string }) {
   const px = `${size}px`;
   if (!player) {
     return (
@@ -139,16 +140,12 @@ function MatchCard({
       ].map((p, i) => {
         const player = p.id ? (userMap.get(p.id) ?? null) : null;
         return (
-          <div
+          <BracketSlotSide
             key={i}
-            className={`flex h-9 items-center gap-2 px-3 text-sm ${i === 0 ? "border-b border-border" : ""} ${
-              p.isWinner ? "font-semibold text-foreground" : "text-muted"
-            }`}
-          >
-            <Avatar player={player} size={22} ringClass={p.isWinner ? "border-accent-volt/60" : "border-border"} />
-            <span className="truncate">{player?.displayName ?? "TBD"}</span>
-            {p.isWinner && <Trophy size={13} className="ml-auto shrink-0 text-gold" />}
-          </div>
+            player={player}
+            isWinner={p.isWinner}
+            borderClass={i === 0 ? "border-b border-border" : ""}
+          />
         );
       })}
       {slot.matchId && (
@@ -403,11 +400,13 @@ export function BracketView({
 
         <aside className="flex h-fit flex-col gap-4 lg:sticky lg:top-[76px]">
           <div data-surface="dark" className="card flex flex-col items-center gap-3 overflow-hidden p-6 text-center">
-            <Crown size={20} className={champion ? "text-gold" : "text-muted"} />
+            {/* Reveal only when there's a real champion to crown — the
+                "still to be decided" placeholder has nothing to celebrate. */}
+            <Crown size={20} className={champion ? "trophy-pop text-gold" : "text-muted"} />
             <div className="relative flex items-center justify-center py-1">
               <Leaf size={26} className={`-rotate-[100deg] ${champion ? "text-gold/70" : "text-muted/40"}`} />
               <div
-                className="relative mx-1 rounded-full"
+                className={`relative mx-1 rounded-full ${champion ? "motion-scale-in" : ""}`}
                 style={champion ? { boxShadow: "0 0 0 3px var(--gold), 0 0 32px 6px color-mix(in srgb, var(--gold) 55%, transparent)" } : undefined}
               >
                 <Avatar player={championPlayer} size={84} ringClass={champion ? "border-gold" : "border-border-strong"} />

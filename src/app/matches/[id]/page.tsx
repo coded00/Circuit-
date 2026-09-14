@@ -85,7 +85,10 @@ export default async function MatchPage({
         {[match.playerA, match.playerB].map((p, i) => {
           const isWinner = match.winnerId === p.id;
           return (
-            <div key={i} className={`card flex flex-col gap-1 ${isWinner ? "border-success/40" : ""}`}>
+            // motion-scale-in here (not celebrate-fade) is a neutral settle-in
+            // for whoever's viewing — spectators and the loser included, not
+            // just the "You won!" banner below, which is participant-only.
+            <div key={i} className={`card flex flex-col gap-1 ${isWinner ? "motion-scale-in border-success/40" : ""}`}>
               <div className="flex items-center justify-between gap-2">
                 <div className="text-eyebrow">Player {i === 0 ? "A" : "B"}</div>
                 {user && user.id !== p.id && (
@@ -101,7 +104,7 @@ export default async function MatchPage({
               <Link href={`/players/${p.handle}`} className="flex items-center gap-1.5 font-medium hover:underline">
                 {isWinner && (
                   <>
-                    <Trophy size={14} className="shrink-0 text-gold" aria-hidden="true" />
+                    <Trophy size={14} className="trophy-pop shrink-0 text-gold" aria-hidden="true" />
                     <span className="sr-only">Winner: </span>
                   </>
                 )}
