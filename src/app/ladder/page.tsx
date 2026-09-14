@@ -37,6 +37,7 @@ import { getCurrentUser } from "@/lib/session";
 import { gameStandings, globalStandings, type Standing } from "@/lib/standings";
 import { getFriendIds } from "@/lib/friends";
 import { GameArtTile } from "@/components/GameArtTile";
+import { CountUp } from "@/components/CountUp";
 
 const RANK_COLORS = ["#eab308", "#9ca3af", "#b45309"]; // gold, silver, bronze — same as homepage leaderboard
 
@@ -84,7 +85,10 @@ function StatTile({
       </span>
       <div className="flex flex-col gap-0.5">
         <div className="flex items-baseline gap-2">
-          <span className="text-stat text-2xl">{value.toLocaleString()}</span>
+          {/* Not CountUp here — these can run into the thousands and
+              CountUp's rAF write doesn't preserve toLocaleString's comma
+              grouping, which would regress the real number's readability. */}
+          <span className="text-stat text-2xl motion-fade-in">{value.toLocaleString()}</span>
           <ChangeBadge pct={changePct} />
         </div>
         <span className="text-metadata">{label} · vs start of month</span>
@@ -93,27 +97,37 @@ function StatTile({
   );
 }
 
-function PodiumStat({ label, value }: { label: string; value: string }) {
+function PodiumStat({ label, value, animate }: { label: string; value: string | number; animate?: boolean }) {
   return (
     <div className="flex flex-col items-center">
-      <span className="text-sm font-bold text-foreground">{value}</span>
+      <span className="text-sm font-bold text-foreground">
+        {animate && typeof value === "number" ? <CountUp value={value} /> : value}
+      </span>
       <span className="text-[10px] tracking-wide text-muted uppercase">{label}</span>
     </div>
   );
 }
 
-function PodiumCard({ standing, rank }: { standing: Standing; rank: number }) {
+function PodiumCard({ standing, rank, order }: { standing: Standing; rank: number; order: number }) {
   const played = standing.wins + standing.losses;
   const winRate = played === 0 ? 0 : Math.round((standing.wins / played) * 100);
   const color = RANK_COLORS[rank - 1];
   return (
     <Link
       href={`/players/${standing.handle}`}
-      className={`card card-hover flex flex-col items-center gap-3 p-5 text-center ${rank === 1 ? "sm:-translate-y-2" : ""}`}
-      style={rank === 1 ? { borderColor: `${color}66`, background: `${color}0d` } : undefined}
+      // motion-fade-in (opacity-only), not celebrate-fade — celebrate-fade
+      // also animates transform, and with fill-mode "both" that would
+      // permanently override rank 1's static sm:-translate-y-2 elevation
+      // once the entrance finished (CSS Animations outrank normal rules
+      // on the cascade for the same property).
+      className={`card card-hover motion-fade-in motion-stagger flex flex-col items-center gap-3 p-5 text-center ${rank === 1 ? "sm:-translate-y-2" : ""}`}
+      style={{
+        "--i": order,
+        ...(rank === 1 ? { borderColor: `${color}66`, background: `${color}0d` } : {}),
+      } as React.CSSProperties}
     >
       <div className="flex items-center gap-1.5">
-        {rank === 1 && <Crown size={16} style={{ color }} />}
+        {rank === 1 && <Crown size={16} className="trophy-pop" style={{ color }} />}
         <span className="font-display text-2xl font-bold" style={{ color }}>
           #{rank}
         </span>
@@ -124,7 +138,7 @@ function PodiumCard({ standing, rank }: { standing: Standing; rank: number }) {
         <span className="text-xs text-muted">@{standing.handle}</span>
       </div>
       <div className="flex w-full items-center justify-center gap-5 border-t border-border pt-3">
-        <PodiumStat label="Wins" value={String(standing.wins)} />
+        <PodiumStat label="Wins" value={standing.wins} animate />
         <PodiumStat label="Matches" value={String(played)} />
         <PodiumStat label="Win Rate" value={`${winRate}%`} />
       </div>
@@ -209,9 +223,9 @@ export default async function LadderPage({
 
       {podium.length > 0 && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:items-end">
-          {podium[1] && <PodiumCard standing={podium[1]} rank={2} />}
-          {podium[0] && <PodiumCard standing={podium[0]} rank={1} />}
-          {podium[2] && <PodiumCard standing={podium[2]} rank={3} />}
+          {podium[1] && <PodiumCard standing={podium[1]} rank={2} order={0} />}
+          {podium[0] && <PodiumCard standing={podium[0]} rank={1} order={1} />}
+          {podium[2] && <PodiumCard standing={podium[2]} rank={3} order={2} />}
         </div>
       )}
 
@@ -282,8 +296,12 @@ export default async function LadderPage({
               {rest.map((s, i) => {
                 const played = s.wins + s.losses;
                 const winRate = played === 0 ? 0 : Math.round((s.wins / played) * 100);
+                // Capped so a long leaderboard doesn't leave rows past the
+                // fold invisible for seconds waiting on their delay — real
+                // rows shouldn't be hidden by decoration.
+                const staggerIndex = Math.min(i, 12);
                 return (
-                  <tr key={s.userId}>
+                  <tr key={s.userId} style={{ "--i": staggerIndex } as React.CSSProperties} className="rank-row">
                     <td className="font-mono text-muted">{i + 4}</td>
                     <td>
                       <Link href={`/players/${s.handle}`} className="flex items-center gap-2.5 hover:underline">
@@ -292,7 +310,9 @@ export default async function LadderPage({
                         <span className="text-muted">@{s.handle}</span>
                       </Link>
                     </td>
-                    <td className="font-mono tabular-nums text-success">{s.wins}</td>
+                    <td className="font-mono tabular-nums text-success">
+                      <CountUp value={s.wins} />
+                    </td>
                     <td className="font-mono tabular-nums text-danger">{s.losses}</td>
                     <td className="font-mono tabular-nums">{played}</td>
                     <td className="font-mono tabular-nums">{winRate}%</td>
