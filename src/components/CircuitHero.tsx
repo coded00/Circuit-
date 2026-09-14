@@ -64,7 +64,7 @@ export function CircuitHero({ tournaments = [], banners = [] }: { tournaments?: 
         src={banner ? banner.imageUrl : unsplashUrl(photo, 1400)}
         alt=""
         aria-hidden
-        className="absolute inset-0 h-full w-full object-cover"
+        className="motion-fade-in absolute inset-0 h-full w-full object-cover"
       />
       <div
         aria-hidden
@@ -75,7 +75,13 @@ export function CircuitHero({ tournaments = [], banners = [] }: { tournaments?: 
         }}
       />
 
-      <div className="relative z-10 flex h-full w-full max-w-[520px] flex-col justify-center gap-2.5 p-6 sm:gap-3 sm:p-8 lg:p-10">
+      {/* Keyed on slide index so each real carousel advance (tournament,
+          admin banner, or the static fallback) crossfades in rather than
+          hard-cutting — the same content, just not an abrupt swap. */}
+      <div
+        key={index}
+        className="motion-fade-in relative z-10 flex h-full w-full max-w-[520px] flex-col justify-center gap-2.5 p-6 sm:gap-3 sm:p-8 lg:p-10"
+      >
         {tournament ? (
           <>
             <span className="text-eyebrow text-accent-volt">{tournament.game}</span>
