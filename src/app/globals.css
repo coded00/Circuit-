@@ -593,27 +593,10 @@ body {
  * ============================================================================
  */
 @layer components {
-  /* Two pulsing-dot implementations used to exist independently here
-     (.live-dot, hardcoded red) and inline inside StatusPill (currentColor,
-     so it matches whatever tone the badge is). Consolidated on one
-     `--pulse-color` variable convention — .live-dot still defaults to the
-     same red it always has (zero visual change at its 4 existing call
-     sites), and the new .pulse-dot below is what StatusPill now uses,
-     inheriting the badge's own color via `currentColor`. */
-  .live-dot {
-    @apply relative flex h-1.5 w-1.5;
-  }
-  .live-dot::before {
-    content: "";
-    @apply absolute inline-flex h-full w-full animate-ping rounded-full opacity-75;
-    background: var(--pulse-color, var(--live));
-  }
-  .live-dot::after {
-    content: "";
-    @apply relative inline-flex h-1.5 w-1.5 rounded-full;
-    background: var(--pulse-color, var(--live));
-  }
-
+  /* StatusPill's live-state dot — inherits the badge's own color via
+     `currentColor` rather than a hardcoded red, so it matches whatever
+     tone the badge is (a `.live-dot` sibling with that hardcoded red
+     existed here previously; StatusPill no longer uses it, removed). */
   .pulse-dot {
     @apply relative inline-flex h-1.5 w-1.5;
   }
@@ -752,9 +735,10 @@ body {
  * Phase 19 — motion foundation. Small, generic primitives built from the
  * tokens above — Level 1 (Quiet) and Level 2 (Interactive) only. Nothing
  * here is applied broadly to existing cards/buttons yet (that's its own
- * later pass); .motion-panel-enter on .dropdown-panel below is the one
- * concrete application in this pass, since a popover with zero enter
- * motion was a real, narrow gap (not a redesign of anything else).
+ * later pass); .dropdown-panel below applying the motion-panel-enter
+ * keyframe directly is the one concrete application in this pass, since
+ * a popover with zero enter motion was a real, narrow gap (not a
+ * redesign of anything else).
  * ============================================================================
  */
 @layer components {
@@ -792,12 +776,6 @@ body {
   }
   .motion-press:active {
     transform: scale(0.97);
-  }
-
-  /* Modal/overlay/dropdown enter. Applied to .dropdown-panel below. */
-  .motion-panel-enter {
-    animation: motion-panel-enter var(--duration-base) var(--ease-out) both;
-    transform-origin: top right;
   }
 }
 
