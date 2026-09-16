@@ -22,13 +22,20 @@ import { WalletBalanceChip } from "./WalletBalanceChip";
  * layout.tsx carries matching top padding so nothing starts out hidden
  * under it.
  *
- * The header background spans edge-to-edge (fixed positioning isn't part
- * of AppShell's grid), but its actual content sits inside the same
- * `mx-auto max-w-[1920px] grid-cols-[Npx_1fr]` structure AppShell itself
- * uses — mirroring that grid (not just left-offsetting from the viewport
- * edge) is what keeps the header's content aligned with the sidebar/main
- * column below it once the viewport exceeds 1920px and that column starts
- * centering with side margins instead of touching the true screen edge.
+ * The outer `<header>` is a bare positioning shell (fixed, full width, no
+ * paint of its own) — the actual visible bar (background/blur/border) is
+ * the grid child one level in, confined to the same second (`1fr`) column
+ * AppShell's own grid gives the main content. That's deliberate, not
+ * redundant nesting: painting the bar on the outer element instead (full
+ * `inset-x-0`) would size it to the whole viewport, and since this header
+ * is `z-30` while AppShell's grid is a plain unpositioned `<div>`, that
+ * bar would then render on top of the sidebar's own top edge at `sm`+
+ * instead of stopping where the sidebar ends. Confining paint to the
+ * grid-positioned child fixes that, and — because it's the same
+ * `mx-auto max-w-[1920px]` grid AppShell itself uses — also keeps the bar
+ * aligned with the sidebar/main column once the viewport exceeds 1920px
+ * and that column starts centering with side margins instead of touching
+ * the true screen edge.
  *
  * Header actions: Notifications, Create, Profile — "Go Live" was removed
  * (Watch/Live/streaming are out of MVP scope for this rework; the button
@@ -51,13 +58,13 @@ export async function TopBar({ user, disputeCount = 0 }: { user: User | null; di
     : [0, 0];
 
   return (
-    <header className="fixed inset-x-0 top-0 z-30 h-[60px] border-b border-border bg-background/85 backdrop-blur-md">
+    <header className="fixed inset-x-0 top-0 z-30 h-[60px]">
       {/* A single grid child placed into the second (`1fr`) column at
           sm+ — no empty first-column spacer div needed, which would
           otherwise force a second implicit row (and unwanted extra
           height) once `grid-cols-1` collapses to one column on mobile. */}
       <div className="mx-auto grid h-full w-full max-w-[1920px] grid-cols-1 sm:grid-cols-[var(--sidebar-width-sm)_1fr] lg:grid-cols-[var(--sidebar-width-lg)_1fr]">
-        <div className="col-start-1 flex h-full items-center gap-4 px-5 sm:col-start-2 sm:px-8">
+        <div className="col-start-1 flex h-full items-center gap-4 border-b border-border bg-background/85 px-5 backdrop-blur-md sm:col-start-2 sm:px-8">
           <Link href="/" className="flex shrink-0 items-center sm:hidden">
             {/* eslint-disable-next-line @next/next/no-img-element -- local /public asset, no next/image usage elsewhere in this codebase */}
             <img src="/circuit-logo.png" alt="Circuit" width={700} height={347} className="h-12 w-auto max-w-none" />
