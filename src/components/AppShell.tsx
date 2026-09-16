@@ -53,7 +53,7 @@ export function AppShell({
 
   return (
     <>
-      <div className="mx-auto grid min-h-full w-full max-w-[1920px] grid-cols-1 pb-28 sm:grid-cols-[72px_1fr] sm:pb-0 lg:grid-cols-[180px_1fr]">
+      <div className="mx-auto grid min-h-full w-full max-w-[1920px] grid-cols-1 pb-[calc(7rem_+_env(safe-area-inset-bottom))] sm:grid-cols-[var(--sidebar-width-sm)_1fr] sm:pb-0 lg:grid-cols-[var(--sidebar-width-lg)_1fr]">
         <div>{sidebar}</div>
         <div className="flex min-w-0 flex-col">
           {topBar}

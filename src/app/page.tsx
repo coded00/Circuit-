@@ -34,6 +34,23 @@ import { AnnouncementBanner } from "@/components/AnnouncementBanner";
 
 const RANK_COLORS = ["#eab308", "#9ca3af", "#b45309"]; // gold, silver, bronze — same as ladder/page.tsx
 
+const relativeTimeFormat = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+// Same shape as notifications/page.tsx's own local formatRelative — no
+// shared lib for this one-line helper, matching that page's convention.
+function formatRelative(date: Date): string {
+  const diffMin = Math.round((date.getTime() - Date.now()) / 60000);
+  if (Math.abs(diffMin) < 60) return relativeTimeFormat.format(diffMin, "minute");
+  const diffHour = Math.round(diffMin / 60);
+  if (Math.abs(diffHour) < 24) return relativeTimeFormat.format(diffHour, "hour");
+  return relativeTimeFormat.format(Math.round(diffHour / 24), "day");
+}
+
+// Same convention as UpcomingCompetitions.tsx/FeaturedCompetitions.tsx's
+// own local formatShortDate.
+function formatShortDate(date: Date): string {
+  return date.toLocaleDateString("en-NG", { month: "short", day: "numeric" });
+}
+
 const cardSelect = {
   id: true,
   name: true,
@@ -142,7 +159,12 @@ export default async function Home({
           where: { OR: [{ playerAId: user.id }, { playerBId: user.id }], status: "UPCOMING" },
           orderBy: { createdAt: "desc" },
           take: 3,
-          include: { tournament: { select: { name: true } }, battle: { select: { game: true } } },
+          include: {
+            tournament: { select: { name: true, game: true } },
+            battle: { select: { game: true, format: true } },
+            playerA: { select: { displayName: true } },
+            playerB: { select: { displayName: true } },
+          },
         })
       : Promise.resolve([]),
     user
@@ -150,7 +172,20 @@ export default async function Home({
           where: { userId: user.id, status: "CONFIRMED" },
           orderBy: { createdAt: "desc" },
           take: 3,
-          include: { tournament: { select: { id: true, name: true, game: true } } },
+          include: {
+            tournament: {
+              select: {
+                id: true,
+                name: true,
+                game: true,
+                startAt: true,
+                prizeAmount: true,
+                entryFee: true,
+                participantCap: true,
+                _count: { select: { registrations: { where: { status: "CONFIRMED" } } } },
+              },
+            },
+          },
         })
       : Promise.resolve([]),
     user
@@ -158,6 +193,7 @@ export default async function Home({
           where: { OR: [{ creatorId: user.id }, { targetUserId: user.id }], status: { in: ["OPEN", "ACCEPTED"] } },
           orderBy: { createdAt: "desc" },
           take: 3,
+          include: { targetUser: { select: { displayName: true } } },
         })
       : Promise.resolve([]),
     user
@@ -186,7 +222,7 @@ export default async function Home({
 
       <CircuitHero tournaments={featuredTournaments} banners={homepageBanners} />
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_330px]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_var(--right-rail-width)]">
         <div className="flex min-w-0 flex-col gap-8">
           <FeaturedCompetitions tournaments={featuredTournaments} />
 
@@ -198,19 +234,42 @@ export default async function Home({
 
           {user && (
             <YourCircuit
+              viewerHandle={user.handle}
               upcomingMatches={upcomingMatches.map((m) => ({
                 id: m.id,
                 matchCode: m.matchCode,
-                context: m.tournament?.name ?? m.battle?.game ?? "Match",
+                opponent: (m.playerAId === user.id ? m.playerB : m.playerA).displayName,
+                game: m.tournament?.game ?? m.battle?.game ?? null,
+                context: m.tournament ? m.tournament.name : m.battle ? (m.battle.format === "BEST_OF_3" ? "Best of 3" : "Single match") : null,
               }))}
               registeredCompetitions={registeredCompetitions.map((r) => ({
                 id: r.id,
                 tournamentId: r.tournament.id,
                 name: r.tournament.name,
                 game: r.tournament.game,
+                startsOn: formatShortDate(r.tournament.startAt),
+                prizeAmount: r.tournament.prizeAmount,
+                entryFee: r.tournament.entryFee,
+                registered: r.tournament._count.registrations,
+                participantCap: r.tournament.participantCap,
               }))}
-              activeChallenges={activeChallenges.map((c) => ({ id: c.id, game: c.game, status: c.status }))}
-              recentActivity={recentActivity.map((n) => ({ id: n.id, ...formatNotification(n.type, n.payload) }))}
+              activeChallenges={activeChallenges.map((c) => ({
+                id: c.id,
+                game: c.game,
+                statusLabel:
+                  c.status === "ACCEPTED"
+                    ? "Accepted — ready to play"
+                    : c.targetUser
+                      ? `Waiting for ${c.targetUser.displayName}`
+                      : "Waiting for a challenger",
+                stakeAmount: c.stakeAmount,
+              }))}
+              recentActivity={recentActivity.map((n) => ({
+                id: n.id,
+                ...formatNotification(n.type, n.payload),
+                time: formatRelative(n.createdAt),
+                flagged: n.type.startsWith("DISPUTE") || n.type === "RESULT_DISPUTED",
+              }))}
             />
           )}
         </div>

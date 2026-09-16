@@ -23,6 +23,11 @@ export default async function AccountPage() {
           </p>
         </div>
       )}
+      {!user.email && (
+        <div className="alert alert-info">
+          <p>Add your email below to get notified when new tournaments and Challenges go live.</p>
+        </div>
+      )}
       <AccountForm
         initialDisplayName={user.displayName}
         initialAvatarUrl={user.avatarUrl ?? ""}
@@ -30,6 +35,9 @@ export default async function AccountPage() {
         initialDateOfBirth={user.dateOfBirth ? user.dateOfBirth.toISOString().slice(0, 10) : ""}
         initialBio={user.bio ?? ""}
         initialFavoriteGames={user.favoriteGames}
+        initialEmail={user.email ?? ""}
+        initialNotifyNewContent={user.notifyNewContent}
+        initialRegion={user.region ?? ""}
       />
 
       <div className="card flex flex-col gap-4">

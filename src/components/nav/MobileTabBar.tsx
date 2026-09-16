@@ -33,6 +33,8 @@ import {
   ShoppingBag,
   Gift,
   Shield,
+  Compass,
+  Plus,
 } from "lucide-react";
 
 type NavUser = { handle: string; isStaff: boolean } | null;
@@ -84,7 +86,7 @@ export function MobileTabBar({ user }: { user: NavUser }) {
   return (
     <>
       {inDashboard && (
-        <nav className="fixed inset-x-0 bottom-14 z-10 flex gap-1 overflow-x-auto border-t border-border bg-background/95 px-2 py-1.5 backdrop-blur-md sm:hidden">
+        <nav className="fixed inset-x-0 bottom-[calc(3.5rem_+_env(safe-area-inset-bottom))] z-10 flex gap-1 overflow-x-auto border-t border-border bg-background/95 px-2 py-1.5 backdrop-blur-md sm:hidden">
           {DASHBOARD_ITEMS.map((item) => {
             const active = item.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(item.href);
             return (
@@ -101,7 +103,7 @@ export function MobileTabBar({ user }: { user: NavUser }) {
         </nav>
       )}
 
-      <nav className="fixed inset-x-0 bottom-0 z-10 flex border-t border-border bg-background/95 backdrop-blur-md sm:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-10 flex border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md sm:hidden">
         <TabLink href="/" icon={Home} label="Home" active={pathname === "/"} />
         <TabLink href="/compete" icon={Trophy} label="Compete" active={pathname.startsWith("/compete")} />
         <TabLink href="/battles" icon={Swords} label="Challenges" active={pathname.startsWith("/battles")} />
@@ -120,7 +122,7 @@ export function MobileTabBar({ user }: { user: NavUser }) {
         <div className="fixed inset-0 z-30 flex items-end sm:hidden" onClick={() => setMenuOpen(false)}>
           <div className="sheet-backdrop-enter absolute inset-0 bg-black/60" />
           <div
-            className="sheet-panel-enter relative z-10 flex max-h-[75vh] w-full flex-col gap-1 overflow-y-auto rounded-t-2xl border-t border-border bg-surface p-4"
+            className="sheet-panel-enter relative z-10 flex max-h-[75vh] w-full flex-col gap-1 overflow-y-auto rounded-t-2xl border-t border-border bg-surface p-4 pb-[calc(1rem_+_env(safe-area-inset-bottom))]"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-2 flex items-center justify-between">
@@ -138,6 +140,22 @@ export function MobileTabBar({ user }: { user: NavUser }) {
               >
                 <UserIcon size={18} /> My Profile
               </Link>
+            )}
+            {user && (
+              <Link href="/discover" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
+                <Compass size={18} /> Discover
+              </Link>
+            )}
+            {user && (
+              <>
+                <span className="text-eyebrow mt-2 px-3">Create</span>
+                <Link href="/tournaments/new" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
+                  <Plus size={18} /> New tournament
+                </Link>
+                <Link href="/battles/new" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
+                  <Swords size={18} /> Open a Battle
+                </Link>
+              </>
             )}
             <Link href="/ladder" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
               <Gamepad2 size={18} /> Games

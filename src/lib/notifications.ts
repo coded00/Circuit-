@@ -14,6 +14,9 @@
 
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { sendPushToAll } from "@/lib/push";
+import { sendEmailBatch } from "@/lib/email";
+import { formatNotification } from "@/lib/notification-format";
 
 export type NotificationType =
   | "REGISTRATION_CONFIRMED"
@@ -34,7 +37,10 @@ export type NotificationType =
   | "REPORT_FILED"
   | "FRIEND_REQUEST"
   | "FRIEND_ACCEPTED"
-  | "TEAM_INVITE";
+  | "TEAM_INVITE"
+  | "TEAM_JOIN_REQUEST"
+  | "NEW_TOURNAMENT"
+  | "NEW_CHALLENGE";
 
 export interface NotificationChannel {
   send(userId: string, type: NotificationType, payload: Record<string, unknown>): Promise<void>;
@@ -87,4 +93,38 @@ export async function notifyStaff(
 ): Promise<void> {
   const staff = await prisma.user.findMany({ where: { isStaff: true }, select: { id: true } });
   await Promise.all(staff.map((s) => notify(s.id, type, payload)));
+}
+
+/**
+ * Broadcast to every user on Circuit — new-tournament/new-challenge
+ * announcements only (src/app/api/tournaments/route.ts,
+ * src/app/api/battles/route.ts). Deliberately not built on top of
+ * `notify()`'s per-user channel loop: that shape means one OneSignal call
+ * and one Resend call per user, which is both wasteful and defeats the
+ * point of either provider's own bulk primitives. Instead:
+ *
+ *  - in-app: one bulk `createMany`, not N individual inserts. Always sent,
+ *    regardless of `notifyNewContent` — InAppChannel above is the
+ *    always-on channel "regardless of push/email state," and that holds
+ *    here too.
+ *  - push: one OneSignal call to its "Subscribed Users" segment — only
+ *    users who both opted in (gating their browser subscription, see
+ *    OneSignalInit) and are actually subscribed receive it.
+ *  - email: one batched Resend send (chunked internally), to users who
+ *    have a real `email` AND `notifyNewContent` — the one channel with no
+ *    provider-side opt-in gate, so it's filtered here explicitly.
+ */
+export async function notifyAllUsers(type: NotificationType, payload: Record<string, unknown> = {}): Promise<void> {
+  const users = await prisma.user.findMany({ select: { id: true, email: true, notifyNewContent: true } });
+  if (users.length === 0) return;
+
+  await prisma.notification.createMany({
+    data: users.map((u) => ({ userId: u.id, type, payload: payload as Prisma.InputJsonValue })),
+  });
+
+  const { message } = formatNotification(type, payload);
+  await sendPushToAll("Circuit", message);
+
+  const emails = users.filter((u): u is typeof u & { email: string } => Boolean(u.email) && u.notifyNewContent).map((u) => u.email);
+  await sendEmailBatch(emails, "Circuit", message);
 }

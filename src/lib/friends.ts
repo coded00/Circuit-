@@ -39,3 +39,10 @@ export async function getFriendIds(userId: string): Promise<string[]> {
   });
   return rows.map((r) => (r.requesterId === userId ? r.addresseeId : r.requesterId));
 }
+
+/** Real mutual-friend count between two users — set intersection of each side's accepted friends. */
+export async function mutualFriendCount(aId: string, bId: string): Promise<number> {
+  const [aFriends, bFriends] = await Promise.all([getFriendIds(aId), getFriendIds(bId)]);
+  const bSet = new Set(bFriends);
+  return aFriends.filter((id) => bSet.has(id)).length;
+}

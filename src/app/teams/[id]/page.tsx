@@ -13,6 +13,7 @@ import { InviteMemberForm } from "@/components/teams/InviteMemberForm";
 import { TeamSettingsForm } from "@/components/teams/TeamSettingsForm";
 import { TeamActionButton } from "@/components/teams/TeamActionButton";
 import { TeamInviteBanner } from "@/components/teams/TeamInviteBanner";
+import { TeamMembershipButton } from "@/components/teams/TeamMembershipButton";
 
 export default async function TeamDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -45,12 +46,24 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ id:
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 p-6 sm:p-8">
-      <div className="flex flex-col gap-1">
-        <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
-          {team.name}
-          {team.tag && <span className="text-muted"> [{team.tag}]</span>}
-        </h1>
-        <p className="text-sm text-muted">{totalMembers} member{totalMembers === 1 ? "" : "s"}</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
+            {team.name}
+            {team.tag && <span className="text-muted"> [{team.tag}]</span>}
+          </h1>
+          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
+            <span>
+              {totalMembers} member{totalMembers === 1 ? "" : "s"}
+            </span>
+            {team.game && <span>{team.game}</span>}
+            {team.region && <span>{team.region}</span>}
+          </p>
+        </div>
+        {role.role === "none" && <TeamMembershipButton teamId={id} viewerId={user.id} status={{ state: "none" }} />}
+        {role.role === "requested" && (
+          <TeamMembershipButton teamId={id} viewerId={user.id} status={{ state: "requested", membershipId: role.membershipId }} />
+        )}
       </div>
 
       {isInvited && <TeamInviteBanner teamId={id} viewerId={user.id} />}
@@ -63,7 +76,16 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ id:
             <MemberRow key={m.id} teamId={id} person={m.user} isCaptain={false} isPending={false} canRemove={isCaptain} />
           ))}
           {pendingMembers.map((m) => (
-            <MemberRow key={m.id} teamId={id} person={m.user} isCaptain={false} isPending canRemove={isCaptain} />
+            <MemberRow
+              key={m.id}
+              teamId={id}
+              person={m.user}
+              isCaptain={false}
+              isPending
+              isJoinRequest={m.requestedByMember}
+              canRemove={isCaptain || m.userId === user.id}
+              canAccept={isCaptain && m.requestedByMember}
+            />
           ))}
         </div>
       </div>
@@ -77,7 +99,7 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ id:
 
           <div className="card flex flex-col gap-2">
             <h2 className="text-card-title">Team settings</h2>
-            <TeamSettingsForm teamId={id} name={team.name} tag={team.tag} />
+            <TeamSettingsForm teamId={id} name={team.name} tag={team.tag} game={team.game} region={team.region} />
           </div>
         </>
       )}

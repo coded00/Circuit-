@@ -102,11 +102,11 @@ function FeaturedCard({ tournament, showFeaturedBadge = false }: { tournament: T
         </div>
 
         <div className="flex items-start justify-between gap-2">
-          <div className="flex flex-col gap-0.5">
+          <div className="flex min-w-0 flex-col gap-0.5">
             <span className="text-[10px] font-semibold tracking-[0.08em] text-muted-strong uppercase">
               {tournament.prizeAmount ? "Prize Pool" : tournament.entryFee === 0 ? "Entry" : "Entry Fee"}
             </span>
-            <span className="font-display text-lg leading-tight font-semibold text-gold">
+            <span className="truncate font-display text-lg leading-tight font-semibold text-gold">
               {tournament.prizeAmount
                 ? formatNaira(tournament.prizeAmount)
                 : tournament.entryFee === 0

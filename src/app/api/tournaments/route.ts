@@ -8,11 +8,12 @@
  * note); that's checked at paid registration and payout claim instead.
  */
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { parseOptionalUrl } from "@/lib/validation";
 import { ALL_TEAM_SIZE_VALUES } from "@/lib/gameFormats";
+import { notifyAllUsers } from "@/lib/notifications";
 
 const MAX_PARTICIPANT_CAP = 128; // D2: V1 bracket ceiling.
 
@@ -144,6 +145,14 @@ export async function POST(request: Request) {
       status,
     },
   });
+
+  // Deferred via after() so the mass fan-out (every user, potentially a
+  // real batch of emails/push) never blocks the organizer's own response —
+  // see notifyAllUsers's own comment on why this isn't a per-user loop.
+  // Fires regardless of DRAFT/OPEN status: a DRAFT tournament (registration
+  // not open yet) is already surfaced as real "Announced" content elsewhere
+  // (UpcomingCompetitions), so announcing it now is consistent, not premature.
+  after(() => notifyAllUsers("NEW_TOURNAMENT", { tournamentId: tournament.id, name: tournament.name }));
 
   return NextResponse.json({ id: tournament.id }, { status: 201 });
 }

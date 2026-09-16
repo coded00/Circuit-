@@ -51,19 +51,23 @@ export function CalendarGrid({
           const cap = dense ? 5 : MAX_VISIBLE_PILLS;
           const visible = events.slice(0, cap);
           const overflow = events.length - visible.length;
+          // Same cap-2 data both sizes — below `sm` the 2nd pill is just
+          // visually hidden (7 columns leaves very little width per cell
+          // on a phone) and folded into the "+N more" count instead.
+          const mobileOverflow = events.length - Math.min(events.length, dense ? 5 : 1);
 
           return (
             <Link
               key={key}
               href={dayHref(key)}
-              className={`flex min-h-[120px] flex-col gap-2 border-r border-b border-border p-2.5 text-left transition last:border-r-0 hover:bg-surface-elevated ${
-                dense ? "min-h-[240px]" : ""
+              className={`flex min-h-[90px] flex-col gap-1.5 border-r border-b border-border p-1.5 text-left transition last:border-r-0 hover:bg-surface-elevated sm:min-h-[120px] sm:gap-2 sm:p-2.5 ${
+                dense ? "min-h-[180px] sm:min-h-[240px]" : ""
               } ${isSelected ? "bg-accent-volt/10 ring-2 ring-inset ring-accent-volt" : ""} ${
                 inMonth ? "bg-surface" : "bg-surface/40"
               }`}
             >
               <span
-                className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
+                className={`flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-semibold sm:h-6 sm:w-6 sm:text-xs ${
                   isToday
                     ? "bg-foreground text-background"
                     : inMonth
@@ -74,15 +78,22 @@ export function CalendarGrid({
                 {day.getDate()}
               </span>
               <div className="flex flex-col gap-1">
-                {visible.map((event) => (
+                {visible.map((event, i) => (
                   <span
                     key={`${event.kind}-${event.id}`}
-                    className={`truncate rounded-full px-2.5 py-1 text-[10px] font-semibold ${eventPillClass(event)}`}
+                    className={`truncate rounded-full px-2.5 py-1 text-[10px] font-semibold ${eventPillClass(event)} ${
+                      i >= 1 && !dense ? "hidden sm:block" : ""
+                    }`}
                   >
                     {eventTitle(event)}
                   </span>
                 ))}
-                {overflow > 0 && <span className="px-1 text-[10px] font-medium text-muted">+{overflow} more</span>}
+                {overflow > 0 && (
+                  <span className="hidden px-1 text-[10px] font-medium text-muted sm:block">+{overflow} more</span>
+                )}
+                {mobileOverflow > 0 && !dense && (
+                  <span className="px-1 text-[10px] font-medium text-muted sm:hidden">+{mobileOverflow} more</span>
+                )}
               </div>
             </Link>
           );

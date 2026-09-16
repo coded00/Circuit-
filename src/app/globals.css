@@ -93,7 +93,12 @@
   --radius-full: 999px;
 
   /* ---- Layout (Phase 1) ---- */
-  --sidebar-width: 170px;
+  /* The real, live values (AppSidebar's tablet icon-rail / desktop
+     labeled rail) — AppShell.tsx and TopBar.tsx both need this same pair
+     for their own grid-cols, so it's a token instead of two files each
+     hardcoding "72px"/"180px" independently. */
+  --sidebar-width-sm: 72px;
+  --sidebar-width-lg: 180px;
   --right-rail-width: 330px;
 
   /* ---- Motion (Phase 19) ----
@@ -383,7 +388,10 @@ body {
   }
 
   .btn-icon {
-    @apply inline-flex h-9 w-9 items-center justify-center rounded-full text-muted transition duration-[var(--duration-base)] ease-[var(--ease-standard)]
+    /* 44px — the WCAG/iOS minimum touch target. One shared class, so this
+       fixes every icon-only button app-wide (header actions, mobile search
+       toggle, admin top bar, share triggers) in one place. */
+    @apply inline-flex h-11 w-11 items-center justify-center rounded-full text-muted transition duration-[var(--duration-base)] ease-[var(--ease-standard)]
       hover:bg-surface-elevated hover:text-foreground active:scale-90 active:duration-[var(--duration-instant)]
       disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100
       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
@@ -395,6 +403,12 @@ body {
      each independently hand-rolled slightly differently. */
   .dropdown-panel {
     @apply rounded-[11px] border border-border bg-surface;
+    /* However a caller anchors this panel (right-0, left-0, ...), it can
+       never be wider than the viewport itself minus a small margin — a
+       fixed-width panel anchored to a trigger that isn't near the true
+       viewport edge (e.g. NotificationBell, mid-header) would otherwise
+       clip off the opposite edge on narrow phones. */
+    max-width: calc(100vw - 2rem);
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
     animation: motion-panel-enter var(--duration-base) var(--ease-out) both;
     transform-origin: top right;
@@ -862,6 +876,12 @@ body {
   .sheet-panel-enter {
     animation: motion-sheet-enter var(--duration-moderate) var(--ease-out) both;
   }
+
+  /* Left-edge drawer (admin mobile nav) — same idea as the bottom sheet
+     above, sliding in from its own physical edge instead. */
+  .drawer-panel-enter {
+    animation: motion-drawer-enter var(--duration-moderate) var(--ease-out) both;
+  }
 }
 
 @keyframes motion-sheet-enter {
@@ -870,6 +890,15 @@ body {
   }
   to {
     transform: translateY(0);
+  }
+}
+
+@keyframes motion-drawer-enter {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
   }
 }
 

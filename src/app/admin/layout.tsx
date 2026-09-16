@@ -30,7 +30,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <AdminSidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <AdminTopBar admin={{ displayName: user.displayName, avatarUrl: user.avatarUrl }} />
-        <main className="flex flex-1 flex-col gap-6 p-8">{children}</main>
+        <main className="flex flex-1 flex-col gap-6 p-4 sm:p-8">{children}</main>
       </div>
     </div>
   );

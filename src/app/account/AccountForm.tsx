@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 const MAX_FAVORITE_GAMES = 6;
 const MAX_BIO_LENGTH = 160;
+const MAX_REGION_LENGTH = 60;
 
 export default function AccountForm({
   initialDisplayName,
@@ -13,6 +14,9 @@ export default function AccountForm({
   initialDateOfBirth,
   initialBio,
   initialFavoriteGames,
+  initialEmail,
+  initialNotifyNewContent,
+  initialRegion,
 }: {
   initialDisplayName: string;
   initialAvatarUrl: string;
@@ -20,6 +24,9 @@ export default function AccountForm({
   initialDateOfBirth: string;
   initialBio: string;
   initialFavoriteGames: string[];
+  initialEmail: string;
+  initialNotifyNewContent: boolean;
+  initialRegion: string;
 }) {
   const router = useRouter();
   const [displayName, setDisplayName] = useState(initialDisplayName);
@@ -28,6 +35,9 @@ export default function AccountForm({
   const [dateOfBirth, setDateOfBirth] = useState(initialDateOfBirth);
   const [bio, setBio] = useState(initialBio);
   const [favoriteGames, setFavoriteGames] = useState(initialFavoriteGames.join(", "));
+  const [email, setEmail] = useState(initialEmail);
+  const [notifyNewContent, setNotifyNewContent] = useState(initialNotifyNewContent);
+  const [region, setRegion] = useState(initialRegion);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -52,6 +62,9 @@ export default function AccountForm({
           .map((g) => g.trim())
           .filter(Boolean)
           .slice(0, MAX_FAVORITE_GAMES),
+        email: email || null,
+        notifyNewContent,
+        region: region || null,
       }),
     });
     const data = await res.json().catch(() => null);
@@ -114,6 +127,31 @@ export default function AccountForm({
       </div>
 
       <div className="flex flex-col gap-1.5">
+        <label htmlFor="email" className="field-label">
+          Email (optional)
+        </label>
+        <input
+          id="email"
+          type="email"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="field-input"
+        />
+        <span className="field-hint">Used only to notify you about new tournaments and Challenges.</span>
+      </div>
+
+      <label className="flex items-start gap-2 text-sm text-muted">
+        <input
+          type="checkbox"
+          checked={notifyNewContent}
+          onChange={(e) => setNotifyNewContent(e.target.checked)}
+          className="mt-0.5 h-4 w-4 shrink-0 rounded border-border-strong bg-surface-elevated accent-accent-blue"
+        />
+        Notify me by email and push when a new tournament or Challenge goes live.
+      </label>
+
+      <div className="flex flex-col gap-1.5">
         <label htmlFor="favoriteGames" className="field-label">
           Favorite games (optional)
         </label>
@@ -125,6 +163,21 @@ export default function AccountForm({
           className="field-input"
         />
         <span className="field-hint">Comma-separated, up to {MAX_FAVORITE_GAMES} games — shown on your public profile.</span>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="region" className="field-label">
+          Region (optional)
+        </label>
+        <input
+          id="region"
+          maxLength={MAX_REGION_LENGTH}
+          placeholder="e.g. Lagos, Nigeria"
+          value={region}
+          onChange={(e) => setRegion(e.target.value)}
+          className="field-input"
+        />
+        <span className="field-hint">Helps other players discover you when browsing by region.</span>
       </div>
 
       <div className="flex flex-col gap-1.5">

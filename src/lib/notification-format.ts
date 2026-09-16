@@ -77,6 +77,12 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
       return { message: "Your friend request was accepted.", href: "/friends" };
     case "TEAM_INVITE":
       return { message: "You've been invited to a team.", href: `/teams/${str(p, "teamId")}` };
+    case "TEAM_JOIN_REQUEST":
+      return { message: `${str(p, "fromHandle")} wants to join ${str(p, "teamName")}.`, href: `/teams/${str(p, "teamId")}` };
+    case "NEW_TOURNAMENT":
+      return { message: `New tournament: ${str(p, "name")}`, href: `/tournaments/${str(p, "tournamentId")}` };
+    case "NEW_CHALLENGE":
+      return { message: `New open Challenge: ${str(p, "game")}`, href: `/battles/${str(p, "battleId")}` };
     default:
       return { message: "You have a new notification.", href: "/notifications" };
   }

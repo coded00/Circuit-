@@ -83,7 +83,13 @@ export function NotificationBell({ initialUnreadCount = 0 }: { initialUnreadCoun
       </button>
 
       {open && (
-        <div className="absolute right-0 z-20 mt-2 w-80 dropdown-panel">
+        // Below `sm` this trigger sits mid-header (not near the true right
+        // edge — Create/Account still sit further right), so a right-0
+        // anchor would clip off the left edge of a narrow phone. Below
+        // `sm`, break out of the trigger anchor entirely and pin the panel
+        // under the (fixed, 60px) header instead; `sm`+ has enough room
+        // for the normal right-anchored dropdown.
+        <div className="dropdown-panel fixed inset-x-4 top-[68px] z-20 origin-top sm:absolute sm:inset-x-auto sm:top-auto sm:right-0 sm:mt-2 sm:w-80 sm:origin-top-right">
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <span className="text-sm font-semibold">Notifications</span>
             <button type="button" onClick={markAllRead} className="text-xs font-medium text-accent-blue hover:underline">

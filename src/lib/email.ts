@@ -34,3 +34,34 @@ export async function sendEmail(to: string, subject: string, text: string): Prom
     console.error("[email] Resend send failed:", error);
   }
 }
+
+// Resend's batch endpoint caps at 100 emails per call.
+const BATCH_CHUNK_SIZE = 100;
+
+/**
+ * Broadcast the same subject/text to many recipients at once — used by
+ * notifyAllUsers (src/lib/notifications.ts) for new-tournament/new-challenge
+ * announcements. One Resend API call per 100 recipients, not one per
+ * recipient — the same reasoning sendPushToAll (src/lib/push.ts) documents
+ * for using OneSignal's segment broadcast instead of a per-user loop.
+ */
+export async function sendEmailBatch(recipients: string[], subject: string, text: string): Promise<void> {
+  if (recipients.length === 0) return;
+
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.warn(
+      `[email] RESEND_API_KEY not set — logging instead of sending.\nTo: ${recipients.length} recipients\nSubject: ${subject}\n\n${text}\n`
+    );
+    return;
+  }
+
+  const resend = new Resend(apiKey);
+  for (let i = 0; i < recipients.length; i += BATCH_CHUNK_SIZE) {
+    const chunk = recipients.slice(i, i + BATCH_CHUNK_SIZE);
+    const { error } = await resend.batch.send(chunk.map((to) => ({ from: FROM_ADDRESS, to, subject, text })));
+    if (error) {
+      console.error("[email] Resend batch send failed:", error);
+    }
+  }
+}

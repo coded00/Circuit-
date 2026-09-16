@@ -7,6 +7,7 @@ import { AppSidebar } from "@/components/nav/AppSidebar";
 import { TopBar } from "@/components/nav/TopBar";
 import { MobileTabBar } from "@/components/nav/MobileTabBar";
 import { AppShell } from "@/components/AppShell";
+import { OneSignalInit } from "@/components/OneSignalInit";
 
 // Phase 14: Inter for UI text, Barlow Condensed ExtraBold for display/hero
 // headlines — a tall, condensed weight suited to the CIRCUIT wordmark's
@@ -76,6 +77,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         >
           {children}
         </AppShell>
+        {user && <OneSignalInit userId={user.id} notifyNewContent={user.notifyNewContent} />}
       </body>
     </html>
   );

@@ -9,6 +9,14 @@
  * `text-muted`, `border-border`, ...) is already the dark palette by the
  * time it reaches this component — same mechanism the player sidebar's
  * own dark rail already uses, not a second theme system.
+ *
+ * Responsive tiers mirror AppSidebar.tsx exactly: hidden below `sm` (the
+ * hamburger-triggered drawer in AdminMobileNav.tsx covers mobile instead,
+ * reusing this same ADMIN_NAV_ITEMS list — 9 flat, equally-weighted
+ * sections don't split cleanly into a "primary 5" the way the player
+ * app's nav does, so mobile gets the same full list, not a subset), a
+ * 64px icon-only rail between `sm` and `lg`, the full 220px labeled rail
+ * at `lg`+.
  */
 
 import Link from "next/link";
@@ -25,7 +33,7 @@ import {
   Settings,
 } from "lucide-react";
 
-const ITEMS = [
+export const ADMIN_NAV_ITEMS = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/competitions", label: "Competitions", icon: Trophy },
@@ -37,7 +45,7 @@ const ITEMS = [
   { href: "/admin/settings", label: "Settings", icon: Settings },
 ] as const;
 
-function isActive(pathname: string, href: string): boolean {
+export function isAdminNavActive(pathname: string, href: string): boolean {
   return href === "/admin" ? pathname === "/admin" : pathname === href || pathname.startsWith(`${href}/`);
 }
 
@@ -47,14 +55,14 @@ const NAV_ROW_STEP = 42;
 
 export function AdminSidebar() {
   const pathname = usePathname();
-  const activeIndex = ITEMS.findIndex((item) => isActive(pathname, item.href));
+  const activeIndex = ADMIN_NAV_ITEMS.findIndex((item) => isAdminNavActive(pathname, item.href));
 
   return (
-    <aside className="sticky top-0 flex h-screen w-[220px] shrink-0 flex-col gap-1 border-r border-border bg-background px-3 py-6">
-      <Link href="/admin" className="mb-8 flex items-center gap-2 px-2">
+    <aside className="sticky top-0 hidden h-screen w-16 shrink-0 flex-col gap-1 border-r border-border bg-background px-2 py-6 sm:flex lg:w-[220px] lg:px-3">
+      <Link href="/admin" className="mb-8 flex items-center justify-center gap-2 px-2 lg:justify-start">
         {/* eslint-disable-next-line @next/next/no-img-element -- local /public asset, no next/image usage elsewhere in this codebase */}
         <img src="/circuit-logo.png" alt="Circuit" width={700} height={347} className="h-6 w-auto max-w-none" />
-        <span className="text-eyebrow text-muted-strong">Control Center</span>
+        <span className="text-eyebrow hidden text-muted-strong lg:inline">Control Center</span>
       </Link>
 
       <nav className="relative flex flex-col gap-0.5">
@@ -65,28 +73,34 @@ export function AdminSidebar() {
             style={{ transform: `translateY(${activeIndex * NAV_ROW_STEP}px)` }}
           />
         )}
-        {ITEMS.map((item, i) => {
+        {ADMIN_NAV_ITEMS.map((item, i) => {
           const active = i === activeIndex;
           const Icon = item.icon;
           return (
             <Link
               key={item.href}
               href={item.href}
+              title={item.label}
               aria-current={active ? "page" : undefined}
-              className={`relative z-10 flex h-10 items-center gap-3 rounded-[9px] px-3 text-sm font-medium transition-colors duration-[var(--duration-fast)] ${
+              className={`relative z-10 flex h-10 items-center justify-center gap-3 rounded-[9px] px-3 text-sm font-medium transition-colors duration-[var(--duration-fast)] lg:justify-start ${
                 active ? "text-accent-volt-foreground" : "text-muted hover:bg-surface-elevated hover:text-foreground"
               }`}
             >
               <Icon size={17} className={active ? "text-accent-volt-foreground" : undefined} />
-              {item.label}
+              <span className="hidden lg:inline">{item.label}</span>
             </Link>
           );
         })}
       </nav>
 
       <div className="mt-auto flex flex-col gap-1 border-t border-border px-2 pt-4">
-        <Link href="/" className="text-xs font-medium text-muted-strong transition hover:text-foreground">
-          ← Back to Circuit
+        <Link
+          href="/"
+          title="Back to Circuit"
+          className="flex items-center justify-center text-xs font-medium text-muted-strong transition hover:text-foreground lg:justify-start"
+        >
+          <span className="lg:hidden">←</span>
+          <span className="hidden lg:inline">← Back to Circuit</span>
         </Link>
       </div>
     </aside>

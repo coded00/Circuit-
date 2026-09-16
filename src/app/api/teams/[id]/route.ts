@@ -38,6 +38,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     data.name = name;
   }
   if (body.tag !== undefined) data.tag = typeof body.tag === "string" ? body.tag.trim() || null : null;
+  if (body.game !== undefined) data.game = typeof body.game === "string" ? body.game.trim() || null : null;
+  if (body.region !== undefined) data.region = typeof body.region === "string" ? body.region.trim() || null : null;
 
   const updated = await prisma.team.update({ where: { id }, data });
   return NextResponse.json({ id: updated.id });

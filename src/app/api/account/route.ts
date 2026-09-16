@@ -7,9 +7,10 @@
  */
 
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
-import { parseOptionalUrl } from "@/lib/validation";
+import { parseOptionalUrl, parseOptionalEmail } from "@/lib/validation";
 
 const MIN_AGE_PLAUSIBLE_YEARS = 130;
 
@@ -26,6 +27,7 @@ export async function PATCH(request: Request) {
 
   const MAX_FAVORITE_GAMES = 6;
   const MAX_BIO_LENGTH = 160;
+  const MAX_REGION_LENGTH = 60;
 
   const data: {
     displayName?: string;
@@ -34,6 +36,10 @@ export async function PATCH(request: Request) {
     dateOfBirth?: Date | null;
     bio?: string | null;
     favoriteGames?: string[];
+    email?: string | null;
+    notifyNewContent?: boolean;
+    oneSignalPlayerId?: string | null;
+    region?: string | null;
   } = {};
 
   if (body.displayName !== undefined) {
@@ -94,7 +100,41 @@ export async function PATCH(request: Request) {
     }
   }
 
-  const updated = await prisma.user.update({ where: { id: user.id }, data });
+  if (body.email !== undefined) {
+    const emailResult = parseOptionalEmail(body.email);
+    if (!emailResult.ok) {
+      return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
+    }
+    data.email = emailResult.email;
+  }
+
+  if (body.notifyNewContent !== undefined) {
+    data.notifyNewContent = Boolean(body.notifyNewContent);
+  }
+
+  // Written by OneSignalInit.tsx once a browser actually subscribes — not
+  // user-facing in the form, just a background sync call.
+  if (body.oneSignalPlayerId !== undefined) {
+    data.oneSignalPlayerId = typeof body.oneSignalPlayerId === "string" ? body.oneSignalPlayerId : null;
+  }
+
+  if (body.region !== undefined) {
+    const region = typeof body.region === "string" ? body.region.trim() : "";
+    if (region.length > MAX_REGION_LENGTH) {
+      return NextResponse.json({ error: `Region must be ${MAX_REGION_LENGTH} characters or fewer.` }, { status: 400 });
+    }
+    data.region = region || null;
+  }
+
+  let updated;
+  try {
+    updated = await prisma.user.update({ where: { id: user.id }, data });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      return NextResponse.json({ error: "That email is already in use." }, { status: 409 });
+    }
+    throw err;
+  }
 
   return NextResponse.json({
     displayName: updated.displayName,
@@ -104,5 +144,8 @@ export async function PATCH(request: Request) {
     dateOfBirth: updated.dateOfBirth,
     bio: updated.bio,
     favoriteGames: updated.favoriteGames,
+    email: updated.email,
+    notifyNewContent: updated.notifyNewContent,
+    region: updated.region,
   });
 }

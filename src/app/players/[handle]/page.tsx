@@ -47,6 +47,11 @@ import { GameArtTile } from "@/components/GameArtTile";
 import { ShareButton } from "@/components/ShareButton";
 import { StatusPill, matchStatusInfo } from "@/components/StatusPill";
 import { FriendButton } from "@/components/FriendButton";
+import { FriendRequestRow } from "@/components/friends/FriendRequestRow";
+import { AddFriendForm } from "@/components/friends/AddFriendForm";
+import { TeamInviteRow } from "@/components/teams/TeamInviteRow";
+import { TeamRequestRow } from "@/components/teams/TeamRequestRow";
+import { CreateTeamForm } from "@/components/teams/CreateTeamForm";
 import { CountUp } from "@/components/CountUp";
 import TournamentTabs, { type TournamentTab } from "@/app/tournaments/[id]/TournamentTabs";
 
@@ -157,6 +162,59 @@ export default async function PlayerProfilePage({
     isOwnProfile ? getWalletActivity(player.id) : Promise.resolve(null),
   ]);
   activeMatches.sort((a, b) => ACTIVE_MATCH_PRIORITY[a.status] - ACTIVE_MATCH_PRIORITY[b.status]);
+
+  // Friends & Teams tabs (moved here from the standalone /friends and
+  // /teams pages) — the accepted list is real and public on every
+  // profile, same as Facebook/Steam; pending requests/invites are only
+  // ever fetched (and only ever shown) on the profile owner's own view.
+  const [incomingRequests, outgoingRequests, acceptedFriendships, captainedTeams, memberTeams, teamInvites, teamRequests] = await Promise.all([
+    isOwnProfile
+      ? prisma.friendship.findMany({
+          where: { addresseeId: player.id, accepted: false },
+          orderBy: { createdAt: "desc" },
+          include: { requester: { select: { handle: true, displayName: true, avatarUrl: true } } },
+        })
+      : Promise.resolve([]),
+    isOwnProfile
+      ? prisma.friendship.findMany({
+          where: { requesterId: player.id, accepted: false },
+          orderBy: { createdAt: "desc" },
+          include: { addressee: { select: { handle: true, displayName: true, avatarUrl: true } } },
+        })
+      : Promise.resolve([]),
+    prisma.friendship.findMany({
+      where: { accepted: true, OR: [{ requesterId: player.id }, { addresseeId: player.id }] },
+      orderBy: { createdAt: "desc" },
+      include: {
+        requester: { select: { handle: true, displayName: true, avatarUrl: true } },
+        addressee: { select: { handle: true, displayName: true, avatarUrl: true } },
+      },
+    }),
+    prisma.team.findMany({ where: { captainId: player.id }, orderBy: { createdAt: "desc" } }),
+    prisma.teamMembership.findMany({
+      where: { userId: player.id, accepted: true, team: { captainId: { not: player.id } } },
+      include: { team: true },
+      orderBy: { createdAt: "desc" },
+    }),
+    isOwnProfile
+      ? prisma.teamMembership.findMany({
+          where: { userId: player.id, accepted: false, requestedByMember: false },
+          include: { team: true },
+          orderBy: { createdAt: "desc" },
+        })
+      : Promise.resolve([]),
+    isOwnProfile
+      ? prisma.teamMembership.findMany({
+          where: { userId: player.id, accepted: false, requestedByMember: true },
+          include: { team: true },
+          orderBy: { createdAt: "desc" },
+        })
+      : Promise.resolve([]),
+  ]);
+  const myTeams = [
+    ...captainedTeams.map((t) => ({ ...t, isCaptain: true })),
+    ...memberTeams.map((m) => ({ ...m.team, isCaptain: false })),
+  ];
 
   const matches = await prisma.match.findMany({
     where: { status: "COMPLETE", OR: [{ playerAId: player.id }, { playerBId: player.id }] },
@@ -478,12 +536,138 @@ export default async function PlayerProfilePage({
       </div>
     );
 
+  const friendsContent = (
+    <div className="flex flex-col gap-6">
+      {isOwnProfile && (
+        <div className="card">
+          <AddFriendForm />
+        </div>
+      )}
+
+      {isOwnProfile && incomingRequests.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <h2 className="text-section-heading">Requests ({incomingRequests.length})</h2>
+          <div className="flex flex-col gap-2">
+            {incomingRequests.map((f) => (
+              <FriendRequestRow key={f.id} friendshipId={f.id} person={f.requester} kind="incoming" />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {isOwnProfile && outgoingRequests.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <h2 className="text-section-heading">Sent ({outgoingRequests.length})</h2>
+          <div className="flex flex-col gap-2">
+            {outgoingRequests.map((f) => (
+              <FriendRequestRow key={f.id} friendshipId={f.id} person={f.addressee} kind="outgoing" />
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-col gap-2">
+        <h2 className="text-section-heading">Friends ({acceptedFriendships.length})</h2>
+        {acceptedFriendships.length === 0 ? (
+          <p className="card text-center text-muted">
+            {isOwnProfile ? "No friends yet — add one above, or from their profile." : `${player.displayName} hasn't added any friends yet.`}
+          </p>
+        ) : isOwnProfile ? (
+          <div className="flex flex-col gap-2">
+            {acceptedFriendships.map((f) => {
+              const person = f.requesterId === player.id ? f.addressee : f.requester;
+              return <FriendRequestRow key={f.id} friendshipId={f.id} person={person} kind="friend" />;
+            })}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {acceptedFriendships.map((f) => {
+              const person = f.requesterId === player.id ? f.addressee : f.requester;
+              return (
+                <Link key={f.id} href={`/players/${person.handle}`} className="card-row flex items-center gap-3 p-3">
+                  {person.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs
+                    <img src={person.avatarUrl} alt="" className="h-10 w-10 shrink-0 rounded-full border border-border object-cover" />
+                  ) : (
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-surface-elevated font-semibold text-muted">
+                      {person.displayName.slice(0, 1).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="flex min-w-0 flex-col">
+                    <span className="truncate font-medium">{person.displayName}</span>
+                    <span className="text-metadata">@{person.handle}</span>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  const teamsContent = (
+    <div className="flex flex-col gap-6">
+      {isOwnProfile && (
+        <div className="card">
+          <CreateTeamForm />
+        </div>
+      )}
+
+      {isOwnProfile && teamInvites.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <h2 className="text-section-heading">Invites ({teamInvites.length})</h2>
+          <div className="flex flex-col gap-2">
+            {teamInvites.map((m) => (
+              <TeamInviteRow key={m.id} teamId={m.teamId} teamName={m.team.name} tag={m.team.tag} viewerId={player.id} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {isOwnProfile && teamRequests.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <h2 className="text-section-heading">Your requests ({teamRequests.length})</h2>
+          <div className="flex flex-col gap-2">
+            {teamRequests.map((m) => (
+              <TeamRequestRow key={m.id} teamId={m.teamId} teamName={m.team.name} tag={m.team.tag} viewerId={player.id} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-col gap-2">
+        <h2 className="text-section-heading">Teams ({myTeams.length})</h2>
+        {myTeams.length === 0 ? (
+          <p className="card text-center text-muted">
+            {isOwnProfile ? "Not on a team yet — create one above." : `${player.displayName} isn't on a team yet.`}
+          </p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {myTeams.map((t) => (
+              <Link key={t.id} href={`/teams/${t.id}`} className="card-row flex items-center gap-3 p-3">
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate font-medium">{t.name}</span>
+                  {t.game && <span className="text-metadata">{t.game}</span>}
+                </div>
+                {t.tag && <span className="text-metadata">[{t.tag}]</span>}
+                {t.isCaptain && <span className="badge badge-brand shrink-0">Captain</span>}
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   const tabs: TournamentTab[] = [
     { key: "overview", label: "Overview", content: overviewContent },
     { key: "matches", label: "Match History", content: matchHistoryContent },
     { key: "achievements", label: "Achievements", content: achievementsContent },
     { key: "stats", label: "Game Stats", content: gameStatsContent },
     { key: "tournaments", label: "Tournaments", content: tournamentsContent },
+    { key: "friends", label: "Friends", content: friendsContent },
+    { key: "teams", label: "Teams", content: teamsContent },
   ];
 
   if (isOwnProfile && walletActivity) {

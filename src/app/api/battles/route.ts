@@ -11,10 +11,10 @@
  * product decision.
  */
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
-import { notify } from "@/lib/notifications";
+import { notify, notifyAllUsers } from "@/lib/notifications";
 import { parseOptionalUrl } from "@/lib/validation";
 import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
 
@@ -134,6 +134,16 @@ export async function POST(request: Request) {
 
     if (targetUserId) {
       await notify(targetUserId, "BATTLE_CHALLENGE", { battleId: battle.id });
+    }
+
+    // Only OPEN Battles are "visible to everyone" (see BattleVisibility's
+    // own schema comment) — FRIENDS/TARGETED already have their own
+    // correctly-scoped audience, so blasting every user about a Challenge
+    // most of them can't even accept would just be confusing. Deferred via
+    // after() for the same not-blocking-the-response reason as tournament
+    // creation.
+    if (visibility === "OPEN") {
+      after(() => notifyAllUsers("NEW_CHALLENGE", { battleId: battle.id, game: battle.game }));
     }
 
     return NextResponse.json({ id: battle.id }, { status: 201 });

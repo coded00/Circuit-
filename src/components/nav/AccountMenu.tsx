@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ShoppingBag, Gift, Trophy, Swords, Shield, Wallet, Users, UsersRound } from "lucide-react";
+import { ChevronDown, ShoppingBag, Gift, Trophy, Swords, Shield, Wallet, Compass } from "lucide-react";
 
 type NavUser = { handle: string; displayName: string; avatarUrl: string | null; isStaff: boolean };
 
@@ -89,24 +89,30 @@ export function AccountMenu({
               as decorative UI, not data. */}
           <span className="text-[10px] leading-tight text-muted-strong">Level 24</span>
         </span>
-        <ChevronDown size={14} className="text-muted" />
+        <ChevronDown size={14} className="hidden text-muted sm:block" />
       </button>
 
       {open && (
         <div className="absolute right-0 z-20 mt-2 w-56 dropdown-panel py-1">
-          <Link href={`/players/${user.handle}`} onClick={() => setOpen(false)} className="block px-4 py-2 text-sm hover:bg-surface-elevated">
-            My Profile
+          <Link
+            href={`/players/${user.handle}?tab=friends`}
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2.5 px-4 py-2 text-sm hover:bg-surface-elevated"
+          >
+            <span className="flex-1">My Profile</span>
+            {/* Friends/Teams management moved onto the profile's own tabs
+                (see players/[handle]/page.tsx) — this badge is the one
+                remaining visible cue that something needs your attention
+                there, same real count /friends used to show directly. */}
+            {friendRequestCount > 0 && <span className="badge badge-cancelled">{friendRequestCount > 9 ? "9+" : friendRequestCount}</span>}
           </Link>
           <Link href="/account" onClick={() => setOpen(false)} className="block px-4 py-2 text-sm hover:bg-surface-elevated">
             Account settings
           </Link>
 
           <div className="my-1 border-t border-border" />
-          <MenuLink href="/friends" icon={Users} badge={friendRequestCount} onClick={() => setOpen(false)}>
-            Friends
-          </MenuLink>
-          <MenuLink href="/teams" icon={UsersRound} onClick={() => setOpen(false)}>
-            Teams
+          <MenuLink href="/discover" icon={Compass} onClick={() => setOpen(false)}>
+            Discover
           </MenuLink>
 
           <div className="my-1 border-t border-border" />

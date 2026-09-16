@@ -96,7 +96,10 @@ export function ChallengeCard({
         </div>
       </div>
 
-      <div className="relative z-10 flex items-center justify-center gap-2 text-[11px] text-muted">
+      {/* flex-wrap: a large stake amount ("₦500,000,000 stake · Best of 3")
+          has no natural break point on this ~240px card — wrap to a
+          second line rather than overflow it. */}
+      <div className="relative z-10 flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-[11px] text-muted">
         <span className={battle.stakeAmount > 0 ? "font-semibold text-gold" : undefined}>
           {battle.stakeAmount > 0 ? `${formatNaira(battle.stakeAmount)} stake` : "Free entry"}
         </span>

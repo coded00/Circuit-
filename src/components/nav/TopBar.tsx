@@ -22,16 +22,25 @@ import { WalletBalanceChip } from "./WalletBalanceChip";
  * layout.tsx carries matching top padding so nothing starts out hidden
  * under it.
  *
- * The header spans edge-to-edge horizontally rather than sitting inside
- * the grid column that used to carry it (fixed positioning isn't part of
- * that grid), offset by `left-*` to clear the sidebar at each of its own
- * responsive widths (0 on mobile where the sidebar is hidden, 72px at
- * `sm`, 180px at `lg` — see AppSidebar.tsx).
+ * The header background spans edge-to-edge (fixed positioning isn't part
+ * of AppShell's grid), but its actual content sits inside the same
+ * `mx-auto max-w-[1920px] grid-cols-[Npx_1fr]` structure AppShell itself
+ * uses — mirroring that grid (not just left-offsetting from the viewport
+ * edge) is what keeps the header's content aligned with the sidebar/main
+ * column below it once the viewport exceeds 1920px and that column starts
+ * centering with side margins instead of touching the true screen edge.
  *
  * Header actions: Notifications, Create, Profile — "Go Live" was removed
  * (Watch/Live/streaming are out of MVP scope for this rework; the button
  * is gone, `.btn-golive`'s two remaining disabled usages elsewhere are
  * being retired in the same pass).
+ *
+ * Create is desktop/tablet-only (`hidden sm:block`) — logo + search-toggle
+ * + notifications + create + account genuinely don't fit next to each
+ * other at 320–375px (measured: they overflow the header by ~70px even
+ * with every icon at its minimum size). "New tournament"/"Open a Battle"
+ * move into MobileTabBar's own sheet below `sm` instead, the same place
+ * Marketplace/Rewards/Organize already live for the same reason.
  */
 export async function TopBar({ user, disputeCount = 0 }: { user: User | null; disputeCount?: number }) {
   const [unreadCount, friendRequestCount] = user
@@ -42,42 +51,52 @@ export async function TopBar({ user, disputeCount = 0 }: { user: User | null; di
     : [0, 0];
 
   return (
-    <header className="fixed inset-x-0 top-0 z-30 flex h-[60px] items-center gap-4 border-b border-border bg-background/85 px-5 backdrop-blur-md sm:left-[72px] sm:px-8 lg:left-[180px]">
-      <Link href="/" className="flex shrink-0 items-center sm:hidden">
-        {/* eslint-disable-next-line @next/next/no-img-element -- local /public asset, no next/image usage elsewhere in this codebase */}
-        <img src="/circuit-logo.png" alt="Circuit" width={700} height={347} className="h-12 w-auto max-w-none" />
-      </Link>
+    <header className="fixed inset-x-0 top-0 z-30 h-[60px] border-b border-border bg-background/85 backdrop-blur-md">
+      {/* A single grid child placed into the second (`1fr`) column at
+          sm+ — no empty first-column spacer div needed, which would
+          otherwise force a second implicit row (and unwanted extra
+          height) once `grid-cols-1` collapses to one column on mobile. */}
+      <div className="mx-auto grid h-full w-full max-w-[1920px] grid-cols-1 sm:grid-cols-[var(--sidebar-width-sm)_1fr] lg:grid-cols-[var(--sidebar-width-lg)_1fr]">
+        <div className="col-start-1 flex h-full items-center gap-4 px-5 sm:col-start-2 sm:px-8">
+          <Link href="/" className="flex shrink-0 items-center sm:hidden">
+            {/* eslint-disable-next-line @next/next/no-img-element -- local /public asset, no next/image usage elsewhere in this codebase */}
+            <img src="/circuit-logo.png" alt="Circuit" width={700} height={347} className="h-12 w-auto max-w-none" />
+          </Link>
 
-      <SearchInput className="hidden min-w-0 flex-1 sm:block sm:max-w-[430px]" />
+          <SearchInput className="hidden min-w-0 flex-1 sm:block sm:max-w-[430px]" />
 
-      <div className="ml-auto flex shrink-0 items-center gap-3">
-        <MobileSearchToggle />
-        {user ? (
-          <>
-            <WalletBalanceChip balance={user.walletBalance} />
-            <NotificationBell initialUnreadCount={unreadCount} />
-            <CreateMenu />
-            <AccountMenu
-              user={{
-                handle: user.handle,
-                displayName: user.displayName,
-                avatarUrl: user.avatarUrl,
-                isStaff: user.isStaff,
-              }}
-              disputeCount={disputeCount}
-              friendRequestCount={friendRequestCount}
-            />
-          </>
-        ) : (
-          <>
-            <Link href="/login" className="text-sm font-medium text-muted transition hover:text-foreground">
-              Log in
-            </Link>
-            <Link href="/signup" className="btn-primary px-4 py-1.5">
-              Sign up
-            </Link>
-          </>
-        )}
+          <div className="ml-auto flex shrink-0 items-center gap-3">
+            <MobileSearchToggle />
+            {user ? (
+              <>
+                <WalletBalanceChip balance={user.walletBalance} />
+                <NotificationBell initialUnreadCount={unreadCount} />
+                <div className="hidden sm:block">
+                  <CreateMenu />
+                </div>
+                <AccountMenu
+                  user={{
+                    handle: user.handle,
+                    displayName: user.displayName,
+                    avatarUrl: user.avatarUrl,
+                    isStaff: user.isStaff,
+                  }}
+                  disputeCount={disputeCount}
+                  friendRequestCount={friendRequestCount}
+                />
+              </>
+            ) : (
+              <>
+                <Link href="/login" className="text-sm font-medium text-muted transition hover:text-foreground">
+                  Log in
+                </Link>
+                <Link href="/signup" className="btn-primary px-4 py-1.5">
+                  Sign up
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
       </div>
     </header>
   );

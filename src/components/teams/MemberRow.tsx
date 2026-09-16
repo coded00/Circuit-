@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { X } from "lucide-react";
+import { X, Check } from "lucide-react";
 
 type Person = { id: string; handle: string; displayName: string; avatarUrl: string | null };
 
@@ -12,13 +12,19 @@ export function MemberRow({
   person,
   isCaptain,
   isPending,
+  isJoinRequest = false,
   canRemove,
+  canAccept = false,
 }: {
   teamId: string;
   person: Person;
   isCaptain: boolean;
   isPending: boolean;
+  /** True for a member-initiated "request to join" row — false (default) is the original captain-invited-a-handle row. See TeamMembership.requestedByMember. */
+  isJoinRequest?: boolean;
   canRemove: boolean;
+  /** Only meaningful alongside isJoinRequest — the captain can accept a join request (an invite instead waits on the invitee, not the captain). */
+  canAccept?: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -27,6 +33,17 @@ export function MemberRow({
     if (!confirm(`Remove ${person.displayName} from the team?`)) return;
     setBusy(true);
     await fetch(`/api/teams/${teamId}/members/${person.id}`, { method: "DELETE" });
+    setBusy(false);
+    router.refresh();
+  }
+
+  async function accept() {
+    setBusy(true);
+    await fetch(`/api/teams/${teamId}/accept`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: person.id }),
+    });
     setBusy(false);
     router.refresh();
   }
@@ -49,8 +66,13 @@ export function MemberRow({
       </Link>
 
       {isCaptain && <span className="badge badge-brand shrink-0">Captain</span>}
-      {isPending && <span className="badge badge-neutral shrink-0">Invited</span>}
+      {isPending && <span className="badge badge-neutral shrink-0">{isJoinRequest ? "Wants to join" : "Invited"}</span>}
 
+      {canAccept && (
+        <button type="button" disabled={busy} onClick={accept} aria-label="Accept" className="shrink-0 text-success hover:opacity-70">
+          <Check size={16} />
+        </button>
+      )}
       {canRemove && (
         <button type="button" disabled={busy} onClick={remove} aria-label="Remove" className="shrink-0 text-danger hover:opacity-70">
           <X size={15} />

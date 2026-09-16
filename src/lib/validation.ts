@@ -5,6 +5,20 @@
  */
 
 const COMMUNITY_POST_MAX_LENGTH = 500;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Same "absent vs present-but-invalid" shape as parseOptionalUrl below —
+ *  Account Settings' own real email field (separate from signup's
+ *  unvalidated emailOrPhone). Trims and lowercases before matching a
+ *  standard, deliberately permissive email pattern — not RFC 5322-exact,
+ *  just enough to reject a phone number or obvious typo. */
+export function parseOptionalEmail(value: unknown): { ok: true; email: string | null } | { ok: false } {
+  if (value === null || value === undefined || value === "") return { ok: true, email: null };
+  if (typeof value !== "string") return { ok: false };
+  const trimmed = value.trim().toLowerCase();
+  if (!EMAIL_PATTERN.test(trimmed)) return { ok: false };
+  return { ok: true, email: trimmed };
+}
 
 /** Trims, rejects empty/non-string, caps length. No rich text, no
  *  profanity filtering — a plain length cap matches this feed's

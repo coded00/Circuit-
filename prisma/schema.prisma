@@ -105,46 +105,66 @@ enum ReportStatus {
 /// Account creation is deferred (D4) — a User row is only created at
 /// register-with-intent-to-pay, Battle accept, or payout claim.
 model User {
-  id               String    @id @default(cuid())
-  displayName      String
-  handle           String    @unique
-  emailOrPhone     String    @unique
-  passwordHash     String?
-  avatarUrl        String?
+  id                String     @id @default(cuid())
+  displayName       String
+  handle            String     @unique
+  emailOrPhone      String     @unique
+  passwordHash      String?
+  avatarUrl         String?
   /// Short public profile tagline (ACC-6 profile edit) — free text,
   /// entirely optional, never used anywhere else in the app.
-  bio              String?
+  bio               String?
+  /// Free-text city/state/country — same optional-profile-field convention
+  /// as bio. Not shown anywhere yet; exists so Player Discovery's region
+  /// filter (a later phase) has real values to query instead of starting
+  /// from zero once that filter ships.
+  region            String?
   /// Self-curated list of games shown on the public profile — player-typed
   /// free text, not derived from real match history and NOT sourced from
   /// the `Game` catalog the way Tournament.game/Battle.game are: a
   /// player's "games I play" is a personal claim, not a real competition,
   /// so it isn't constrained to what organizers can actually host.
-  favoriteGames    String[]  @default([])
-  dateOfBirth      DateTime?
-  ageVerified      Boolean   @default(false)
+  favoriteGames     String[]   @default([])
+  dateOfBirth       DateTime?
+  ageVerified       Boolean    @default(false)
   /// P0-7: linked payout destination — what REG-6's payout actually pays out to.
-  payoutMethodRef  String?
+  payoutMethodRef   String?
+  /// Real, validated email — separate from `emailOrPhone` above, which may
+  /// hold a phone number instead and was never format-checked at signup.
+  /// Only ever set through Account Settings' own validation. Nullable:
+  /// nobody is required to add one, they just don't get the email side of
+  /// notifyNewContent below until they do.
+  email             String?    @unique
+  /// Single opt-out switch for "new tournament/challenge" broadcast
+  /// announcements (email + push only — in-app notifications are always-on
+  /// regardless, per InAppChannel's own comment in notifications.ts).
+  /// Defaults to on so a real audience exists for the feature at all.
+  notifyNewContent  Boolean    @default(true)
+  /// Set once this user's browser subscribes via OneSignal. Not the
+  /// broadcast targeting mechanism (that uses OneSignal's own "Subscribed
+  /// Users" segment) — kept mainly for future debugging/visibility.
+  oneSignalPlayerId String?
   /// P6-1/P6-2/P6-4: Circuit staff access — dispute-queue escalation
   /// ruling, account suspension. No self-serve grant path exists yet;
   /// setting this currently means a direct DB write, which is fine at V1's
   /// staffing size but is itself worth flagging as a gap.
-  isStaff          Boolean   @default(false)
+  isStaff           Boolean    @default(false)
   /// Only meaningful when `isStaff` is true — which of the two fixed
   /// admin roles this staff account has. Null for an ordinary player.
   /// See `AdminRole`'s own comment for what each role can actually do.
-  adminRole        AdminRole?
+  adminRole         AdminRole?
   /// P6-4/TRU-4: blocks registering, paying, or accepting Battles —
   /// checked at those specific write actions, never at login or browsing
   /// (same "don't touch the read path" discipline as the age gate, TRU-5).
-  isSuspended      Boolean   @default(false)
-  suspensionReason String?
+  isSuspended       Boolean    @default(false)
+  suspensionReason  String?
   /// Real, spendable Circuit balance (kobo) — funded via Fund Wallet,
   /// spent on entry fees, cashed out via Withdraw. The authoritative
   /// running total; `WalletTransaction` below is the immutable ledger
   /// that justifies it, kept in sync in the same DB transaction as every
   /// balance change so the two can never drift apart.
-  walletBalance    Int       @default(0)
-  createdAt        DateTime  @default(now())
+  walletBalance     Int        @default(0)
+  createdAt         DateTime   @default(now())
 
   organizerProfile    OrganizerProfile?
   registrations       Registration[]
@@ -578,12 +598,20 @@ model Friendship {
 /// no captaincy-transfer flow); anyone else just leaves their own
 /// `TeamMembership` row.
 model Team {
-  id        String           @id @default(cuid())
-  name      String           @unique
+  id        String   @id @default(cuid())
+  name      String   @unique
   tag       String?
+  /// Free text, same convention as Tournament.game/Battle.game/
+  /// User.favoriteGames — not a Game-catalog foreign key. Added for
+  /// Player & Team Discovery Phase 3: without this, "browse teams by
+  /// game" has nothing real to filter on. Optional — a team can exist
+  /// before its captain sets one.
+  game      String?
+  /// Free text city/state/country, same convention as User.region.
+  region    String?
   captainId String
-  captain   User             @relation("TeamCaptain", fields: [captainId], references: [id])
-  createdAt DateTime         @default(now())
+  captain   User     @relation("TeamCaptain", fields: [captainId], references: [id])
+  createdAt DateTime @default(now())
 
   members TeamMembership[]
 }
@@ -594,13 +622,20 @@ model Team {
 /// state" convention as `Friendship`: declining an invite, leaving, and
 /// being removed all just delete the row.
 model TeamMembership {
-  id        String   @id @default(cuid())
-  teamId    String
-  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  accepted  Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id                String   @id @default(cuid())
+  teamId            String
+  team              Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId            String
+  user              User     @relation(fields: [userId], references: [id])
+  accepted          Boolean  @default(false)
+  /// Distinguishes who started this pending row, since `accepted: false`
+  /// now means either direction (Discovery Phase 3): false (default) is
+  /// the original captain-invites-a-handle flow (the invited user
+  /// accepts); true is a player requesting to join a team found via
+  /// Discovery (the captain accepts). Same row shape, different
+  /// permission check on whoever's allowed to flip `accepted`.
+  requestedByMember Boolean  @default(false)
+  createdAt         DateTime @default(now())
 
   @@unique([teamId, userId])
   @@index([userId, accepted])

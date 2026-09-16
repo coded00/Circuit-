@@ -62,6 +62,14 @@ function formatLabel(format: string): string {
   return format === "BEST_OF_3" ? "Best of 3" : "Single match";
 }
 
+/** `size` is the full desktop size — below that, the circle scales down
+ *  fluidly (never below ~70% of it) with the viewport, since two of these
+ *  sit side-by-side in a fixed-layout VS row (see below) and a rigid
+ *  104px circle on each side leaves near-zero breathing room at 320px. */
+function fluidCircle(size: number): string {
+  return `clamp(${Math.round(size * 0.7)}px, 20vw, ${size}px)`;
+}
+
 function Avatar({
   avatarUrl,
   name,
@@ -73,18 +81,13 @@ function Avatar({
   ringClass: string;
   size: number;
 }) {
-  const px = `${size}px`;
+  const style = { height: fluidCircle(size), width: fluidCircle(size) };
   return avatarUrl ? (
     // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs
-    <img
-      src={avatarUrl}
-      alt=""
-      style={{ height: px, width: px }}
-      className={`rounded-full border-2 object-cover ${ringClass}`}
-    />
+    <img src={avatarUrl} alt="" style={style} className={`rounded-full border-2 object-cover ${ringClass}`} />
   ) : (
     <div
-      style={{ height: px, width: px }}
+      style={style}
       className={`flex items-center justify-center rounded-full border-2 bg-surface text-2xl font-semibold text-muted ${ringClass}`}
     >
       {name.slice(0, 1).toUpperCase()}
@@ -93,10 +96,9 @@ function Avatar({
 }
 
 function EmptySlot({ size }: { size: number }) {
-  const px = `${size}px`;
   return (
     <div
-      style={{ height: px, width: px }}
+      style={{ height: fluidCircle(size), width: fluidCircle(size) }}
       className="flex items-center justify-center rounded-full border-2 border-dashed border-border-strong text-3xl font-bold text-muted"
     >
       ?

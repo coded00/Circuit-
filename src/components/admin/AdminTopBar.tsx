@@ -7,11 +7,17 @@
  * bar doesn't duplicate a title) and who's signed in, with a fast way
  * back out. A direct "Log out" button rather than a dropdown menu — one
  * real action doesn't need a disclosure to hide behind.
+ *
+ * Below `sm`, AdminSidebar is hidden entirely (see its own comment), so
+ * this bar also carries the hamburger trigger for AdminMobileNav's
+ * drawer — and drops "View Site" (a convenience, not essential admin
+ * functionality) to keep the row from crowding on a narrow phone.
  */
 
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { LogOut, ExternalLink } from "lucide-react";
+import { AdminMobileNav } from "./AdminMobileNav";
 
 export function AdminTopBar({
   admin,
@@ -27,20 +33,23 @@ export function AdminTopBar({
   }
 
   return (
-    <header className="flex h-[64px] shrink-0 items-center justify-between border-b border-border px-8">
-      <span className="text-eyebrow text-muted-strong">Circuit Admin</span>
+    <header className="flex h-[64px] shrink-0 items-center justify-between border-b border-border px-4 sm:px-8">
+      <div className="flex items-center gap-3">
+        <AdminMobileNav />
+        <span className="text-eyebrow text-muted-strong">Circuit Admin</span>
+      </div>
 
       <div className="flex items-center gap-4">
         <Link
           href="/"
           target="_blank"
-          className="flex items-center gap-1.5 text-sm font-medium text-muted transition hover:text-foreground"
+          className="hidden items-center gap-1.5 text-sm font-medium text-muted transition hover:text-foreground sm:flex"
         >
           View Site
           <ExternalLink size={13} />
         </Link>
 
-        <div className="h-5 w-px bg-border" aria-hidden />
+        <div className="hidden h-5 w-px bg-border sm:block" aria-hidden />
 
         <div className="flex items-center gap-2.5">
           {admin.avatarUrl ? (
