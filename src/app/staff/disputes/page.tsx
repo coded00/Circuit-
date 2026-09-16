@@ -9,11 +9,15 @@
  * any ESCALATED dispute) rather than a separate ruling UI here.
  */
 
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { StatusPill, disputeStatusInfo } from "@/components/StatusPill";
+
+// Staff-only queue — never real public content.
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 function timeSince(date: Date): string {
   const ms = Date.now() - date.getTime();

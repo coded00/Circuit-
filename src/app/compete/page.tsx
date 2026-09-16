@@ -19,6 +19,7 @@ import { prisma } from "@/lib/db";
 import { GameArtTile } from "@/components/GameArtTile";
 import { StatusPill, tournamentStatusInfo } from "@/components/StatusPill";
 import { openDueTournaments } from "@/lib/tournaments";
+import { tournamentPath } from "@/lib/seo";
 
 type SearchParams = {
   q?: string;
@@ -166,7 +167,7 @@ export default async function CompetePage({ searchParams }: { searchParams: Prom
             return (
               <Link
                 key={tournament.id}
-                href={`/tournaments/${tournament.id}`}
+                href={tournamentPath(tournament)}
                 className="card-media card-hover flex h-full flex-col"
               >
                 <div className="relative h-28 w-full overflow-hidden">

@@ -3,6 +3,7 @@ import { Calendar, Swords, ArrowRight } from "lucide-react";
 import { GameArtTile } from "@/components/GameArtTile";
 import { tournamentStatusInfo } from "@/components/StatusPill";
 import { CapacityBar } from "@/components/CapacityBar";
+import { tournamentPath } from "@/lib/seo";
 
 /**
  * Circuit — "Featured Competitions" homepage section. Tall editorial
@@ -71,7 +72,7 @@ function FeaturedCard({ tournament, showFeaturedBadge = false }: { tournament: T
 
   return (
     <Link
-      href={`/tournaments/${tournament.id}`}
+      href={tournamentPath(tournament)}
       className="group flex h-full w-full flex-col overflow-hidden rounded-[16px] border border-border bg-surface transition duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] active:duration-[var(--duration-instant)]"
     >
       <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden">

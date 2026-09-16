@@ -31,8 +31,10 @@
  *   only for a side that has actually completed matches in this game.
  */
 
+import { cache } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { ArrowLeft, CheckCircle2, Tv, Zap } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
@@ -44,6 +46,7 @@ import { getFriendIds } from "@/lib/friends";
 import { CountUp } from "@/components/CountUp";
 import AcceptButton from "./AcceptButton";
 import CancelBattleButton from "./CancelBattleButton";
+import { buildMetadata, parseIdSegment, battlePath, absoluteUrl, DEFAULT_DESCRIPTION } from "@/lib/seo";
 
 function formatNaira(kobo: number): string {
   return `₦${(kobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 0 })}`;
@@ -169,14 +172,10 @@ function howItWorks(stakeAmount: number): string[] {
   ];
 }
 
-export default async function BattlePage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
-
-  const battle = await prisma.battle.findUnique({
+// react's cache() dedupes this within a single request — generateMetadata
+// and the page component below both call it, but it only hits the DB once.
+const getBattle = cache(async (id: string) =>
+  prisma.battle.findUnique({
     where: { id },
     include: {
       creator: { select: { displayName: true, handle: true, avatarUrl: true } },
@@ -192,7 +191,34 @@ export default async function BattlePage({
         take: 1,
       },
     },
+  })
+);
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id: rawId } = await params;
+  const battle = await getBattle(parseIdSegment(rawId));
+  if (!battle) return buildMetadata({ title: "Challenge not found", description: DEFAULT_DESCRIPTION, path: `/battles/${rawId}`, noindex: true });
+
+  const stakeText = battle.stakeAmount > 0 ? `₦${(battle.stakeAmount / 100).toLocaleString("en-NG")} stake` : "free to enter";
+  return buildMetadata({
+    title: `${battle.game} 1v1 Challenge`,
+    description: `Join a ${battle.game} 1v1 Challenge on Circuit — ${stakeText}. Real opponents, real results.`,
+    path: battlePath(battle),
+    // Targeted (FRIENDS) challenges aren't genuinely public content —
+    // only real open, anyone-can-accept challenges are worth indexing.
+    noindex: battle.visibility !== "OPEN",
   });
+}
+
+export default async function BattlePage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id: rawId } = await params;
+  const id = parseIdSegment(rawId);
+
+  const battle = await getBattle(id);
   if (!battle) notFound();
 
   const user = await getCurrentUser();
@@ -361,7 +387,7 @@ export default async function BattlePage({
             )}
             <ShareButton
               title={`${battle.creator.displayName}'s ${battle.game} Challenge on Circuit`}
-              url={`${process.env.NEXT_PUBLIC_APP_URL}/battles/${battle.id}`}
+              url={absoluteUrl(battlePath(battle))}
             />
           </div>
 
@@ -435,7 +461,7 @@ export default async function BattlePage({
             <ShareButton
               variant="inline"
               title={`${battle.creator.displayName}'s ${battle.game} Challenge on Circuit`}
-              url={`${process.env.NEXT_PUBLIC_APP_URL}/battles/${battle.id}`}
+              url={absoluteUrl(battlePath(battle))}
             />
           </div>
         </aside>

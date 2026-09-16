@@ -5,8 +5,13 @@
  * this layout only guards the route and provides the panel's padding.
  */
 
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
+
+// Private, per-user organizer tooling — nothing under here is real public
+// content, and every child page inherits this rather than repeating it.
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();

@@ -17,9 +17,10 @@
  * organizer-typed game name only, nothing more granular).
  */
 
-import { Suspense } from "react";
+import { Suspense, cache } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { Tv, Calendar, Users, Layers, Swords, Trophy, Wallet, ShieldCheck, Timer } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
@@ -35,6 +36,7 @@ import TournamentTabs, { type TournamentTab } from "./TournamentTabs";
 import CancelButton from "./CancelButton";
 import WithdrawButton from "./WithdrawButton";
 import ClaimPrizeButton from "./ClaimPrizeButton";
+import { buildMetadata, parseIdSegment, tournamentPath, absoluteUrl, DEFAULT_DESCRIPTION } from "@/lib/seo";
 
 function formatNaira(kobo: number): string {
   return `₦ ${(kobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 0 })}`;
@@ -82,15 +84,41 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string;
   );
 }
 
+// react's cache() dedupes this within a single request — generateMetadata
+// and the page component below both call it, but it only hits the DB once.
+const getTournament = cache(async (id: string) => prisma.tournament.findUnique({ where: { id } }));
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id: rawId } = await params;
+  const tournament = await getTournament(parseIdSegment(rawId));
+  if (!tournament) return buildMetadata({ title: "Tournament not found", description: DEFAULT_DESCRIPTION, path: `/tournaments/${rawId}`, noindex: true });
+
+  const prizeText = tournament.prizeAmount
+    ? `₦${(tournament.prizeAmount / 100).toLocaleString("en-NG")} prize pool`
+    : tournament.entryFee === 0
+      ? "free entry"
+      : `₦${(tournament.entryFee / 100).toLocaleString("en-NG")} entry`;
+  const path = tournamentPath(tournament);
+
+  return buildMetadata({
+    title: `${tournament.name} — ${tournament.game} Tournament`,
+    description: `Join ${tournament.name}, a ${tournament.game} tournament on Circuit. ${prizeText}. Register now and compete.`,
+    path,
+    image: tournament.posterUrl ?? undefined,
+    imageAlt: `${tournament.name} tournament artwork`,
+  });
+}
+
 export default async function TournamentPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id } = await params;
+  const { id: rawId } = await params;
+  const id = parseIdSegment(rawId);
   await openDueTournaments();
 
-  const tournament = await prisma.tournament.findUnique({ where: { id } });
+  const tournament = await getTournament(id);
   if (!tournament) {
     notFound();
   }
@@ -146,6 +174,31 @@ export default async function TournamentPage({
         ? "Free to enter, no cost to compete."
         : `${formatNaira(tournament.entryFee)} entry fee.`
   }`;
+
+  // Real data only, per the "no fake ratings/reviews/prices/dates" rule —
+  // every field below is a genuine Tournament column. No `organizer` field
+  // yet: this query doesn't fetch the relation, and a real one requires an
+  // extra join for a schema.org-optional field, not worth it in this pass.
+  const canonicalUrl = absoluteUrl(tournamentPath(tournament));
+  const eventJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Event",
+    name: tournament.name,
+    description: aboutText,
+    startDate: tournament.startAt.toISOString(),
+    eventStatus: `https://schema.org/${tournament.status === "CANCELLED" ? "EventCancelled" : "EventScheduled"}`,
+    eventAttendanceMode: "https://schema.org/OnlineEventAttendanceMode",
+    location: { "@type": "VirtualLocation", url: canonicalUrl },
+    url: canonicalUrl,
+    image: tournament.posterUrl ?? undefined,
+    offers: {
+      "@type": "Offer",
+      price: (tournament.entryFee / 100).toString(),
+      priceCurrency: "NGN",
+      url: canonicalUrl,
+      availability: registrationOpen ? "https://schema.org/InStock" : "https://schema.org/SoldOut",
+    },
+  };
 
   const tabs: TournamentTab[] = [
     {
@@ -284,6 +337,7 @@ export default async function TournamentPage({
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-6 sm:p-8">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(eventJsonLd) }} />
       {/* Real "live" page — a Poller-driven refresh is what makes the
           capacity flash, FULL state, and status pill above genuinely
           respond to someone else registering while this page is open,
@@ -396,7 +450,7 @@ export default async function TournamentPage({
               <ShareButton
                 variant="compact"
                 title={`${tournament.name} on Circuit`}
-                url={`${process.env.NEXT_PUBLIC_APP_URL}/tournaments/${tournament.id}`}
+                url={canonicalUrl}
               />
             </div>
 

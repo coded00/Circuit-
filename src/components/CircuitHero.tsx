@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useSpotlight } from "@/lib/useSpotlight";
 import { CINEMATIC_GAMING_IMAGE, realGameImage, unsplashUrl } from "@/lib/gameImagery";
+import { tournamentPath } from "@/lib/seo";
 
 /**
  * Circuit — homepage hero. "Dark to compete" starts here: the one
@@ -97,7 +98,7 @@ export function CircuitHero({ tournaments = [], banners = [] }: { tournaments?: 
               {tournament._count.registrations}/{tournament.participantCap} players
             </p>
             <div className="flex flex-wrap gap-3 pt-1">
-              <Link href={`/tournaments/${tournament.id}`} className="btn-primary">
+              <Link href={tournamentPath(tournament)} className="btn-primary">
                 View Competition →
               </Link>
             </div>

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Search } from "lucide-react";
 import { StatusPill, tournamentStatusInfo } from "@/components/StatusPill";
+import { tournamentPath, battlePath } from "@/lib/seo";
 
 type SearchResults = {
   tournaments: { id: string; name: string; game: string; status: string }[];
@@ -95,7 +96,7 @@ export function SearchInput({ className = "" }: { className?: string }) {
                     return (
                       <Link
                         key={t.id}
-                        href={`/tournaments/${t.id}`}
+                        href={tournamentPath(t)}
                         onClick={() => setOpen(false)}
                         className="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-surface-elevated"
                       >
@@ -114,7 +115,7 @@ export function SearchInput({ className = "" }: { className?: string }) {
                   {results.battles.map((b) => (
                     <Link
                       key={b.id}
-                      href={`/battles/${b.id}`}
+                      href={battlePath(b)}
                       onClick={() => setOpen(false)}
                       className="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-surface-elevated"
                     >

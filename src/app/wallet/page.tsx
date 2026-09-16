@@ -15,12 +15,16 @@
  * landing in this wallet, while a Battle stake payout always does).
  */
 
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowDownToLine, ArrowUpFromLine, ReceiptText, Settings, Trophy, Wallet as WalletIcon } from "lucide-react";
 import { getCurrentUser } from "@/lib/session";
 import { getWalletActivity } from "@/lib/wallet";
 import { FundWalletButton } from "./FundWalletButton";
+
+// Private, per-user financial data — never real public content.
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 import { WithdrawButton } from "./WithdrawButton";
 
 function formatNaira(kobo: number): string {

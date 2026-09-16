@@ -8,6 +8,7 @@ import { TopBar } from "@/components/nav/TopBar";
 import { MobileTabBar } from "@/components/nav/MobileTabBar";
 import { AppShell } from "@/components/AppShell";
 import { OneSignalInit } from "@/components/OneSignalInit";
+import { SITE_NAME, SITE_URL, DEFAULT_DESCRIPTION } from "@/lib/seo";
 
 // Phase 14: Inter for UI text, Barlow Condensed ExtraBold for display/hero
 // headlines — a tall, condensed weight suited to the CIRCUIT wordmark's
@@ -28,9 +29,50 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// metadataBase resolves every relative OG/Twitter image URL a page's own
+// generateMetadata supplies (most do, via lib/seo.ts's absoluteUrl) — set
+// once here so individual pages never need to repeat it.
+//
+// No title.template here on purpose: Next's title-template inheritance
+// turned out to behave inconsistently between a static `export const
+// metadata` (homepage) and a `generateMetadata()` function (tournament/
+// battle pages) in this Next.js version — the suffix applied to one but
+// not the other. buildMetadata() (lib/seo.ts) is the single source of
+// truth instead: every page's title already includes " | Circuit" by the
+// time it reaches here, so this default only covers the rare page with
+// no metadata export of its own.
 export const metadata: Metadata = {
-  title: "Circuit",
-  description: "Tournament and 1v1 Battle platform for Nigeria-first esports organizers.",
+  metadataBase: new URL(SITE_URL),
+  title: "Circuit — Gaming Tournaments & Esports Competitions",
+  description: DEFAULT_DESCRIPTION,
+  openGraph: {
+    siteName: SITE_NAME,
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+  },
+};
+
+// Organization + WebSite — real, static facts about Circuit itself (not
+// per-page), so this lives once at the root rather than repeated per
+// page. No SearchAction: Circuit's search is a client-driven UI
+// (SearchInput.tsx -> /api/search), not a real GET-query page a search
+// engine could link a sitelinks searchbox to — adding one anyway would
+// describe a capability that doesn't actually exist at that URL.
+const ORGANIZATION_JSON_LD = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: SITE_NAME,
+  url: SITE_URL,
+  logo: `${SITE_URL}/circuit-logo.png`,
+};
+
+const WEBSITE_JSON_LD = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: SITE_NAME,
+  url: SITE_URL,
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
@@ -54,6 +96,15 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       className={`${bodyFont.variable} ${displayFont.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full">
+        {/* Real, static site-level facts only — see this file's own
+            ORGANIZATION_JSON_LD/WEBSITE_JSON_LD comment on why no
+            SearchAction. Per-page structured data (Event on tournament
+            pages, etc.) lives on those pages themselves, not here. */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(ORGANIZATION_JSON_LD) }}
+        />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(WEBSITE_JSON_LD) }} />
         {/* Phase 1: left nav + flexible main content. The persistent 330px
             right rail is homepage-specific composition (Phases 5/10-12 all
             describe homepage widgets), not a universal shell column — other

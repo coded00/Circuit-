@@ -6,12 +6,16 @@
  * badge linking to /dashboard/disputes.
  */
 
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { formatNotification } from "@/lib/notification-format";
 import MarkAllReadButton from "./MarkAllReadButton";
 import LoadMoreNotifications from "./LoadMoreNotifications";
+
+// Private, per-user inbox — never real public content.
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 const PAGE_SIZE = 20;
 

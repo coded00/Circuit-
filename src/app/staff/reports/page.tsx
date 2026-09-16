@@ -2,11 +2,15 @@
  * Circuit — staff abuse-report queue (Build Plan P6-3/P6-4, maps: TRU-3, TRU-4).
  */
 
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import ReportActions from "./ReportActions";
+
+// Staff-only queue — never real public content.
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 export default async function StaffReportsPage() {
   const user = await getCurrentUser();
