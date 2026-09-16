@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Wallet } from "lucide-react";
 import { Spinner } from "@/components/Spinner";
+import { MatchFoundHud } from "@/components/MatchFoundHud";
 
 export default function RegistrationForm({
   tournamentId,
@@ -20,6 +21,7 @@ export default function RegistrationForm({
   const [payFromWallet, setPayFromWallet] = useState(canPayFromWallet);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [matchFound, setMatchFound] = useState(false);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -47,8 +49,22 @@ export default function RegistrationForm({
       return;
     }
 
-    router.push(`/tournaments/${tournamentId}`);
-    router.refresh();
+    // Card payments leave via authorizationUrl above and never reach here
+    // (Paystack/Flutterwave's own redirect handles that success moment) —
+    // this is the free-entry and pay-from-wallet path, where registration
+    // is already complete the instant this response comes back.
+    setMatchFound(true);
+  }
+
+  if (matchFound) {
+    return (
+      <MatchFoundHud
+        onComplete={() => {
+          router.push(`/tournaments/${tournamentId}`);
+          router.refresh();
+        }}
+      />
+    );
   }
 
   return (

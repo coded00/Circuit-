@@ -126,14 +126,23 @@ function MatchCard({
   userMap,
   hasNextRound,
   matchHref,
+  staggerIndex,
 }: {
   slot: BracketSlot;
   userMap: Map<string, Player>;
   hasNextRound: boolean;
   matchHref: (matchId: string) => string;
+  /** Position within its round column, top to bottom — Level 2's "card
+   *  stagger" (see globals.css's Phase 20 comment), reusing the existing
+   *  `.motion-slide-up`/`.motion-stagger` primitives rather than a new
+   *  bracket-specific animation. */
+  staggerIndex: number;
 }) {
   return (
-    <div className="card relative flex flex-col gap-0 overflow-hidden p-0">
+    <div
+      className="card motion-slide-up motion-stagger relative flex flex-col gap-0 overflow-hidden p-0"
+      style={{ "--i": staggerIndex } as React.CSSProperties}
+    >
       {[
         { id: slot.playerAId, isWinner: slot.winnerId === slot.playerAId },
         { id: slot.playerBId, isWinner: slot.winnerId === slot.playerBId },
@@ -247,8 +256,15 @@ export function BracketView({
                   <div className="flex flex-1 flex-col justify-around gap-6">
                     {chunkPairs(round.slots).map((pair, pairIndex) => (
                       <div key={pairIndex} className="relative flex flex-col gap-6">
-                        {pair.map((slot) => (
-                          <MatchCard key={slot.position} slot={slot} userMap={userMap} hasNextRound={!isLast} matchHref={matchHref} />
+                        {pair.map((slot, slotIndex) => (
+                          <MatchCard
+                            key={slot.position}
+                            slot={slot}
+                            userMap={userMap}
+                            hasNextRound={!isLast}
+                            matchHref={matchHref}
+                            staggerIndex={pairIndex * 2 + slotIndex}
+                          />
                         ))}
                         {pair.length === 2 && <BracketConnector hasNextRound={!isLast} />}
                       </div>

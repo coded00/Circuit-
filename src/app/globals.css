@@ -845,27 +845,34 @@ body {
 
 /*
  * ============================================================================
- * Phase 20 — navigation & page transitions. Route changes, tab content
- * switches, and the one real modal-like surface in the app (the mobile
- * nav's bottom sheet) all get an entrance now — nothing here changes
- * layout/structure, only how a change in content arrives.
+ * Phase 20 — navigation & page transitions. Circuit's motion hierarchy has
+ * three levels (see PageTransition.tsx for Level 1's Framer Motion side):
+ *
+ *   Level 1 Every navigation — fade/rise/scale, ~350ms. Framer Motion,
+ *           applied everywhere via AppShell's AnimatePresence.
+ *   Level 2 Game/tournament pages — a HUD scan line + slight glitch, layered
+ *           on top of Level 1 rather than replacing it. `.arena-transition`
+ *           below. Scoped in AppShell to tournament/battle detail + bracket
+ *           only (isArenaRoute) — deliberately NOT global, so the "gaming"
+ *           feeling stays a moment you arrive at, not constant motion.
+ *   Level 3 Major moments (e.g. tournament registration success) — a real
+ *           "MATCH FOUND" loading HUD, not a page-transition flourish at
+ *           all. See MatchFoundHud.tsx.
  * ============================================================================
  */
 @layer components {
-  /* Route change's fade/rise/scale is now Framer Motion (PageTransition.tsx,
-     AppShell.tsx) rather than a CSS-only enter animation — Framer gives it
-     a real exit choreography (AnimatePresence) CSS-only couldn't. This
-     class stays, repurposed as a decorative flourish layered on top of
-     that: a volt-green line scanning left-to-right across the incoming
-     page, applied to the same wrapper Framer animates. `overflow: hidden`
-     keeps the line clipped to the page's own bounds rather than briefly
-     spilling past the sidebar. */
-  .page-transition {
+  /* Level 2. `overflow: hidden` keeps the scan line clipped to the page's
+     own bounds rather than briefly spilling past the sidebar; the glitch
+     is a small transform/opacity jitter on the wrapper itself, not the
+     pseudo-element the scan line uses — same box, two independent
+     animations, so neither clobbers the other's `animation` property. */
+  .arena-transition {
     position: relative;
     overflow: hidden;
+    animation: arena-glitch 260ms var(--ease-standard);
   }
 
-  .page-transition::after {
+  .arena-transition::after {
     content: "";
     position: absolute;
     top: 0;
@@ -874,7 +881,7 @@ body {
     height: 2px;
     background: var(--accent-volt);
     box-shadow: 0 0 12px var(--accent-volt);
-    animation: page-transition-scan 0.4s var(--ease-out);
+    animation: arena-scan 0.4s var(--ease-out);
     pointer-events: none;
   }
 
@@ -911,12 +918,39 @@ body {
   }
 }
 
-@keyframes page-transition-scan {
+@keyframes arena-scan {
   from {
     left: -100%;
   }
   to {
     left: 100%;
+  }
+}
+
+/* Brief, deliberately subtle — a "static" hint, not chromatic aberration.
+   Settles back to (0, 1) so it never leaves the page visibly offset. */
+@keyframes arena-glitch {
+  0%,
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  10% {
+    transform: translateX(-2px);
+    opacity: 0.96;
+  }
+  20% {
+    transform: translateX(2px);
+  }
+  30% {
+    transform: translateX(-1px);
+    opacity: 0.98;
+  }
+  40% {
+    transform: translateX(1px);
+  }
+  50% {
+    transform: translateX(0);
   }
 }
 

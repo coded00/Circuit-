@@ -7,6 +7,18 @@ import PageTransition from "@/components/PageTransition";
 
 const BARE_ROUTES = ["/login", "/signup", "/forgot-password", "/reset-password", "/admin"];
 
+/** Level 2 of Circuit's motion hierarchy (globals.css's own comment on
+ *  `.arena-transition` has the full breakdown) is deliberately scoped to
+ *  "you're in the arena" pages only — tournament/battle detail and the
+ *  bracket — not creation/edit/register forms or browsing pages like
+ *  /compete or /ladder, and not `/new` (which would otherwise false-match
+ *  the same `/tournaments/[id]` pattern). */
+function isArenaRoute(pathname: string): boolean {
+  if (/^\/tournaments\/(?!new$)[^/]+(\/bracket)?$/.test(pathname)) return true;
+  if (/^\/battles\/(?!new$)[^/]+$/.test(pathname)) return true;
+  return false;
+}
+
 /**
  * Circuit — decides whether a route gets the normal player app shell
  * (sidebar + top bar + mobile tab bar) or the bare page. The four auth
@@ -70,13 +82,17 @@ export function AppShell({
                 page's exit animation before the incoming one enters
                 (`mode="wait"`) — doesn't apply to in-place content changes
                 (tab switches, search params) since those don't change
-                `pathname`. `.page-transition` (globals.css) layers a
-                decorative volt-green scan line on top — a fresh DOM node
-                mounts on every navigation (the changed `key`), so its
-                CSS animation naturally replays each time without any
-                extra JS trigger. */}
+                `pathname`. Level 1, applied everywhere. `.arena-transition`
+                (Level 2, globals.css) layers a volt-green scan line + brief
+                glitch on top, scoped to isArenaRoute only — a fresh DOM
+                node mounts on every navigation (the changed `key`), so its
+                CSS animation naturally replays each time without any extra
+                JS trigger. */}
             <AnimatePresence mode="wait">
-              <PageTransition key={pathname} className="page-transition flex flex-1 flex-col">
+              <PageTransition
+                key={pathname}
+                className={`flex flex-1 flex-col ${isArenaRoute(pathname) ? "arena-transition" : ""}`}
+              >
                 {children}
               </PageTransition>
             </AnimatePresence>
