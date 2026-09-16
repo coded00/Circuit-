@@ -70,10 +70,13 @@ export function AppShell({
                 page's exit animation before the incoming one enters
                 (`mode="wait"`) — doesn't apply to in-place content changes
                 (tab switches, search params) since those don't change
-                `pathname`. Replaces the old CSS-only `.page-transition`
-                (enter-only, no exit choreography). */}
+                `pathname`. `.page-transition` (globals.css) layers a
+                decorative volt-green scan line on top — a fresh DOM node
+                mounts on every navigation (the changed `key`), so its
+                CSS animation naturally replays each time without any
+                extra JS trigger. */}
             <AnimatePresence mode="wait">
-              <PageTransition key={pathname} className="flex flex-1 flex-col">
+              <PageTransition key={pathname} className="page-transition flex flex-1 flex-col">
                 {children}
               </PageTransition>
             </AnimatePresence>

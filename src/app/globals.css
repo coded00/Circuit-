@@ -852,13 +852,33 @@ body {
  * ============================================================================
  */
 @layer components {
-  /* Route change is now Framer Motion (PageTransition.tsx, AppShell.tsx)
-     rather than this CSS-only enter animation — Framer gives it a real
-     exit choreography (AnimatePresence) this couldn't. Kept
-     `motion-fade-in` itself since `.tab-content-enter`/`.sheet-*-enter`
-     below still use it.
+  /* Route change's fade/rise/scale is now Framer Motion (PageTransition.tsx,
+     AppShell.tsx) rather than a CSS-only enter animation — Framer gives it
+     a real exit choreography (AnimatePresence) CSS-only couldn't. This
+     class stays, repurposed as a decorative flourish layered on top of
+     that: a volt-green line scanning left-to-right across the incoming
+     page, applied to the same wrapper Framer animates. `overflow: hidden`
+     keeps the line clipped to the page's own bounds rather than briefly
+     spilling past the sidebar. */
+  .page-transition {
+    position: relative;
+    overflow: hidden;
+  }
 
-     Tab content switch (TournamentTabs) — quicker than a full page
+  .page-transition::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 2px;
+    background: var(--accent-volt);
+    box-shadow: 0 0 12px var(--accent-volt);
+    animation: page-transition-scan 0.4s var(--ease-out);
+    pointer-events: none;
+  }
+
+  /* Tab content switch (TournamentTabs) — quicker than a full page
      transition since it's a much smaller change of context. */
   .tab-content-enter {
     animation: motion-fade-in var(--duration-fast) var(--ease-standard) both;
@@ -888,6 +908,15 @@ body {
   }
   to {
     transform: translateY(0);
+  }
+}
+
+@keyframes page-transition-scan {
+  from {
+    left: -100%;
+  }
+  to {
+    left: 100%;
   }
 }
 
