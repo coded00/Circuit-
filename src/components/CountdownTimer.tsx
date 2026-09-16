@@ -23,13 +23,29 @@ function formatRemaining(ms: number): string {
 // own re-render scheduling via useSyncExternalStore, rather than a
 // useEffect calling setState directly (which cascades an extra render
 // and is what the react-hooks/set-state-in-effect rule flags).
+//
+// Unlike CountUp's boolean snapshot (naturally stable via Object.is until
+// the real value flips), Date.now() is a genuinely different number on
+// every call at millisecond precision — calling it fresh inside
+// getSnapshot means React's "did the snapshot change?" check after every
+// render sees a new value from the mere act of checking, which is exactly
+// the infinite-loop guard useSyncExternalStore warns about. cachedNow
+// only advances inside the tick itself, so repeated getSnapshot calls
+// between ticks return the identical value. Module-level (not per-
+// instance) is deliberate too — every CountdownTimer on the page shares
+// one clock and one interval instead of each maintaining its own.
+let cachedNow = Date.now();
+
 function subscribeToClock(callback: () => void) {
-  const interval = setInterval(callback, 1000);
+  const interval = setInterval(() => {
+    cachedNow = Date.now();
+    callback();
+  }, 1000);
   return () => clearInterval(interval);
 }
 
 function getClockSnapshot(): number {
-  return Date.now();
+  return cachedNow;
 }
 
 // A real Date.now() is never 0 — used as the "not mounted yet" sentinel
