@@ -36,7 +36,7 @@ import TournamentTabs, { type TournamentTab } from "./TournamentTabs";
 import CancelButton from "./CancelButton";
 import WithdrawButton from "./WithdrawButton";
 import ClaimPrizeButton from "./ClaimPrizeButton";
-import { buildMetadata, parseIdSegment, tournamentPath, absoluteUrl, DEFAULT_DESCRIPTION } from "@/lib/seo";
+import { buildMetadata, parseIdSegment, tournamentPath, gamePath, organiserPath, absoluteUrl, DEFAULT_DESCRIPTION } from "@/lib/seo";
 
 function formatNaira(kobo: number): string {
   return `₦ ${(kobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 0 })}`;
@@ -86,7 +86,12 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string;
 
 // react's cache() dedupes this within a single request — generateMetadata
 // and the page component below both call it, but it only hits the DB once.
-const getTournament = cache(async (id: string) => prisma.tournament.findUnique({ where: { id } }));
+const getTournament = cache(async (id: string) =>
+  prisma.tournament.findUnique({
+    where: { id },
+    include: { organizer: { include: { user: { select: { handle: true, displayName: true } } } } },
+  })
+);
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id: rawId } = await params;
@@ -176,9 +181,8 @@ export default async function TournamentPage({
   }`;
 
   // Real data only, per the "no fake ratings/reviews/prices/dates" rule —
-  // every field below is a genuine Tournament column. No `organizer` field
-  // yet: this query doesn't fetch the relation, and a real one requires an
-  // extra join for a schema.org-optional field, not worth it in this pass.
+  // every field below is a genuine Tournament (or OrganizerProfile/User)
+  // column.
   const canonicalUrl = absoluteUrl(tournamentPath(tournament));
   const eventJsonLd = {
     "@context": "https://schema.org",
@@ -191,6 +195,11 @@ export default async function TournamentPage({
     location: { "@type": "VirtualLocation", url: canonicalUrl },
     url: canonicalUrl,
     image: tournament.posterUrl ?? undefined,
+    organizer: {
+      "@type": "Person",
+      name: tournament.organizer.user.displayName,
+      url: absoluteUrl(organiserPath(tournament.organizer.user.handle)),
+    },
     offers: {
       "@type": "Offer",
       price: (tournament.entryFee / 100).toString(),
@@ -236,15 +245,29 @@ export default async function TournamentPage({
           </div>
           <div className="flex flex-col gap-3 border-t border-border pt-6">
             <h2 className="text-section-heading">Game</h2>
-            <div className="card flex items-center gap-4">
+            <Link href={gamePath(tournament.game)} className="card card-hover flex items-center gap-4">
               <GameArtTile game={tournament.game} className="h-20 w-20 shrink-0 rounded-[10px]" hideLabel />
               <div className="flex min-w-0 flex-col">
                 <span className="text-card-title truncate">{tournament.game}</span>
                 <p className="text-metadata">
                   {formatText} · {tournament.teamSize} tournament
                 </p>
+                <p className="mt-1 text-xs font-medium text-accent-blue">See all {tournament.game} tournaments →</p>
               </div>
-            </div>
+            </Link>
+          </div>
+          <div className="flex flex-col gap-3 border-t border-border pt-6">
+            <h2 className="text-section-heading">Organizer</h2>
+            <Link href={organiserPath(tournament.organizer.user.handle)} className="card-row flex items-center gap-3 p-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-surface-elevated text-xs font-semibold text-muted">
+                {tournament.organizer.user.displayName.slice(0, 1).toUpperCase()}
+              </span>
+              <div className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate text-sm font-medium">{tournament.organizer.user.displayName}</span>
+                <span className="text-metadata truncate">@{tournament.organizer.user.handle}</span>
+              </div>
+              {tournament.organizer.verified && <ShieldCheck size={14} className="shrink-0 text-accent-blue" />}
+            </Link>
           </div>
         </div>
       ),

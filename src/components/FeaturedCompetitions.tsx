@@ -8,11 +8,10 @@ import { tournamentPath } from "@/lib/seo";
 /**
  * Circuit — "Featured Competitions" homepage section. Tall editorial
  * poster-style cards (image top ~62%, light content below), not a
- * standard dashboard card — replaces the old right-rail
- * `FeaturedCompetition` rotator (still on disk, unwired) now that this
- * section covers the same ground in the main column. "Featured" is a
- * real, data-backed selection (a real prize pool), not an arbitrary pick
- * — see the query in page.tsx.
+ * standard dashboard card — replaces the old right-rail card rotator
+ * this superseded. "Featured" is a real, data-backed selection (a real
+ * prize pool), not an arbitrary pick — see the query in page.tsx. Also
+ * reused (with its own title/viewAllHref) by /calendar and /games/[slug].
  *
  * Every value shown is a real tournament field, including `teamSize` —
  * the organizer-set players-per-side for that specific competition

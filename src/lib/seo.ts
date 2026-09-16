@@ -52,6 +52,14 @@ export function battlePath(battle: { id: string; game: string }): string {
   return slug ? `/battles/${battle.id}-${slug}` : `/battles/${battle.id}`;
 }
 
+export function gamePath(gameName: string): string {
+  return `/games/${slugify(gameName)}`;
+}
+
+export function organiserPath(handle: string): string {
+  return `/organisers/${handle}`;
+}
+
 /** Shared metadata builder — every page passes its own title/description/
  *  path/image; this owns the OpenGraph/Twitter/canonical shape so no page
  *  hand-rolls that structure independently. */

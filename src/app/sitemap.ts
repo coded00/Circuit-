@@ -1,10 +1,13 @@
 /**
  * Circuit — dynamic XML sitemap. Real public content only: the handful of
- * static discovery routes, every genuinely public (non-DRAFT, non-
- * CANCELLED) tournament, and every open (not FRIENDS-only, not cancelled)
- * Battle. Nothing private — no /admin, /dashboard, /account, /wallet,
- * /notifications, /api — those are noindex'd at the page level (see each
- * route's own `robots` metadata) and never belong in a sitemap regardless.
+ * static discovery routes, every real game (/games/[slug], gated the same
+ * way the page itself is — see lib/games.ts), every organiser with a real
+ * tournament (same gate as /organisers/[handle]), every genuinely public
+ * (non-DRAFT, non-CANCELLED) tournament, and every open (not FRIENDS-only,
+ * not cancelled) Battle. Nothing private — no /admin, /dashboard,
+ * /account, /wallet, /notifications, /api — those are noindex'd at the
+ * page level (see each route's own `robots` metadata) and never belong in
+ * a sitemap regardless.
  *
  * A single flat file for now, not Next's generateSitemaps() chunking API —
  * tried that first, but this Next.js version calls the default export with
@@ -17,7 +20,8 @@
 
 import type { MetadataRoute } from "next";
 import { prisma } from "@/lib/db";
-import { SITE_URL, tournamentPath, battlePath } from "@/lib/seo";
+import { SITE_URL, tournamentPath, battlePath, gamePath, organiserPath } from "@/lib/seo";
+import { realGameNames } from "@/lib/games";
 
 // Without this, Next prerenders sitemap.xml once at build time (it has no
 // cookies()/headers() call to make it dynamic on its own) — a tournament
@@ -37,7 +41,7 @@ const STATIC_ROUTES: { path: string; changeFrequency: MetadataRoute.Sitemap[numb
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [tournaments, battles] = await Promise.all([
+  const [tournaments, battles, gameNames, organizedByCounts] = await Promise.all([
     prisma.tournament.findMany({
       where: { status: { in: [...TOURNAMENT_STATUSES] } },
       select: { id: true, name: true, createdAt: true },
@@ -46,6 +50,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     prisma.battle.findMany({
       where: { visibility: "OPEN", status: { not: "CANCELLED" } },
       select: { id: true, game: true, createdAt: true },
+    }),
+    realGameNames(),
+    // Only organizers with >=1 real tournament get a public page — same
+    // gate the page itself (organisers/[handle]/page.tsx) enforces.
+    prisma.organizerProfile.findMany({
+      where: { tournaments: { some: {} } },
+      select: { user: { select: { handle: true } } },
     }),
   ]);
 
@@ -71,5 +82,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.8,
   }));
 
-  return [...staticEntries, ...battleEntries, ...tournamentEntries];
+  const gameEntries: MetadataRoute.Sitemap = gameNames.map((name) => ({
+    url: `${SITE_URL}${gamePath(name)}`,
+    changeFrequency: "daily",
+    priority: 0.7,
+  }));
+
+  const organiserEntries: MetadataRoute.Sitemap = organizedByCounts.map((o) => ({
+    url: `${SITE_URL}${organiserPath(o.user.handle)}`,
+    changeFrequency: "weekly",
+    priority: 0.4,
+  }));
+
+  return [...staticEntries, ...gameEntries, ...organiserEntries, ...battleEntries, ...tournamentEntries];
 }
