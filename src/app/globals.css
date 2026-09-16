@@ -852,15 +852,13 @@ body {
  * ============================================================================
  */
 @layer components {
-  /* Route change — applied to a wrapper keyed by pathname in AppShell, so
-     a fresh key on every navigation re-triggers this on mount. 300ms sits
-     inside the 250–500ms target range, biased toward "fast" per that
-     target's own instruction. */
-  .page-transition {
-    animation: motion-fade-in var(--duration-moderate) var(--ease-out) both;
-  }
+  /* Route change is now Framer Motion (PageTransition.tsx, AppShell.tsx)
+     rather than this CSS-only enter animation — Framer gives it a real
+     exit choreography (AnimatePresence) this couldn't. Kept
+     `motion-fade-in` itself since `.tab-content-enter`/`.sheet-*-enter`
+     below still use it.
 
-  /* Tab content switch (TournamentTabs) — quicker than a full page
+     Tab content switch (TournamentTabs) — quicker than a full page
      transition since it's a much smaller change of context. */
   .tab-content-enter {
     animation: motion-fade-in var(--duration-fast) var(--ease-standard) both;
