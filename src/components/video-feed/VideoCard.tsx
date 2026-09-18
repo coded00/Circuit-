@@ -12,7 +12,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Heart, Bookmark, Share2, Volume2, VolumeX, Play, Trophy, Gamepad2 } from "lucide-react";
+import { Heart, Bookmark, Share2, Volume2, VolumeX, Play, Trophy, Gamepad2, Check } from "lucide-react";
 import { GameArtTile } from "@/components/GameArtTile";
 import { gamePath, tournamentPath, videoPath, absoluteUrl } from "@/lib/seo";
 import { extractYouTubeId } from "@/lib/youtube";
@@ -49,6 +49,7 @@ export function VideoCard({
   const [liked, setLiked] = useState(video.likedByMe);
   const [likeCount, setLikeCount] = useState(video.likes);
   const [saved, setSaved] = useState(video.savedByMe);
+  const [copied, setCopied] = useState(false);
   // A ref, not state: it only guards against double-firing the view POST
   // and never needs to trigger a re-render.
   const viewCountedRef = useRef(false);
@@ -102,9 +103,14 @@ export function VideoCard({
     if (isActive && !userPaused) el.play().catch(() => undefined);
   }, [muted, isActive, userPaused]);
 
+  function getLoginRedirect() {
+    const path = typeof window !== "undefined" ? window.location.pathname + window.location.search : "/ladder";
+    return `/login?next=${encodeURIComponent(path)}`;
+  }
+
   async function handleLike() {
     if (!currentUserId) {
-      router.push("/login");
+      router.push(getLoginRedirect());
       return;
     }
     const nextLiked = !liked;
@@ -125,7 +131,7 @@ export function VideoCard({
 
   async function handleSave() {
     if (!currentUserId) {
-      router.push("/login");
+      router.push(getLoginRedirect());
       return;
     }
     const nextSaved = !saved;
@@ -144,10 +150,12 @@ export function VideoCard({
   async function handleShare() {
     const url = absoluteUrl(videoPath(video));
     fetch(`/api/videos/${video.id}/share`, { method: "POST" }).catch(() => undefined);
-    if (navigator.share) {
+    if (typeof navigator !== "undefined" && navigator.share) {
       navigator.share({ title: video.title, url }).catch(() => undefined);
-    } else {
+    } else if (typeof navigator !== "undefined" && navigator.clipboard) {
       await navigator.clipboard.writeText(url).catch(() => undefined);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
   }
 
@@ -261,10 +269,12 @@ export function VideoCard({
             type="button"
             onClick={handleShare}
             className="flex flex-col items-center gap-1 text-white transition active:scale-90"
-            aria-label="Share"
+            aria-label={copied ? "Link copied" : "Share"}
           >
-            <Share2 size={24} />
-            <span className="text-[11px] font-semibold drop-shadow-sm">Share</span>
+            {copied ? <Check size={24} className="text-accent-volt drop-shadow-sm" /> : <Share2 size={24} />}
+            <span className={`text-[11px] font-semibold drop-shadow-sm ${copied ? "text-accent-volt" : ""}`}>
+              {copied ? "Copied" : "Share"}
+            </span>
           </button>
           <button
             type="button"
