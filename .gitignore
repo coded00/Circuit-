@@ -49,3 +49,7 @@ next-env.d.ts
 
 # local dev proof-file storage (src/lib/storage.ts) — never commit uploaded files
 /storage
+
+# test artifacts
+/.playwright-mcp/
+
