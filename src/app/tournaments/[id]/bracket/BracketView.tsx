@@ -16,6 +16,7 @@ import { ShareButton } from "@/components/ShareButton";
 import { StatusPill, matchStatusInfo } from "@/components/StatusPill";
 import TournamentTabs, { type TournamentTab } from "../TournamentTabs";
 import { BracketSlotSide } from "./BracketSlotSide";
+import { BracketCanvas } from "./BracketCanvas";
 
 export type BracketSlot = {
   position: number;
@@ -246,7 +247,7 @@ export function BracketView({
       key: "bracket",
       label: "Bracket",
       content: (
-        <div className="overflow-x-auto pb-4">
+        <BracketCanvas>
           <div className="flex min-w-max items-stretch gap-6">
             {structure.rounds.map((round) => {
               const isLast = round.round === structure.totalRounds;
@@ -274,7 +275,7 @@ export function BracketView({
               );
             })}
           </div>
-        </div>
+        </BracketCanvas>
       ),
     },
     {

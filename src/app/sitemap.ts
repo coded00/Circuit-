@@ -20,7 +20,7 @@
 
 import type { MetadataRoute } from "next";
 import { prisma } from "@/lib/db";
-import { SITE_URL, tournamentPath, battlePath, gamePath, organiserPath } from "@/lib/seo";
+import { SITE_URL, tournamentPath, battlePath, gamePath, organiserPath, videoPath } from "@/lib/seo";
 import { realGameNames } from "@/lib/games";
 
 // Without this, Next prerenders sitemap.xml once at build time (it has no
@@ -33,7 +33,8 @@ const TOURNAMENT_STATUSES = ["OPEN", "CLOSED", "LIVE", "COMPLETE"] as const;
 const STATIC_ROUTES: { path: string; changeFrequency: MetadataRoute.Sitemap[number]["changeFrequency"]; priority: number }[] = [
   { path: "/", changeFrequency: "daily", priority: 1 },
   { path: "/compete", changeFrequency: "hourly", priority: 0.9 },
-  { path: "/ladder", changeFrequency: "daily", priority: 0.7 },
+  { path: "/ladder", changeFrequency: "hourly", priority: 0.7 },
+  { path: "/leaderboard", changeFrequency: "daily", priority: 0.6 },
   { path: "/battles", changeFrequency: "hourly", priority: 0.7 },
   { path: "/calendar", changeFrequency: "daily", priority: 0.6 },
   { path: "/discover", changeFrequency: "daily", priority: 0.6 },
@@ -41,7 +42,7 @@ const STATIC_ROUTES: { path: string; changeFrequency: MetadataRoute.Sitemap[numb
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [tournaments, battles, gameNames, organizedByCounts] = await Promise.all([
+  const [tournaments, battles, gameNames, organizedByCounts, videos] = await Promise.all([
     prisma.tournament.findMany({
       where: { status: { in: [...TOURNAMENT_STATUSES] } },
       select: { id: true, name: true, createdAt: true },
@@ -57,6 +58,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     prisma.organizerProfile.findMany({
       where: { tournaments: { some: {} } },
       select: { user: { select: { handle: true } } },
+    }),
+    prisma.video.findMany({
+      where: { status: "PUBLISHED" },
+      select: { slug: true, createdAt: true },
     }),
   ]);
 
@@ -94,5 +99,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.4,
   }));
 
-  return [...staticEntries, ...gameEntries, ...organiserEntries, ...battleEntries, ...tournamentEntries];
+  const videoEntries: MetadataRoute.Sitemap = videos.map((v) => ({
+    url: `${SITE_URL}${videoPath(v)}`,
+    lastModified: v.createdAt,
+    changeFrequency: "weekly",
+    priority: 0.5,
+  }));
+
+  return [...staticEntries, ...gameEntries, ...organiserEntries, ...battleEntries, ...tournamentEntries, ...videoEntries];
 }

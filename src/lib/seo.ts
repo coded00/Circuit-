@@ -60,6 +60,25 @@ export function organiserPath(handle: string): string {
   return `/organisers/${handle}`;
 }
 
+export function videoPath(video: { slug: string }): string {
+  return `/videos/${video.slug}`;
+}
+
+/** Unique slug for a new Video row — `slugify(title)` plus a short suffix
+ *  when that collides with an existing one (two videos can share a title,
+ *  e.g. two "Match Point" clips). Callers pass in a `taken` check rather
+ *  than this module owning a DB import. */
+export async function uniqueVideoSlug(title: string, isTaken: (slug: string) => Promise<boolean>): Promise<string> {
+  const base = slugify(title) || "video";
+  let candidate = base;
+  let suffix = 1;
+  while (await isTaken(candidate)) {
+    suffix += 1;
+    candidate = `${base}-${suffix}`;
+  }
+  return candidate;
+}
+
 /** Shared metadata builder — every page passes its own title/description/
  *  path/image; this owns the OpenGraph/Twitter/canonical shape so no page
  *  hand-rolls that structure independently. */

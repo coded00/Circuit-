@@ -186,6 +186,8 @@ model User {
   teamsCaptained      Team[]               @relation("TeamCaptain")
   teamMemberships     TeamMembership[]
   escrowTransactions  EscrowTransaction[]
+  videoLikes          VideoLike[]
+  videoSaves          VideoSave[]
 
   @@index([emailOrPhone])
 }
@@ -355,6 +357,7 @@ model Tournament {
   bracket       Bracket?
   matches       Match[]
   escrowTxns    EscrowTransaction[]
+  videos        Video[]
 
   @@index([game, status])
 }
@@ -763,4 +766,88 @@ model RateLimitAttempt {
   createdAt DateTime @default(now())
 
   @@index([key, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Video Feed (Circuit Video Feed spec, Phase 1 — foundation)
+// ---------------------------------------------------------------------------
+
+enum VideoSource {
+  CIRCUIT
+  YOUTUBE
+}
+
+enum VideoStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+/// Unified model so Circuit-managed clips and (Phase 3) official YouTube
+/// gaming Shorts can appear in the same feed. `game` follows the same
+/// free-text convention as `Tournament.game`/`Battle.game` (not a foreign
+/// key to the admin `Game` catalog — see that model's comment), so a video
+/// can reference any real game name without depending on catalog upkeep.
+/// `tournamentId` is optional and only ever set for Circuit-managed
+/// highlight/announcement clips tied to a real tournament.
+model Video {
+  id           String      @id @default(cuid())
+  /// Stable, URL-safe identifier for `/videos/[slug]` deep links — derived
+  /// from `title` at creation, not user-editable.
+  slug         String      @unique
+  source       VideoSource @default(CIRCUIT)
+  title        String
+  description  String?
+  /// Directly playable file — required for `source: CIRCUIT`, null for
+  /// `source: YOUTUBE` (Phase 3 plays those via the official embed instead).
+  videoUrl     String?
+  thumbnailUrl String?
+  /// External canonical URL — required for `source: YOUTUBE` attribution,
+  /// unused for Circuit-managed content.
+  sourceUrl    String?
+  sourceAuthor String?
+  /// Free text, same convention as `Tournament.game` — see that field's
+  /// comment above.
+  game         String?
+  tournamentId String?
+  tournament   Tournament? @relation(fields: [tournamentId], references: [id])
+  tags         String[]    @default([])
+  likes        Int         @default(0)
+  views        Int         @default(0)
+  shares       Int         @default(0)
+  status       VideoStatus @default(DRAFT)
+  publishedAt  DateTime?
+  createdAt    DateTime    @default(now())
+
+  likedBy VideoLike[]
+  savedBy VideoSave[]
+
+  @@index([status, publishedAt])
+  @@index([game])
+}
+
+/// One row per (user, video) like — the duplicate-like guard the product
+/// spec calls for. `Video.likes` is the fast denormalized counter, kept in
+/// sync in the same transaction as this row's insert/delete.
+model VideoLike {
+  id        String   @id @default(cuid())
+  videoId   String
+  video     Video    @relation(fields: [videoId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([videoId, userId])
+}
+
+/// Same shape as `VideoLike`, for the "Save" interaction.
+model VideoSave {
+  id        String   @id @default(cuid())
+  videoId   String
+  video     Video    @relation(fields: [videoId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([videoId, userId])
 }

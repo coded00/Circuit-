@@ -11,10 +11,13 @@
  *
  * Watch/Live/Community are removed-from-MVP (spec section 4) — hidden
  * from navigation, not deleted; their routes/components stay on disk.
- * "Compete" and "Games" are Circuit's real tournament-discovery
- * (`/compete`) and per-game ladder (`/ladder`) pages; "Challenges" is the
- * existing free 1v1 Battle feature under its new user-facing name — same
- * `/battles` route, no schema/logic change, copy-only rename.
+ * "Compete" is Circuit's real tournament-discovery page (`/compete`);
+ * "Feed" is the Circuit Video Feed (`/ladder` — that route used to be the
+ * leaderboard, which moved to `/leaderboard`; see that page's own header
+ * comment) under its user-facing name, not "Games" — it's short-form
+ * video, not a game browser. "Challenges" is the existing free 1v1 Battle
+ * feature under its own new user-facing name — same `/battles` route, no
+ * schema/logic change, copy-only rename.
  *
  * No "More" disclosure: that used to fold Marketplace/Rewards/Organize/
  * Staff behind one toggle at the bottom of this same flat list — expanded
@@ -45,7 +48,7 @@ type Item = { href: string; label: string; icon: React.ComponentType<{ size?: nu
 const PRIMARY: Item[] = [
   { href: "/", label: "Home", icon: Home },
   { href: "/compete", label: "Compete", icon: Trophy },
-  { href: "/ladder", label: "Games", icon: Gamepad2 },
+  { href: "/ladder", label: "Feed", icon: Gamepad2 },
   { href: "/battles", label: "Challenges", icon: Swords },
   { href: "/calendar", label: "Calendar", icon: Calendar },
 ];

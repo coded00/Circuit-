@@ -7,7 +7,7 @@
  * longer appear here at all (hidden, not deleted — see /watch's own
  * route, still on disk).
  *
- * Games/Calendar/Marketplace/Rewards/Organize/Staff/Account (everything
+ * Feed/Calendar/Marketplace/Rewards/Organize/Staff/Account (everything
  * that doesn't fit the primary 5) live in the sheet opened from the
  * Profile tab — same pattern the desktop sidebar's "More" disclosure
  * uses for its own overflow.
@@ -158,7 +158,7 @@ export function MobileTabBar({ user }: { user: NavUser }) {
               </>
             )}
             <Link href="/ladder" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
-              <Gamepad2 size={18} /> Games
+              <Gamepad2 size={18} /> Feed
             </Link>
             <Link href="/calendar" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
               <Calendar size={18} /> Calendar

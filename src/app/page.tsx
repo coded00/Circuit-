@@ -290,7 +290,7 @@ export default async function Home({
                   <Trophy size={15} className="text-gold" />
                   Leaderboard
                 </h2>
-                <Link href="/ladder" className="text-xs font-medium text-accent-blue hover:underline">
+                <Link href="/leaderboard" className="text-xs font-medium text-accent-blue hover:underline">
                   View All →
                 </Link>
               </div>

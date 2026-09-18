@@ -9,13 +9,16 @@ const BARE_ROUTES = ["/login", "/signup", "/forgot-password", "/reset-password",
 
 /** Level 2 of Circuit's motion hierarchy (globals.css's own comment on
  *  `.arena-transition` has the full breakdown) is deliberately scoped to
- *  "you're in the arena" pages only — tournament/battle detail and the
- *  bracket — not creation/edit/register forms or browsing pages like
- *  /compete or /ladder, and not `/new` (which would otherwise false-match
- *  the same `/tournaments/[id]` pattern). */
+ *  "you're in the arena" pages — tournament/battle detail, the bracket,
+ *  and (since the Video Feed took over `/ladder`) the feed itself, a
+ *  full-bleed HUD-styled surface that fits this treatment much better
+ *  than the leaderboard page that used to live there — not creation/edit/
+ *  register forms or browsing pages like /compete, and not `/new` (which
+ *  would otherwise false-match the same `/tournaments/[id]` pattern). */
 function isArenaRoute(pathname: string): boolean {
   if (/^\/tournaments\/(?!new$)[^/]+(\/bracket)?$/.test(pathname)) return true;
   if (/^\/battles\/(?!new$)[^/]+$/.test(pathname)) return true;
+  if (pathname === "/ladder") return true;
   return false;
 }
 
