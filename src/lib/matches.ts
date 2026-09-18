@@ -186,78 +186,79 @@ export async function generateBracket(tournamentId: string): Promise<void> {
   const byeAdvances: { position: number; winnerId: string }[] = [];
   const createdMatches: { id: string; playerAId: string; playerBId: string }[] = [];
 
-  for (let position = 0; position < round1.slots.length; position++) {
-    const playerA = seeded[position * 2];
-    const playerB = seeded[position * 2 + 1];
-    const slot = round1.slots[position];
-    slot.playerAId = playerA;
-    slot.playerBId = playerB;
-
-    if (playerA && playerB) {
-      const match = await createMatchWithUniqueCode({
-        tournamentId,
-        round: 1,
-        playerAId: playerA,
-        playerBId: playerB,
-      });
-      slot.matchId = match.id;
-      createdMatches.push({ id: match.id, playerAId: playerA, playerBId: playerB });
-    } else {
-      const byeWinner = playerA ?? playerB;
-      if (byeWinner) {
-        slot.winnerId = byeWinner;
-        byeAdvances.push({ position, winnerId: byeWinner });
-      }
-    }
-  }
-
-  // Propagate byes into round 2+ in-memory, before Bracket even exists as
-  // a row — recordWinner may need to create round-2+ matches too, if a
-  // round-2 slot happens to be fed entirely by byes.
-  for (const { position, winnerId } of byeAdvances) {
-    const readyMatch = recordWinner(structure, 1, position, winnerId);
-    if (readyMatch) {
-      const match = await createMatchWithUniqueCode({
-        tournamentId,
-        round: readyMatch.round,
-        playerAId: readyMatch.playerAId,
-        playerBId: readyMatch.playerBId,
-      });
-      setSlotMatchId(structure, readyMatch.round, readyMatch.position, match.id);
-      createdMatches.push({ id: match.id, playerAId: readyMatch.playerAId, playerBId: readyMatch.playerBId });
-    }
-  }
-
   try {
-    await prisma.$transaction([
-      prisma.bracket.create({
+    await prisma.$transaction(async (tx) => {
+      // Re-check existence inside transaction to prevent duplicate work
+      const alreadyExists = await tx.bracket.findUnique({ where: { tournamentId } });
+      if (alreadyExists) return;
+
+      for (let position = 0; position < round1.slots.length; position++) {
+        const playerA = seeded[position * 2];
+        const playerB = seeded[position * 2 + 1];
+        const slot = round1.slots[position];
+        slot.playerAId = playerA;
+        slot.playerBId = playerB;
+
+        if (playerA && playerB) {
+          const match = await createMatchWithUniqueCode(
+            {
+              tournamentId,
+              round: 1,
+              playerAId: playerA,
+              playerBId: playerB,
+            },
+            tx
+          );
+          slot.matchId = match.id;
+          createdMatches.push({ id: match.id, playerAId: playerA, playerBId: playerB });
+        } else {
+          const byeWinner = playerA ?? playerB;
+          if (byeWinner) {
+            slot.winnerId = byeWinner;
+            byeAdvances.push({ position, winnerId: byeWinner });
+          }
+        }
+      }
+
+      // Propagate byes into round 2+ in-memory, creating round-2+ matches inside the same transaction
+      for (const { position, winnerId } of byeAdvances) {
+        const readyMatch = recordWinner(structure, 1, position, winnerId);
+        if (readyMatch) {
+          const match = await createMatchWithUniqueCode(
+            {
+              tournamentId,
+              round: readyMatch.round,
+              playerAId: readyMatch.playerAId,
+              playerBId: readyMatch.playerBId,
+            },
+            tx
+          );
+          setSlotMatchId(structure, readyMatch.round, readyMatch.position, match.id);
+          createdMatches.push({ id: match.id, playerAId: readyMatch.playerAId, playerBId: readyMatch.playerBId });
+        }
+      }
+
+      await tx.bracket.create({
         data: { tournamentId, structure: structure as unknown as Prisma.InputJsonValue },
-      }),
-      prisma.tournament.update({ where: { id: tournamentId }, data: { status: "LIVE" } }),
-    ]);
+      });
+      await tx.tournament.update({ where: { id: tournamentId }, data: { status: "LIVE" } });
+    });
   } catch (err) {
-    // Known gap, accepted for V1: the existence check at the top of this
-    // function and this create aren't atomic with each other, so two
-    // callers racing for the same tournament (the cap-fill path and the
-    // deadline sweep, in principle, though not in practice at V1's
-    // volume) could both get past it. Bracket.tournamentId's unique
-    // constraint stops a duplicate Bracket row — the loser's already-created
-    // Match rows above become orphaned (no Bracket slot references them)
-    // rather than a 500, since generateBracket is meant to be a safe,
-    // idempotent call from either trigger. Not notifying players of an
-    // orphaned match is the correct behavior here — skip notification too.
+    // If a concurrent call created the bracket in parallel, P2002 rolls back the entire
+    // transaction cleanly, ensuring zero orphaned matches are left in the database.
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") return;
     throw err;
   }
 
-  // Only notify once the Bracket/Tournament rows actually committed —
-  // real, playable matches now, not the orphaned-race case above.
-  await Promise.all(
-    createdMatches.flatMap((match) => [
-      notify(match.playerAId, "MATCH_READY", { matchId: match.id }),
-      notify(match.playerBId, "MATCH_READY", { matchId: match.id }),
-    ])
-  );
+  // Only notify once the transaction committed successfully
+  if (createdMatches.length > 0) {
+    await Promise.all(
+      createdMatches.flatMap((match) => [
+        notify(match.playerAId, "MATCH_READY", { matchId: match.id }),
+        notify(match.playerBId, "MATCH_READY", { matchId: match.id }),
+      ])
+    );
+  }
 }
 
 /** Records a winner into its slot and propagates into the next round's
@@ -744,8 +745,13 @@ export async function runScheduledSweep(): Promise<{
   bracketsGenerated: number;
   autoAccepted: number;
   escalated: number;
+  errors?: string[];
 }> {
   const now = new Date();
+  const errors: string[] = [];
+  let bracketsGenerated = 0;
+  let autoAccepted = 0;
+  let escalated = 0;
 
   const readyTournaments = await prisma.tournament.findMany({
     where: {
@@ -756,33 +762,50 @@ export async function runScheduledSweep(): Promise<{
     select: { id: true, organizerId: true },
   });
   for (const tournament of readyTournaments) {
-    await notify(tournament.organizerId, "REGISTRATION_CLOSED", { tournamentId: tournament.id });
-    await generateBracket(tournament.id);
+    try {
+      await notify(tournament.organizerId, "REGISTRATION_CLOSED", { tournamentId: tournament.id });
+      await generateBracket(tournament.id);
+      bracketsGenerated++;
+    } catch (err) {
+      console.error(`[sweep] Error generating bracket for tournament ${tournament.id}:`, err);
+      errors.push(`tournament:${tournament.id}`);
+    }
   }
 
   const staleMatches = await prisma.match.findMany({
     where: { status: "NEEDS_RESULT", reportWindowExpiresAt: { lte: now } },
   });
-  let autoAccepted = 0;
   for (const match of staleMatches) {
-    const reported = (match.resultA ?? match.resultB) as unknown as ResultPayload | null;
-    if (!reported) continue; // defensive — shouldn't be reachable
-    await completeMatch(match, reported.winnerId);
-    autoAccepted++;
+    try {
+      const reported = (match.resultA ?? match.resultB) as unknown as ResultPayload | null;
+      if (!reported) continue; // defensive — shouldn't be reachable
+      await completeMatch(match, reported.winnerId);
+      autoAccepted++;
+    } catch (err) {
+      console.error(`[sweep] Error auto-accepting match ${match.id}:`, err);
+      errors.push(`match:${match.id}`);
+    }
   }
 
   const overdueDisputes = await prisma.dispute.findMany({
     where: { status: "ORGANIZER_REVIEW", organizerRulingDeadline: { lte: now } },
   });
   for (const dispute of overdueDisputes) {
-    await prisma.dispute.update({ where: { id: dispute.id }, data: { status: "ESCALATED" } });
-    await notifyStaff("DISPUTE_ESCALATED", { matchId: dispute.matchId });
+    try {
+      await prisma.dispute.update({ where: { id: dispute.id }, data: { status: "ESCALATED" } });
+      await notifyStaff("DISPUTE_ESCALATED", { matchId: dispute.matchId });
+      escalated++;
+    } catch (err) {
+      console.error(`[sweep] Error escalating dispute ${dispute.id}:`, err);
+      errors.push(`dispute:${dispute.id}`);
+    }
   }
 
   return {
-    bracketsGenerated: readyTournaments.length,
+    bracketsGenerated,
     autoAccepted,
-    escalated: overdueDisputes.length,
+    escalated,
+    ...(errors.length > 0 ? { errors } : {}),
   };
 }
 

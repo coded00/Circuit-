@@ -44,16 +44,48 @@ export async function confirmEntryFeePayment(reference: string): Promise<void> {
     return;
   }
 
-  await prisma.$transaction([
-    prisma.registration.update({
+  const confirmed = await prisma.$transaction(async (tx) => {
+    const confirmedCount = await tx.registration.count({
+      where: { tournamentId: registration.tournamentId, status: "CONFIRMED" },
+    });
+
+    if (confirmedCount >= registration.tournament.participantCap) {
+      // The slot was filled by a concurrent payment while this charge was processing.
+      // Refuse confirmation and mark for refund.
+      await tx.registration.update({
+        where: { id: registration.id },
+        data: { status: "REFUNDED" },
+      });
+      await tx.escrowTransaction.update({
+        where: { id: escrowTxn.id },
+        data: { status: "FAILED" },
+      });
+      return false;
+    }
+
+    await tx.registration.update({
       where: { id: registration.id },
       data: { status: "CONFIRMED" },
-    }),
-    prisma.escrowTransaction.update({
+    });
+    await tx.escrowTransaction.update({
       where: { id: escrowTxn.id },
       data: { status: "COMPLETE" },
-    }),
-  ]);
+    });
+    return true;
+  });
+
+  if (!confirmed) {
+    // Automatically issue the gateway refund so the player's funds are returned
+    try {
+      await provider.refundCharge(reference, registration.tournament.entryFee);
+    } catch (refundErr) {
+      console.error(`[payment] Failed to auto-refund over-capacity payment for reference ${reference}:`, refundErr);
+    }
+    await notify(registration.userId, "REGISTRATION_CLOSED", {
+      tournamentId: registration.tournamentId,
+    });
+    return;
+  }
 
   await notify(registration.userId, "REGISTRATION_CONFIRMED", {
     tournamentId: registration.tournamentId,

@@ -12,7 +12,7 @@
  * above this file should need to change.
  */
 
-import { randomUUID, createHmac, timingSafeEqual } from "crypto";
+import { randomUUID, createHmac, createHash, timingSafeEqual } from "crypto";
 import { mkdir, writeFile, readFile } from "fs/promises";
 import path from "path";
 
@@ -105,7 +105,141 @@ class LocalProofStorage implements ProofStorage {
   }
 }
 
-export const proofStorage: ProofStorage = new LocalProofStorage();
+function hmac(key: Buffer | string, data: string): Buffer {
+  return createHmac("sha256", key).update(data).digest();
+}
+
+function sha256(data: Buffer | string): string {
+  return createHash("sha256").update(data).digest("hex");
+}
+
+function getSignatureKey(key: string, dateStamp: string, regionName: string, serviceName: string): Buffer {
+  const kDate = hmac("AWS4" + key, dateStamp);
+  const kRegion = hmac(kDate, regionName);
+  const kService = hmac(kRegion, serviceName);
+  return hmac(kService, "aws4_request");
+}
+
+/**
+ * Cloudflare R2 / AWS S3 storage adapter using native SigV4 signing
+ * with standard Node.js crypto (zero heavy SDK dependencies).
+ */
+class R2ProofStorage implements ProofStorage {
+  private bucket: string;
+  private endpoint: string;
+  private accessKeyId: string;
+  private secretAccessKey: string;
+  private region: string;
+
+  constructor(config: { bucket: string; endpoint: string; accessKeyId: string; secretAccessKey: string; region?: string }) {
+    this.bucket = config.bucket;
+    this.endpoint = config.endpoint.replace(/\/$/, "");
+    this.accessKeyId = config.accessKeyId;
+    this.secretAccessKey = config.secretAccessKey;
+    this.region = config.region || "auto";
+  }
+
+  private signRequest(method: string, path: string, body: Buffer = Buffer.alloc(0), contentType?: string): { url: string; headers: Record<string, string> } {
+    const url = `${this.endpoint}/${this.bucket}${path}`;
+    const parsedUrl = new URL(url);
+    const now = new Date();
+    const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, "");
+    const dateStamp = amzDate.slice(0, 8);
+    const payloadHash = sha256(body);
+
+    const headers: Record<string, string> = {
+      host: parsedUrl.host,
+      "x-amz-content-sha256": payloadHash,
+      "x-amz-date": amzDate,
+    };
+    if (contentType) headers["content-type"] = contentType;
+
+    const sortedHeaderKeys = Object.keys(headers).sort();
+    const canonicalHeaders = sortedHeaderKeys.map((k) => `${k.toLowerCase()}:${headers[k].trim()}\n`).join("");
+    const signedHeaders = sortedHeaderKeys.map((k) => k.toLowerCase()).join(";");
+
+    const canonicalRequest = [
+      method,
+      parsedUrl.pathname,
+      "",
+      canonicalHeaders,
+      signedHeaders,
+      payloadHash,
+    ].join("\n");
+
+    const credentialScope = `${dateStamp}/${this.region}/s3/aws4_request`;
+    const stringToSign = [
+      "AWS4-HMAC-SHA256",
+      amzDate,
+      credentialScope,
+      sha256(canonicalRequest),
+    ].join("\n");
+
+    const signingKey = getSignatureKey(this.secretAccessKey, dateStamp, this.region, "s3");
+    const signature = createHmac("sha256", signingKey).update(stringToSign).digest("hex");
+
+    headers["authorization"] = `AWS4-HMAC-SHA256 Credential=${this.accessKeyId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+
+    return { url, headers };
+  }
+
+  async store(matchId: string, fileBuffer: Buffer, contentType: string): Promise<string> {
+    const fileId = randomUUID();
+    const objectKey = `/${matchId}/${fileId}`;
+    const { url, headers } = this.signRequest("PUT", objectKey, fileBuffer, contentType);
+
+    const res = await fetch(url, {
+      method: "PUT",
+      headers,
+      body: new Uint8Array(fileBuffer),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => res.statusText);
+      throw new Error(`R2/S3 store failed (${res.status}): ${errText}`);
+    }
+
+    return encodeRef({ matchId, fileId, contentType });
+  }
+
+  async read(ref: string): Promise<{ buffer: Buffer; contentType: string }> {
+    const { matchId, fileId, contentType } = decodeRef(ref);
+    const objectKey = `/${matchId}/${fileId}`;
+    const { url, headers } = this.signRequest("GET", objectKey);
+
+    const res = await fetch(url, { method: "GET", headers });
+    if (!res.ok) {
+      throw new Error(`R2/S3 read failed (${res.status}): ${res.statusText}`);
+    }
+
+    const arrayBuffer = await res.arrayBuffer();
+    return { buffer: Buffer.from(arrayBuffer), contentType };
+  }
+}
+
+function createProofStorage(): ProofStorage {
+  const bucket = process.env.R2_BUCKET || process.env.S3_BUCKET;
+  const endpoint =
+    process.env.R2_ENDPOINT ||
+    process.env.S3_ENDPOINT ||
+    (process.env.R2_ACCOUNT_ID ? `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com` : "");
+  const accessKeyId = process.env.R2_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY;
+
+  if (bucket && endpoint && accessKeyId && secretAccessKey) {
+    return new R2ProofStorage({
+      bucket,
+      endpoint,
+      accessKeyId,
+      secretAccessKey,
+      region: process.env.R2_REGION || process.env.AWS_REGION || "auto",
+    });
+  }
+
+  return new LocalProofStorage();
+}
+
+export const proofStorage: ProofStorage = createProofStorage();
 
 /**
  * The access rule NFR-4 actually cares about. Call this in the route

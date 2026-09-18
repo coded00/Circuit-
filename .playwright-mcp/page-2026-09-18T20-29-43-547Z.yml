@@ -1,0 +1,73 @@
+- generic [active] [ref=f7e1]:
+  - button "Open Next.js Dev Tools" [ref=f7e27] [cursor=pointer]
+  - alert [ref=f7e31]: Overview
+  - generic [ref=f7e32]:
+    - complementary [ref=f7e33]:
+      - link "Circuit Control Center" [ref=f7e34] [cursor=pointer]:
+        - /url: /admin
+        - img "Circuit" [ref=f7e35]
+        - generic [ref=f7e36]: Control Center
+      - navigation [ref=f7e37]:
+        - link "Overview" [ref=f7e39] [cursor=pointer]:
+          - /url: /admin
+        - link "Users" [ref=f7e46] [cursor=pointer]:
+          - /url: /admin/users
+        - link "Competitions" [ref=f7e53] [cursor=pointer]:
+          - /url: /admin/competitions
+        - link "Challenges" [ref=f7e61] [cursor=pointer]:
+          - /url: /admin/challenges
+        - link "Games" [ref=f7e72] [cursor=pointer]:
+          - /url: /admin/games
+        - link "Content" [ref=f7e76] [cursor=pointer]:
+          - /url: /admin/content
+        - link "Finance" [ref=f7e81] [cursor=pointer]:
+          - /url: /admin/finance
+        - link "Calendar" [ref=f7e86] [cursor=pointer]:
+          - /url: /admin/calendar
+        - link "Settings" [ref=f7e90] [cursor=pointer]:
+          - /url: /admin/settings
+      - link "← Back to Circuit" [ref=f7e96] [cursor=pointer]:
+        - /url: /
+    - generic [ref=f7e98]:
+      - banner [ref=f7e99]:
+        - generic [ref=f7e100]: Circuit Admin
+        - generic [ref=f7e102]:
+          - link "View Site" [ref=f7e103] [cursor=pointer]:
+            - /url: /
+          - generic [ref=f7e109]:
+            - generic [ref=f7e110]: C
+            - generic [ref=f7e111]: Circuit Admin
+          - button "Log out" [ref=f7e112]
+      - main [ref=f7e116]:
+        - generic [ref=f7e117]:
+          - generic [ref=f7e118]:
+            - heading "Overview" [level=1] [ref=f7e119]
+            - paragraph [ref=f7e120]: What's happening on Circuit right now.
+          - generic [ref=f7e121]:
+            - generic [ref=f7e129]:
+              - generic [ref=f7e130]: Users
+              - generic [ref=f7e131]: "1"
+            - generic [ref=f7e140]:
+              - generic [ref=f7e141]: Active Competitions
+              - generic [ref=f7e142]: "0"
+            - generic [ref=f7e154]:
+              - generic [ref=f7e155]: Open Challenges
+              - generic [ref=f7e156]: "0"
+            - generic [ref=f7e162]:
+              - generic [ref=f7e163]: Revenue
+              - generic [ref=f7e164]: ₦0
+          - generic [ref=f7e165]:
+            - generic [ref=f7e166]:
+              - heading "Recent Activity" [level=2] [ref=f7e167]
+              - paragraph [ref=f7e168]: Nothing yet.
+            - generic [ref=f7e169]:
+              - heading "Platform Snapshot" [level=2] [ref=f7e170]
+              - paragraph [ref=f7e171]: New users, registrations, and challenges — last 7 days.
+              - generic [ref=f7e172]:
+                - generic [ref=f7e173]: S
+                - generic [ref=f7e177]: S
+                - generic [ref=f7e181]: M
+                - generic [ref=f7e185]: T
+                - generic [ref=f7e189]: W
+                - generic [ref=f7e193]: T
+                - generic [ref=f7e197]: F

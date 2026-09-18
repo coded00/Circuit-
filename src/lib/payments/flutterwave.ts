@@ -105,10 +105,15 @@ export const flutterwaveClient: PaymentProviderClient = {
     // Flutterwave's /transfers endpoint expects (account_bank + account_number).
     // Resolving a stored payout method (P0-7) into that shape happens before
     // this call, not inside this client.
-    const destination = JSON.parse(input.destinationRef) as {
-      account_bank: string;
-      account_number: string;
-    };
+    let destination: { account_bank: string; account_number: string };
+    try {
+      destination = JSON.parse(input.destinationRef);
+      if (!destination.account_bank || !destination.account_number) {
+        throw new Error("Missing account_bank or account_number.");
+      }
+    } catch {
+      throw new Error(`Invalid Flutterwave destination reference: "${input.destinationRef}". Expected JSON with account_bank and account_number.`);
+    }
     const data = await flutterwaveFetch<{ status: string; reference: string }>("/transfers", {
       method: "POST",
       body: JSON.stringify({

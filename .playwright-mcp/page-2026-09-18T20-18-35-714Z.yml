@@ -1,0 +1,152 @@
+- generic [active] [ref=f3e1]:
+  - generic [ref=f3e2]:
+    - complementary [ref=f3e4]:
+      - link [ref=f3e5] [cursor=pointer]:
+        - /url: /
+        - img "Circuit" [ref=f3e6]
+      - navigation [ref=f3e7]:
+        - link "Home" [ref=f3e9] [cursor=pointer]:
+          - /url: /
+        - link "Compete" [ref=f3e14] [cursor=pointer]:
+          - /url: /compete
+        - link "Feed" [ref=f3e22] [cursor=pointer]:
+          - /url: /ladder
+        - link "Challenges" [ref=f3e26] [cursor=pointer]:
+          - /url: /battles
+        - link "Calendar" [ref=f3e37] [cursor=pointer]:
+          - /url: /calendar
+      - generic [ref=f3e41]:
+        - generic [ref=f3e42]:
+          - generic [ref=f3e45]: Play.Connect.Compete.
+          - generic [ref=f3e46]: Real tournaments, real opponents, real payouts.
+          - link "Join the Circuit →" [ref=f3e47] [cursor=pointer]:
+            - /url: /signup
+        - generic [ref=f3e48]:
+          - link "Log in" [ref=f3e49] [cursor=pointer]:
+            - /url: /login
+          - link "Sign up" [ref=f3e50] [cursor=pointer]:
+            - /url: /signup
+        - paragraph [ref=f3e51]: © 2026 CIRCUITPlay Connected.
+    - generic [ref=f3e52]:
+      - banner [ref=f3e53]:
+        - generic [ref=f3e55]:
+          - generic [ref=f3e57]:
+            - textbox "Search games, players, tournaments…" [ref=f3e58]
+            - generic: ⌘K
+          - generic [ref=f3e59]:
+            - link "Log in" [ref=f3e60] [cursor=pointer]:
+              - /url: /login
+            - link "Sign up" [ref=f3e61] [cursor=pointer]:
+              - /url: /signup
+      - main [ref=f3e62]:
+        - generic [ref=f3e65]:
+          - generic [ref=f3e66]:
+            - button "For You" [ref=f3e67]
+            - button "Trending" [ref=f3e68]
+            - button "Games" [ref=f3e69]
+            - button "Following" [ref=f3e70]
+          - generic [ref=f3e71]:
+            - generic [ref=f3e73]:
+              - generic [ref=f3e79]:
+                - generic [ref=f3e80]: Circuit
+                - generic [ref=f3e81]: Fortnite build fight breakdown
+                - generic [ref=f3e82]: Slowed-down look at a close build battle.
+                - link "Fortnite" [ref=f3e84] [cursor=pointer]:
+                  - /url: /games/fortnite
+              - generic [ref=f3e87]:
+                - button "Like" [ref=f3e88]:
+                  - generic [ref=f3e91]: "2"
+                - button "Save" [ref=f3e92]
+                - button "Share" [ref=f3e96]
+                - button "Unmute" [ref=f3e104]
+            - generic [ref=f3e110]:
+              - generic [ref=f3e116]:
+                - generic [ref=f3e117]: Circuit
+                - generic [ref=f3e118]: 3 angles you're not using enough in COD Mobile
+                - generic [ref=f3e119]: Quick tips clip — map control basics for ranked.
+                - link "Call of Duty Mobile" [ref=f3e121] [cursor=pointer]:
+                  - /url: /games/call-of-duty-mobile
+              - generic [ref=f3e124]:
+                - button "Like" [ref=f3e125]:
+                  - generic [ref=f3e128]: "24"
+                - button "Save" [ref=f3e129]
+                - button "Share" [ref=f3e133]
+                - button "Unmute" [ref=f3e141]
+            - generic [ref=f3e147]:
+              - generic [ref=f3e150]:
+                - generic [ref=f3e151]: Circuit
+                - generic [ref=f3e152]: "Circuit gaming tip: warm up like this before ranked"
+                - generic [ref=f3e153]: A five-minute warm-up routine before you queue.
+              - generic [ref=f3e155]:
+                - button "Like" [ref=f3e156]:
+                  - generic [ref=f3e159]: "15"
+                - button "Save" [ref=f3e160]
+                - button "Share" [ref=f3e164]
+                - button "Unmute" [ref=f3e172]
+            - generic [ref=f3e178]:
+              - generic [ref=f3e183]:
+                - generic [ref=f3e184]: Circuit
+                - generic [ref=f3e185]: Efootball set-piece routine that keeps working
+                - generic [ref=f3e186]: A corner routine worth adding to your playbook.
+                - link "Efootball" [ref=f3e188] [cursor=pointer]:
+                  - /url: /games/efootball
+              - generic [ref=f3e191]:
+                - button "Like" [ref=f3e192]:
+                  - generic [ref=f3e195]: "29"
+                - button "Save" [ref=f3e196]
+                - button "Share" [ref=f3e200]
+                - button "Unmute" [ref=f3e208]
+            - generic [ref=f3e214]:
+              - generic [ref=f3e220]:
+                - generic [ref=f3e221]: Circuit
+                - generic [ref=f3e222]: "Valorant clutch: 1v3 eco round"
+                - generic [ref=f3e223]: Community clip from a Circuit Challenge.
+                - link "Valorant" [ref=f3e225] [cursor=pointer]:
+                  - /url: /games/valorant
+              - generic [ref=f3e228]:
+                - button "Like" [ref=f3e229]:
+                  - generic [ref=f3e232]: "36"
+                - button "Save" [ref=f3e233]
+                - button "Share" [ref=f3e237]
+                - button "Unmute" [ref=f3e245]
+            - generic [ref=f3e251]:
+              - generic [ref=f3e257]:
+                - generic [ref=f3e258]: Circuit
+                - generic [ref=f3e259]: Inside a Circuit organiser's ranked run
+                - generic [ref=f3e260]: Community highlight from this month's ladder climb.
+                - link "Call of Duty" [ref=f3e262] [cursor=pointer]:
+                  - /url: /games/call-of-duty
+              - generic [ref=f3e265]:
+                - button "Like" [ref=f3e266]:
+                  - generic [ref=f3e269]: "15"
+                - button "Save" [ref=f3e270]
+                - button "Share" [ref=f3e274]
+                - button "Unmute" [ref=f3e282]
+            - generic [ref=f3e288]:
+              - generic [ref=f3e293]:
+                - generic [ref=f3e294]: Circuit
+                - generic [ref=f3e295]: "Apex ranked: ring positioning for late game"
+                - generic [ref=f3e296]: Where to sit before the final two rings close.
+                - link "Apex Legends" [ref=f3e298] [cursor=pointer]:
+                  - /url: /games/apex-legends
+              - generic [ref=f3e301]:
+                - button "Like" [ref=f3e302]:
+                  - generic [ref=f3e305]: "18"
+                - button "Save" [ref=f3e306]
+                - button "Share" [ref=f3e310]
+                - button "Unmute" [ref=f3e318]
+            - generic [ref=f3e324]:
+              - generic [ref=f3e330]:
+                - generic [ref=f3e331]: Circuit
+                - generic [ref=f3e332]: Circuit Demo Cup — champion crowned
+                - generic [ref=f3e333]: How the Circuit Demo Cup bracket wrapped up, round by round.
+                - link "Call of Duty Mobile" [ref=f3e335] [cursor=pointer]:
+                  - /url: /games/call-of-duty-mobile
+              - generic [ref=f3e338]:
+                - button "Like" [ref=f3e339]:
+                  - generic [ref=f3e342]: "14"
+                - button "Save" [ref=f3e343]
+                - button "Share" [ref=f3e347]
+                - button "Unmute" [ref=f3e355]
+  - button "Open Next.js Dev Tools" [ref=f3e365] [cursor=pointer]
+  - alert [ref=f3e369]

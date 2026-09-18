@@ -1,0 +1,125 @@
+- generic [active] [ref=f5e1]:
+  - generic [ref=f5e2]:
+    - complementary [ref=f5e4]:
+      - link [ref=f5e5] [cursor=pointer]:
+        - /url: /
+        - img "Circuit" [ref=f5e6]
+      - navigation [ref=f5e7]:
+        - link "Home" [ref=f5e9] [cursor=pointer]:
+          - /url: /
+        - link "Compete" [ref=f5e14] [cursor=pointer]:
+          - /url: /compete
+        - link "Feed" [ref=f5e22] [cursor=pointer]:
+          - /url: /ladder
+        - link "Challenges" [ref=f5e26] [cursor=pointer]:
+          - /url: /battles
+        - link "Calendar" [ref=f5e37] [cursor=pointer]:
+          - /url: /calendar
+      - generic [ref=f5e41]:
+        - generic [ref=f5e42]:
+          - generic [ref=f5e45]: Play.Connect.Compete.
+          - generic [ref=f5e46]: Real tournaments, real opponents, real payouts.
+          - link "Join the Circuit →" [ref=f5e47] [cursor=pointer]:
+            - /url: /signup
+        - generic [ref=f5e48]:
+          - link "Log in" [ref=f5e49] [cursor=pointer]:
+            - /url: /login
+          - link "Sign up" [ref=f5e50] [cursor=pointer]:
+            - /url: /signup
+        - paragraph [ref=f5e51]: © 2026 CIRCUITPlay Connected.
+    - generic [ref=f5e52]:
+      - banner [ref=f5e53]:
+        - generic [ref=f5e55]:
+          - generic [ref=f5e57]:
+            - textbox "Search games, players, tournaments…" [ref=f5e58]
+            - generic: ⌘K
+          - generic [ref=f5e59]:
+            - link "Log in" [ref=f5e60] [cursor=pointer]:
+              - /url: /login
+            - link "Sign up" [ref=f5e61] [cursor=pointer]:
+              - /url: /signup
+      - main [ref=f5e62]:
+        - generic [ref=f5e64]:
+          - generic [ref=f5e68]:
+            - generic [ref=f5e69]: Play · Compete · Connect
+            - heading "More Games Bigger Moments" [level=1] [ref=f5e70]: More GamesBigger Moments
+            - paragraph [ref=f5e71]: Join tournaments, challenge players, and be part of a growing gaming community.
+            - link "Start Competing →" [ref=f5e73] [cursor=pointer]:
+              - /url: "#featured"
+          - generic [ref=f5e74]:
+            - generic [ref=f5e75]:
+              - generic [ref=f5e76]:
+                - generic [ref=f5e77]:
+                  - heading "Explore by Game" [level=2] [ref=f5e78]
+                  - paragraph [ref=f5e79]: Discover the games and competitions happening now.
+                - region "Explore by game" [ref=f5e82]:
+                  - generic [ref=f5e83]:
+                    - link "Call of Duty 0 Active Competitions" [ref=f5e85] [cursor=pointer]:
+                      - /url: /compete?game=Call%20of%20Duty
+                      - generic [ref=f5e86]: Call of Duty
+                      - generic [ref=f5e90]: 0 Active Competitions
+                    - link "Valorant 0 Active Competitions" [ref=f5e92] [cursor=pointer]:
+                      - /url: /compete?game=Valorant
+                      - generic [ref=f5e93]: Valorant
+                      - generic [ref=f5e97]: 0 Active Competitions
+                    - link "EA FC 25 0 Active Competitions" [ref=f5e99] [cursor=pointer]:
+                      - /url: /compete?game=EA%20FC%2025
+                      - generic [ref=f5e100]: EA FC 25
+                      - generic [ref=f5e104]: 0 Active Competitions
+                    - link "Fortnite 0 Active Competitions" [ref=f5e106] [cursor=pointer]:
+                      - /url: /compete?game=Fortnite
+                      - generic [ref=f5e107]: Fortnite
+                      - generic [ref=f5e111]: 0 Active Competitions
+                    - link "GTA V 0 Active Competitions" [ref=f5e113] [cursor=pointer]:
+                      - /url: /compete?game=GTA%20V
+                      - generic [ref=f5e114]: GTA V
+                      - generic [ref=f5e118]: 0 Active Competitions
+                    - link "More Games Explore All" [ref=f5e120] [cursor=pointer]:
+                      - /url: /ladder
+                      - generic [ref=f5e126]: More Games
+                      - generic [ref=f5e127]: Explore All
+                  - button "Previous" [ref=f5e130]
+                  - button "Next" [ref=f5e133]
+              - generic [ref=f5e136]:
+                - generic [ref=f5e137]:
+                  - generic [ref=f5e138]:
+                    - heading "Upcoming Competitions" [level=2] [ref=f5e139]
+                    - paragraph [ref=f5e142]: Join the next wave of tournaments and put your skills to the test.
+                  - link "View All Competitions →" [ref=f5e143] [cursor=pointer]:
+                    - /url: /compete
+                - paragraph [ref=f5e146]: Nothing upcoming right now — be the first.
+            - generic [ref=f5e148]:
+              - heading "Gamer News" [level=2] [ref=f5e149]
+              - generic [ref=f5e154]:
+                - link "GameSpot · 27 minutes ago New Pokemon Plane Looks Incredible, Even Includes Themed Cups And Napkins Japanese airline All Nippon Airways (ANA) has unveiled a Pokemon-themed airliner to celebrate the franchise's 30th anniversary this year, an" [ref=f5e155] [cursor=pointer]:
+                  - /url: https://www.gamespot.com/articles/new-pokemon-plane-looks-incredible-even-includes-themed-cups-and-napkins/
+                  - generic [ref=f5e156]:
+                    - generic [ref=f5e157]: GameSpot · 27 minutes ago
+                    - generic [ref=f5e158]: New Pokemon Plane Looks Incredible, Even Includes Themed Cups And Napkins
+                    - generic [ref=f5e159]: Japanese airline All Nippon Airways (ANA) has unveiled a Pokemon-themed airliner to celebrate the franchise's 30th anniversary this year, an
+                - link "PC Gamer · 34 minutes ago Reacher star Alan Ritchson is in talks to replace Jason Momoa on the Helldivers movie There's a new John Helldiver in town (maybe)." [ref=f5e160] [cursor=pointer]:
+                  - /url: https://www.pcgamer.com/movies-tv/reacher-star-alan-ritchson-is-in-talks-to-replace-jason-momoa-on-the-helldivers-movie/
+                  - generic [ref=f5e161]:
+                    - generic [ref=f5e162]: PC Gamer · 34 minutes ago
+                    - generic [ref=f5e163]: Reacher star Alan Ritchson is in talks to replace Jason Momoa on the Helldivers movie
+                    - generic [ref=f5e164]: There's a new John Helldiver in town (maybe).
+                - link "Eurogamer · 35 minutes ago Sony execs behind iconic game-sharing meme recreate it, but fittingly, without a physical game Former PlayStation executives Shuhei Yoshida and Adam Boyes have recreated their iconic \"this is how you share your games on PS4\" moment - n" [ref=f5e165] [cursor=pointer]:
+                  - /url: https://www.eurogamer.net/sony-execs-game-sharing-meme-physical
+                  - generic [ref=f5e166]:
+                    - generic [ref=f5e167]: Eurogamer · 35 minutes ago
+                    - generic [ref=f5e168]: Sony execs behind iconic game-sharing meme recreate it, but fittingly, without a physical game
+                    - generic [ref=f5e169]: Former PlayStation executives Shuhei Yoshida and Adam Boyes have recreated their iconic "this is how you share your games on PS4" moment - n
+                - link "GameSpot · 1 hour ago I Guess I’ll Delete Every PS5 Game I Own To Make Room For FF7 Revelation There are quite a few months until Final Fantasy 7 Revelation launches on Nintendo Switch 2, PC, PlayStation 5, and Xbox Series X|S. But you" [ref=f5e170] [cursor=pointer]:
+                  - /url: https://www.gamespot.com/articles/i-guess-ill-delete-every-ps5-game-i-own-to-make-room-for-ff7-revelation/
+                  - generic [ref=f5e171]:
+                    - generic [ref=f5e172]: GameSpot · 1 hour ago
+                    - generic [ref=f5e173]: I Guess I’ll Delete Every PS5 Game I Own To Make Room For FF7 Revelation
+                    - generic [ref=f5e174]: There are quite a few months until Final Fantasy 7 Revelation launches on Nintendo Switch 2, PC, PlayStation 5, and Xbox Series X|S. But you
+                - link "PC Gamer · 2 hours ago 'The PC platform is becoming more and more important,' Take-Two chief says, as we continue to wonder when we're going to get GTA 6 Strauss Zelnick was asked about GTA 6 on PC during Take-Two's recent annual meeting." [ref=f5e175] [cursor=pointer]:
+                  - /url: https://www.pcgamer.com/games/grand-theft-auto/the-pc-platform-is-becoming-more-and-more-important-take-two-chief-says-as-we-continue-to-wonder-when-were-going-to-get-gta-6/
+                  - generic [ref=f5e176]:
+                    - generic [ref=f5e177]: PC Gamer · 2 hours ago
+                    - generic [ref=f5e178]: "'The PC platform is becoming more and more important,' Take-Two chief says, as we continue to wonder when we're going to get GTA 6"
+                    - generic [ref=f5e179]: Strauss Zelnick was asked about GTA 6 on PC during Take-Two's recent annual meeting.
+  - button "Open Next.js Dev Tools" [ref=f5e185] [cursor=pointer]
+  - alert [ref=f5e189]
