@@ -1,7 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+
+type Bank = {
+  name: string;
+  code: string;
+  slug: string;
+};
 
 const MAX_FAVORITE_GAMES = 6;
 const MAX_BIO_LENGTH = 160;
@@ -41,6 +47,68 @@ export default function AccountForm({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // Bank resolution state
+  const [banks, setBanks] = useState<Bank[]>([]);
+  const [loadingBanks, setLoadingBanks] = useState(false);
+  const [selectedBank, setSelectedBank] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [resolvingAccount, setResolvingAccount] = useState(false);
+  const [resolvedAccountName, setResolvedAccountName] = useState("");
+  const [bankResolveError, setBankResolveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    async function fetchBanks() {
+      setLoadingBanks(true);
+      try {
+        const res = await fetch("/api/payments/banks");
+        if (res.ok) {
+          const data = await res.json();
+          if (active && Array.isArray(data.banks)) {
+            setBanks(data.banks);
+          }
+        }
+      } catch (err) {
+        console.warn("Could not load banks:", err);
+      } finally {
+        if (active) setLoadingBanks(false);
+      }
+    }
+    fetchBanks();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function handleResolveAndLink() {
+    if (!selectedBank || accountNumber.length !== 10) return;
+    setResolvingAccount(true);
+    setBankResolveError(null);
+
+    try {
+      const res = await fetch("/api/payments/resolve-account", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bankCode: selectedBank,
+          accountNumber,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setBankResolveError(data.error || "Account resolution failed. Check the details.");
+        return;
+      }
+      setResolvedAccountName(data.accountName);
+      setPayoutMethodRef(data.recipientCode);
+    } catch {
+      setBankResolveError("Network error while resolving account.");
+    } finally {
+      setResolvingAccount(false);
+    }
+  }
+
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -197,21 +265,130 @@ export default function AccountForm({
         </span>
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="payoutMethodRef" className="field-label">
-          Payout method reference (optional)
-        </label>
-        <input
-          id="payoutMethodRef"
-          placeholder="Paystack recipient code, e.g. RCP_xxx"
-          value={payoutMethodRef}
-          onChange={(e) => setPayoutMethodRef(e.target.value)}
-          className="field-input"
-        />
-        <span className="field-hint">
-          Known V1 gap: there&apos;s no UI yet to link a bank account and get a real recipient
-          code — this field takes the raw reference directly until that&apos;s built.
-        </span>
+      <div className="flex flex-col gap-3 rounded-lg border border-border bg-card/50 p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <label className="text-sm font-semibold text-foreground">
+              Bank Account / Payout Destination
+            </label>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Link your Nigerian bank account to receive prize winnings and wallet withdrawals automatically via Paystack.
+            </p>
+          </div>
+          {payoutMethodRef && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-success/15 px-2.5 py-0.5 text-xs font-medium text-success border border-success/30">
+              <span className="h-1.5 w-1.5 rounded-full bg-success" />
+              Active
+            </span>
+          )}
+        </div>
+
+        {payoutMethodRef ? (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded border border-border/80 bg-background/60 p-3">
+            <div>
+              <p className="text-sm font-medium text-foreground">
+                {resolvedAccountName || "Linked Recipient"}
+              </p>
+              <p className="text-xs text-muted-foreground font-mono mt-0.5">
+                Recipient Code: {payoutMethodRef}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setPayoutMethodRef("");
+                  setResolvedAccountName("");
+                }}
+                className="text-xs text-destructive hover:underline"
+              >
+                Change bank account
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3 pt-1">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="bankSelect" className="field-label text-xs">
+                  Select Bank
+                </label>
+                <select
+                  id="bankSelect"
+                  value={selectedBank}
+                  onChange={(e) => {
+                    setSelectedBank(e.target.value);
+                    setBankResolveError(null);
+                  }}
+                  className="field-input text-sm"
+                  disabled={loadingBanks}
+                >
+                  <option value="">{loadingBanks ? "Loading banks…" : "— Choose Bank —"}</option>
+                  {banks.map((b) => (
+                    <option key={b.code} value={b.code}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="accountNumber" className="field-label text-xs">
+                  10-Digit Account Number (NUBAN)
+                </label>
+                <input
+                  id="accountNumber"
+                  type="text"
+                  maxLength={10}
+                  placeholder="0123456789"
+                  value={accountNumber}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, "");
+                    setAccountNumber(val);
+                    setBankResolveError(null);
+                  }}
+                  className="field-input text-sm font-mono tracking-wider"
+                />
+              </div>
+            </div>
+
+            {bankResolveError && (
+              <p className="text-xs text-destructive">{bankResolveError}</p>
+            )}
+
+            {resolvedAccountName && (
+              <div className="flex items-center gap-2 rounded bg-success/10 border border-success/30 px-3 py-2 text-xs text-success font-medium">
+                <span>✓ Verified:</span>
+                <span className="font-semibold">{resolvedAccountName}</span>
+              </div>
+            )}
+
+            <button
+              type="button"
+              disabled={resolvingAccount || !selectedBank || accountNumber.length !== 10}
+              onClick={handleResolveAndLink}
+              className="btn-secondary self-start text-xs py-1.5 px-3"
+            >
+              {resolvingAccount ? "Verifying with Paystack…" : "Verify & Link Bank Account"}
+            </button>
+          </div>
+        )}
+
+        <details className="mt-1 text-xs text-muted-foreground">
+          <summary className="cursor-pointer hover:text-foreground">Advanced / Raw Recipient Code</summary>
+          <div className="pt-2 flex flex-col gap-1.5">
+            <input
+              id="rawPayoutRef"
+              placeholder="e.g. RCP_xxxxxxxxxxxx"
+              value={payoutMethodRef}
+              onChange={(e) => setPayoutMethodRef(e.target.value)}
+              className="field-input font-mono text-xs"
+            />
+            <span className="text-[11px] text-muted-foreground">
+              Directly sets User.payoutMethodRef. Overridden automatically when you verify a bank account above.
+            </span>
+          </div>
+        </details>
       </div>
 
       {error && <p className="field-error">{error}</p>}

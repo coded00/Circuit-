@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev"
+    "prisma:migrate": "prisma migrate dev",
+    "test:storage": "node scripts/test-storage.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
