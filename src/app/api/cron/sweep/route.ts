@@ -10,13 +10,49 @@
 import { NextResponse } from "next/server";
 import { runScheduledSweep } from "@/lib/matches";
 
-export async function POST(request: Request) {
+async function handleSweep(request: Request) {
   const secret = process.env.CRON_SECRET;
   const authHeader = request.headers.get("authorization");
+
+  // Vercel Cron automatically includes `Authorization: Bearer <CRON_SECRET>`
+  // when CRON_SECRET is configured in project environment variables.
   if (!secret || authHeader !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+    return NextResponse.json(
+      { error: "Unauthorized. Provide valid Bearer token in Authorization header." },
+      { status: 401 }
+    );
   }
 
-  const result = await runScheduledSweep();
-  return NextResponse.json(result);
+  const startTime = Date.now();
+  try {
+    const result = await runScheduledSweep();
+    const durationMs = Date.now() - startTime;
+
+    return NextResponse.json({
+      success: true,
+      durationMs,
+      timestamp: new Date().toISOString(),
+      ...result,
+    });
+  } catch (error) {
+    const durationMs = Date.now() - startTime;
+    console.error("[cron/sweep] Unexpected failure during scheduled sweep:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        durationMs,
+        error: error instanceof Error ? error.message : "Internal sweep failure",
+      },
+      { status: 500 }
+    );
+  }
 }
+
+export async function GET(request: Request) {
+  return handleSweep(request);
+}
+
+export async function POST(request: Request) {
+  return handleSweep(request);
+}
+

@@ -43,6 +43,61 @@ async function paystackFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return body.data as T;
 }
 
+export type BankItem = {
+  name: string;
+  code: string;
+  slug: string;
+};
+
+export async function listBanks(): Promise<BankItem[]> {
+  const data = await paystackFetch<Array<{ name: string; code: string; slug: string; active?: boolean }>>(
+    "/bank?country=nigeria&perPage=100"
+  );
+  return data
+    .filter((b) => b.active !== false)
+    .map((b) => ({ name: b.name, code: b.code, slug: b.slug }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export async function resolveAccountNumber(
+  accountNumber: string,
+  bankCode: string
+): Promise<{ accountNumber: string; accountName: string; bankId: number }> {
+  const data = await paystackFetch<{
+    account_number: string;
+    account_name: string;
+    bank_id: number;
+  }>(`/bank/resolve?account_number=${encodeURIComponent(accountNumber)}&bank_code=${encodeURIComponent(bankCode)}`);
+  return {
+    accountNumber: data.account_number,
+    accountName: data.account_name,
+    bankId: data.bank_id,
+  };
+}
+
+export async function createTransferRecipient(input: {
+  accountName: string;
+  accountNumber: string;
+  bankCode: string;
+}): Promise<{ recipientCode: string }> {
+  const data = await paystackFetch<{
+    recipient_code: string;
+  }>("/transferrecipient", {
+    method: "POST",
+    body: JSON.stringify({
+      type: "nuban",
+      name: input.accountName,
+      account_number: input.accountNumber,
+      bank_code: input.bankCode,
+      currency: "NGN",
+    }),
+  });
+  return {
+    recipientCode: data.recipient_code,
+  };
+}
+
+
 export const paystackClient: PaymentProviderClient = {
   name: "PAYSTACK",
 
