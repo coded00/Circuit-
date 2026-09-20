@@ -1,16 +1,31 @@
 import { NextResponse } from "next/server";
 import { confirmEntryFeePayment, confirmWalletFunding } from "@/lib/payments/confirm";
 import { verifyPaystackSignature } from "@/lib/payments/webhookVerification";
+import { captureMessage, captureException } from "@/lib/observability";
 
 export async function POST(request: Request) {
   const rawBody = await request.text();
   const signature = request.headers.get("x-paystack-signature");
 
   if (!verifyPaystackSignature(rawBody, signature)) {
+    // A rejected signature is either a misconfigured PAYSTACK_SECRET_KEY
+    // or a forged webhook attempt — previously invisible either way (a
+    // plain 401 return, nothing logged). A flood of these is exactly the
+    // kind of thing that should be noticed, not silently swallowed.
+    captureMessage("Paystack webhook rejected: invalid signature", "warning");
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
-  const event = JSON.parse(rawBody);
+  let event: { event?: string; data?: { reference?: string } };
+  try {
+    event = JSON.parse(rawBody);
+  } catch (err) {
+    // A validly-signed but malformed body — shouldn't happen from the
+    // real Paystack, but a thrown JSON.parse previously became an
+    // uncaught 500 instead of a clean, logged response.
+    captureException(err, { source: "webhooks/paystack", reason: "malformed JSON body" });
+    return NextResponse.json({ error: "Malformed request body" }, { status: 400 });
+  }
   const reference = event?.data?.reference;
 
   // Both confirm functions are no-ops for a reference they don't own (a

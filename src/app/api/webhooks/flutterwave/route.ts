@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { confirmEntryFeePayment, confirmWalletFunding } from "@/lib/payments/confirm";
 import { verifyFlutterwaveSignature } from "@/lib/payments/webhookVerification";
+import { captureMessage } from "@/lib/observability";
 
 export async function POST(request: Request) {
   const hash = request.headers.get("verif-hash");
 
   if (!verifyFlutterwaveSignature(hash)) {
+    // Same reasoning as the Paystack webhook's own comment — a rejected
+    // signature was previously invisible (a plain 401, nothing logged).
+    captureMessage("Flutterwave webhook rejected: invalid signature", "warning");
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
