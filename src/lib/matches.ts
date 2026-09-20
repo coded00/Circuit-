@@ -28,6 +28,7 @@ import { prisma } from "@/lib/db";
 import { notify, notifyStaff } from "@/lib/notifications";
 import { proofStorage } from "@/lib/storage";
 import { settleOrganizerRevenue } from "@/lib/settlement";
+import { trackEvent } from "@/lib/analytics";
 
 export class MatchError extends Error {
   code:
@@ -467,6 +468,8 @@ export async function submitResult(input: SubmitResultInput): Promise<{ match: M
       : { resultB: result as unknown as Prisma.InputJsonValue, proofBRef: proofRef },
   });
 
+  trackEvent("match_score_submitted", { userId: input.submittingUserId, matchId: match.id });
+
   return resolveAfterSubmission(updated, input.submittingUserId);
 }
 
@@ -509,6 +512,16 @@ async function completeMatch(match: Match, winnerId: string): Promise<Match> {
   const updated = await prisma.match.update({
     where: { id: match.id },
     data: { status: "COMPLETE", winnerId, reportWindowExpiresAt: null },
+  });
+
+  // North Star metric (PRD §17) — every real way a match reaches a
+  // verified winner funnels through this one function (immediate
+  // agreement, the sweep's auto-accept, or a dispute ruling with a
+  // winner), so this is the one place it needs to fire.
+  trackEvent("match_completed_verified", {
+    matchId: match.id,
+    tournamentId: match.tournamentId ?? undefined,
+    userId: winnerId,
   });
 
   if (match.tournamentId) {
@@ -560,6 +573,15 @@ async function settleBattleOnComplete(battleId: string, winnerId: string): Promi
   }
 
   await prisma.$transaction(writes);
+
+  if (battle.stakeAmount > 0) {
+    trackEvent("escrow_payout_released", {
+      userId: winnerId,
+      amountMinor: battle.stakeAmount * 2,
+      currency: "NGN",
+      game: battle.game,
+    });
+  }
 }
 
 async function openDispute(match: Match, raisedById: string): Promise<Match> {

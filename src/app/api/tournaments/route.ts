@@ -15,6 +15,7 @@ import { parseOptionalUrl } from "@/lib/validation";
 import { ALL_TEAM_SIZE_VALUES } from "@/lib/gameFormats";
 import { notifyAllUsers } from "@/lib/notifications";
 import { enableCommunity } from "@/lib/community";
+import { trackEvent } from "@/lib/analytics";
 
 const MAX_PARTICIPANT_CAP = 128; // D2: V1 bracket ceiling.
 
@@ -155,6 +156,8 @@ export async function POST(request: Request) {
       status,
     },
   });
+
+  trackEvent("tournament_created", { userId: user.id, tournamentId: tournament.id, game: tournament.game });
 
   // "Community toggle during tournament creation" (Circuit Community
   // Phase 1) — one request, not a create-then-enable round trip. Default

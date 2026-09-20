@@ -15,6 +15,7 @@ import { notify } from "@/lib/notifications";
 import { getPaymentProvider } from "@/lib/payments";
 import { maybeGenerateBracketOnCapFill } from "@/lib/matches";
 import { computePlatformFee } from "@/lib/platformFee";
+import { trackEvent } from "@/lib/analytics";
 
 export async function confirmEntryFeePayment(reference: string): Promise<void> {
   const registration = await prisma.registration.findUnique({
@@ -44,6 +45,14 @@ export async function confirmEntryFeePayment(reference: string): Promise<void> {
     }
     return;
   }
+
+  trackEvent("payment_verified", {
+    userId: registration.userId,
+    tournamentId: registration.tournamentId,
+    game: registration.tournament.game,
+    amountMinor: result.amount,
+    currency: "NGN",
+  });
 
   // Read outside the transaction — this rate rarely changes, and a
   // registration landing on the old vs. new rate in the rare case an
@@ -127,6 +136,13 @@ export async function confirmEntryFeePayment(reference: string): Promise<void> {
     });
     return;
   }
+
+  trackEvent("tournament_joined", {
+    userId: registration.userId,
+    tournamentId: registration.tournamentId,
+    game: registration.tournament.game,
+    amountMinor: registration.tournament.entryFee,
+  });
 
   await notify(registration.userId, "REGISTRATION_CONFIRMED", {
     tournamentId: registration.tournamentId,

@@ -20,6 +20,7 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { getDefaultPaymentProvider } from "@/lib/payments";
 import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
+import { trackEvent } from "@/lib/analytics";
 
 const MIN_WITHDRAW_AMOUNT = 10000; // ₦100
 
@@ -120,6 +121,8 @@ export async function POST(request: Request) {
       await prisma.user.update({ where: { id: user.id }, data: { walletBalance: { increment: amount } } });
       return NextResponse.json({ error: "Withdrawal failed. Your balance has been restored." }, { status: 502 });
     }
+
+    trackEvent("wallet_withdrawn", { userId: user.id, amountMinor: amount, currency: "NGN" });
 
     return NextResponse.json({ status: transfer.status });
   } catch (err) {

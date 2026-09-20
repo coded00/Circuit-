@@ -14,6 +14,7 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { getDefaultPaymentProvider } from "@/lib/payments";
 import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
+import { trackEvent } from "@/lib/analytics";
 
 // A row still PENDING or already COMPLETE means this prize is spoken for;
 // a FAILED row (the transfer call itself errored, or the provider reported
@@ -152,6 +153,15 @@ export async function POST(
         status: transfer.status === "SUCCESS" ? "COMPLETE" : transfer.status === "FAILED" ? "FAILED" : "PENDING",
       },
     });
+
+    if (transfer.status === "SUCCESS") {
+      trackEvent("escrow_payout_released", {
+        userId: user.id,
+        tournamentId: tournament.id,
+        amountMinor: prizeAmount,
+        currency: "NGN",
+      });
+    }
 
     return NextResponse.json({ status: transfer.status });
   } catch (err) {
