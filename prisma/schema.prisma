@@ -358,6 +358,18 @@ model Tournament {
   registrationOpenAt  DateTime
   registrationCloseAt DateTime
   startAt             DateTime
+  /// A separate timestamp from startAt/registrationCloseAt on purpose —
+  /// players who already paid need protection *before* the tournament
+  /// even begins, not just once it's live. Computed once at creation
+  /// (startAt minus PlatformSetting.cancellationLockHoursBeforeStart at
+  /// that moment) and stored concretely, so a later change to that
+  /// default doesn't retroactively move an already-set lock point.
+  /// Past this timestamp, tournaments/[id]/cancel/route.ts blocks the
+  /// organizer specifically — staff can still cancel (an intentional
+  /// "only admin/system action" escape hatch, same reasoning as
+  /// fundsFrozen). Null on any tournament created before this field
+  /// existed — treated as "no lock," same as today's behavior.
+  cancellationLockAt  DateTime?
   status              TournamentStatus @default(DRAFT)
   /// Admin financial control (V1 audit's fund-freeze requirement) — set
   /// via POST/DELETE /api/tournaments/[id]/freeze-funds, requireStaff()
@@ -749,9 +761,10 @@ model CalendarEvent {
 }
 
 /// Singleton row (`id` is always "singleton") — real platform-wide
-/// toggles. Deliberately just the one real, meaningful setting
-/// (maintenance mode) rather than a grab-bag of unused fields invented to
-/// look complete; see `/admin/settings`'s own comment.
+/// toggles and defaults, each added only once there was a genuine
+/// feature behind it (maintenance mode; the platform fee rate; the
+/// cancellation-lock default below), not a grab-bag of unused fields
+/// invented to look complete; see `/admin/settings`'s own comment.
 model PlatformSetting {
   id              String  @id @default("singleton")
   maintenanceMode Boolean @default(false)
@@ -764,6 +777,14 @@ model PlatformSetting {
   /// entry-fee confirmations going forward; changing it never rewrites
   /// already-recorded PLATFORM_FEE escrow rows.
   platformFeeBps  Int     @default(500)
+  /// Default lead time for Tournament.cancellationLockAt, computed once
+  /// at tournament creation (startAt minus this many hours) and stored
+  /// as a concrete timestamp on that row — not re-derived from this
+  /// setting later, so changing the default never moves the lock point
+  /// on a tournament that already has one. See cancellationLockAt's own
+  /// schema comment for why this exists as its own timestamp instead of
+  /// reusing startAt or registrationCloseAt.
+  cancellationLockHoursBeforeStart Int @default(24)
 }
 
 /// Every real write an admin makes anywhere in `/admin` appends one row

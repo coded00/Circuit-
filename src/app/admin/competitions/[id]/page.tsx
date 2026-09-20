@@ -23,6 +23,10 @@ function formatNaira(kobo: number): string {
   return `₦${(kobo / 100).toLocaleString("en-NG")}`;
 }
 
+function formatDateTime(date: Date): string {
+  return date.toLocaleString("en-NG", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+}
+
 export default async function AdminCompetitionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
@@ -83,14 +87,23 @@ export default async function AdminCompetitionDetailPage({ params }: { params: P
           <h1 className="font-display text-2xl font-bold tracking-tight">{tournament.name}</h1>
           <span className="text-sm text-muted">{tournament.game}</span>
         </div>
-        <div className="flex items-center gap-4">
-          <Link href={`/tournaments/${id}`} target="_blank" className="text-sm font-medium text-accent-blue hover:underline">
-            View public page ↗
-          </Link>
-          <Link href={`/admin/competitions/${id}/edit`} className="btn-secondary text-sm">
-            Edit
-          </Link>
-          {cancellable && <CancelTournamentButton tournamentId={id} />}
+        <div className="flex flex-col items-end gap-2">
+          <div className="flex items-center gap-4">
+            <Link href={`/tournaments/${id}`} target="_blank" className="text-sm font-medium text-accent-blue hover:underline">
+              View public page ↗
+            </Link>
+            <Link href={`/admin/competitions/${id}/edit`} className="btn-secondary text-sm">
+              Edit
+            </Link>
+            {cancellable && <CancelTournamentButton tournamentId={id} />}
+          </div>
+          {tournament.cancellationLockAt && cancellable && (
+            <span className="text-xs text-muted">
+              {new Date() < tournament.cancellationLockAt
+                ? `Organizer can cancel until ${formatDateTime(tournament.cancellationLockAt)}`
+                : `Past the cancellation lock (${formatDateTime(tournament.cancellationLockAt)}) — staff-only now`}
+            </span>
+          )}
         </div>
       </div>
 

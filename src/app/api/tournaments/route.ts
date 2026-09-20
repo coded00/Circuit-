@@ -127,6 +127,14 @@ export async function POST(request: Request) {
 
   const status = registrationOpenAt <= new Date() ? "OPEN" : "DRAFT";
 
+  // Computed once, now, and stored concretely — see
+  // Tournament.cancellationLockAt's own schema comment for why this
+  // isn't re-derived from the platform setting later.
+  const platformSetting = await prisma.platformSetting.findUnique({ where: { id: "singleton" } });
+  const cancellationLockAt = new Date(
+    startAt.getTime() - (platformSetting?.cancellationLockHoursBeforeStart ?? 24) * 60 * 60 * 1000
+  );
+
   const tournament = await prisma.tournament.create({
     data: {
       organizerId: organizerProfile.userId,
@@ -141,6 +149,7 @@ export async function POST(request: Request) {
       registrationOpenAt,
       registrationCloseAt,
       startAt,
+      cancellationLockAt,
       streamUrl: streamUrlResult.url,
       posterUrl: posterUrlResult.url,
       status,

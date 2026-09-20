@@ -51,6 +51,20 @@ export async function POST(
       { status: 409 }
     );
   }
+  // Past the lock point, the organizer specifically loses the ability to
+  // cancel — staff retain it as the "only admin/system action" escape
+  // hatch. This is deliberately a *different* gate from the fundsFrozen
+  // one above: fundsFrozen is a staff-initiated hold for a specific
+  // investigation, cancellationLockAt is a standing, player-protecting
+  // rule that applies to every tournament automatically, organizer intent
+  // aside — see its own schema comment for why this can't just be
+  // startAt itself.
+  if (tournament.cancellationLockAt && new Date() >= tournament.cancellationLockAt && !user.isStaff) {
+    return NextResponse.json(
+      { error: "Past the cancellation lock — only Circuit staff can cancel this tournament now." },
+      { status: 409 }
+    );
+  }
   // Cancelling after startAt voids the whole event, not just the
   // remaining unplayed matches — every CONFIRMED registrant is refunded
   // below regardless of how far their own match got, and nothing further
