@@ -58,6 +58,7 @@ export default async function AdminCompetitionsPage({ searchParams }: { searchPa
       participantCap: true,
       startAt: true,
       registrationCloseAt: true,
+      fundsFrozen: true,
       _count: { select: { registrations: { where: { status: "CONFIRMED" } } } },
     },
   });
@@ -132,7 +133,10 @@ export default async function AdminCompetitionsPage({ searchParams }: { searchPa
             <tbody>
               {tournaments.map((t) => {
                 const statusInfo = tournamentStatusInfo(t.status);
-                const cancellable = t.status !== "CANCELLED" && t.status !== "COMPLETE" && new Date() < t.startAt;
+                // Matches tournaments/[id]/cancel/route.ts's own guard —
+                // see admin/competitions/[id]/page.tsx's own comment on
+                // why this doesn't also check startAt.
+                const cancellable = t.status !== "CANCELLED" && t.status !== "COMPLETE" && !t.fundsFrozen;
                 return (
                   <tr key={t.id}>
                     <td>

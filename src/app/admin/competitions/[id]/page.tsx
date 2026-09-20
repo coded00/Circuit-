@@ -13,10 +13,11 @@
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Snowflake } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { StatusPill, registrationStatusInfo, tournamentStatusInfo } from "@/components/StatusPill";
 import { CancelTournamentButton } from "@/components/admin/CancelTournamentButton";
+import { FreezeFundsControl } from "@/components/admin/FreezeFundsControl";
 
 function formatNaira(kobo: number): string {
   return `₦${(kobo / 100).toLocaleString("en-NG")}`;
@@ -28,7 +29,7 @@ export default async function AdminCompetitionDetailPage({ params }: { params: P
   const tournament = await prisma.tournament.findUnique({ where: { id } });
   if (!tournament) notFound();
 
-  const [registrations, escrowTxns, openDisputes, bracket] = await Promise.all([
+  const [registrations, escrowTxns, openDisputes, bracket, latestFreezeAction] = await Promise.all([
     prisma.registration.findMany({
       where: { tournamentId: id },
       orderBy: { createdAt: "asc" },
@@ -42,13 +43,30 @@ export default async function AdminCompetitionDetailPage({ params }: { params: P
       },
     }),
     prisma.bracket.findUnique({ where: { tournamentId: id } }),
+    // Freeze reason isn't duplicated onto Tournament itself — the most
+    // recent freeze/unfreeze audit-log row is the source of truth for
+    // "why," same reasoning as the schema field's own comment.
+    prisma.auditLogEntry.findFirst({
+      where: { targetType: "Tournament", targetId: id, action: { in: ["tournament.freezeFunds", "tournament.unfreezeFunds"] } },
+      orderBy: { createdAt: "desc" },
+    }),
   ]);
 
   const collected = escrowTxns.filter((t) => t.type === "ENTRY_FEE" && t.status === "COMPLETE").reduce((s, t) => s + t.amount, 0);
   const refunded = escrowTxns.filter((t) => t.type === "REFUND").reduce((s, t) => s + t.amount, 0);
   const payout = escrowTxns.find((t) => t.type === "PRIZE_PAYOUT");
   const status = tournamentStatusInfo(tournament.status);
-  const cancellable = tournament.status !== "CANCELLED" && tournament.status !== "COMPLETE" && new Date() < tournament.startAt;
+  // Matches tournaments/[id]/cancel/route.ts's own guard exactly — that
+  // route stopped blocking cancellation once startAt passes (a live
+  // tournament can still be voided/refunded), but this button's own
+  // visibility condition was never updated to match, so it kept hiding
+  // itself past startAt even though the API underneath would have
+  // allowed the call. Found while wiring the freeze-funds condition in.
+  const cancellable = tournament.status !== "CANCELLED" && tournament.status !== "COMPLETE" && !tournament.fundsFrozen;
+  const freezeReason =
+    tournament.fundsFrozen && latestFreezeAction?.action === "tournament.freezeFunds"
+      ? ((latestFreezeAction.metadata as { reason?: string } | null)?.reason ?? null)
+      : null;
 
   return (
     <div className="flex flex-1 flex-col gap-6">
@@ -73,6 +91,25 @@ export default async function AdminCompetitionDetailPage({ params }: { params: P
           </Link>
           {cancellable && <CancelTournamentButton tournamentId={id} />}
         </div>
+      </div>
+
+      {tournament.fundsFrozen && (
+        <section className="alert alert-danger flex-col items-stretch gap-3">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-danger">
+            <Snowflake size={16} />
+            Funds frozen — payouts and cancellation are blocked
+          </h2>
+          {freezeReason && <p className="text-sm">{freezeReason}</p>}
+        </section>
+      )}
+
+      <div className="card flex flex-col items-start gap-2">
+        <h2 className="text-card-title">Fund controls</h2>
+        <p className="text-sm text-muted">
+          Freezing blocks the prize-payout claim and cancel-with-refund actions for this tournament until unfrozen —
+          use this while investigating a dispute or a suspected issue, not as a routine action.
+        </p>
+        <FreezeFundsControl tournamentId={id} fundsFrozen={tournament.fundsFrozen} freezeReason={freezeReason} />
       </div>
 
       {openDisputes.length > 0 && (

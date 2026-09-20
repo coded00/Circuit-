@@ -353,6 +353,14 @@ model Tournament {
   registrationCloseAt DateTime
   startAt             DateTime
   status              TournamentStatus @default(DRAFT)
+  /// Admin financial control (V1 audit's fund-freeze requirement) — set
+  /// via POST/DELETE /api/tournaments/[id]/freeze-funds, requireStaff()
+  /// gated. Blocks the prize-payout claim and cancel-with-refund routes
+  /// while true; who froze it, when, and why lives in AuditLogEntry
+  /// (action "tournament.freezeFunds"/"tournament.unfreezeFunds") rather
+  /// than duplicating actor/reason/timestamp fields here — same "reuse
+  /// the existing audit log" reasoning as every other admin action.
+  fundsFrozen         Boolean          @default(false)
   createdAt           DateTime         @default(now())
 
   registrations Registration[]

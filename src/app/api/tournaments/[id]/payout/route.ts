@@ -47,6 +47,9 @@ export async function POST(
   if (tournament.status !== "COMPLETE") {
     return NextResponse.json({ error: "This tournament isn't complete yet." }, { status: 409 });
   }
+  if (tournament.fundsFrozen) {
+    return NextResponse.json({ error: "Funds for this tournament are frozen pending review." }, { status: 409 });
+  }
   if (!tournament.prizeAmount || tournament.prizeAmount <= 0) {
     return NextResponse.json({ error: "This tournament has no cash prize to claim." }, { status: 409 });
   }

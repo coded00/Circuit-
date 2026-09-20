@@ -45,6 +45,12 @@ export async function POST(
       { status: 409 }
     );
   }
+  if (tournament.fundsFrozen) {
+    return NextResponse.json(
+      { error: "Funds for this tournament are frozen pending review — cancelling would refund them." },
+      { status: 409 }
+    );
+  }
   // Cancelling after startAt voids the whole event, not just the
   // remaining unplayed matches — every CONFIRMED registrant is refunded
   // below regardless of how far their own match got, and nothing further
