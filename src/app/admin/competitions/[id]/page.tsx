@@ -58,6 +58,8 @@ export default async function AdminCompetitionDetailPage({ params }: { params: P
 
   const collected = escrowTxns.filter((t) => t.type === "ENTRY_FEE" && t.status === "COMPLETE").reduce((s, t) => s + t.amount, 0);
   const platformFee = escrowTxns.filter((t) => t.type === "PLATFORM_FEE" && t.status === "COMPLETE").reduce((s, t) => s + t.amount, 0);
+  const organizerRevenueSettled = escrowTxns.filter((t) => t.type === "ORGANIZER_REVENUE" && t.status === "COMPLETE").reduce((s, t) => s + t.amount, 0);
+  const organizerRevenuePending = escrowTxns.filter((t) => t.type === "ORGANIZER_REVENUE" && t.status === "PENDING").reduce((s, t) => s + t.amount, 0);
   const refunded = escrowTxns.filter((t) => t.type === "REFUND").reduce((s, t) => s + t.amount, 0);
   const payout = escrowTxns.find((t) => t.type === "PRIZE_PAYOUT");
   const status = tournamentStatusInfo(tournament.status);
@@ -143,7 +145,7 @@ export default async function AdminCompetitionDetailPage({ params }: { params: P
         </section>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <div className="widget flex flex-col gap-1">
           <span className="text-eyebrow">Entry fees collected</span>
           <span className="text-stat text-xl">{formatNaira(collected)}</span>
@@ -151,6 +153,13 @@ export default async function AdminCompetitionDetailPage({ params }: { params: P
         <div className="widget flex flex-col gap-1">
           <span className="text-eyebrow">Platform fee</span>
           <span className="text-stat text-xl">{formatNaira(platformFee)}</span>
+        </div>
+        <div className="widget flex flex-col gap-1">
+          <span className="text-eyebrow">Organizer revenue</span>
+          <span className="text-stat text-xl">{formatNaira(organizerRevenueSettled)}</span>
+          {organizerRevenuePending > 0 && (
+            <span className="text-xs text-muted">{formatNaira(organizerRevenuePending)} pending settlement</span>
+          )}
         </div>
         <div className="widget flex flex-col gap-1">
           <span className="text-eyebrow">Refunded</span>

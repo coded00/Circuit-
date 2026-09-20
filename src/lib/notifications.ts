@@ -40,7 +40,8 @@ export type NotificationType =
   | "TEAM_INVITE"
   | "TEAM_JOIN_REQUEST"
   | "NEW_TOURNAMENT"
-  | "NEW_CHALLENGE";
+  | "NEW_CHALLENGE"
+  | "ORGANIZER_REVENUE_SETTLED";
 
 export interface NotificationChannel {
   send(userId: string, type: NotificationType, payload: Record<string, unknown>): Promise<void>;

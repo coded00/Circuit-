@@ -27,6 +27,7 @@ import type { Dispute, Match } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { notify, notifyStaff } from "@/lib/notifications";
 import { proofStorage } from "@/lib/storage";
+import { settleOrganizerRevenue } from "@/lib/settlement";
 
 export class MatchError extends Error {
   code:
@@ -372,7 +373,7 @@ async function applyWinnerAdvancement(tournamentId: string, matchId: string, win
           if (isFinal) {
             completedTournament = await tx.tournament.update({
               where: { id: tournamentId },
-              data: { status: "COMPLETE" },
+              data: { status: "COMPLETE", completedAt: new Date() },
               select: { organizerId: true },
             });
           }
@@ -764,6 +765,7 @@ export async function runScheduledSweep(): Promise<{
   bracketsGenerated: number;
   autoAccepted: number;
   escalated: number;
+  organizerRevenueSettled: number;
   errors?: string[];
 }> {
   const now = new Date();
@@ -835,10 +837,18 @@ export async function runScheduledSweep(): Promise<{
     }
   }
 
+  // Its own concern (revenue settlement, not match/bracket progression),
+  // folded into this one sweep call rather than a second cron entry — see
+  // this file's own header on the Battle/tournament split for the same
+  // "one function, branch inside it" preference.
+  const settlement = await settleOrganizerRevenue();
+  if (settlement.errors) errors.push(...settlement.errors);
+
   return {
     bracketsGenerated,
     autoAccepted,
     escalated,
+    organizerRevenueSettled: settlement.settled,
     ...(errors.length > 0 ? { errors } : {}),
   };
 }

@@ -57,6 +57,12 @@ export default async function DashboardTournamentDetailPage({
     .filter((t) => t.type === "ENTRY_FEE" && t.status === "COMPLETE")
     .reduce((sum, t) => sum + t.amount, 0);
   const refunded = escrowTxns.filter((t) => t.type === "REFUND").reduce((sum, t) => sum + t.amount, 0);
+  const organizerRevenueSettled = escrowTxns
+    .filter((t) => t.type === "ORGANIZER_REVENUE" && t.status === "COMPLETE")
+    .reduce((sum, t) => sum + t.amount, 0);
+  const organizerRevenuePending = escrowTxns
+    .filter((t) => t.type === "ORGANIZER_REVENUE" && t.status === "PENDING")
+    .reduce((sum, t) => sum + t.amount, 0);
   const payout = escrowTxns.find((t) => t.type === "PRIZE_PAYOUT");
   const status = tournamentStatusInfo(tournament.status);
 
@@ -94,10 +100,17 @@ export default async function DashboardTournamentDetailPage({
         </section>
       )}
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="widget flex flex-col gap-1">
           <span className="text-eyebrow">Entry fees collected</span>
           <span className="text-stat text-xl">{formatNaira(collected)}</span>
+        </div>
+        <div className="widget flex flex-col gap-1">
+          <span className="text-eyebrow">Your revenue</span>
+          <span className="text-stat text-xl">{formatNaira(organizerRevenueSettled)}</span>
+          {organizerRevenuePending > 0 && (
+            <span className="text-xs text-muted">{formatNaira(organizerRevenuePending)} pending settlement</span>
+          )}
         </div>
         <div className="widget flex flex-col gap-1">
           <span className="text-eyebrow">Refunded</span>

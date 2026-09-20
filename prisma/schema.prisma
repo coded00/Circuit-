@@ -66,6 +66,16 @@ enum EscrowType {
   /// the player either way: this doesn't change what anyone pays, only
   /// how the money that already arrived is allocated in the ledger.
   PLATFORM_FEE
+  /// The organizer's own cut of an entry fee — entryFee minus PLATFORM_FEE,
+  /// in full (no separate configurable rate; the platform fee is the only
+  /// cut taken). Recorded PENDING alongside ENTRY_FEE/PLATFORM_FEE at
+  /// confirmation time, then flipped to COMPLETE by settleOrganizerRevenue
+  /// once the tournament's settlement window passes with no open dispute
+  /// or funds freeze — see Tournament.completedAt and
+  /// PlatformSetting.organizerRevenueSettlementHours. Unlike PLATFORM_FEE,
+  /// `userId` is set (the organizer) so the settlement sweep knows whose
+  /// wallet to credit.
+  ORGANIZER_REVENUE
 }
 
 enum EscrowStatus {
@@ -240,6 +250,13 @@ enum WalletTransactionType {
   /// Battle stake always resolves straight back into the wallet — no
   /// organizer/claim flow for a peer-to-peer pot.
   STAKE_CREDIT
+  /// A settled `EscrowType.ORGANIZER_REVENUE` row credited to the
+  /// organizer's wallet balance by settleOrganizerRevenue() — always
+  /// wallet-only, no provider touched (same reasoning as ENTRY_FEE_DEBIT):
+  /// this is Circuit crediting an internal ledger allocation, not a fresh
+  /// payment. Withdrawing it afterward reuses the existing Withdraw from
+  /// Wallet flow unchanged — no separate organizer payout route needed.
+  ORGANIZER_REVENUE_CREDIT
 }
 
 enum WalletTransactionStatus {
@@ -379,6 +396,15 @@ model Tournament {
   /// than duplicating actor/reason/timestamp fields here — same "reuse
   /// the existing audit log" reasoning as every other admin action.
   fundsFrozen         Boolean          @default(false)
+  /// Set once, the moment this tournament's final bracket match completes
+  /// (applyWinnerAdvancement in src/lib/matches.ts) — the anchor
+  /// settleOrganizerRevenue() waits PlatformSetting.
+  /// organizerRevenueSettlementHours past before crediting that
+  /// tournament's PENDING ORGANIZER_REVENUE rows to the organizer's
+  /// wallet. Null until then; null forever for a cancelled tournament
+  /// (cancellation voids the whole event before it ever reaches this
+  /// flip — see tournaments/[id]/cancel/route.ts).
+  completedAt         DateTime?
   createdAt           DateTime         @default(now())
 
   registrations Registration[]
@@ -785,6 +811,16 @@ model PlatformSetting {
   /// schema comment for why this exists as its own timestamp instead of
   /// reusing startAt or registrationCloseAt.
   cancellationLockHoursBeforeStart Int @default(24)
+  /// Dispute/review buffer after a tournament's final match completes
+  /// (Tournament.completedAt) before its PENDING ORGANIZER_REVENUE escrow
+  /// rows settle into the organizer's wallet balance — see
+  /// settleOrganizerRevenue() in src/lib/settlement.ts. Same "computed
+  /// once, not re-derived later" caution doesn't apply here: unlike
+  /// cancellationLockAt, this is read fresh at sweep time (no per-
+  /// tournament snapshot column), so changing it does shift the settle
+  /// point for every still-PENDING row, not just new ones. No admin UI
+  /// control yet — same as cancellationLockHoursBeforeStart above.
+  organizerRevenueSettlementHours Int @default(24)
 }
 
 /// Every real write an admin makes anywhere in `/admin` appends one row

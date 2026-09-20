@@ -83,6 +83,8 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
       return { message: `New tournament: ${str(p, "name")}`, href: `/tournaments/${str(p, "tournamentId")}` };
     case "NEW_CHALLENGE":
       return { message: `New open Challenge: ${str(p, "game")}`, href: `/battles/${str(p, "battleId")}` };
+    case "ORGANIZER_REVENUE_SETTLED":
+      return { message: "Your tournament revenue was credited to your wallet.", href: "/wallet" };
     default:
       return { message: "You have a new notification.", href: "/notifications" };
   }

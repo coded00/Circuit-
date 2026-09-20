@@ -181,6 +181,21 @@ export async function POST(
             data: { tournamentId, registrationId: reg.id, type: "PLATFORM_FEE", amount: feeAmount, status: "COMPLETE" },
           });
         }
+        // The organizer's own cut — same PENDING-until-settled shape as
+        // confirmEntryFeePayment's own ORGANIZER_REVENUE row.
+        const organizerRevenueAmount = tournament.entryFee - feeAmount;
+        if (organizerRevenueAmount > 0) {
+          await tx.escrowTransaction.create({
+            data: {
+              tournamentId,
+              registrationId: reg.id,
+              userId: tournament.organizerId,
+              type: "ORGANIZER_REVENUE",
+              amount: organizerRevenueAmount,
+              status: "PENDING",
+            },
+          });
+        }
         await tx.walletTransaction.create({
           data: {
             userId: user.id,

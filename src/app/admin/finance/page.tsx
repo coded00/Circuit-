@@ -69,6 +69,8 @@ function escrowTypeLabel(type: EscrowType): string {
       return "Challenge stake payout";
     case "PLATFORM_FEE":
       return "Platform fee";
+    case "ORGANIZER_REVENUE":
+      return "Organizer revenue";
   }
 }
 
@@ -98,6 +100,7 @@ const ESCROW_TYPE_OPTIONS: { value: EscrowType | ""; label: string }[] = [
   { value: "STAKE", label: "Challenge stake" },
   { value: "STAKE_PAYOUT", label: "Challenge stake payout" },
   { value: "PLATFORM_FEE", label: "Platform fee" },
+  { value: "ORGANIZER_REVENUE", label: "Organizer revenue" },
 ];
 
 const ESCROW_STATUS_OPTIONS: { value: EscrowStatus | ""; label: string }[] = [
@@ -143,9 +146,11 @@ export default async function AdminFinancePage({ searchParams }: { searchParams:
   if (estatus) escrowAnd.push({ status: estatus as EscrowStatus });
   const escrowWhere: Prisma.EscrowTransactionWhereInput = escrowAnd.length ? { AND: escrowAnd } : {};
 
-  const [entryFeeRevenue, platformFeeRevenue, deposits, withdrawals, pendingPayouts, transactions, escrowTxns] = await Promise.all([
+  const [entryFeeRevenue, platformFeeRevenue, organizerRevenueSettled, organizerRevenuePending, deposits, withdrawals, pendingPayouts, transactions, escrowTxns] = await Promise.all([
     prisma.escrowTransaction.aggregate({ where: { type: "ENTRY_FEE", status: "COMPLETE" }, _sum: { amount: true } }),
     prisma.escrowTransaction.aggregate({ where: { type: "PLATFORM_FEE", status: "COMPLETE" }, _sum: { amount: true } }),
+    prisma.escrowTransaction.aggregate({ where: { type: "ORGANIZER_REVENUE", status: "COMPLETE" }, _sum: { amount: true } }),
+    prisma.escrowTransaction.aggregate({ where: { type: "ORGANIZER_REVENUE", status: "PENDING" }, _sum: { amount: true } }),
     prisma.walletTransaction.aggregate({ where: { type: "FUND", status: "COMPLETE" }, _sum: { amount: true } }),
     prisma.walletTransaction.aggregate({ where: { type: "WITHDRAWAL", status: "COMPLETE" }, _sum: { amount: true } }),
     prisma.escrowTransaction.aggregate({ where: { type: "PRIZE_PAYOUT", status: "PENDING" }, _sum: { amount: true } }),
@@ -175,6 +180,8 @@ export default async function AdminFinancePage({ searchParams }: { searchParams:
   const metrics = [
     { label: "Revenue", value: formatNaira(entryFeeRevenue._sum.amount ?? 0) },
     { label: "Platform Fee Revenue", value: formatNaira(platformFeeRevenue._sum.amount ?? 0) },
+    { label: "Organizer Revenue (Settled)", value: formatNaira(organizerRevenueSettled._sum.amount ?? 0) },
+    { label: "Organizer Revenue (Pending)", value: formatNaira(organizerRevenuePending._sum.amount ?? 0) },
     { label: "Deposits", value: formatNaira(deposits._sum.amount ?? 0) },
     { label: "Withdrawals", value: formatNaira(withdrawals._sum.amount ?? 0) },
     { label: "Pending Payouts", value: formatNaira(pendingPayouts._sum.amount ?? 0) },

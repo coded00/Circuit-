@@ -94,6 +94,24 @@ export async function confirmEntryFeePayment(reference: string): Promise<void> {
         },
       });
     }
+    // The organizer's own cut — the remainder after the platform fee, in
+    // full. Starts PENDING: settleOrganizerRevenue() (src/lib/
+    // settlement.ts) credits it to the organizer's wallet once this
+    // tournament's settlement window passes with no open dispute or
+    // funds freeze — see ORGANIZER_REVENUE's own schema comment.
+    const organizerRevenueAmount = registration.tournament.entryFee - feeAmount;
+    if (organizerRevenueAmount > 0) {
+      await tx.escrowTransaction.create({
+        data: {
+          tournamentId: registration.tournamentId,
+          registrationId: registration.id,
+          userId: registration.tournament.organizerId,
+          type: "ORGANIZER_REVENUE",
+          amount: organizerRevenueAmount,
+          status: "PENDING",
+        },
+      });
+    }
     return true;
   });
 
