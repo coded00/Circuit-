@@ -373,22 +373,6 @@ export default function AccountForm({
             </button>
           </div>
         )}
-
-        <details className="mt-1 text-xs text-muted-foreground">
-          <summary className="cursor-pointer hover:text-foreground">Advanced / Raw Recipient Code</summary>
-          <div className="pt-2 flex flex-col gap-1.5">
-            <input
-              id="rawPayoutRef"
-              placeholder="e.g. RCP_xxxxxxxxxxxx"
-              value={payoutMethodRef}
-              onChange={(e) => setPayoutMethodRef(e.target.value)}
-              className="field-input font-mono text-xs"
-            />
-            <span className="text-[11px] text-muted-foreground">
-              Directly sets User.payoutMethodRef. Overridden automatically when you verify a bank account above.
-            </span>
-          </div>
-        </details>
       </div>
 
       {error && <p className="field-error">{error}</p>}

@@ -79,6 +79,22 @@ export async function PATCH(request: Request) {
 
   if (body.payoutMethodRef !== undefined) {
     const ref = typeof body.payoutMethodRef === "string" ? body.payoutMethodRef.trim() : "";
+    // Real payout destinations only ever come from /api/payments/resolve-
+    // account, which verifies the bank account with Paystack first and
+    // returns their own RCP_... recipient code (src/lib/payments/
+    // paystack.ts's createTransferRecipient) — never typed by hand. This
+    // format check is what actually enforces that invariant server-side;
+    // the account page used to expose a raw text input that could set
+    // this to anything, bypassing verification entirely. Underscores are
+    // allowed (not just alphanumeric) so this still accepts the dev-mode
+    // simulated code (RCP_sim_..., resolve-account/route.ts's own
+    // fallback when PAYSTACK_SECRET_KEY is unset).
+    if (ref && !/^RCP_[A-Za-z0-9_]+$/.test(ref)) {
+      return NextResponse.json(
+        { error: "Invalid payout method. Link a bank account instead of setting this directly." },
+        { status: 400 }
+      );
+    }
     data.payoutMethodRef = ref || null;
   }
 
