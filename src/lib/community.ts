@@ -243,7 +243,9 @@ export type MessageCursorPage = {
  *  cursor-on-id pagination — `createdAt` isn't unique enough alone under
  *  concurrent writes, `id` (cuid, monotonically-ish sortable) plus its
  *  own createdAt is. */
-export async function getChannelMessages(channelId: string, cursor?: string, take = 50): Promise<MessageCursorPage> {
+export async function getChannelMessages(channelId: string, userId: string, cursor?: string, take = 50): Promise<MessageCursorPage> {
+  await assertChannelMembership(channelId, userId);
+
   const messages = await prisma.message.findMany({
     where: { channelId },
     orderBy: { createdAt: "desc" },
@@ -263,12 +265,33 @@ export async function getChannelMessages(channelId: string, cursor?: string, tak
 /** The polling path's own query — "what's new since I last checked,"
  *  oldest-first, uncapped (a channel realistically won't produce enough
  *  messages in one poll interval to need a limit here). */
-export async function getChannelMessagesSince(channelId: string, since: Date): Promise<MessageCursorPage["messages"]> {
+export async function getChannelMessagesSince(channelId: string, userId: string, since: Date): Promise<MessageCursorPage["messages"]> {
+  await assertChannelMembership(channelId, userId);
+
   return prisma.message.findMany({
     where: { channelId, createdAt: { gt: since } },
     orderBy: { createdAt: "asc" },
     include: { author: { select: { id: true, displayName: true, handle: true, avatarUrl: true } } },
   });
+}
+
+/** Every channel action — reading messages or sending one — requires the
+ *  caller to be a member of the channel's community. Reads and sends were
+ *  previously checked separately (sendMessage had its own inline check,
+ *  reads had none at all — a real broken-access-control bug: any
+ *  authenticated user could read any channel's full history, including a
+ *  tournament-restricted community they never joined, just by knowing its
+ *  channelId). This is now the one shared gate both paths go through. */
+async function assertChannelMembership(channelId: string, userId: string): Promise<{ communityId: string }> {
+  const channel = await prisma.channel.findUnique({ where: { id: channelId }, select: { communityId: true } });
+  if (!channel) throw new CommunityError("NOT_FOUND", "Channel not found.");
+
+  const membership = await prisma.communityMember.findUnique({
+    where: { communityId_userId: { communityId: channel.communityId, userId } },
+  });
+  if (!membership) throw new CommunityError("NOT_A_MEMBER", "Join the community to view this channel.");
+
+  return channel;
 }
 
 export async function sendMessage(channelId: string, authorId: string, content: string) {
@@ -278,13 +301,7 @@ export async function sendMessage(channelId: string, authorId: string, content: 
     throw new CommunityError("MESSAGE_TOO_LONG", `Messages are limited to ${MAX_MESSAGE_LENGTH} characters.`);
   }
 
-  const channel = await prisma.channel.findUnique({ where: { id: channelId }, select: { communityId: true } });
-  if (!channel) throw new CommunityError("NOT_FOUND", "Channel not found.");
-
-  const membership = await prisma.communityMember.findUnique({
-    where: { communityId_userId: { communityId: channel.communityId, userId: authorId } },
-  });
-  if (!membership) throw new CommunityError("NOT_A_MEMBER", "Join the community to post.");
+  await assertChannelMembership(channelId, authorId);
 
   return prisma.message.create({
     data: { channelId, authorId, content: trimmed },

@@ -33,6 +33,12 @@ export async function POST(
   if (!target) {
     return NextResponse.json({ error: "Account not found." }, { status: 404 });
   }
+  // Same protection as admin/users/[id] (which handles ordinary-user
+  // suspension) — without it, any moderator-level staff account could
+  // suspend another staff member, or a Super Admin, through this route.
+  if (target.isStaff) {
+    return NextResponse.json({ error: "Staff accounts can't be suspended from here." }, { status: 409 });
+  }
 
   await prisma.user.update({
     where: { id },

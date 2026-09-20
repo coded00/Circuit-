@@ -42,7 +42,7 @@ export default async function GlobalCommunityPage() {
   );
 
   const initialMessages = orderedChannels[0]
-    ? await getChannelMessages(orderedChannels[0].id)
+    ? await getChannelMessages(orderedChannels[0].id, user.id)
     : { messages: [], nextCursor: null };
 
   return (

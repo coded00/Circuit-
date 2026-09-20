@@ -28,13 +28,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ chan
   const cursor = searchParams.get("cursor") ?? undefined;
   const since = searchParams.get("since"); // ISO timestamp — "only what's new" for the polling path
 
-  if (since) {
-    const messages = await getChannelMessagesSince(channelId, new Date(since));
-    return NextResponse.json({ messages });
-  }
+  try {
+    if (since) {
+      const messages = await getChannelMessagesSince(channelId, user.id, new Date(since));
+      return NextResponse.json({ messages });
+    }
 
-  const page = await getChannelMessages(channelId, cursor);
-  return NextResponse.json(page);
+    const page = await getChannelMessages(channelId, user.id, cursor);
+    return NextResponse.json(page);
+  } catch (err) {
+    if (err instanceof CommunityError) return NextResponse.json({ error: err.message }, { status: STATUS_BY_CODE[err.code] });
+    throw err;
+  }
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ channelId: string }> }) {

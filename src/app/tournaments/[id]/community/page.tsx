@@ -38,12 +38,18 @@ export default async function CommunityPage({ params }: { params: Promise<{ id: 
     (a, b) => (channelOrder.get(a.key) ?? 99) - (channelOrder.get(b.key) ?? 99)
   );
 
-  const [membership, initialMessages] = await Promise.all([
-    prisma.communityMember.findUnique({
-      where: { communityId_userId: { communityId: community.id, userId: user.id } },
-    }),
-    channels[0] ? getChannelMessages(channels[0].id) : Promise.resolve({ messages: [], nextCursor: null }),
-  ]);
+  // Membership has to be known BEFORE fetching messages, not fetched in
+  // parallel with them — getChannelMessages now asserts membership itself
+  // (see its own comment), and a non-member viewing this page (the
+  // community/tournament being public doesn't imply the channel's
+  // messages are) should see the join prompt, not a thrown error.
+  const membership = await prisma.communityMember.findUnique({
+    where: { communityId_userId: { communityId: community.id, userId: user.id } },
+  });
+  const initialMessages =
+    channels[0] && membership
+      ? await getChannelMessages(channels[0].id, user.id)
+      : { messages: [], nextCursor: null };
 
   return (
     <CommunityView
