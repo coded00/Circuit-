@@ -30,6 +30,7 @@ import { proofStorage } from "@/lib/storage";
 import { settleOrganizerRevenue } from "@/lib/settlement";
 import { trackEvent } from "@/lib/analytics";
 import { captureException } from "@/lib/observability";
+import { logAdminAction } from "@/lib/auditLog";
 
 export class MatchError extends Error {
   code:
@@ -774,6 +775,21 @@ export async function ruleDispute(input: RulingInput): Promise<Dispute> {
       throw new MatchError("ALREADY_RESOLVED", "This dispute has already been resolved.");
     }
 
+    // V1 audit follow-up: only a staff ruling is a real "admin action" —
+    // an organizer has no void path (refused above for tournament
+    // matches, and a Battle organizer doesn't exist), so this only ever
+    // fires for staff, same "reuse the audit log" convention as every
+    // other sensitive admin write.
+    if (input.isStaffRuling) {
+      await logAdminAction({
+        actorId: input.rulingUserId,
+        action: "dispute.void",
+        targetType: "Dispute",
+        targetId: dispute.id,
+        metadata: { matchId: dispute.matchId, ruling: input.ruling },
+      });
+    }
+
     await Promise.all([
       notify(dispute.match.playerAId, "DISPUTE_RESOLVED", { matchId: dispute.matchId, voided: true }),
       notify(dispute.match.playerBId, "DISPUTE_RESOLVED", { matchId: dispute.matchId, voided: true }),
@@ -805,6 +821,21 @@ export async function ruleDispute(input: RulingInput): Promise<Dispute> {
   const updatedDispute = await prisma.dispute.findUniqueOrThrow({ where: { id: dispute.id } });
 
   await completeMatch(dispute.match, input.winnerId);
+
+  // V1 audit follow-up: an organizer ruling on their own tournament's
+  // dispute is routine self-service (same reasoning as tournament
+  // cancellation's own audit-log condition) — only a staff ruling
+  // deciding a match winner is a real admin action worth the trail.
+  if (input.isStaffRuling) {
+    await logAdminAction({
+      actorId: input.rulingUserId,
+      action: "dispute.rule",
+      targetType: "Dispute",
+      targetId: dispute.id,
+      metadata: { matchId: dispute.matchId, winnerId: input.winnerId, ruling: input.ruling },
+    });
+  }
+
   await Promise.all([
     notify(dispute.match.playerAId, "DISPUTE_RESOLVED", { matchId: dispute.matchId }),
     notify(dispute.match.playerBId, "DISPUTE_RESOLVED", { matchId: dispute.matchId }),

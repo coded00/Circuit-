@@ -10,12 +10,34 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/session";
 import { resolveAccountNumber, createTransferRecipient } from "@/lib/payments/paystack";
+import { isRateLimited, recordAttempt } from "@/lib/rateLimit";
+
+// V1 audit follow-up: any signed-in user could previously call this
+// repeatedly with arbitrary NUBAN/bank-code pairs and get back the real
+// account holder's name — a PII-enumeration vector — plus each call costs
+// a live Paystack API call regardless of outcome. 10/hour is generous for
+// genuine typo-retries while bounding both.
+const RESOLVE_ACCOUNT_MAX_ATTEMPTS = 10;
+const RESOLVE_ACCOUNT_WINDOW_MS = 60 * 60 * 1000;
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
+
+  const rateLimitKey = `resolve-account:${user.id}`;
+  const { limited, retryAfterSeconds } = await isRateLimited(rateLimitKey, {
+    max: RESOLVE_ACCOUNT_MAX_ATTEMPTS,
+    windowMs: RESOLVE_ACCOUNT_WINDOW_MS,
+  });
+  if (limited) {
+    return NextResponse.json(
+      { error: "Too many account lookups recently. Try again shortly." },
+      { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } }
+    );
+  }
+  await recordAttempt(rateLimitKey);
 
   let body: unknown;
   try {

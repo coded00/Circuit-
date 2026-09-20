@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireStaff } from "@/lib/session";
+import { logAdminAction } from "@/lib/auditLog";
 
 const VALID_STATUSES = ["REVIEWED", "ACTIONED", "DISMISSED"];
 
@@ -14,6 +15,7 @@ export async function PATCH(
 ) {
   const staffAuth = await requireStaff();
   if (staffAuth.error) return staffAuth.error;
+  const staff = staffAuth.user;
 
   const { id } = await params;
   const body = await request.json().catch(() => null);
@@ -28,5 +30,17 @@ export async function PATCH(
   }
 
   const updated = await prisma.report.update({ where: { id }, data: { status } });
+
+  // V1 audit follow-up: a moderation decision on an abuse report had no
+  // audit trail at all — lower stakes than a suspension/dispute ruling,
+  // but still a real moderation action worth the same trail.
+  await logAdminAction({
+    actorId: staff.id,
+    action: "report.statusChange",
+    targetType: "Report",
+    targetId: id,
+    metadata: { status: updated.status, reportedUserId: report.reportedUserId },
+  });
+
   return NextResponse.json({ status: updated.status });
 }

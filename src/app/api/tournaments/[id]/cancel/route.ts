@@ -113,6 +113,21 @@ export async function POST(
     );
     if (!paidEntryFeeTxn) continue; // free registration — nothing to refund
 
+    // V1 audit follow-up: refunding the ENTRY_FEE alone left that
+    // registration's already-carved PLATFORM_FEE (still COMPLETE forever)
+    // and ORGANIZER_REVENUE (still PENDING forever, since a cancelled
+    // tournament never reaches completedAt — see that field's own schema
+    // comment) rows dangling. The platform kept "earning" a fee on money
+    // it just gave back, and /admin/finance's revenue tiles (which sum
+    // COMPLETE PLATFORM_FEE rows) overstated actual revenue after any
+    // cancelled-and-refunded tournament. Reusing FAILED — the same status
+    // an ENTRY_FEE/payout row already gets when its money movement didn't
+    // actually happen — rather than a new EscrowType or a negative-amount
+    // reversal entry: the simplest fit that correctly drops both out of
+    // every COMPLETE/PENDING sum this ledger is read through.
+    const platformFeeTxn = registration.escrowTxns.find((txn) => txn.type === "PLATFORM_FEE" && txn.status === "COMPLETE");
+    const organizerRevenueTxn = registration.escrowTxns.find((txn) => txn.type === "ORGANIZER_REVENUE" && txn.status === "PENDING");
+
     try {
       const provider = getPaymentProvider(paidEntryFeeTxn.provider!); // always set for an ENTRY_FEE row
       const refund = await provider.refundCharge(
@@ -136,6 +151,8 @@ export async function POST(
             status: refund.status === "SUCCESS" ? "COMPLETE" : "PENDING",
           },
         }),
+        ...(platformFeeTxn ? [prisma.escrowTransaction.update({ where: { id: platformFeeTxn.id }, data: { status: "FAILED" as const } })] : []),
+        ...(organizerRevenueTxn ? [prisma.escrowTransaction.update({ where: { id: organizerRevenueTxn.id }, data: { status: "FAILED" as const } })] : []),
       ]);
       refundedCount++;
     } catch (err) {

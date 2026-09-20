@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireStaff } from "@/lib/session";
+import { logAdminAction } from "@/lib/auditLog";
 
 export async function POST(
   request: Request,
@@ -8,6 +9,7 @@ export async function POST(
 ) {
   const staffAuth = await requireStaff();
   if (staffAuth.error) return staffAuth.error;
+  const staff = staffAuth.user;
 
   const { id } = await params;
   const target = await prisma.user.findUnique({ where: { id } });
@@ -25,6 +27,14 @@ export async function POST(
   await prisma.user.update({
     where: { id },
     data: { isSuspended: false, suspensionReason: null },
+  });
+
+  // V1 audit follow-up — same gap as this route's suspend sibling.
+  await logAdminAction({
+    actorId: staff.id,
+    action: "user.unsuspend",
+    targetType: "User",
+    targetId: id,
   });
 
   return NextResponse.json({ ok: true });

@@ -9,6 +9,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireStaff } from "@/lib/session";
+import { logAdminAction } from "@/lib/auditLog";
 
 export async function POST(
   request: Request,
@@ -16,6 +17,7 @@ export async function POST(
 ) {
   const staffAuth = await requireStaff();
   if (staffAuth.error) return staffAuth.error;
+  const staff = staffAuth.user;
 
   const { id } = await params;
   const body = await request.json().catch(() => null);
@@ -38,6 +40,19 @@ export async function POST(
   await prisma.user.update({
     where: { id },
     data: { isSuspended: true, suspensionReason: reason },
+  });
+
+  // V1 audit follow-up: this route (driven by the Reports queue) did the
+  // exact same write as admin/users/[id]'s own suspend action but never
+  // logged it — a moderator suspending someone from the Reports queue
+  // left zero audit trail, while the equivalent action from /admin/users
+  // was fully logged.
+  await logAdminAction({
+    actorId: staff.id,
+    action: "user.suspend",
+    targetType: "User",
+    targetId: id,
+    metadata: { reason },
   });
 
   return NextResponse.json({ ok: true });
