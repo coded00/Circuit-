@@ -71,7 +71,16 @@ export function BannerRow({
 
         <div className="flex min-w-0 flex-1 flex-col">
           <span className="truncate text-sm font-semibold">{banner.headline}</span>
-          <span className="truncate text-xs text-muted">
+          {/* V1 audit follow-up: `scheduled` compares publishAt against
+              `new Date()` at render time — server and client render at
+              genuinely different instants, so this can legitimately
+              differ by the render's own latency (not a systematic
+              timezone gap like CommunityView.tsx's own fix). React's own
+              recommended fix for a real, expected, low-consequence
+              server/client value mismatch is suppressHydrationWarning,
+              not a heavier useEffect-deferred render for an admin-only
+              "Scheduled" badge. */}
+          <span className="truncate text-xs text-muted" suppressHydrationWarning>
             {scheduled ? `Scheduled for ${new Date(banner.publishAt!).toLocaleString("en-NG")}` : banner.description || "No description"}
           </span>
         </div>

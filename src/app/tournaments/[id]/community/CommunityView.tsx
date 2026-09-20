@@ -27,8 +27,26 @@ const POLL_INTERVAL_MS = 4000;
  *  only data already on the message (author, createdAt), nothing new. */
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
 
+// V1 audit follow-up: `Intl`'s default timeZone is the *runtime's own*
+// local zone — the server (likely UTC) and a visitor's browser almost
+// never agree, which both produces a React hydration-mismatch warning
+// (this is a "use client" component, so it's still server-rendered for
+// the initial HTML) and can show the wrong day/time until the client
+// re-renders. Pinning Africa/Lagos explicitly — Circuit's own locale
+// throughout ("en-NG" everywhere) — makes server and client compute the
+// exact same value regardless of where either actually runs.
+const LOCAL_TIME_ZONE = "Africa/Lagos";
+
 function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString("en-NG", { hour: "numeric", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString("en-NG", { hour: "numeric", minute: "2-digit", timeZone: LOCAL_TIME_ZONE });
+}
+
+/** The LOCAL_TIME_ZONE calendar date as a stable string key — used both
+ *  to decide "Today"/"Yesterday" below and to decide where a day divider
+ *  goes in groupMessages, so both agree on the same day boundary
+ *  regardless of the runtime's own timezone. */
+function dayKeyIn(date: Date): string {
+  return date.toLocaleDateString("en-CA", { timeZone: LOCAL_TIME_ZONE }); // en-CA => YYYY-MM-DD
 }
 
 /** "Today" / "Yesterday" / a real date — for the divider between
@@ -39,11 +57,9 @@ function formatDayDivider(iso: string): string {
   const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
-  const isSameDay = (a: Date, b: Date) =>
-    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-  if (isSameDay(date, today)) return "Today";
-  if (isSameDay(date, yesterday)) return "Yesterday";
-  return date.toLocaleDateString("en-NG", { day: "numeric", month: "long", year: "numeric" });
+  if (dayKeyIn(date) === dayKeyIn(today)) return "Today";
+  if (dayKeyIn(date) === dayKeyIn(yesterday)) return "Yesterday";
+  return date.toLocaleDateString("en-NG", { day: "numeric", month: "long", year: "numeric", timeZone: LOCAL_TIME_ZONE });
 }
 
 type MessageGroup = { author: Author; dayLabel: string | null; messages: MessageInfo[] };
@@ -56,8 +72,7 @@ function groupMessages(messages: MessageInfo[]): MessageGroup[] {
   let lastDayKey: string | null = null;
 
   for (const message of messages) {
-    const day = new Date(message.createdAt);
-    const dayKey = `${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`;
+    const dayKey = dayKeyIn(new Date(message.createdAt));
     const isNewDay = dayKey !== lastDayKey;
     lastDayKey = dayKey;
 
