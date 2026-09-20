@@ -117,8 +117,20 @@ export async function confirmWalletFunding(reference: string): Promise<void> {
     return;
   }
 
-  await prisma.$transaction([
-    prisma.walletTransaction.update({ where: { id: txn.id }, data: { status: "COMPLETE" } }),
-    prisma.user.update({ where: { id: txn.userId }, data: { walletBalance: { increment: txn.amount } } }),
-  ]);
+  // The "still PENDING" check above is only a fast-path read, taken before
+  // the (slow) provider call — not the actual guard. Two calls for the same
+  // reference (a webhook retry racing the redirect callback, or two webhook
+  // deliveries) could both pass that read before either commits. The real
+  // guard is this conditional update: only the call that actually flips
+  // PENDING→COMPLETE gets to increment the balance, so a genuine race
+  // credits the wallet once, not twice.
+  await prisma.$transaction(async (tx) => {
+    const updated = await tx.walletTransaction.updateMany({
+      where: { id: txn.id, status: "PENDING" },
+      data: { status: "COMPLETE" },
+    });
+    if (updated.count === 0) return; // a concurrent call already credited this reference
+
+    await tx.user.update({ where: { id: txn.userId }, data: { walletBalance: { increment: txn.amount } } });
+  });
 }

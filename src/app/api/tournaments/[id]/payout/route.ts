@@ -9,10 +9,26 @@
  */
 
 import { NextResponse } from "next/server";
+import { Prisma, EscrowStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { getDefaultPaymentProvider } from "@/lib/payments";
 import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
+
+// A row still PENDING or already COMPLETE means this prize is spoken for;
+// a FAILED row (the transfer call itself errored, or the provider reported
+// a failure) doesn't block a fresh claim attempt.
+const CLAIMED_STATUSES: EscrowStatus[] = ["PENDING", "COMPLETE"];
+
+// Same isolation + retry pattern as applyWinnerAdvancement in
+// src/lib/matches.ts, for the same reason: this "check nothing exists yet,
+// then create" needs to be atomic against a second concurrent request, not
+// just fast — a plain read-then-write here previously let two concurrent
+// claims from the legitimate champion both pass the check, both call
+// Paystack, and both succeed, i.e. a real double payout of prize money.
+const PAYOUT_CLAIM_MAX_RETRIES = 3;
+
+class AlreadyClaimedError extends Error {}
 
 export async function POST(
   request: Request,
@@ -46,8 +62,11 @@ export async function POST(
     return NextResponse.json({ error: "Only the tournament champion can claim this prize." }, { status: 403 });
   }
 
+  // Fast-path check only — not the actual guard against a concurrent
+  // double-claim (that's the transaction below). This just avoids running
+  // the age-gate/payout-method checks below for the common case.
   const existingPayout = await prisma.escrowTransaction.findFirst({
-    where: { tournamentId: id, type: "PRIZE_PAYOUT" },
+    where: { tournamentId: id, type: "PRIZE_PAYOUT", status: { in: CLAIMED_STATUSES } },
   });
   if (existingPayout) {
     return NextResponse.json({ error: "This prize has already been claimed." }, { status: 409 });
@@ -80,24 +99,64 @@ export async function POST(
 
   const provider = getDefaultPaymentProvider();
   const reference = `payout_${tournament.id}`;
-  const transfer = await provider.initiateTransfer({
-    amount: tournament.prizeAmount,
-    currency: "NGN",
-    destinationRef: user.payoutMethodRef,
-    reference,
-    reason: `Prize payout — ${tournament.name}`,
-  });
+  const prizeAmount = tournament.prizeAmount;
 
-  await prisma.escrowTransaction.create({
-    data: {
-      tournamentId: tournament.id,
-      type: "PRIZE_PAYOUT",
-      amount: tournament.prizeAmount,
-      provider: provider.name,
-      providerRef: transfer.providerReference,
-      status: transfer.status === "SUCCESS" ? "COMPLETE" : "PENDING",
-    },
-  });
+  // Reserve the claim — a PENDING row created inside a Serializable
+  // transaction that re-checks for an existing claim first. Two concurrent
+  // requests can't both pass this: Postgres forces one to retry, and the
+  // retry sees the row the other one committed.
+  let txnId: string;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      txnId = await prisma.$transaction(
+        async (tx) => {
+          const existing = await tx.escrowTransaction.findFirst({
+            where: { tournamentId: id, type: "PRIZE_PAYOUT", status: { in: CLAIMED_STATUSES } },
+          });
+          if (existing) throw new AlreadyClaimedError();
 
-  return NextResponse.json({ status: transfer.status });
+          const row = await tx.escrowTransaction.create({
+            data: { tournamentId: tournament.id, type: "PRIZE_PAYOUT", amount: prizeAmount, provider: provider.name, status: "PENDING" },
+          });
+          return row.id;
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+      );
+      break;
+    } catch (err) {
+      if (err instanceof AlreadyClaimedError) {
+        return NextResponse.json({ error: "This prize has already been claimed." }, { status: 409 });
+      }
+      const isSerializationFailure = err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2034";
+      if (isSerializationFailure && attempt < PAYOUT_CLAIM_MAX_RETRIES - 1) continue;
+      throw err;
+    }
+  }
+
+  try {
+    const transfer = await provider.initiateTransfer({
+      amount: prizeAmount,
+      currency: "NGN",
+      destinationRef: user.payoutMethodRef,
+      reference,
+      reason: `Prize payout — ${tournament.name}`,
+    });
+
+    await prisma.escrowTransaction.update({
+      where: { id: txnId },
+      data: {
+        providerRef: transfer.providerReference,
+        status: transfer.status === "SUCCESS" ? "COMPLETE" : transfer.status === "FAILED" ? "FAILED" : "PENDING",
+      },
+    });
+
+    return NextResponse.json({ status: transfer.status });
+  } catch (err) {
+    // The transfer call itself threw (network/provider error, not a
+    // reported FAILED status) — nothing confirmed to have left custody.
+    // Mark FAILED rather than leaving the reservation stuck PENDING
+    // forever; a FAILED row doesn't block the champion trying again.
+    await prisma.escrowTransaction.update({ where: { id: txnId }, data: { status: "FAILED" } });
+    throw err;
+  }
 }

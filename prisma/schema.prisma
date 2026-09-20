@@ -535,7 +535,12 @@ model EscrowTransaction {
   /// provider touched (same reasoning as `WalletTransactionType.
   /// STAKE_DEBIT`/`STAKE_PAYOUT_CREDIT`).
   provider       PaymentProviderName?
-  providerRef    String?
+  /// Unique like WalletTransaction.providerRef — a duplicate provider
+  /// reference (a literal webhook replay, or two writes racing to record
+  /// the same transfer/charge) fails at the DB, not just in application
+  /// logic. Multiple NULLs are fine (Postgres doesn't treat them as
+  /// duplicates) — only set once a provider call actually returns one.
+  providerRef    String?              @unique
   status         EscrowStatus         @default(PENDING)
   createdAt      DateTime             @default(now())
 
