@@ -1,12 +1,14 @@
 name: CI
 
-# Runs on every push and PR: typecheck, lint, and a production build.
-# Uses placeholder env values, not a real database — nothing in this repo
-# performs a build-time DB query (no generateStaticParams, no top-level
-# `dynamic` overrides; every page is request-time dynamic behind a real
-# session cookie check), so `next build` only needs `DATABASE_URL` to be
-# a syntactically valid Postgres URL for Prisma's client to initialize,
-# not a reachable one.
+# Runs on every push and PR: typecheck, lint, the real Vitest suite
+# (against an ephemeral Postgres service — spun up fresh for this run,
+# migrated, then discarded; never the real Neon dev/prod database), and a
+# production build. The build step itself still doesn't need a *reachable*
+# database on its own (nothing in this repo performs a build-time DB
+# query — no generateStaticParams, no top-level `dynamic` overrides;
+# every page is request-time dynamic behind a real session cookie check),
+# but DATABASE_URL now points at a real one anyway since the service is
+# already up for the test step.
 
 on:
   push:
@@ -17,9 +19,31 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      DATABASE_URL: "postgresql://ci:ci@localhost:5432/circuit_ci"
+      DATABASE_URL: "postgresql://circuit:circuit@localhost:5432/circuit_test"
       JWT_SECRET: "ci-placeholder-secret-do-not-use-in-production"
       NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+      # The webhook-signature unit tests need real (if fake) values —
+      # PAYSTACK_SECRET_KEY/FLUTTERWAVE_SECRET_HASH deliberately fail
+      # closed when unset, which is exactly what those tests assert on
+      # too, so each test sets/restores its own value rather than relying
+      # on this — this is just so nothing else that happens to read them
+      # at import time throws.
+      PAYSTACK_SECRET_KEY: "ci-placeholder-paystack-key"
+      FLUTTERWAVE_SECRET_HASH: "ci-placeholder-flutterwave-hash"
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: circuit
+          POSTGRES_PASSWORD: circuit
+          POSTGRES_DB: circuit_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -49,6 +73,12 @@ jobs:
 
       - name: Lint
         run: npx eslint .
+
+      - name: Apply database migrations
+        run: npx prisma migrate deploy
+
+      - name: Test
+        run: npm test
 
       - name: Build
         run: npm run build
