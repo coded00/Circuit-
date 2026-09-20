@@ -21,6 +21,7 @@ import { getCurrentUser } from "@/lib/session";
 import { getDefaultPaymentProvider } from "@/lib/payments";
 import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
 import { trackEvent } from "@/lib/analytics";
+import { captureException, captureMessage } from "@/lib/observability";
 
 const MIN_WITHDRAW_AMOUNT = 10000; // ₦100
 
@@ -119,6 +120,12 @@ export async function POST(request: Request) {
     if (transfer.status === "FAILED") {
       // Nothing actually left the platform — give the balance back.
       await prisma.user.update({ where: { id: user.id }, data: { walletBalance: { increment: amount } } });
+      captureMessage("Wallet withdrawal reported FAILED by provider", "warning", {
+        userId: user.id,
+        walletTransactionId: txnId,
+        amount,
+        provider: provider.name,
+      });
       return NextResponse.json({ error: "Withdrawal failed. Your balance has been restored." }, { status: 502 });
     }
 
@@ -128,6 +135,11 @@ export async function POST(request: Request) {
   } catch (err) {
     // The transfer call itself threw (network/provider error, not a
     // reported FAILED status) — same restoration, nothing left custody.
+    // V1 audit follow-up: this used to only console-log via the
+    // uncaught throw below — a real production transfer failure here
+    // (a Paystack/Flutterwave outage mid-withdrawal) was invisible to
+    // any error-monitoring dashboard.
+    captureException(err, { route: "wallet/withdraw", userId: user.id, walletTransactionId: txnId, amount, provider: provider.name });
     await prisma.$transaction([
       prisma.user.update({ where: { id: user.id }, data: { walletBalance: { increment: amount } } }),
       prisma.walletTransaction.update({ where: { id: txnId }, data: { status: "FAILED" } }),

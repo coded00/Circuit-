@@ -27,16 +27,23 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  // The self-modification check above already guarantees the acting
-  // SUPER_ADMIN can never remove their own access, so the count can never
-  // reach zero through this route — but it could reach exactly one (just
-  // the actor), a single point of failure if that one account is ever
-  // lost or locked out. Requiring at least two is a business-continuity
-  // floor, not a security fix for an otherwise-reachable bug.
+  // Business-continuity floor, not a security fix for an otherwise-
+  // reachable bug: the self-modification check above already guarantees
+  // the acting SUPER_ADMIN can't remove their OWN access via this route,
+  // but nothing stopped them demoting/revoking every OTHER SUPER_ADMIN,
+  // leaving just themselves — a single point of failure.
+  //
+  // V1 audit follow-up: this used to exclude only `id` (the target) from
+  // the count — since the actor is always a SUPER_ADMIN (requireSuperAdmin
+  // above) and always != target (checked above), the actor was always
+  // counted, so the count could never actually reach 0 and this check
+  // never fired. Excluding both id and admin.id answers the real
+  // question: with the target removed, is there anyone left besides the
+  // actor themselves?
   const removesLastOtherSuperAdmin =
     target.adminRole === "SUPER_ADMIN" &&
     (body.revoke === true || body.role === "MODERATOR") &&
-    (await prisma.user.count({ where: { adminRole: "SUPER_ADMIN", id: { not: id } } })) === 0;
+    (await prisma.user.count({ where: { adminRole: "SUPER_ADMIN", id: { notIn: [id, admin.id] } } })) === 0;
   if (removesLastOtherSuperAdmin) {
     return NextResponse.json(
       { error: "This is the only other Super Admin — promote someone else first." },

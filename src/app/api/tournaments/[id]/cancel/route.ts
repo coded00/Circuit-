@@ -15,6 +15,7 @@ import { getCurrentUser } from "@/lib/session";
 import { getPaymentProvider } from "@/lib/payments";
 import { notify } from "@/lib/notifications";
 import { logAdminAction } from "@/lib/auditLog";
+import { captureException } from "@/lib/observability";
 
 export async function POST(
   request: Request,
@@ -137,7 +138,18 @@ export async function POST(
         }),
       ]);
       refundedCount++;
-    } catch {
+    } catch (err) {
+      // V1 audit follow-up: this used to be a silent catch — real money
+      // not returned to a player, with zero server-side log or
+      // monitoring signal, only visible in the response body's
+      // failedRegistrationIds (which nobody's watching after the fact).
+      captureException(err, {
+        route: "tournaments/[id]/cancel",
+        tournamentId: id,
+        registrationId: registration.id,
+        userId: registration.userId,
+        amount: paidEntryFeeTxn.amount,
+      });
       failedRefunds.push(registration.id);
     }
   }

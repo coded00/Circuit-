@@ -32,8 +32,18 @@ export async function POST(request: Request) {
   // Registration lookup miss, or a WalletTransaction lookup miss) — safe
   // to try both rather than parsing the reference's own prefix to decide.
   if (event?.event === "charge.success" && typeof reference === "string") {
-    await confirmEntryFeePayment(reference);
-    await confirmWalletFunding(reference);
+    try {
+      await confirmEntryFeePayment(reference);
+      await confirmWalletFunding(reference);
+    } catch (err) {
+      // V1 audit follow-up: previously an uncaught throw here became a
+      // generic 500 with no monitoring context — a real failure
+      // confirming a live entry-fee/wallet-funding payment was invisible.
+      // Still rethrown (not swallowed): the 500 makes Paystack retry this
+      // webhook later, which is the actual recovery path.
+      captureException(err, { source: "webhooks/paystack", reference });
+      throw err;
+    }
   }
 
   // Always 200 once the signature checks out — anything else makes

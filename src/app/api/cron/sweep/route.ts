@@ -12,6 +12,7 @@
 
 import { NextResponse } from "next/server";
 import { runScheduledSweep } from "@/lib/matches";
+import { captureException } from "@/lib/observability";
 
 async function handleSweep(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -40,6 +41,11 @@ async function handleSweep(request: Request) {
   } catch (error) {
     const durationMs = Date.now() - startTime;
     console.error("[cron/sweep] Unexpected failure during scheduled sweep:", error);
+    // A failure that escapes runScheduledSweep's own per-item try/catches
+    // means the whole sweep run failed outright — even more worth
+    // knowing about than a single item's failure (which is already
+    // captured inside runScheduledSweep itself).
+    captureException(error, { source: "cron/sweep", durationMs });
     return NextResponse.json(
       {
         success: false,

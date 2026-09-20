@@ -29,6 +29,7 @@ import { notify, notifyStaff } from "@/lib/notifications";
 import { proofStorage } from "@/lib/storage";
 import { settleOrganizerRevenue } from "@/lib/settlement";
 import { trackEvent } from "@/lib/analytics";
+import { captureException } from "@/lib/observability";
 
 export class MatchError extends Error {
   code:
@@ -866,6 +867,10 @@ export async function runScheduledSweep(): Promise<{
       bracketsGenerated++;
     } catch (err) {
       console.error(`[sweep] Error generating bracket for tournament ${tournament.id}:`, err);
+      // V1 audit follow-up: this sweep drives match completion (and
+      // therefore payouts) on a timer with no human watching it — a
+      // recurring failure here previously only reached the console.
+      captureException(err, { source: "sweep:bracketGeneration", tournamentId: tournament.id });
       errors.push(`tournament:${tournament.id}`);
     }
   }
@@ -890,6 +895,7 @@ export async function runScheduledSweep(): Promise<{
       autoAccepted++;
     } catch (err) {
       console.error(`[sweep] Error auto-accepting match ${match.id}:`, err);
+      captureException(err, { source: "sweep:autoAccept", matchId: match.id });
       errors.push(`match:${match.id}`);
     }
   }
@@ -910,6 +916,7 @@ export async function runScheduledSweep(): Promise<{
       escalated++;
     } catch (err) {
       console.error(`[sweep] Error escalating dispute ${dispute.id}:`, err);
+      captureException(err, { source: "sweep:disputeEscalation", disputeId: dispute.id });
       errors.push(`dispute:${dispute.id}`);
     }
   }

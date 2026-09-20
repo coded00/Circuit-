@@ -16,8 +16,19 @@ import { ALL_TEAM_SIZE_VALUES } from "@/lib/gameFormats";
 import { notifyAllUsers } from "@/lib/notifications";
 import { enableCommunity } from "@/lib/community";
 import { trackEvent } from "@/lib/analytics";
+import { isRateLimited, recordAttempt } from "@/lib/rateLimit";
+import { captureException } from "@/lib/observability";
 
 const MAX_PARTICIPANT_CAP = 128; // D2: V1 bracket ceiling.
+
+// V1 audit follow-up: every tournament creation triggers a platform-wide
+// email+push blast via notifyAllUsers below, and this route is open to
+// any signed-in player (ACC-4, no staff gate, no cost to create a free
+// tournament) — nothing previously bounded how often one account could
+// call this. Keyed by userId, not IP: the actor here is always a real
+// signed-in account, so that's the more precise identity to throttle.
+const TOURNAMENT_CREATE_MAX_ATTEMPTS = 5;
+const TOURNAMENT_CREATE_WINDOW_MS = 60 * 60 * 1000;
 
 function parseDate(value: unknown): Date | null {
   if (typeof value !== "string") return null;
@@ -33,6 +44,23 @@ export async function POST(request: Request) {
       { status: 401 }
     );
   }
+
+  const rateLimitKey = `tournament-create:${user.id}`;
+  const { limited, retryAfterSeconds } = await isRateLimited(rateLimitKey, {
+    max: TOURNAMENT_CREATE_MAX_ATTEMPTS,
+    windowMs: TOURNAMENT_CREATE_WINDOW_MS,
+  });
+  if (limited) {
+    return NextResponse.json(
+      { error: "Too many tournaments created recently. Try again shortly." },
+      { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } }
+    );
+  }
+  // No real success/failure signal to branch on here — a repeated
+  // malformed submission is just as throttle-worthy as a repeated valid
+  // one, so every call that reaches this point counts (same reasoning as
+  // the video view/share routes' own rate limiting).
+  await recordAttempt(rateLimitKey);
 
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== "object") {
@@ -175,7 +203,14 @@ export async function POST(request: Request) {
   // Fires regardless of DRAFT/OPEN status: a DRAFT tournament (registration
   // not open yet) is already surfaced as real "Announced" content elsewhere
   // (UpcomingCompetitions), so announcing it now is consistent, not premature.
-  after(() => notifyAllUsers("NEW_TOURNAMENT", { tournamentId: tournament.id, name: tournament.name }));
+  // V1 audit follow-up: a thrown error inside after() previously became
+  // an unhandled rejection Next only logs to console — invisible to any
+  // error-monitoring dashboard. Caught and captured here instead.
+  after(() =>
+    notifyAllUsers("NEW_TOURNAMENT", { tournamentId: tournament.id, name: tournament.name }).catch((err) =>
+      captureException(err, { source: "tournaments/route.ts:after", tournamentId: tournament.id })
+    )
+  );
 
   return NextResponse.json({ id: tournament.id }, { status: 201 });
 }
