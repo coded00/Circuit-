@@ -39,12 +39,19 @@ export async function POST(
   if (tournament.status === "CANCELLED") {
     return NextResponse.json({ error: "Already cancelled." }, { status: 409 });
   }
-  if (new Date() >= tournament.startAt) {
+  if (tournament.status === "COMPLETE") {
     return NextResponse.json(
-      { error: "Can't cancel after the tournament has started." },
+      { error: "Can't cancel a tournament that's already finished." },
       { status: 409 }
     );
   }
+  // Cancelling after startAt voids the whole event, not just the
+  // remaining unplayed matches — every CONFIRMED registrant is refunded
+  // below regardless of how far their own match got, and nothing further
+  // can happen to any of this tournament's matches afterward (submitResult
+  // and ruleDispute both check for CANCELLED status; the sweep's own
+  // auto-accept/escalation queries exclude a cancelled tournament's
+  // matches too — see their own comments in src/lib/matches.ts).
 
   const confirmedRegistrations = await prisma.registration.findMany({
     where: { tournamentId: id, status: "CONFIRMED" },

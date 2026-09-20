@@ -40,7 +40,8 @@ export class MatchError extends Error {
     | "NOT_ORGANIZER_REVIEW"
     | "FORBIDDEN"
     | "WINDOW_EXPIRED"
-    | "VOID_UNSUPPORTED";
+    | "VOID_UNSUPPORTED"
+    | "TOURNAMENT_CANCELLED";
 
   constructor(code: MatchError["code"], message: string) {
     super(message);
@@ -428,8 +429,14 @@ export type SubmitResultOutcome = "RECORDED" | "AUTO_COMPLETED" | "DISPUTED";
  * dispute reaches them), not something this function verifies.
  */
 export async function submitResult(input: SubmitResultInput): Promise<{ match: Match; outcome: SubmitResultOutcome }> {
-  const match = await prisma.match.findUnique({ where: { id: input.matchId } });
+  const match = await prisma.match.findUnique({
+    where: { id: input.matchId },
+    include: { tournament: { select: { status: true } } },
+  });
   if (!match) throw new MatchError("NOT_FOUND", "Match not found.");
+  if (match.tournament?.status === "CANCELLED") {
+    throw new MatchError("TOURNAMENT_CANCELLED", "This tournament was cancelled — no results can be submitted.");
+  }
   if (match.status === "COMPLETE") {
     throw new MatchError("ALREADY_COMPLETE", "This match is already complete.");
   }
@@ -615,6 +622,9 @@ export async function ruleDispute(input: RulingInput): Promise<Dispute> {
     include: { match: { include: { tournament: true, battle: true } } },
   });
   if (!dispute) throw new MatchError("NOT_FOUND", "Dispute not found.");
+  if (dispute.match.tournament?.status === "CANCELLED") {
+    throw new MatchError("TOURNAMENT_CANCELLED", "This tournament was cancelled — nothing left to rule on.");
+  }
   if (dispute.status === "RESOLVED" || dispute.status === "VOID") {
     throw new MatchError("ALREADY_RESOLVED", "This dispute has already been resolved.");
   }
@@ -781,8 +791,17 @@ export async function runScheduledSweep(): Promise<{
     }
   }
 
+  // Excludes a cancelled tournament's matches — auto-accepting a stale
+  // result would silently advance a bracket that's supposed to be void
+  // (a live cancel voids everything and refunds everyone; letting the
+  // sweep keep completing its matches afterward would undermine that).
+  // Battle matches (tournamentId null) are unaffected either way.
   const staleMatches = await prisma.match.findMany({
-    where: { status: "NEEDS_RESULT", reportWindowExpiresAt: { lte: now } },
+    where: {
+      status: "NEEDS_RESULT",
+      reportWindowExpiresAt: { lte: now },
+      OR: [{ tournamentId: null }, { tournament: { status: { not: "CANCELLED" } } }],
+    },
   });
   for (const match of staleMatches) {
     try {
@@ -796,8 +815,14 @@ export async function runScheduledSweep(): Promise<{
     }
   }
 
+  // Same reasoning as staleMatches above — a dispute on a now-voided
+  // tournament's match has nothing left to escalate to staff for.
   const overdueDisputes = await prisma.dispute.findMany({
-    where: { status: "ORGANIZER_REVIEW", organizerRulingDeadline: { lte: now } },
+    where: {
+      status: "ORGANIZER_REVIEW",
+      organizerRulingDeadline: { lte: now },
+      match: { OR: [{ tournamentId: null }, { tournament: { status: { not: "CANCELLED" } } }] },
+    },
   });
   for (const dispute of overdueDisputes) {
     try {
