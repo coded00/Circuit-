@@ -5,15 +5,13 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getCurrentUser } from "@/lib/session";
+import { requireSuperAdmin } from "@/lib/session";
 import { logAdminAction } from "@/lib/auditLog";
 
 export async function PATCH(request: Request) {
-  const admin = await getCurrentUser();
-  if (!admin) return NextResponse.json({ error: "You must be signed in." }, { status: 401 });
-  if (admin.adminRole !== "SUPER_ADMIN") {
-    return NextResponse.json({ error: "Only a Super Admin can change platform settings." }, { status: 403 });
-  }
+  const superAdminAuth = await requireSuperAdmin("Only a Super Admin can change platform settings.");
+  if (superAdminAuth.error) return superAdminAuth.error;
+  const admin = superAdminAuth.user;
 
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== "object" || typeof body.maintenanceMode !== "boolean") {

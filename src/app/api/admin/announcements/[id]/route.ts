@@ -4,13 +4,13 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getCurrentUser } from "@/lib/session";
+import { requireStaff } from "@/lib/session";
 import { logAdminAction } from "@/lib/auditLog";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const admin = await getCurrentUser();
-  if (!admin) return NextResponse.json({ error: "You must be signed in." }, { status: 401 });
-  if (!admin.isStaff) return NextResponse.json({ error: "Staff access required." }, { status: 403 });
+  const staffAuth = await requireStaff();
+  if (staffAuth.error) return staffAuth.error;
+  const admin = staffAuth.user;
 
   const { id } = await params;
   const existing = await prisma.announcement.findUnique({ where: { id } });
@@ -33,9 +33,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const admin = await getCurrentUser();
-  if (!admin) return NextResponse.json({ error: "You must be signed in." }, { status: 401 });
-  if (!admin.isStaff) return NextResponse.json({ error: "Staff access required." }, { status: 403 });
+  const staffAuth = await requireStaff();
+  if (staffAuth.error) return staffAuth.error;
+  const admin = staffAuth.user;
 
   const { id } = await params;
   const existing = await prisma.announcement.findUnique({ where: { id } });
