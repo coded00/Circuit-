@@ -10,13 +10,12 @@
  */
 
 import Link from "next/link";
-import { ArrowLeft, Calendar, Crown, Leaf, Settings2, Swords, Trophy, Users, UsersRound } from "lucide-react";
+import { ArrowLeft, Calendar, Crown, Leaf, Settings2, Share2, Swords, Target, Trophy, Users, UsersRound } from "lucide-react";
 import { GameArtTile } from "@/components/GameArtTile";
 import { ShareButton } from "@/components/ShareButton";
 import { StatusPill, matchStatusInfo } from "@/components/StatusPill";
 import TournamentTabs, { type TournamentTab } from "../TournamentTabs";
-import { BracketSlotSide } from "./BracketSlotSide";
-import { BracketCanvas } from "./BracketCanvas";
+import { BracketRounds } from "./BracketRounds";
 
 export type BracketSlot = {
   position: number;
@@ -57,7 +56,7 @@ function formatNaira(kobo: number): string {
   return `₦ ${(kobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 0 })}`;
 }
 
-function roundName(round: number, totalRounds: number): string {
+export function roundName(round: number, totalRounds: number): string {
   const fromEnd = totalRounds - round;
   if (fromEnd === 0) return "Final";
   if (fromEnd === 1) return "Semi Finals";
@@ -91,81 +90,6 @@ export function Avatar({ player, size, ringClass }: { player: Player | null; siz
       className={`flex items-center justify-center rounded-full border-2 bg-surface-elevated text-sm font-semibold text-muted ${ringClass}`}
     >
       {player.displayName.slice(0, 1).toUpperCase()}
-    </div>
-  );
-}
-
-function chunkPairs<T>(items: T[]): T[][] {
-  const pairs: T[][] = [];
-  for (let i = 0; i < items.length; i += 2) pairs.push(items.slice(i, i + 2));
-  return pairs;
-}
-
-/**
- * Bracket connector "elbow": each match card gets a 12px stub reaching a
- * shared vertical trunk (positioned at exactly half of match-card height
- * above/below the pair's own midline, both computed from the fixed 36px
- * row height below — not measured via JS), and the trunk itself carries
- * one more 12px stub into the next round. 12+12=24px matches the gap-6
- * between round columns exactly, so the line lands right at the next
- * round's column edge. This is a deterministic CSS approximation, not a
- * pixel-measured connector — close enough for a 2-8 round bracket, but
- * won't perfectly re-center itself around unusually tall match cards.
- */
-function BracketConnector({ hasNextRound }: { hasNextRound: boolean }) {
-  if (!hasNextRound) return null;
-  return (
-    <>
-      <div aria-hidden className="absolute top-9 right-[-12px] bottom-9 w-0 border-r-2 border-accent-volt/40" />
-      <div aria-hidden className="absolute top-1/2 right-[-24px] h-0 w-3 -translate-y-1/2 border-t-2 border-accent-volt/40" />
-    </>
-  );
-}
-
-function MatchCard({
-  slot,
-  userMap,
-  hasNextRound,
-  matchHref,
-  staggerIndex,
-}: {
-  slot: BracketSlot;
-  userMap: Map<string, Player>;
-  hasNextRound: boolean;
-  matchHref: (matchId: string) => string;
-  /** Position within its round column, top to bottom — Level 2's "card
-   *  stagger" (see globals.css's Phase 20 comment), reusing the existing
-   *  `.motion-slide-up`/`.motion-stagger` primitives rather than a new
-   *  bracket-specific animation. */
-  staggerIndex: number;
-}) {
-  return (
-    <div
-      className="card motion-slide-up motion-stagger relative flex flex-col gap-0 overflow-hidden p-0"
-      style={{ "--i": staggerIndex } as React.CSSProperties}
-    >
-      {[
-        { id: slot.playerAId, isWinner: slot.winnerId === slot.playerAId },
-        { id: slot.playerBId, isWinner: slot.winnerId === slot.playerBId },
-      ].map((p, i) => {
-        const player = p.id ? (userMap.get(p.id) ?? null) : null;
-        return (
-          <BracketSlotSide
-            key={i}
-            player={player}
-            isWinner={p.isWinner}
-            borderClass={i === 0 ? "border-b border-border" : ""}
-          />
-        );
-      })}
-      {slot.matchId && (
-        <Link href={matchHref(slot.matchId)} className="border-t border-border px-3 py-1.5 text-xs font-medium text-accent-blue hover:underline">
-          View match →
-        </Link>
-      )}
-      {hasNextRound && (
-        <div aria-hidden className="absolute top-1/2 right-[-12px] h-0 w-3 -translate-y-1/2 border-t-2 border-accent-volt/40" />
-      )}
     </div>
   );
 }
@@ -217,8 +141,9 @@ export function BracketView({
   users,
   matches,
   championRank,
+  topFragger,
   backHref,
-  matchHref,
+  matchHrefBase,
   playerHref,
   tournamentHref,
   shareUrl,
@@ -228,9 +153,18 @@ export function BracketView({
   users: Player[];
   matches: ViewMatch[];
   championRank: number | null;
+  /** Highest self-reported kills across the tournament — omit/null hides
+   *  the Top Fragger card rather than crowning a fabricated 0-kill
+   *  "winner" (see `computeTopFragger`'s own doc on why this can be null:
+   *  not every game has a kill count, and nobody's required to enter one). */
+  topFragger?: { userId: string; totalKills: number } | null;
   /** "Back to Tournament" at the top of the hero card. */
   backHref: string;
-  matchHref: (matchId: string) => string;
+  /** Prefix only (e.g. "/matches" or "/admin/matches") — `${matchHrefBase}/${matchId}`
+   *  builds the real link. A plain string, not a function: `BracketRounds`
+   *  is a client component, and a function prop can't cross that server →
+   *  client boundary the way a string can. */
+  matchHrefBase: string;
   playerHref: (userId: string, handle: string) => string;
   /** "View full tournament page →" in the About tab — omit to hide it. */
   tournamentHref?: string;
@@ -241,42 +175,13 @@ export function BracketView({
   const champion = structure.rounds[structure.totalRounds - 1]?.slots[0]?.winnerId ?? null;
   const championPlayer = champion ? (userMap.get(champion) ?? null) : null;
   const placements = computePlacements(structure);
+  const topFraggerPlayer = topFragger ? (userMap.get(topFragger.userId) ?? null) : null;
 
   const tabs: TournamentTab[] = [
     {
       key: "bracket",
       label: "Bracket",
-      content: (
-        <BracketCanvas>
-          <div className="flex min-w-max items-stretch gap-6">
-            {structure.rounds.map((round) => {
-              const isLast = round.round === structure.totalRounds;
-              return (
-                <div key={round.round} className="flex w-60 shrink-0 flex-col gap-4">
-                  <h2 className="text-eyebrow text-center">{roundName(round.round, structure.totalRounds)}</h2>
-                  <div className="flex flex-1 flex-col justify-around gap-6">
-                    {chunkPairs(round.slots).map((pair, pairIndex) => (
-                      <div key={pairIndex} className="relative flex flex-col gap-6">
-                        {pair.map((slot, slotIndex) => (
-                          <MatchCard
-                            key={slot.position}
-                            slot={slot}
-                            userMap={userMap}
-                            hasNextRound={!isLast}
-                            matchHref={matchHref}
-                            staggerIndex={pairIndex * 2 + slotIndex}
-                          />
-                        ))}
-                        {pair.length === 2 && <BracketConnector hasNextRound={!isLast} />}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </BracketCanvas>
-      ),
+      content: <BracketRounds structure={structure} users={users} matchHrefBase={matchHrefBase} />,
     },
     {
       key: "matches",
@@ -289,7 +194,7 @@ export function BracketView({
             {matches.map((match) => {
               const status = matchStatusInfo(match.status);
               return (
-                <Link key={match.id} href={matchHref(match.id)} className="card-row flex items-center justify-between gap-3 p-3">
+                <Link key={match.id} href={`${matchHrefBase}/${match.id}`} className="card-row flex items-center justify-between gap-3 p-3">
                   <div className="flex min-w-0 flex-col gap-0.5">
                     <span className="text-metadata">{roundName(match.round ?? 0, structure.totalRounds)}</span>
                     <span className="truncate text-sm font-medium">
@@ -375,7 +280,7 @@ export function BracketView({
 
   return (
     <div className="flex w-full flex-1 flex-col gap-6">
-      <div data-surface="dark" className="relative overflow-hidden rounded-[20px] border border-border p-6 sm:p-8">
+      <div data-surface="dark" className="relative overflow-hidden rounded-[var(--radius-hero)] border border-border p-6 sm:p-8">
         <GameArtTile game={tournament.game} posterUrl={tournament.posterUrl} className="opacity-[0.16]" fill hideLabel imgWidth={1400} />
         <div
           aria-hidden
@@ -413,7 +318,7 @@ export function BracketView({
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
-        <TournamentTabs tabs={tabs} trailing={shareUrl ? <ShareButton title={`${tournament.name} bracket on Circuit`} url={shareUrl} /> : undefined} />
+        <TournamentTabs tabs={tabs} trailing={shareUrl ? <ShareButton key="share" title={`${tournament.name} bracket on Circuit`} url={shareUrl} /> : undefined} />
 
         <aside className="flex h-fit flex-col gap-4 lg:sticky lg:top-[76px]">
           <div data-surface="dark" className="card flex flex-col items-center gap-3 overflow-hidden p-6 text-center">
@@ -437,8 +342,36 @@ export function BracketView({
             </div>
             {championRank != null && <span className="text-xs font-semibold text-gold">Rank #{championRank}</span>}
             <p className="text-xs text-muted">{champion ? "Crowned after the Final." : "Still to be decided — check back once the Final is played."}</p>
+            {champion && (
+              <Link
+                href={`/share/champion/${tournament.id}`}
+                className="flex items-center gap-1.5 text-xs font-semibold text-accent-blue hover:underline"
+              >
+                <Share2 size={12} />
+                Share the champion card
+              </Link>
+            )}
             <p className="border-t border-border pt-3 text-xs text-muted italic">&ldquo;Same game. Bigger players.&rdquo;</p>
           </div>
+
+          {topFraggerPlayer && (
+            <div className="card flex flex-col items-center gap-2 p-5 text-center">
+              <Target size={18} aria-hidden className="text-accent-blue" />
+              <Avatar player={topFraggerPlayer} size={56} ringClass="border-accent-blue" />
+              <div className="flex flex-col gap-0.5">
+                <span className="text-eyebrow text-accent-blue">Top Fragger</span>
+                <span className="font-display text-lg font-bold tracking-tight">{topFraggerPlayer.displayName}</span>
+                <span className="text-xs text-muted">{topFragger!.totalKills} kills</span>
+              </div>
+              <Link
+                href={`/share/kills/${tournament.id}`}
+                className="flex items-center gap-1.5 text-xs font-semibold text-accent-blue hover:underline"
+              >
+                <Share2 size={12} />
+                Share this card
+              </Link>
+            </div>
+          )}
         </aside>
       </div>
     </div>

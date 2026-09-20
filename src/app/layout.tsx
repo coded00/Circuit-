@@ -95,7 +95,12 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${bodyFont.variable} ${displayFont.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full">
+      {/* suppressHydrationWarning is scoped to this element's own attributes
+          only (not its children) — needed because extensions like Grammarly
+          inject data-gr-* attributes onto <body> before React hydrates,
+          which otherwise logs a false-positive mismatch warning on every
+          load for anyone with that extension installed. */}
+      <body className="min-h-full" suppressHydrationWarning>
         {/* Real, static site-level facts only — see this file's own
             ORGANIZATION_JSON_LD/WEBSITE_JSON_LD comment on why no
             SearchAction. Per-page structured data (Event on tournament

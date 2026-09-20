@@ -18,6 +18,9 @@ export const GAME_IMAGES: Record<string, string> = {
   "ea fc": "https://images.unsplash.com/photo-1745997645080-941f962f1392",
   fortnite: "https://images.unsplash.com/photo-1750274077417-8765b230e311",
   "gta v": "https://images.unsplash.com/photo-1616063971315-5500225a0aaf",
+  "apex legends": "https://images.unsplash.com/photo-1558743941-459179fe00e7",
+  efootball: "https://images.unsplash.com/photo-1569531955323-33c6b2dca44b",
+  "rocket league": "https://images.unsplash.com/photo-1760604359281-b738de589439",
 };
 
 /** Case-insensitive, substring-tolerant lookup — "Call of Duty: Warzone"
@@ -48,4 +51,33 @@ export const STREAMER_PORTRAIT_IMAGES = [
 /** Builds an Unsplash CDN URL with sizing/format params. */
 export function unsplashUrl(baseUrl: string, width: number, quality = 80): string {
   return `${baseUrl}?w=${width}&q=${quality}&auto=format&fit=crop`;
+}
+
+/** A generically evocative accent color per well-known game (a shooter
+ *  reads red, a football title reads green, etc.) — descriptive color
+ *  choice only, not any game's actual trademarked brand color/logo. Used
+ *  by the win-share-card's edge accent bar. Falls back to the same
+ *  deterministic hash-based palette `gameTint` (GameArtTile.tsx) already
+ *  uses for any game outside this curated set, so an unrecognized game
+ *  still gets a consistent, non-random accent rather than none at all. */
+export const GAME_ACCENTS: Record<string, string> = {
+  valorant: "#ff4655",
+  "call of duty mobile": "#e8912d",
+  "call of duty": "#e8912d",
+  "apex legends": "#da292a",
+  "ea fc": "#1ea896",
+  efootball: "#1ea896",
+  fortnite: "#8e5ff5",
+  "gta v": "#f5a623",
+  "rocket league": "#2f8fe0",
+  "delta force": "#6b7280",
+};
+
+export function gameAccent(game: string, fallback: (game: string) => string): string {
+  const normalized = game.trim().toLowerCase();
+  if (GAME_ACCENTS[normalized]) return GAME_ACCENTS[normalized];
+  const key = Object.keys(GAME_ACCENTS)
+    .sort((a, b) => b.length - a.length)
+    .find((k) => normalized.includes(k));
+  return key ? GAME_ACCENTS[key] : fallback(game);
 }

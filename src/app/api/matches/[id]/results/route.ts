@@ -45,6 +45,7 @@ export async function POST(
 
   const winnerId = form.get("winnerId");
   const score = form.get("score");
+  const killsRaw = form.get("kills");
   const proofConfirmed = form.get("proofShowsMatchCode");
   const proofFile = form.get("proof");
 
@@ -53,6 +54,16 @@ export async function POST(
   }
   if (typeof score !== "string" || !score.trim()) {
     return NextResponse.json({ error: "Score is required." }, { status: 400 });
+  }
+  // Optional — most games don't have a meaningful per-match kill count, so
+  // this is only validated (not required) when the player actually filled it in.
+  let kills: number | undefined;
+  if (typeof killsRaw === "string" && killsRaw.trim() !== "") {
+    const parsed = Number(killsRaw);
+    if (!Number.isInteger(parsed) || parsed < 0) {
+      return NextResponse.json({ error: "Kills must be a non-negative whole number." }, { status: 400 });
+    }
+    kills = parsed;
   }
   if (proofConfirmed !== "true") {
     return NextResponse.json(
@@ -75,6 +86,7 @@ export async function POST(
       submittingUserId: user.id,
       winnerId,
       score: score.trim(),
+      kills,
       proofBuffer,
       proofContentType: proofFile.type || "application/octet-stream",
     });

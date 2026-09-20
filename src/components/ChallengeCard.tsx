@@ -43,7 +43,7 @@ export function ChallengeCard({
     <Link
       href={`/battles/${battle.id}`}
       data-surface="dark"
-      className="group relative flex h-full w-full flex-col gap-4 overflow-hidden rounded-[16px] border border-border bg-surface p-5 transition duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:border-border-hover hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] active:duration-[var(--duration-instant)]"
+      className="group relative flex h-full w-full flex-col gap-4 overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface p-5 transition duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:border-border-hover hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] active:duration-[var(--duration-instant)]"
     >
       {/* The real per-game art (or the deterministic gradient fallback for
           an unrecognized game) shown at real strength, not crushed to near-

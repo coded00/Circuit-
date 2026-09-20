@@ -302,7 +302,7 @@ export default async function BattlePage({
 
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-4">
-              <GameArtTile game={battle.game} hideLabel className="h-16 w-16 shrink-0 rounded-[14px]" />
+              <GameArtTile game={battle.game} hideLabel className="h-16 w-16 shrink-0 rounded-[var(--radius-md)]" />
               <div className="flex flex-col gap-1.5">
                 <h1 className="font-display text-3xl leading-none font-bold tracking-tight uppercase sm:text-4xl">
                   {battle.game}
@@ -322,7 +322,7 @@ export default async function BattlePage({
             </div>
           </div>
 
-          <div className="relative overflow-hidden rounded-[20px] border border-border bg-surface p-6 sm:p-10">
+          <div className="relative overflow-hidden rounded-[var(--radius-hero)] border border-border bg-surface p-6 sm:p-10">
             <GameArtTile game={battle.game} className="opacity-[0.18]" fill hideLabel imgWidth={1200} />
             <div
               aria-hidden

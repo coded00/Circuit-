@@ -15,6 +15,7 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { createSessionToken, hashPassword, sessionCookie } from "@/lib/auth";
+import { joinGlobalCommunity } from "@/lib/community";
 
 const MIN_PASSWORD_LENGTH = 8;
 const HANDLE_PATTERN = /^[a-z0-9_]{3,20}$/;
@@ -75,6 +76,11 @@ export async function POST(request: Request) {
     const user = await prisma.user.create({
       data: { emailOrPhone, passwordHash, handle, displayName: handle },
     });
+
+    // Every account is a member of Circuit's own platform-wide community
+    // from the moment it exists — not something a new player has to
+    // discover and opt into separately.
+    await joinGlobalCommunity(user.id);
 
     const token = await createSessionToken({ userId: user.id });
     const response = NextResponse.json({ id: user.id, handle: user.handle }, { status: 201 });

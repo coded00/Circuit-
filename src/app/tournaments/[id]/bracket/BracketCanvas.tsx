@@ -92,7 +92,7 @@ export function BracketCanvas({ children }: { children: ReactNode }) {
   return (
     <div
       ref={viewportRef}
-      className={`relative h-[min(68vh,46rem)] min-h-[24rem] w-full overflow-hidden rounded-xl border border-border bg-surface-elevated/40 select-none ${
+      className={`relative h-[min(75vh,52rem)] min-h-[24rem] w-full overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface-elevated/40 select-none ${
         isDragging ? "cursor-grabbing" : "cursor-grab"
       }`}
       onPointerDown={startDrag}

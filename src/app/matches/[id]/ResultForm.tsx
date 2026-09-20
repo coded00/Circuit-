@@ -19,6 +19,7 @@ export default function ResultForm({
   const router = useRouter();
   const [winnerId, setWinnerId] = useState("");
   const [score, setScore] = useState("");
+  const [kills, setKills] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -31,6 +32,7 @@ export default function ResultForm({
     const form = new FormData(event.currentTarget);
     form.set("winnerId", winnerId);
     form.set("score", score);
+    if (kills.trim()) form.set("kills", kills.trim());
     form.set("proofShowsMatchCode", confirmed ? "true" : "false");
 
     const res = await fetch(`/api/matches/${matchId}/results`, { method: "POST", body: form });
@@ -76,6 +78,25 @@ export default function ResultForm({
           onChange={(e) => setScore(e.target.value)}
           className="field-input"
         />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="kills" className="field-label">
+          Your kills (optional)
+        </label>
+        <input
+          id="kills"
+          type="number"
+          min={0}
+          step={1}
+          placeholder="e.g. 12"
+          value={kills}
+          onChange={(e) => setKills(e.target.value)}
+          className="field-input"
+        />
+        <span className="field-hint">
+          If this game tracks kills, add yours — it feeds the &quot;Top Fragger&quot; share card for this tournament.
+        </span>
       </div>
 
       <div className="flex flex-col gap-1.5">

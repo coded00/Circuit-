@@ -31,7 +31,7 @@ export function AdminMobileNav() {
         <div className="fixed inset-0 z-30 flex sm:hidden" onClick={() => setOpen(false)}>
           <div className="sheet-backdrop-enter absolute inset-0 bg-black/60" />
           <div
-            className="drawer-panel-enter relative z-10 flex h-full w-[260px] max-w-[80vw] flex-col gap-1 overflow-y-auto border-r border-border bg-surface p-4 pb-[calc(1rem_+_env(safe-area-inset-bottom))]"
+            className="drawer-panel-enter scrollbar-hide relative z-10 flex h-full w-[260px] max-w-[80vw] flex-col gap-1 overflow-y-auto border-r border-border bg-surface p-4 pb-[calc(1rem_+_env(safe-area-inset-bottom))]"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-2 flex items-center justify-between">

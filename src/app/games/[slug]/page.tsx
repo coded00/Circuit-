@@ -106,7 +106,7 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 p-6 sm:p-8">
       <div
         data-surface="dark"
-        className="relative flex min-h-[180px] w-full flex-col justify-end overflow-hidden rounded-[16px] border border-border p-6 sm:p-8"
+        className="relative flex min-h-[180px] w-full flex-col justify-end overflow-hidden rounded-[var(--radius-hero)] border border-border p-6 sm:p-8"
       >
         <GameArtTile game={game} fill hideLabel imgWidth={1200} />
         <div

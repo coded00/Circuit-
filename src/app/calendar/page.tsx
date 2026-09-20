@@ -246,7 +246,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     <div className="flex w-full flex-1 flex-col gap-6 p-6 sm:p-8">
       <div
         data-surface="dark"
-        className="relative flex h-[190px] w-full flex-col justify-center overflow-hidden rounded-[16px] border border-border px-6 sm:h-[220px] sm:px-8"
+        className="relative flex h-[190px] w-full flex-col justify-center overflow-hidden rounded-[var(--radius-hero)] border border-border px-6 sm:h-[220px] sm:px-8"
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- external CDN hero photo, same asset CircuitHero uses */}
         <img src={unsplashUrl(CINEMATIC_GAMING_IMAGE, 1400)} alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover" />

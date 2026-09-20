@@ -166,28 +166,30 @@ model User {
   walletBalance     Int        @default(0)
   createdAt         DateTime   @default(now())
 
-  organizerProfile    OrganizerProfile?
-  registrations       Registration[]
-  matchesAsPlayerA    Match[]              @relation("MatchPlayerA")
-  matchesAsPlayerB    Match[]              @relation("MatchPlayerB")
-  matchesWon          Match[]              @relation("MatchWinner")
-  battlesCreated      Battle[]             @relation("BattleCreator")
-  battlesTargeted     Battle[]             @relation("BattleTarget")
-  disputesRaised      Dispute[]            @relation("DisputeRaisedBy")
-  notifications       Notification[]
-  reportsFiled        Report[]             @relation("ReportFiledBy")
-  reportsReceived     Report[]             @relation("ReportAgainstUser")
-  communityPosts      CommunityPost[]      @relation("CommunityPostAuthor")
-  passwordResetTokens PasswordResetToken[]
-  walletTransactions  WalletTransaction[]
-  auditLogEntries     AuditLogEntry[]
-  friendshipsSent     Friendship[]         @relation("FriendshipRequester")
-  friendshipsReceived Friendship[]         @relation("FriendshipAddressee")
-  teamsCaptained      Team[]               @relation("TeamCaptain")
-  teamMemberships     TeamMembership[]
-  escrowTransactions  EscrowTransaction[]
-  videoLikes          VideoLike[]
-  videoSaves          VideoSave[]
+  organizerProfile     OrganizerProfile?
+  registrations        Registration[]
+  matchesAsPlayerA     Match[]              @relation("MatchPlayerA")
+  matchesAsPlayerB     Match[]              @relation("MatchPlayerB")
+  matchesWon           Match[]              @relation("MatchWinner")
+  battlesCreated       Battle[]             @relation("BattleCreator")
+  battlesTargeted      Battle[]             @relation("BattleTarget")
+  disputesRaised       Dispute[]            @relation("DisputeRaisedBy")
+  notifications        Notification[]
+  reportsFiled         Report[]             @relation("ReportFiledBy")
+  reportsReceived      Report[]             @relation("ReportAgainstUser")
+  communityPosts       CommunityPost[]      @relation("CommunityPostAuthor")
+  passwordResetTokens  PasswordResetToken[]
+  walletTransactions   WalletTransaction[]
+  auditLogEntries      AuditLogEntry[]
+  friendshipsSent      Friendship[]         @relation("FriendshipRequester")
+  friendshipsReceived  Friendship[]         @relation("FriendshipAddressee")
+  teamsCaptained       Team[]               @relation("TeamCaptain")
+  teamMemberships      TeamMembership[]
+  escrowTransactions   EscrowTransaction[]
+  videoLikes           VideoLike[]
+  videoSaves           VideoSave[]
+  communityMemberships CommunityMember[]
+  messages             Message[]
 
   @@index([emailOrPhone])
 }
@@ -358,6 +360,7 @@ model Tournament {
   matches       Match[]
   escrowTxns    EscrowTransaction[]
   videos        Video[]
+  community     Community?
 
   @@index([game, status])
 }
@@ -850,4 +853,96 @@ model VideoSave {
   createdAt DateTime @default(now())
 
   @@unique([videoId, userId])
+}
+
+// ---------------------------------------------------------------------------
+// Circuit Community, Phase 1 — a Discord-style chat attached to one specific
+// Tournament. Unrelated to `CommunityPost` above despite the name overlap:
+// that model is a flat, global, Twitter-like public feed with no channels,
+// no per-tournament scope, and no relation to any of the models below —
+// don't conflate the two when reading either.
+//
+// Deliberately minimal for Phase 1 (validate whether people actually talk
+// around a tournament before building reactions/roles/moderation nobody's
+// asked for yet): one Community per Tournament, four fixed channels, plain
+// text messages, join/leave, and a single last-read timestamp per member
+// for a basic unread indicator. No real-time transport — messages are read
+// via ordinary polling (see `Poller.tsx`'s own doc on why: no WebSocket
+// infra exists, Vercel serverless can't hold one open anyway, and the
+// stack docs already name Pusher/Ably as the escalation path if polling
+// ever stops feeling live enough).
+// ---------------------------------------------------------------------------
+
+/// 1:1 with Tournament for a normal community — `enabled` is the
+/// organizer's on/off switch (set at tournament creation or toggled
+/// later from the edit form), and the row itself, once created, is never
+/// deleted just by disabling, so re-enabling doesn't lose channel/
+/// message history. `tournamentId` is nullable for exactly one
+/// exception: the single platform-wide "Circuit" community every user
+/// is auto-joined to at signup (`isGlobal: true`, no tournament at all).
+/// Application code (`getOrCreateGlobalCommunity`), not a DB constraint,
+/// is what keeps that singleton to one row — see that function's own
+/// comment for why a schema-level constraint wasn't worth it at V1.
+model Community {
+  id           String      @id @default(cuid())
+  tournamentId String?     @unique
+  tournament   Tournament? @relation(fields: [tournamentId], references: [id])
+  isGlobal     Boolean     @default(false)
+  enabled      Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+
+  channels Channel[]
+  members  CommunityMember[]
+}
+
+/// The four fixed V1 channels (general/announcements/matches/results),
+/// created together when a Community is enabled. `key` (not just `name`)
+/// exists because Phase 3's auto-generated match/tournament event
+/// messages need to target "the matches channel" and "the results
+/// channel" programmatically by a stable identifier, not by matching on
+/// a human-editable display name.
+model Channel {
+  id          String    @id @default(cuid())
+  communityId String
+  community   Community @relation(fields: [communityId], references: [id])
+  key         String
+  name        String
+  createdAt   DateTime  @default(now())
+
+  messages Message[]
+
+  @@unique([communityId, key])
+}
+
+/// Join/leave membership — posting or reading requires a row here. A
+/// single `lastReadAt` per member (not per-channel) is Phase 1's
+/// deliberately basic unread signal: "anything new since I last opened
+/// this community," not a per-channel read receipt.
+model CommunityMember {
+  id          String    @id @default(cuid())
+  communityId String
+  community   Community @relation(fields: [communityId], references: [id])
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  joinedAt    DateTime  @default(now())
+  lastReadAt  DateTime  @default(now())
+
+  @@unique([communityId, userId])
+}
+
+/// Plain text only for Phase 1 — no attachments, no edit history. `isSystem`
+/// is unused today (nothing sets it true yet) but exists so Phase 3's
+/// auto-generated match/tournament event messages don't need a schema
+/// change to be visually distinguished from a real user's message.
+model Message {
+  id        String   @id @default(cuid())
+  channelId String
+  channel   Channel  @relation(fields: [channelId], references: [id])
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  content   String
+  isSystem  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([channelId, createdAt])
 }

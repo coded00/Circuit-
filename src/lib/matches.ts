@@ -76,10 +76,17 @@ type BracketStructure = {
   rounds: BracketRound[];
 };
 
-type ResultPayload = {
+export type ResultPayload = {
   winnerId: string;
   score: string;
   submittedAt: string;
+  /** Self-reported by whichever side submitted this result — same trust
+   *  model as `score` (the proof screenshot is the real backstop, this is
+   *  supplementary flavor data for the "Top Fragger" share-card award,
+   *  not money-related). Optional: most games don't have a meaningful
+   *  per-match kill count (e.g. EA FC, Rocket League), so this is never
+   *  required. */
+  kills?: number;
 };
 
 const AUTO_ACCEPT_WINDOW_MS = 2 * 60 * 60 * 1000; // BRK-10, 2h placeholder
@@ -406,6 +413,7 @@ export type SubmitResultInput = {
   submittingUserId: string;
   winnerId: string;
   score: string;
+  kills?: number;
   proofBuffer: Buffer;
   proofContentType: string;
 };
@@ -441,6 +449,7 @@ export async function submitResult(input: SubmitResultInput): Promise<{ match: M
     winnerId: input.winnerId,
     score: input.score,
     submittedAt: new Date().toISOString(),
+    ...(input.kills != null ? { kills: input.kills } : {}),
   };
 
   const updated = await prisma.match.update({

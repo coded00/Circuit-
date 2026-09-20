@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { Tournament } from "@prisma/client";
 import { ImageUrlField, POSTER_BOUNDS } from "@/components/ImageUrlField";
 import { gameFormatOptions } from "@/lib/gameFormats";
+import { defaultRulesFor } from "@/lib/gameRules";
 
 function toLocalInput(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -20,6 +21,7 @@ export default function EditForm({
   moneyFieldsLocked,
   redirectTo,
   games,
+  communityEnabled: initialCommunityEnabled,
 }: {
   tournament: Tournament;
   moneyFieldsLocked: boolean;
@@ -30,9 +32,16 @@ export default function EditForm({
    *  player-facing app. */
   redirectTo?: string;
   games: { id: string; name: string }[];
+  /** "Enable/disable from tournament settings" — this edit form is
+   *  Circuit Community Phase 1's only settings surface today. Note this
+   *  page itself redirects once registration closes (see its own page.tsx),
+   *  so toggling from here only covers the pre-close window; a LIVE
+   *  tournament's community can't be disabled mid-run yet. */
+  communityEnabled: boolean;
 }) {
   const router = useRouter();
   const [name, setName] = useState(tournament.name);
+  const [communityEnabled, setCommunityEnabled] = useState(initialCommunityEnabled);
   const [game, setGame] = useState(tournament.game);
   const [teamSize, setTeamSize] = useState(tournament.teamSize);
   const [participantCap, setParticipantCap] = useState(String(tournament.participantCap));
@@ -86,6 +95,12 @@ export default function EditForm({
       setError(data?.error ?? "Something went wrong. Please try again.");
       setSubmitting(false);
       return;
+    }
+
+    if (communityEnabled !== initialCommunityEnabled) {
+      await fetch(`/api/tournaments/${tournament.id}/community`, {
+        method: communityEnabled ? "POST" : "PATCH",
+      });
     }
 
     router.push(redirectTo ?? `/tournaments/${tournament.id}`);
@@ -291,14 +306,41 @@ export default function EditForm({
         bounds={POSTER_BOUNDS}
       />
 
+      <label className="flex items-start gap-2.5 rounded-[10px] border border-border bg-surface-elevated px-3.5 py-3">
+        <input
+          type="checkbox"
+          checked={communityEnabled}
+          onChange={(e) => setCommunityEnabled(e.target.checked)}
+          className="mt-0.5 h-4 w-4 shrink-0 rounded border-border-strong bg-surface accent-accent-blue"
+        />
+        <span className="flex flex-col gap-0.5">
+          <span className="text-sm font-medium">Enable Community</span>
+          <span className="field-hint">
+            A chat space attached to this tournament — general, announcements, matches, and results channels.
+          </span>
+        </span>
+      </label>
+
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="rulesText" className="field-label">
-          Rules
-        </label>
+        <div className="flex items-center justify-between">
+          <label htmlFor="rulesText" className="field-label">
+            Rules
+          </label>
+          {!rulesText && (
+            <button
+              type="button"
+              onClick={() => setRulesText(defaultRulesFor(game))}
+              className="text-xs font-medium text-accent-blue hover:underline"
+            >
+              Use suggested rules for {game || "this game"}
+            </button>
+          )}
+        </div>
         <textarea
           id="rulesText"
           required
           rows={5}
+          placeholder="e.g. Bo3, screenshot the final scoreboard as proof, no exploits or third-party cheats…"
           value={rulesText}
           onChange={(e) => setRulesText(e.target.value)}
           className="field-textarea"

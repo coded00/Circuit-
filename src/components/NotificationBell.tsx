@@ -96,7 +96,7 @@ export function NotificationBell({ initialUnreadCount = 0 }: { initialUnreadCoun
               Mark all read
             </button>
           </div>
-          <div className="flex max-h-80 flex-col overflow-y-auto">
+          <div className="scrollbar-hide flex max-h-80 flex-col overflow-y-auto">
             {notifications.length === 0 ? (
               <p className="p-4 text-center text-sm text-muted">You&apos;re all caught up.</p>
             ) : (

@@ -57,7 +57,7 @@ export function CircuitHero({ tournaments = [], banners = [] }: { tournaments?: 
   return (
     <div
       data-surface="dark"
-      className="relative flex h-[280px] w-full overflow-hidden rounded-[16px] border border-border sm:h-[320px] lg:h-[360px]"
+      className="relative flex h-[280px] w-full overflow-hidden rounded-[var(--radius-hero)] border border-border sm:h-[320px] lg:h-[360px]"
     >
       {/* eslint-disable-next-line @next/next/no-img-element -- external CDN hero photo, or an admin-pasted banner URL */}
       <img

@@ -14,6 +14,7 @@ import { getCurrentUser } from "@/lib/session";
 import { parseOptionalUrl } from "@/lib/validation";
 import { ALL_TEAM_SIZE_VALUES } from "@/lib/gameFormats";
 import { notifyAllUsers } from "@/lib/notifications";
+import { enableCommunity } from "@/lib/community";
 
 const MAX_PARTICIPANT_CAP = 128; // D2: V1 bracket ceiling.
 
@@ -145,6 +146,16 @@ export async function POST(request: Request) {
       status,
     },
   });
+
+  // "Community toggle during tournament creation" (Circuit Community
+  // Phase 1) — one request, not a create-then-enable round trip. Default
+  // true: maximizes how many tournaments actually get a community during
+  // the phase this whole feature exists to answer ("will people talk
+  // around a Circuit tournament?"), while still respecting an explicit
+  // opt-out.
+  if (body.enableCommunity !== false) {
+    await enableCommunity(tournament.id);
+  }
 
   // Deferred via after() so the mass fan-out (every user, potentially a
   // real batch of emails/push) never blocks the organizer's own response —

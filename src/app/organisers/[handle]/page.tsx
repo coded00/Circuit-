@@ -116,7 +116,7 @@ export default async function OrganiserPage({ params }: { params: Promise<{ hand
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-1.5">
             <h1 className="font-display text-2xl font-bold tracking-tight">{organiser.displayName}</h1>
-            {organiser.verified && <ShieldCheck size={18} className="text-accent-blue" />}
+            {organiser.verified && <ShieldCheck size={20} className="text-accent-blue" />}
           </div>
           <p className="text-sm text-muted">
             <Link href={`/players/${organiser.handle}`} className="hover:underline">

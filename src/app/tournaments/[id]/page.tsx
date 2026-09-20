@@ -21,7 +21,7 @@ import { Suspense, cache } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { Tv, Calendar, Users, Layers, Swords, Trophy, Wallet, ShieldCheck, Timer } from "lucide-react";
+import { Tv, Calendar, Users, Layers, Swords, Trophy, Wallet, ShieldCheck, Timer, MessageCircle } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { StatusPill, tournamentStatusInfo } from "@/components/StatusPill";
@@ -89,7 +89,10 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string;
 const getTournament = cache(async (id: string) =>
   prisma.tournament.findUnique({
     where: { id },
-    include: { organizer: { include: { user: { select: { handle: true, displayName: true } } } } },
+    include: {
+      organizer: { include: { user: { select: { handle: true, displayName: true } } } },
+      community: { select: { id: true, enabled: true } },
+    },
   })
 );
 
@@ -246,7 +249,7 @@ export default async function TournamentPage({
           <div className="flex flex-col gap-3 border-t border-border pt-6">
             <h2 className="text-section-heading">Game</h2>
             <Link href={gamePath(tournament.game)} className="card card-hover flex items-center gap-4">
-              <GameArtTile game={tournament.game} className="h-20 w-20 shrink-0 rounded-[10px]" hideLabel />
+              <GameArtTile game={tournament.game} className="h-20 w-20 shrink-0 rounded-[var(--radius-md)]" hideLabel />
               <div className="flex min-w-0 flex-col">
                 <span className="text-card-title truncate">{tournament.game}</span>
                 <p className="text-metadata">
@@ -356,6 +359,43 @@ export default async function TournamentPage({
           </div>
         ),
     },
+    // Hidden entirely for a non-organizer if the community was never
+    // enabled — nothing to see, and no "enable" control they can use
+    // anyway. The organizer still sees it (even disabled) so Edit is
+    // reachable from a natural place instead of only from the sidebar.
+    ...(tournament.community?.enabled || isOrganizer
+      ? [
+          {
+            key: "community",
+            label: "Community",
+            content: (
+              <div className="card flex flex-col items-center gap-3 py-12 text-center">
+                {tournament.community?.enabled ? (
+                  <>
+                    <MessageCircle size={28} className="text-accent-blue" />
+                    <p className="max-w-sm text-sm text-muted">
+                      Chat with other players about this tournament — general, announcements, matches, and results.
+                    </p>
+                    <Link href={`/tournaments/${tournament.id}/community`} className="btn-primary">
+                      Open Community →
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <MessageCircle size={28} className="text-muted" />
+                    <p className="max-w-sm text-sm text-muted">
+                      This tournament doesn&apos;t have a community yet.
+                    </p>
+                    <Link href={`/tournaments/${tournament.id}/edit`} className="btn-secondary">
+                      Enable from Edit
+                    </Link>
+                  </>
+                )}
+              </div>
+            ),
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -368,7 +408,7 @@ export default async function TournamentPage({
       <Poller />
       <div
         data-surface="dark"
-        className="relative flex min-h-[260px] w-full flex-col justify-end overflow-hidden rounded-[16px] border border-border p-6 sm:min-h-[300px] sm:p-8"
+        className="relative flex min-h-[260px] w-full flex-col justify-end overflow-hidden rounded-[var(--radius-hero)] border border-border p-6 sm:min-h-[300px] sm:p-8"
       >
         <GameArtTile game={tournament.game} posterUrl={tournament.posterUrl} fill hideLabel imgWidth={1200} />
         <div
@@ -559,7 +599,7 @@ export default async function TournamentPage({
           {canClaimPrize && <ClaimPrizeButton tournamentId={tournament.id} />}
 
           <div className="card flex items-start gap-3 bg-surface-elevated">
-            <ShieldCheck size={18} className="mt-0.5 shrink-0 text-accent-blue" />
+            <ShieldCheck size={16} className="mt-0.5 shrink-0 text-accent-blue" />
             <div className="flex flex-col gap-0.5">
               <span className="text-card-title">Fair Play Guaranteed</span>
               <p className="text-metadata">

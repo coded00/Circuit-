@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ImageUrlField, POSTER_BOUNDS } from "@/components/ImageUrlField";
 import { gameFormatOptions } from "@/lib/gameFormats";
+import { defaultRulesFor } from "@/lib/gameRules";
 
 function nairaToKobo(value: string): number {
   const naira = Number(value || 0);
@@ -11,10 +12,13 @@ function nairaToKobo(value: string): number {
 }
 
 export default function TournamentForm({
-  redirectTo,
+  redirectBase,
   games,
 }: {
-  redirectTo?: (id: string) => string;
+  // A plain path prefix, not a function — Server Component callers
+  // (e.g. the admin page) can't pass functions as props to this Client
+  // Component.
+  redirectBase?: string;
   games: { id: string; name: string }[];
 } = { games: [] }) {
   const router = useRouter();
@@ -29,6 +33,7 @@ export default function TournamentForm({
   const [prizeText, setPrizeText] = useState("");
   const [rulesText, setRulesText] = useState("");
   const [streamUrl, setStreamUrl] = useState("");
+  const [enableCommunity, setEnableCommunity] = useState(true);
   const [posterUrl, setPosterUrl] = useState("");
   const [posterBlocked, setPosterBlocked] = useState(false);
   const [registrationOpenAt, setRegistrationOpenAt] = useState("");
@@ -56,6 +61,7 @@ export default function TournamentForm({
         prizeText: prizeText || null,
         rulesText,
         streamUrl: streamUrl || null,
+        enableCommunity,
         posterUrl: posterUrl || null,
         registrationOpenAt: registrationOpenAt
           ? new Date(registrationOpenAt).toISOString()
@@ -75,7 +81,7 @@ export default function TournamentForm({
       return;
     }
 
-    router.push(redirectTo ? redirectTo(data.id) : `/tournaments/${data.id}`);
+    router.push(redirectBase ? `${redirectBase}/${data.id}` : `/tournaments/${data.id}`);
     router.refresh();
   }
 
@@ -256,13 +262,28 @@ export default function TournamentForm({
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="rulesText" className="field-label">
-          Rules
-        </label>
+        <div className="flex items-center justify-between">
+          <label htmlFor="rulesText" className="field-label">
+            Rules
+          </label>
+          {/* Only offered while the field is still blank — a quick-fill
+              suggestion, not an overwrite tool, so it can never clobber
+              rules the organizer already wrote. */}
+          {!rulesText && (
+            <button
+              type="button"
+              onClick={() => setRulesText(defaultRulesFor(game))}
+              className="text-xs font-medium text-accent-blue hover:underline"
+            >
+              Use suggested rules for {game || "this game"}
+            </button>
+          )}
+        </div>
         <textarea
           id="rulesText"
           required
           rows={5}
+          placeholder="e.g. Bo3, screenshot the final scoreboard as proof, no exploits or third-party cheats…"
           value={rulesText}
           onChange={(e) => setRulesText(e.target.value)}
           className="field-textarea"
@@ -283,6 +304,22 @@ export default function TournamentForm({
         />
         <span className="field-hint">Shown as a &quot;Watch stream&quot; link on the tournament page.</span>
       </div>
+
+      <label className="flex items-start gap-2.5 rounded-[10px] border border-border bg-surface-elevated px-3.5 py-3">
+        <input
+          type="checkbox"
+          checked={enableCommunity}
+          onChange={(e) => setEnableCommunity(e.target.checked)}
+          className="mt-0.5 h-4 w-4 shrink-0 rounded border-border-strong bg-surface accent-accent-blue"
+        />
+        <span className="flex flex-col gap-0.5">
+          <span className="text-sm font-medium">Enable Community</span>
+          <span className="field-hint">
+            Gives players a chat space attached to this tournament — general, announcements, matches, and results
+            channels. You can turn this off later from Edit.
+          </span>
+        </span>
+      </label>
 
       <ImageUrlField
         label="Tournament poster (optional)"

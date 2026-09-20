@@ -87,7 +87,7 @@ export function SearchInput({ className = "" }: { className?: string }) {
           ) : !hasResults ? (
             <p className="p-4 text-center text-sm text-muted">No results for &ldquo;{query}&rdquo;.</p>
           ) : (
-            <div className="flex max-h-96 flex-col overflow-y-auto py-2">
+            <div className="scrollbar-hide flex max-h-96 flex-col overflow-y-auto py-2">
               {results.tournaments.length > 0 && (
                 <div className="flex flex-col">
                   <span className="text-eyebrow px-4 py-1">Tournaments</span>

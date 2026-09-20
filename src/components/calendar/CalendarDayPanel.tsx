@@ -22,7 +22,7 @@ function TournamentOrChallengeCard({ event }: { event: Extract<CalendarEvent, { 
   return (
     <Link href={eventHref(event)!} className="card card-hover flex flex-col gap-3 p-3.5">
       <div className="flex items-start gap-3">
-        <GameArtTile game={event.game} className="h-11 w-11 shrink-0 rounded-[9px]" hideLabel imgWidth={120} />
+        <GameArtTile game={event.game} className="h-11 w-11 shrink-0 rounded-[var(--radius-sm)]" hideLabel imgWidth={120} />
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <div className="flex items-center justify-between gap-2">
             <span className="truncate text-xs font-semibold text-muted uppercase">{event.game}</span>
@@ -68,7 +68,7 @@ function TournamentOrChallengeCard({ event }: { event: Extract<CalendarEvent, { 
 
       <div className="flex items-center justify-between gap-2 border-t border-border pt-3">
         <span className="flex items-center gap-1.5 text-sm font-semibold text-gold">
-          <Trophy size={13} />
+          <Trophy size={14} />
           {event.kind === "tournament"
             ? event.prizeAmount
               ? formatNaira(event.prizeAmount)
@@ -141,7 +141,7 @@ export function CalendarDayPanel({
       ) : (
         /* The card's own header stays put; only this list scrolls — so
            a busy day (11+ events) can't stretch the whole page instead. */
-        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1">
+        <div className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1">
           {events.map((event) => (
             <EventCard key={`${event.kind}-${event.id}`} event={event} />
           ))}

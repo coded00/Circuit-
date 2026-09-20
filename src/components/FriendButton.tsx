@@ -48,7 +48,7 @@ export function FriendButton({ targetHandle, status }: { targetHandle: string; s
         onClick={() => remove(status.friendshipId, `Remove ${targetHandle} as a friend?`)}
         className="btn-secondary"
       >
-        <UserCheck size={13} />
+        <UserCheck size={14} />
         Friends
       </button>
     );
@@ -57,7 +57,7 @@ export function FriendButton({ targetHandle, status }: { targetHandle: string; s
   if (status.state === "outgoing") {
     return (
       <button type="button" disabled={busy} onClick={() => remove(status.friendshipId)} className="btn-secondary">
-        <Clock size={13} />
+        <Clock size={14} />
         Request Sent
       </button>
     );
@@ -67,11 +67,11 @@ export function FriendButton({ targetHandle, status }: { targetHandle: string; s
     return (
       <div className="flex gap-2">
         <button type="button" disabled={busy} onClick={() => accept(status.friendshipId)} className="btn-primary">
-          <UserCheck size={13} />
+          <UserCheck size={14} />
           Accept
         </button>
         <button type="button" disabled={busy} onClick={() => remove(status.friendshipId)} className="btn-secondary">
-          <UserX size={13} />
+          <UserX size={14} />
           Decline
         </button>
       </div>
@@ -80,7 +80,7 @@ export function FriendButton({ targetHandle, status }: { targetHandle: string; s
 
   return (
     <button type="button" disabled={busy} onClick={sendRequest} className="btn-secondary">
-      <UserPlus size={13} />
+      <UserPlus size={14} />
       Add Friend
     </button>
   );
