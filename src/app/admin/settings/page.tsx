@@ -9,10 +9,10 @@
  * - Roles & Permissions: a static explainer of the two fixed roles —
  *   there's no per-permission matrix to browse, so this is documentation,
  *   not another actionable table.
- * - Platform Settings: the two real platform-wide controls Circuit has
- *   — maintenance mode, and the platform fee rate (see `PlatformSetting`'s
- *   own schema comment for why the fee is admin-configurable rather than
- *   a code constant).
+ * - Platform Settings: the real platform-wide controls Circuit has —
+ *   maintenance mode, the platform fee rate, and the organizer-revenue
+ *   settlement window (see `PlatformSetting`'s own schema comment for why
+ *   these are admin-configurable rather than code constants).
  * - Audit Log: a real, read-only feed of every write the routes above
  *   (plus user-suspend/tournament-cancel/tournament-edit) have logged.
  */
@@ -23,6 +23,7 @@ import { getCurrentUser } from "@/lib/session";
 import { AdminUsersManager } from "@/components/admin/AdminUsersManager";
 import { MaintenanceModeToggle } from "@/components/admin/MaintenanceModeToggle";
 import { PlatformFeeControl } from "@/components/admin/PlatformFeeControl";
+import { OrganizerRevenueSettlementControl } from "@/components/admin/OrganizerRevenueSettlementControl";
 
 function timeAgo(date: Date): string {
   const ms = Date.now() - date.getTime();
@@ -131,6 +132,12 @@ export default async function AdminSettingsPage() {
         <MaintenanceModeToggle enabled={platformSetting?.maintenanceMode ?? false} canEdit={isSuperAdmin} />
         <div className="border-t border-border pt-4">
           <PlatformFeeControl platformFeeBps={platformSetting?.platformFeeBps ?? 500} canEdit={isSuperAdmin} />
+        </div>
+        <div className="border-t border-border pt-4">
+          <OrganizerRevenueSettlementControl
+            hours={platformSetting?.organizerRevenueSettlementHours ?? 24}
+            canEdit={isSuperAdmin}
+          />
         </div>
         {!isSuperAdmin && <p className="text-xs text-muted">Only a Super Admin can change these.</p>}
       </div>

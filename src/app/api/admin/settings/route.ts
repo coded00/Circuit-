@@ -1,8 +1,8 @@
 /**
  * Circuit — platform-wide settings (maintenance mode, the platform fee
- * rate). SUPER_ADMIN only — both affect every visitor/transaction, not a
- * single record. Either field may be sent alone or together; at least
- * one is required.
+ * rate, the organizer-revenue settlement window). SUPER_ADMIN only — all
+ * three affect every visitor/transaction, not a single record. Any subset
+ * of fields may be sent together; at least one is required.
  */
 
 import { NextResponse } from "next/server";
@@ -21,7 +21,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const data: { maintenanceMode?: boolean; platformFeeBps?: number } = {};
+  const data: { maintenanceMode?: boolean; platformFeeBps?: number; organizerRevenueSettlementHours?: number } = {};
   const actions: { action: string; metadata?: Prisma.InputJsonValue }[] = [];
 
   if (body.maintenanceMode !== undefined) {
@@ -44,6 +44,24 @@ export async function PATCH(request: Request) {
     actions.push({ action: "settings.platformFeeChange", metadata: { platformFeeBps: bps } });
   }
 
+  if (body.organizerRevenueSettlementHours !== undefined) {
+    const hours = Number(body.organizerRevenueSettlementHours);
+    // Read fresh at sweep time, not snapshotted per tournament (see
+    // PlatformSetting.organizerRevenueSettlementHours's own schema
+    // comment) — a change here shifts every still-PENDING tournament's
+    // settle point, not just new ones. 720h (30 days) is a real ceiling
+    // against fat-fingering a value that'd hold organizer revenue
+    // hostage indefinitely, not an arbitrary one.
+    if (!Number.isInteger(hours) || hours < 0 || hours > 720) {
+      return NextResponse.json(
+        { error: "Settlement window must be a whole number of hours between 0 and 720 (30 days)." },
+        { status: 400 }
+      );
+    }
+    data.organizerRevenueSettlementHours = hours;
+    actions.push({ action: "settings.organizerRevenueSettlementHoursChange", metadata: { organizerRevenueSettlementHours: hours } });
+  }
+
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
   }
@@ -58,5 +76,9 @@ export async function PATCH(request: Request) {
     await logAdminAction({ actorId: admin.id, action, targetType: "PlatformSetting", targetId: "singleton", metadata });
   }
 
-  return NextResponse.json({ maintenanceMode: updated.maintenanceMode, platformFeeBps: updated.platformFeeBps });
+  return NextResponse.json({
+    maintenanceMode: updated.maintenanceMode,
+    platformFeeBps: updated.platformFeeBps,
+    organizerRevenueSettlementHours: updated.organizerRevenueSettlementHours,
+  });
 }

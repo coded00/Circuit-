@@ -817,9 +817,9 @@ model PlatformSetting {
   /// settleOrganizerRevenue() in src/lib/settlement.ts. Same "computed
   /// once, not re-derived later" caution doesn't apply here: unlike
   /// cancellationLockAt, this is read fresh at sweep time (no per-
-  /// tournament snapshot column), so changing it does shift the settle
-  /// point for every still-PENDING row, not just new ones. No admin UI
-  /// control yet — same as cancellationLockHoursBeforeStart above.
+  /// tournament snapshot column), so changing it via Admin > Settings
+  /// (OrganizerRevenueSettlementControl.tsx) does shift the settle point
+  /// for every still-PENDING row, not just new ones.
   organizerRevenueSettlementHours Int @default(24)
 }
 
