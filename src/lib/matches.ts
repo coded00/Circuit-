@@ -505,14 +505,35 @@ async function resolveAfterSubmission(
   // check) is the closest honest fit for Dispute.raisedById's NOT NULL
   // constraint.
   const disputed = await openDispute(match, submittingUserId);
-  return { match: disputed, outcome: "DISPUTED" };
+  // openDispute can no-op (see its own comment) if this match was already
+  // completed by a concurrent call — report the truthful outcome rather
+  // than claiming a dispute that never actually opened.
+  return { match: disputed, outcome: disputed.status === "COMPLETE" ? "AUTO_COMPLETED" : "DISPUTED" };
 }
 
+/**
+ * Compare-and-swap on `status`, not a plain update — completeMatch is
+ * reachable from three independent paths (immediate two-sided agreement,
+ * the sweep's auto-accept on a stale single-sided report, and a dispute
+ * ruling with a winner), and a real race between any two of them (a late
+ * submission landing right as the sweep auto-accepts the same match; two
+ * concurrent dispute rulings) previously ran the advancement/payout/
+ * notification side effects below twice — double-paying a staked Battle's
+ * winner, re-advancing an already-decided bracket slot, or resetting
+ * Tournament.completedAt and relitigating the organizer-revenue
+ * settlement window. Only the call that actually wins the race (count
+ * === 1) runs any of that; a losing call is a pure no-op that returns the
+ * row as whichever call got there first left it.
+ */
 async function completeMatch(match: Match, winnerId: string): Promise<Match> {
-  const updated = await prisma.match.update({
-    where: { id: match.id },
+  const result = await prisma.match.updateMany({
+    where: { id: match.id, status: { not: "COMPLETE" } },
     data: { status: "COMPLETE", winnerId, reportWindowExpiresAt: null },
   });
+
+  if (result.count === 0) {
+    return prisma.match.findUniqueOrThrow({ where: { id: match.id } });
+  }
 
   // North Star metric (PRD §17) — every real way a match reaches a
   // verified winner funnels through this one function (immediate
@@ -539,7 +560,7 @@ async function completeMatch(match: Match, winnerId: string): Promise<Match> {
     notify(match.playerBId, "MATCH_COMPLETE", { matchId: match.id }),
   ]);
 
-  return updated;
+  return { ...match, status: "COMPLETE", winnerId, reportWindowExpiresAt: null };
 }
 
 /**
@@ -585,10 +606,21 @@ async function settleBattleOnComplete(battleId: string, winnerId: string): Promi
 }
 
 async function openDispute(match: Match, raisedById: string): Promise<Match> {
-  const updated = await prisma.match.update({
-    where: { id: match.id },
+  // Same compare-and-swap reasoning as completeMatch: a late, disagreeing
+  // submission can lose a race against the sweep's auto-accept (which
+  // already completed this match off the OTHER side's single-sided
+  // report) — without this guard, that late submission would flip an
+  // already-COMPLETE match back to DISPUTED. If that's what happened,
+  // there's nothing left to dispute; the completion that already
+  // happened stands, and the caller (resolveAfterSubmission) checks the
+  // returned status to report the truthful outcome.
+  const result = await prisma.match.updateMany({
+    where: { id: match.id, status: { not: "COMPLETE" } },
     data: { status: "DISPUTED", reportWindowExpiresAt: null },
   });
+  if (result.count === 0) {
+    return prisma.match.findUniqueOrThrow({ where: { id: match.id } });
+  }
 
   const tournament = match.tournamentId
     ? await prisma.tournament.findUnique({
@@ -622,7 +654,7 @@ async function openDispute(match: Match, raisedById: string): Promise<Match> {
     await notifyStaff("DISPUTE_ESCALATED", { matchId: match.id });
   }
 
-  return updated;
+  return { ...match, status: "DISPUTED", reportWindowExpiresAt: null };
 }
 
 // ---------------------------------------------------------------------------
@@ -689,57 +721,76 @@ export async function ruleDispute(input: RulingInput): Promise<Dispute> {
 
     // Only reachable for a Battle match (the check above refuses any
     // match with a tournamentId), so battleId/battle are guaranteed here.
-    const writes: Prisma.PrismaPromise<unknown>[] = [
-      prisma.dispute.update({
-        where: { id: dispute.id },
+    //
+    // Compare-and-swap on the dispute's own status (`dispute.status` here
+    // is already confirmed ESCALATED/ORGANIZER_REVIEW by the checks
+    // above, and nothing else in this file ever writes a dispute to
+    // RESOLVED/VOID) — an interactive transaction, not a plain array of
+    // writes, so two concurrent void rulings on the same dispute (staff
+    // double-clicking, or two staff racing) can't both pass the claim and
+    // both refund the same stake twice. A losing call throws
+    // ALREADY_RESOLVED instead of silently re-crediting.
+    const voidResult = await prisma.$transaction(async (tx) => {
+      const claimed = await tx.dispute.updateMany({
+        where: { id: dispute.id, status: dispute.status },
         data: {
           status: "VOID",
           ruling: input.ruling,
           ruledById: input.rulingUserId,
           ruledAt: new Date(),
         },
-      }),
-      prisma.match.update({
+      });
+      if (claimed.count === 0) return null;
+
+      await tx.match.update({
         where: { id: dispute.matchId },
         data: { status: "COMPLETE", reportWindowExpiresAt: null },
-      }),
-    ];
-    if (dispute.match.battleId && dispute.match.battle) {
-      writes.push(
-        prisma.battle.update({ where: { id: dispute.match.battleId }, data: { status: "COMPLETE" } })
-      );
-      // Both sides' locked stakes go back — a void means nobody won,
-      // not that the pot is up for grabs. Same amount each, since accept
-      // requires matching the creator's stake exactly.
-      const stake = dispute.match.battle.stakeAmount;
-      if (stake > 0) {
-        for (const playerId of [dispute.match.playerAId, dispute.match.playerBId]) {
-          writes.push(
-            prisma.user.update({ where: { id: playerId }, data: { walletBalance: { increment: stake } } }),
-            prisma.escrowTransaction.create({
+      });
+
+      if (dispute.match.battleId && dispute.match.battle) {
+        await tx.battle.update({ where: { id: dispute.match.battleId }, data: { status: "COMPLETE" } });
+        // Both sides' locked stakes go back — a void means nobody won,
+        // not that the pot is up for grabs. Same amount each, since accept
+        // requires matching the creator's stake exactly.
+        const stake = dispute.match.battle.stakeAmount;
+        if (stake > 0) {
+          for (const playerId of [dispute.match.playerAId, dispute.match.playerBId]) {
+            await tx.user.update({ where: { id: playerId }, data: { walletBalance: { increment: stake } } });
+            await tx.escrowTransaction.create({
               data: { battleId: dispute.match.battleId, userId: playerId, type: "REFUND", amount: stake, status: "COMPLETE" },
-            }),
-            prisma.walletTransaction.create({
+            });
+            await tx.walletTransaction.create({
               data: { userId: playerId, type: "STAKE_CREDIT", amount: stake, status: "COMPLETE" },
-            })
-          );
+            });
+          }
         }
       }
+
+      return tx.dispute.findUniqueOrThrow({ where: { id: dispute.id } });
+    });
+
+    if (!voidResult) {
+      throw new MatchError("ALREADY_RESOLVED", "This dispute has already been resolved.");
     }
-    const [updatedDispute] = (await prisma.$transaction(writes)) as [Dispute, ...unknown[]];
+
     await Promise.all([
       notify(dispute.match.playerAId, "DISPUTE_RESOLVED", { matchId: dispute.matchId, voided: true }),
       notify(dispute.match.playerBId, "DISPUTE_RESOLVED", { matchId: dispute.matchId, voided: true }),
     ]);
-    return updatedDispute;
+    return voidResult;
   }
 
   if (!input.winnerId || ![dispute.match.playerAId, dispute.match.playerBId].includes(input.winnerId)) {
     throw new MatchError("INVALID_WINNER", "The ruled winner must be one of the two players.");
   }
 
-  const updatedDispute = await prisma.dispute.update({
-    where: { id: dispute.id },
+  // Same compare-and-swap reasoning as the void branch above — two
+  // concurrent rulings on the same dispute (a double-click, or two staff
+  // racing on the same escalated dispute) shouldn't both succeed. The
+  // losing call throws ALREADY_RESOLVED rather than overwriting the
+  // first call's ruling/ruledById and re-running completeMatch.
+  const claimed = await prisma.dispute.updateMany({
+    where: { id: dispute.id, status: dispute.status },
     data: {
       status: "RESOLVED",
       ruling: input.ruling,
@@ -747,6 +798,10 @@ export async function ruleDispute(input: RulingInput): Promise<Dispute> {
       ruledAt: new Date(),
     },
   });
+  if (claimed.count === 0) {
+    throw new MatchError("ALREADY_RESOLVED", "This dispute has already been resolved.");
+  }
+  const updatedDispute = await prisma.dispute.findUniqueOrThrow({ where: { id: dispute.id } });
 
   await completeMatch(dispute.match, input.winnerId);
   await Promise.all([

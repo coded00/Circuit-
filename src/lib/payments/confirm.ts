@@ -62,11 +62,30 @@ export async function confirmEntryFeePayment(reference: string): Promise<void> {
   const feeAmount = computePlatformFee(registration.tournament.entryFee, platformSetting?.platformFeeBps ?? 0);
 
   const confirmed = await prisma.$transaction(async (tx) => {
+    // The top-of-function `status !== "PENDING_PAYMENT"` read is only a
+    // fast-path check, taken before the slow provider.verifyCharge() call
+    // above — not the actual guard (same reasoning as
+    // confirmWalletFunding's own comment). This conditional update is the
+    // real one: it's the single point that decides whether THIS call gets
+    // to create the PLATFORM_FEE/ORGANIZER_REVENUE rows below. Without
+    // it, a webhook delivery racing the redirect-callback page's poll
+    // (both funnel into this function, per this file's header comment)
+    // could both pass the fast-path read and both create those rows —
+    // double-crediting the organizer for one entry fee.
+    const claimed = await tx.registration.updateMany({
+      where: { id: registration.id, status: "PENDING_PAYMENT" },
+      data: { status: "CONFIRMED" },
+    });
+    if (claimed.count === 0) return "ALREADY_HANDLED" as const;
+
+    // Counted AFTER claiming this registration (it's already CONFIRMED
+    // above), so this row counts itself — `>` here is the same check as
+    // the original `confirmedCount >= cap` taken before confirming.
     const confirmedCount = await tx.registration.count({
       where: { tournamentId: registration.tournamentId, status: "CONFIRMED" },
     });
 
-    if (confirmedCount >= registration.tournament.participantCap) {
+    if (confirmedCount > registration.tournament.participantCap) {
       // The slot was filled by a concurrent payment while this charge was processing.
       // Refuse confirmation and mark for refund.
       await tx.registration.update({
@@ -77,13 +96,9 @@ export async function confirmEntryFeePayment(reference: string): Promise<void> {
         where: { id: escrowTxn.id },
         data: { status: "FAILED" },
       });
-      return false;
+      return "OVER_CAPACITY" as const;
     }
 
-    await tx.registration.update({
-      where: { id: registration.id },
-      data: { status: "CONFIRMED" },
-    });
     await tx.escrowTransaction.update({
       where: { id: escrowTxn.id },
       data: { status: "COMPLETE" },
@@ -121,10 +136,17 @@ export async function confirmEntryFeePayment(reference: string): Promise<void> {
         },
       });
     }
-    return true;
+    return "CONFIRMED" as const;
   });
 
-  if (!confirmed) {
+  if (confirmed === "ALREADY_HANDLED") {
+    // A concurrent call already confirmed (or refunded) this exact
+    // registration — its own success/refund path already ran once.
+    // Nothing left for this call to do.
+    return;
+  }
+
+  if (confirmed === "OVER_CAPACITY") {
     // Automatically issue the gateway refund so the player's funds are returned
     try {
       await provider.refundCharge(reference, registration.tournament.entryFee);

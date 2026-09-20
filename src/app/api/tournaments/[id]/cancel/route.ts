@@ -73,12 +73,26 @@ export async function POST(
   // auto-accept/escalation queries exclude a cancelled tournament's
   // matches too — see their own comments in src/lib/matches.ts).
 
+  // Atomic claim, not the plain update this used to be — the checks above
+  // (status/fundsFrozen/cancellationLockAt) are all plain reads, so two
+  // concurrent cancel requests (a double-click, or organizer + staff
+  // racing) could both pass every one of them and both reach this point.
+  // Without this being a compare-and-swap, both would go on to refund
+  // every confirmed registrant — a full double-refund of the tournament's
+  // entry fees. Only the call that actually flips the status gets to run
+  // the refund loop below.
+  const claimed = await prisma.tournament.updateMany({
+    where: { id, status: { notIn: ["CANCELLED", "COMPLETE"] }, fundsFrozen: false },
+    data: { status: "CANCELLED" },
+  });
+  if (claimed.count === 0) {
+    return NextResponse.json({ error: "This tournament can no longer be cancelled." }, { status: 409 });
+  }
+
   const confirmedRegistrations = await prisma.registration.findMany({
     where: { tournamentId: id, status: "CONFIRMED" },
     include: { escrowTxns: true },
   });
-
-  await prisma.tournament.update({ where: { id }, data: { status: "CANCELLED" } });
 
   // Every confirmed registrant hears about it, not just the ones getting a
   // refund — a free registrant has no money moving but still had plans
