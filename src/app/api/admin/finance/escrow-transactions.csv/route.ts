@@ -26,6 +26,8 @@ function escrowTypeLabel(type: EscrowType): string {
       return "Challenge stake";
     case "STAKE_PAYOUT":
       return "Challenge stake payout";
+    case "PLATFORM_FEE":
+      return "Platform fee";
   }
 }
 

@@ -4,16 +4,15 @@
  * 7-day activity snapshot. Every number here is a live query — nothing
  * on this page is mocked or illustrative.
  *
- * "Revenue" is the one metric worth a note: Circuit's schema has no
- * platform-commission/fee field anywhere (`EscrowTransaction` moves
- * entry fees and prize payouts, but the platform doesn't currently take
- * a cut of either) — so there's no real "take-home revenue" number to
- * show. What IS real and shown here instead is gross entry-fee volume:
- * the sum of every completed `EscrowTransaction` of type `ENTRY_FEE`,
- * i.e. total real money that has moved through paid tournament entries.
- * Honest under the label the product spec asked for, not a fabricated
- * commission calculation.
+ * "Revenue" here is gross completed entry-fee volume (every completed
+ * `EscrowTransaction` of type `ENTRY_FEE`) — total real money that has
+ * moved through paid tournament entries, not Circuit's own cut of it.
+ * That cut is real too now (`EscrowType.PLATFORM_FEE`, configurable rate
+ * at Admin > Settings) but belongs on the dedicated Finance page
+ * (Admin > Finance) alongside the rest of the money-movement detail,
+ * not folded into this page's deliberately small curated set.
  *
+
  * "Competition completed" (an activity-feed line the spec's example
  * copy showed) is deliberately not one of the feed types below —
  * `Tournament` has no `completedAt`/`updatedAt` field, only `createdAt`,

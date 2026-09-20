@@ -27,6 +27,7 @@ import { getCurrentUser } from "@/lib/session";
 import { getDefaultPaymentProvider, toCheckoutEmail } from "@/lib/payments";
 import { maybeGenerateBracketOnCapFill } from "@/lib/matches";
 import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
+import { computePlatformFee } from "@/lib/platformFee";
 
 class InsufficientWalletBalanceError extends Error {}
 
@@ -136,6 +137,8 @@ export async function POST(
   if (payFromWallet) {
     const reference = `wallet_entry_${randomUUID().slice(0, 12)}`;
     const provider = getDefaultPaymentProvider();
+    const platformSetting = await prisma.platformSetting.findUnique({ where: { id: "singleton" } });
+    const feeAmount = computePlatformFee(tournament.entryFee, platformSetting?.platformFeeBps ?? 0);
 
     try {
       const registration = await prisma.$transaction(async (tx) => {
@@ -171,6 +174,13 @@ export async function POST(
             status: "COMPLETE",
           },
         });
+        // Same fee logic as confirmEntryFeePayment's own comment — carved
+        // out of the entry fee that already arrived, not charged on top.
+        if (feeAmount > 0) {
+          await tx.escrowTransaction.create({
+            data: { tournamentId, registrationId: reg.id, type: "PLATFORM_FEE", amount: feeAmount, status: "COMPLETE" },
+          });
+        }
         await tx.walletTransaction.create({
           data: {
             userId: user.id,

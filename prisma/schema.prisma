@@ -60,6 +60,12 @@ enum EscrowType {
   /// Created once, to the match winner, for the full pot (both players'
   /// STAKE amounts) when a staked Battle's match completes.
   STAKE_PAYOUT
+  /// Circuit's own cut, carved out of an entry fee the moment it's
+  /// confirmed — see PlatformSetting.platformFeeBps. Recorded alongside
+  /// the ENTRY_FEE row for the same registration, same amount charged to
+  /// the player either way: this doesn't change what anyone pays, only
+  /// how the money that already arrived is allocated in the ledger.
+  PLATFORM_FEE
 }
 
 enum EscrowStatus {
@@ -749,6 +755,15 @@ model CalendarEvent {
 model PlatformSetting {
   id              String  @id @default("singleton")
   maintenanceMode Boolean @default(false)
+  /// Circuit's cut of every paid tournament entry, in basis points (1/100
+  /// of a percent — 500 = 5.00%) rather than a plain integer percent, so
+  /// a future rate change never needs a fractional-percent migration.
+  /// Admin-configurable (Admin > Settings), not a code constant, on
+  /// purpose: the exact rate is a business decision that can change
+  /// without a deploy — see PlatformFeeControl.tsx. Applied only to new
+  /// entry-fee confirmations going forward; changing it never rewrites
+  /// already-recorded PLATFORM_FEE escrow rows.
+  platformFeeBps  Int     @default(500)
 }
 
 /// Every real write an admin makes anywhere in `/admin` appends one row

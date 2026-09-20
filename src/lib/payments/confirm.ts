@@ -14,6 +14,7 @@ import { prisma } from "@/lib/db";
 import { notify } from "@/lib/notifications";
 import { getPaymentProvider } from "@/lib/payments";
 import { maybeGenerateBracketOnCapFill } from "@/lib/matches";
+import { computePlatformFee } from "@/lib/platformFee";
 
 export async function confirmEntryFeePayment(reference: string): Promise<void> {
   const registration = await prisma.registration.findUnique({
@@ -44,6 +45,13 @@ export async function confirmEntryFeePayment(reference: string): Promise<void> {
     return;
   }
 
+  // Read outside the transaction — this rate rarely changes, and a
+  // registration landing on the old vs. new rate in the rare case an
+  // admin changes it in the exact instant this is running is not a
+  // correctness issue worth another query inside the transaction below.
+  const platformSetting = await prisma.platformSetting.findUnique({ where: { id: "singleton" } });
+  const feeAmount = computePlatformFee(registration.tournament.entryFee, platformSetting?.platformFeeBps ?? 0);
+
   const confirmed = await prisma.$transaction(async (tx) => {
     const confirmedCount = await tx.registration.count({
       where: { tournamentId: registration.tournamentId, status: "CONFIRMED" },
@@ -71,6 +79,21 @@ export async function confirmEntryFeePayment(reference: string): Promise<void> {
       where: { id: escrowTxn.id },
       data: { status: "COMPLETE" },
     });
+    // Carved out of the entry fee that already arrived, not charged on
+    // top of it — see PLATFORM_FEE's own schema comment. Same
+    // transaction as the entry-fee confirmation itself: never recorded
+    // without it, never missing when it succeeds.
+    if (feeAmount > 0) {
+      await tx.escrowTransaction.create({
+        data: {
+          tournamentId: registration.tournamentId,
+          registrationId: registration.id,
+          type: "PLATFORM_FEE",
+          amount: feeAmount,
+          status: "COMPLETE",
+        },
+      });
+    }
     return true;
   });
 

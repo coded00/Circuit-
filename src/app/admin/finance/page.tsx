@@ -13,9 +13,12 @@
  * rows). This tab is that same data, un-scoped to one tournament,
  * filterable and exportable the same way Wallet Activity already is.
  *
- * "Revenue" is the same honest number the Overview page uses — gross
- * completed entry-fee volume, not a fabricated commission (see that
- * page's own header comment for why: no platform-fee field exists yet).
+ * "Revenue" is gross completed entry-fee volume (the same number the
+ * Overview page shows) — the money that moved through paid entries, not
+ * Circuit's own cut of it. "Platform Fee Revenue" is that cut: the real
+ * sum of completed PLATFORM_FEE escrow rows, carved out of each entry
+ * fee at confirmation per the configurable rate in Admin > Settings (see
+ * PlatformSetting.platformFeeBps's own schema comment).
  */
 
 import Link from "next/link";
@@ -64,6 +67,8 @@ function escrowTypeLabel(type: EscrowType): string {
       return "Challenge stake";
     case "STAKE_PAYOUT":
       return "Challenge stake payout";
+    case "PLATFORM_FEE":
+      return "Platform fee";
   }
 }
 
@@ -92,6 +97,7 @@ const ESCROW_TYPE_OPTIONS: { value: EscrowType | ""; label: string }[] = [
   { value: "PRIZE_PAYOUT", label: "Prize payout" },
   { value: "STAKE", label: "Challenge stake" },
   { value: "STAKE_PAYOUT", label: "Challenge stake payout" },
+  { value: "PLATFORM_FEE", label: "Platform fee" },
 ];
 
 const ESCROW_STATUS_OPTIONS: { value: EscrowStatus | ""; label: string }[] = [
@@ -137,8 +143,9 @@ export default async function AdminFinancePage({ searchParams }: { searchParams:
   if (estatus) escrowAnd.push({ status: estatus as EscrowStatus });
   const escrowWhere: Prisma.EscrowTransactionWhereInput = escrowAnd.length ? { AND: escrowAnd } : {};
 
-  const [entryFeeRevenue, deposits, withdrawals, pendingPayouts, transactions, escrowTxns] = await Promise.all([
+  const [entryFeeRevenue, platformFeeRevenue, deposits, withdrawals, pendingPayouts, transactions, escrowTxns] = await Promise.all([
     prisma.escrowTransaction.aggregate({ where: { type: "ENTRY_FEE", status: "COMPLETE" }, _sum: { amount: true } }),
+    prisma.escrowTransaction.aggregate({ where: { type: "PLATFORM_FEE", status: "COMPLETE" }, _sum: { amount: true } }),
     prisma.walletTransaction.aggregate({ where: { type: "FUND", status: "COMPLETE" }, _sum: { amount: true } }),
     prisma.walletTransaction.aggregate({ where: { type: "WITHDRAWAL", status: "COMPLETE" }, _sum: { amount: true } }),
     prisma.escrowTransaction.aggregate({ where: { type: "PRIZE_PAYOUT", status: "PENDING" }, _sum: { amount: true } }),
@@ -167,6 +174,7 @@ export default async function AdminFinancePage({ searchParams }: { searchParams:
 
   const metrics = [
     { label: "Revenue", value: formatNaira(entryFeeRevenue._sum.amount ?? 0) },
+    { label: "Platform Fee Revenue", value: formatNaira(platformFeeRevenue._sum.amount ?? 0) },
     { label: "Deposits", value: formatNaira(deposits._sum.amount ?? 0) },
     { label: "Withdrawals", value: formatNaira(withdrawals._sum.amount ?? 0) },
     { label: "Pending Payouts", value: formatNaira(pendingPayouts._sum.amount ?? 0) },
