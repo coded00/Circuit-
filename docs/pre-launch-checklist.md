@@ -40,10 +40,8 @@ Configure these in **Vercel Project Settings > Environment Variables** (or `.env
 | `JWT_SECRET` | **YES** | Generate via `openssl rand -base64 32`. Signs player session cookies and storage tokens. |
 | `NEXT_PUBLIC_APP_URL` | **YES** | Production domain with HTTPS, e.g. `https://circuit.gg`. |
 | `CRON_SECRET` | **YES** | Generate via `openssl rand -base64 32`. Vercel Cron uses this to authenticate sweeps. |
-| `PAYSTACK_SECRET_KEY` | **YES** | Paystack Live Secret Key (`sk_live_...`). Required for entry fees & transfers. |
-| `PAYSTACK_PUBLIC_KEY` | **YES** | Paystack Live Public Key (`pk_live_...`). Required for client-side popups. |
-| `FLUTTERWAVE_SECRET_KEY` | **YES** | Flutterwave Live Secret Key (`FLWSECK_LIVE-...`). |
-| `FLUTTERWAVE_PUBLIC_KEY` | **YES** | Flutterwave Live Public Key (`FLWPUBK_LIVE-...`). |
+| `PAYSTACK_SECRET_KEY` | **YES** | Paystack Live Secret Key (`sk_live_...`). Required for entry fees & transfers. Checkout is server-initiated hosted checkout (src/lib/payments/paystack.ts), not a client-side inline popup — there's no public key anywhere in the code. |
+| `FLUTTERWAVE_SECRET_KEY` | **YES** | Flutterwave Live Secret Key (`FLWSECK_LIVE-...`). Same server-initiated-checkout reasoning as Paystack above — no public key used. |
 | `FLUTTERWAVE_SECRET_HASH`| **YES** | Shared secret configured in Flutterwave Dashboard under Webhooks. |
 | `R2_BUCKET` | **YES** | Name of Cloudflare R2 bucket (e.g. `circuit-proofs-prod`). |
 | `R2_ACCOUNT_ID` | **YES** | Cloudflare Account ID from dashboard. |
