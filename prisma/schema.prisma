@@ -181,6 +181,13 @@ model User {
   /// balance change so the two can never drift apart.
   walletBalance     Int        @default(0)
   createdAt         DateTime   @default(now())
+  /// V1 audit follow-up (money-relevant models) — walletBalance and the
+  /// suspension/staff flags above all mutate after creation with no
+  /// signal of when; useful for debugging a balance that looks stale and
+  /// for reconciliation, same reasoning as the other money-relevant
+  /// models this was added to alongside (WalletTransaction,
+  /// EscrowTransaction, Registration, Tournament, Battle).
+  updatedAt         DateTime   @updatedAt
 
   organizerProfile     OrganizerProfile?
   registrations        Registration[]
@@ -281,6 +288,11 @@ model WalletTransaction {
   providerRef String?                 @unique
   status      WalletTransactionStatus @default(PENDING)
   createdAt   DateTime                @default(now())
+  /// V1 audit follow-up — `status` flips PENDING→COMPLETE/FAILED after
+  /// creation with no record of when, which matters for spotting a
+  /// transaction stuck PENDING and for reconciliation against the
+  /// provider's own records.
+  updatedAt   DateTime                @updatedAt
 
   @@index([userId, status])
 }
@@ -406,6 +418,10 @@ model Tournament {
   /// flip — see tournaments/[id]/cancel/route.ts).
   completedAt         DateTime?
   createdAt           DateTime         @default(now())
+  /// V1 audit follow-up — status/fundsFrozen/cancellationLockAt all
+  /// mutate after creation; useful for reconciliation and for spotting
+  /// what changed and when on a specific tournament during a dispute.
+  updatedAt           DateTime         @updatedAt
 
   registrations Registration[]
   bracket       Bracket?
@@ -415,6 +431,10 @@ model Tournament {
   community     Community?
 
   @@index([game, status])
+  // V1 audit follow-up — dashboard/payouts, dashboard's own overview, and
+  // the community route all filter by organizerId alone (no game/status
+  // alongside it), so the composite index above doesn't help those reads.
+  @@index([organizerId])
 }
 
 /// Links a User to a Tournament. Maps to REG-1..REG-7.
@@ -434,11 +454,20 @@ model Registration {
   /// what a webhook looks up a Registration by.
   paymentRef   String?            @unique
   createdAt    DateTime           @default(now())
+  /// V1 audit follow-up — status moves through the whole
+  /// PENDING_PAYMENT→CONFIRMED→WITHDRAWN/REFUNDED lifecycle with no
+  /// record of when each transition happened.
+  updatedAt    DateTime           @updatedAt
 
   escrowTxns EscrowTransaction[]
 
   @@unique([tournamentId, userId])
   @@index([tournamentId, status])
+  // V1 audit follow-up — the @@unique above leads with tournamentId, so
+  // it doesn't serve "every registration for this user" queries (the
+  // homepage, a player's public profile, admin's user detail page, and
+  // the discovery feed's personalization all run exactly that).
+  @@index([userId])
 }
 
 /// 1:1 with Tournament. Maps to BRK-1.
@@ -501,6 +530,13 @@ model Match {
   @@index([tournamentId])
   @@index([battleId])
   @@index([status])
+  // V1 audit follow-up — the homepage's "your upcoming matches", a
+  // player's public profile, admin's user detail page, the wallet-history
+  // battle lookup, and discovery's personalization all filter on one of
+  // these two fields via an OR (a bitmap-or over two single-column
+  // indexes serves that better than one composite would).
+  @@index([playerAId])
+  @@index([playerBId])
 }
 
 /// Created by a User. Maps to BTL-1..BTL-6.
@@ -528,11 +564,22 @@ model Battle {
   streamUrl    String?
   status       BattleStatus     @default(OPEN)
   createdAt    DateTime         @default(now())
+  /// V1 audit follow-up — status moves OPEN→ACCEPTED→COMPLETE/CANCELLED,
+  /// and a staked Battle's stake sits locked the whole time; useful for
+  /// spotting how long a Battle has actually been in its current state.
+  updatedAt    DateTime         @updatedAt
 
   matches    Match[]
   escrowTxns EscrowTransaction[]
 
   @@index([game, status])
+  // V1 audit follow-up — the homepage's open-challenge feed, a player's
+  // public profile, admin's user detail page, the dashboard's own
+  // Battles list, and discovery's personalization all filter by one of
+  // these two fields directly (often via an OR), same reasoning as
+  // Match.playerAId/playerBId above.
+  @@index([creatorId])
+  @@index([targetUserId])
 }
 
 /// Belongs to a Match. Maps to BRK-5, BRK-6, TRU-1..TRU-2.
@@ -572,14 +619,19 @@ model EscrowTransaction {
   tournament     Tournament?          @relation(fields: [tournamentId], references: [id])
   registrationId String?
   registration   Registration?        @relation(fields: [registrationId], references: [id])
-  /// Set only for a Battle-stake row (STAKE/STAKE_PAYOUT/REFUND on a
-  /// Battle) — who paid a STAKE or received a STAKE_PAYOUT/REFUND. Always
-  /// null on the tournament side, where `registration.userId` already
-  /// answers this.
+  /// Set for a Battle-stake row (STAKE/STAKE_PAYOUT/REFUND — who paid or
+  /// received it) and for an ORGANIZER_REVENUE row (the organizer the
+  /// settlement sweep credits — see that EscrowType's own comment). Null
+  /// for every other tournament-side row, where `registration.userId`
+  /// already answers this.
   battleId       String?
   battle         Battle?              @relation(fields: [battleId], references: [id])
   userId         String?
-  user           User?                @relation(fields: [userId], references: [id])
+  /// V1 audit follow-up — matches WalletTransaction.userId's onDelete
+  /// (RESTRICT): a User with financial history (a Battle payout, or
+  /// organizer revenue) shouldn't be deletable in a way that silently
+  /// orphans that history, even though nothing deletes a User today.
+  user           User?                @relation(fields: [userId], references: [id], onDelete: Restrict)
   type           EscrowType
   /// Minor currency units (kobo).
   amount         Int
@@ -595,9 +647,17 @@ model EscrowTransaction {
   providerRef    String?              @unique
   status         EscrowStatus         @default(PENDING)
   createdAt      DateTime             @default(now())
+  /// V1 audit follow-up — status flips PENDING→COMPLETE/FAILED (a payout
+  /// claim, a settlement) after creation with no record of when.
+  updatedAt      DateTime             @updatedAt
 
   @@index([tournamentId, type])
   @@index([battleId, type])
+  // V1 audit follow-up — the wallet page's own Battle-activity section
+  // filters by userId directly (`where: { userId, battleId: { not: null } }`),
+  // which neither composite index above serves.
+  @@index([userId])
+  @@index([registrationId])
 }
 
 /// Belongs to a User. Maps to NOT-1..NOT-4.
