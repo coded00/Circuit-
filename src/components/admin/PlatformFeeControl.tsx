@@ -51,6 +51,7 @@ export function PlatformFeeControl({ platformFeeBps, canEdit }: { platformFeeBps
             step="0.01"
             value={percent}
             onChange={(e) => setPercent(e.target.value)}
+            aria-label="Platform fee percentage"
             className="field-input w-24 text-sm"
           />
           <span className="text-sm text-muted">%</span>

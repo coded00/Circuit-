@@ -76,6 +76,7 @@ export function FreezeFundsControl({
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           placeholder="Reason for freezing funds"
+          aria-label="Reason for freezing funds"
           className="field-input text-xs"
         />
         {error && <p className="field-error">{error}</p>}

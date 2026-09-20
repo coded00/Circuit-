@@ -78,6 +78,14 @@ Configure these in **Vercel Project Settings > Environment Variables** (or `.env
 
 ## 4. Automated Match Sweeper (Vercel Cron)
 
+**Requires a paid Vercel plan.** Vercel's Hobby (free) tier only allows
+Cron Jobs to run once per day — `*/2 * * * *` needs Pro or above. On
+Hobby, Vercel silently accepts this `vercel.json` at deploy time but
+only actually fires it once daily, well short of what bracket
+progression, auto-accept, dispute escalation, and organizer-revenue
+settlement all need. Confirm the project's Vercel plan before relying on
+this.
+
 Circuit includes `vercel.json` configured to sweep matches every 2 minutes:
 ```json
 {
@@ -156,7 +164,10 @@ Run these 5 checks immediately after deploying:
    ```bash
    npx prisma migrate status
    ```
-   Must confirm all 20 migrations are applied.
+   Must report "Database schema is up to date!" — not a specific
+   migration count (that number only grows as the schema evolves and
+   goes stale the moment it does; the real go/no-go signal is whether
+   anything is still pending).
 
 3. **Super Admin Access**:
    - Access `https://<your-domain>/admin`.

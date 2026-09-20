@@ -524,6 +524,11 @@ model Match {
   /// BRK-10: silent-side auto-accept deadline once one side has reported.
   reportWindowExpiresAt DateTime?
   createdAt             DateTime  @default(now())
+  /// V1 audit follow-up — status cycles UPCOMING→NEEDS_RESULT→DISPUTED→
+  /// COMPLETE with no record of when, which matters for reconciling a
+  /// stuck or disputed match (it directly gates a tournament's payout and
+  /// organizer-revenue settlement).
+  updatedAt             DateTime  @updatedAt
 
   dispute Dispute?
 
@@ -599,6 +604,12 @@ model Dispute {
   ruledById               String?
   ruledAt                 DateTime?
   createdAt               DateTime      @default(now())
+  /// V1 audit follow-up — status moves OPEN→ORGANIZER_REVIEW/ESCALATED→
+  /// RESOLVED/VOID, including a sweep step that flips OPEN→ESCALATED, with
+  /// no timestamp anywhere except `ruledAt` (only set at final
+  /// resolution). Staff couldn't tell how long a dispute had actually sat
+  /// in ESCALATED, which matters for an SLA-driven queue.
+  updatedAt               DateTime      @updatedAt
 
   @@index([status])
 }
@@ -737,6 +748,11 @@ model Team {
   createdAt DateTime @default(now())
 
   members TeamMembership[]
+
+  // V1 audit follow-up — a player's public profile and the team-role
+  // lookup in src/lib/teams.ts both filter by captainId directly, with no
+  // supporting index (only `name` had one, via its own unique constraint).
+  @@index([captainId])
 }
 
 /// One row per (team, user) pair, including the captain's own membership

@@ -150,6 +150,17 @@ export default async function TournamentPage({
 
   const now = new Date();
   const isOrganizer = user !== null && tournament.organizerId === user.id;
+  // V1 audit follow-up: this page's own cancel button used to have no
+  // gating at all beyond "not already cancelled" — an organizer past the
+  // cancellation lock, or with funds frozen, would still see a working-
+  // looking button that would just 409 on click. Same guard as
+  // dashboard/tournaments/[id]/page.tsx and the cancel route itself.
+  const pastCancellationLock = !!(tournament.cancellationLockAt && now >= tournament.cancellationLockAt);
+  const cancellable =
+    tournament.status !== "CANCELLED" &&
+    tournament.status !== "COMPLETE" &&
+    !tournament.fundsFrozen &&
+    (!pastCancellationLock || !!user?.isStaff);
   const registrationOpen =
     tournament.status !== "CANCELLED" &&
     now >= tournament.registrationOpenAt &&
@@ -546,7 +557,7 @@ export default async function TournamentPage({
                       Edit
                     </Link>
                   )}
-                  <CancelButton tournamentId={tournament.id} />
+                  {cancellable && <CancelButton tournamentId={tournament.id} />}
                 </div>
               ) : myRegistration?.status === "CONFIRMED" ? (
                 <div className="alert alert-success flex-col items-stretch gap-3">

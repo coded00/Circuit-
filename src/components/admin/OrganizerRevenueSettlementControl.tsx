@@ -58,6 +58,7 @@ export function OrganizerRevenueSettlementControl({
             step="1"
             value={value}
             onChange={(e) => setValue(e.target.value)}
+            aria-label="Organizer revenue settlement window in hours"
             className="field-input w-24 text-sm"
           />
           <span className="text-sm text-muted">hours</span>
