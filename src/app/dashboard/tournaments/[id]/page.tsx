@@ -10,9 +10,14 @@ import { AlertTriangle } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { StatusPill, registrationStatusInfo, tournamentStatusInfo } from "@/components/StatusPill";
+import { CancelTournamentButton } from "@/components/CancelTournamentButton";
 
 function formatNaira(kobo: number): string {
   return `₦ ${(kobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 0 })}`;
+}
+
+function formatDateTime(date: Date): string {
+  return date.toLocaleString("en-NG", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 }
 
 export default async function DashboardTournamentDetailPage({
@@ -65,6 +70,18 @@ export default async function DashboardTournamentDetailPage({
     .reduce((sum, t) => sum + t.amount, 0);
   const payout = escrowTxns.find((t) => t.type === "PRIZE_PAYOUT");
   const status = tournamentStatusInfo(tournament.status);
+  // Same guard as tournaments/[id]/cancel/route.ts itself — see that
+  // route's own comments for why fundsFrozen and cancellationLockAt are
+  // two separate gates. Staff viewing an organizer's own dashboard (the
+  // redirect above allows it) keep the "only admin/system action" escape
+  // hatch past the lock, same as everywhere else this condition appears.
+  const pastCancellationLock = !!(tournament.cancellationLockAt && new Date() >= tournament.cancellationLockAt);
+  // Status/funds-frozen only — deliberately NOT factoring in the lock, so
+  // the lock hint below can still render once an organizer is past it
+  // (explaining why the button below disappeared), rather than the hint
+  // vanishing along with the button itself.
+  const statusCancellable = tournament.status !== "CANCELLED" && tournament.status !== "COMPLETE" && !tournament.fundsFrozen;
+  const cancellable = statusCancellable && (!pastCancellationLock || user.isStaff);
 
   return (
     <div className="flex flex-1 flex-col gap-8">
@@ -73,14 +90,22 @@ export default async function DashboardTournamentDetailPage({
           {status.label}
         </StatusPill>
         <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">{tournament.name}</h1>
-        <div className="flex flex-wrap gap-4 text-sm">
+        <div className="flex flex-wrap items-center gap-4 text-sm">
           <Link href={`/tournaments/${id}`} className="font-medium text-accent-blue hover:underline">
             Public page →
           </Link>
           <Link href={`/tournaments/${id}/edit`} className="font-medium text-accent-blue hover:underline">
             Edit →
           </Link>
+          {cancellable && <CancelTournamentButton tournamentId={id} />}
         </div>
+        {tournament.cancellationLockAt && statusCancellable && (
+          <span className="text-xs text-muted">
+            {pastCancellationLock
+              ? `Past the cancellation lock (${formatDateTime(tournament.cancellationLockAt)}) — staff-only now`
+              : `You can cancel until ${formatDateTime(tournament.cancellationLockAt)}`}
+          </span>
+        )}
       </div>
 
       {openDisputes.length > 0 && (

@@ -16,7 +16,7 @@ import { notFound } from "next/navigation";
 import { AlertTriangle, Snowflake } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { StatusPill, registrationStatusInfo, tournamentStatusInfo } from "@/components/StatusPill";
-import { CancelTournamentButton } from "@/components/admin/CancelTournamentButton";
+import { CancelTournamentButton } from "@/components/CancelTournamentButton";
 import { FreezeFundsControl } from "@/components/admin/FreezeFundsControl";
 
 function formatNaira(kobo: number): string {

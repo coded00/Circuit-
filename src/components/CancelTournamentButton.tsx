@@ -4,11 +4,15 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 /**
- * Circuit — admin "Cancel" action on the Competitions list. Posts to the
- * same real `/api/tournaments/[id]/cancel` route the organizer's own
- * cancel flow already uses (refunds every paid registrant, notifies
- * every confirmed one) — its auth gate now also accepts staff, not just
- * the tournament's own organizer.
+ * Circuit — "Cancel" action, shared by the admin Competitions list/detail
+ * and the organizer's own dashboard tournament detail panel. Posts to the
+ * real `/api/tournaments/[id]/cancel` route — its auth gate accepts both
+ * the tournament's own organizer and staff, and its own guards (funds
+ * frozen, past the cancellation lock, already cancelled/complete) are the
+ * actual source of truth; the caller decides whether to render this
+ * button at all based on the same `cancellable` condition the route
+ * enforces, but a stale render still fails safely with the route's own
+ * error message.
  */
 export function CancelTournamentButton({ tournamentId }: { tournamentId: string }) {
   const router = useRouter();

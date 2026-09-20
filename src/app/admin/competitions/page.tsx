@@ -12,7 +12,7 @@ import Link from "next/link";
 import type { Prisma, TournamentStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { StatusPill, tournamentStatusInfo } from "@/components/StatusPill";
-import { CancelTournamentButton } from "@/components/admin/CancelTournamentButton";
+import { CancelTournamentButton } from "@/components/CancelTournamentButton";
 
 type SearchParams = { q?: string; status?: string; game?: string };
 
