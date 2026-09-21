@@ -9,6 +9,10 @@ function nairaToKobo(value: string): number {
   return Math.round(naira * 100);
 }
 
+// Mirrors MAX_STAKE_AMOUNT in src/app/api/battles/route.ts (kobo) — kept
+// as a display/UX-only ceiling here; the API route is the source of truth.
+const MAX_STAKE_NAIRA = 100_000;
+
 type Friend = { handle: string; displayName: string };
 
 export default function BattleForm({
@@ -112,6 +116,7 @@ export default function BattleForm({
               id="stakeNaira"
               type="number"
               min={1}
+              max={MAX_STAKE_NAIRA}
               step="0.01"
               required
               value={stakeNaira}
@@ -119,7 +124,8 @@ export default function BattleForm({
               className="field-input"
             />
             <span className="field-hint">
-              Locked from your wallet now. Your opponent matches it to accept — the winner takes both.
+              Locked from your wallet now. Your opponent matches it to accept — the winner takes both. Capped at ₦
+              {MAX_STAKE_NAIRA.toLocaleString("en-NG")} per Battle.
             </span>
           </div>
         )}

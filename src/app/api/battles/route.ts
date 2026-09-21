@@ -31,6 +31,13 @@ const VALID_VISIBILITIES = ["OPEN", "TARGETED", "FRIENDS"];
 const OPEN_BATTLE_CREATE_MAX_ATTEMPTS = 10;
 const OPEN_BATTLE_CREATE_WINDOW_MS = 60 * 60 * 1000;
 
+// V1 audit follow-up: staked Battles shipped with the core escrow
+// mechanism only (see this file's own top comment) — no per-account
+// stake limits, collusion detection, or self-exclusion tooling yet. Pending
+// that, cap a single stake so one Battle's exposure stays bounded while
+// those responsible-gambling controls are still unbuilt.
+const MAX_STAKE_AMOUNT = 10_000_000; // ₦100,000
+
 class InsufficientWalletBalanceError extends Error {}
 
 export async function POST(request: Request) {
@@ -76,6 +83,12 @@ export async function POST(request: Request) {
   }
   if (!VALID_FORMATS.includes(format)) {
     return NextResponse.json({ error: "Format must be a single match or best of three." }, { status: 400 });
+  }
+  if (stakeAmount > MAX_STAKE_AMOUNT) {
+    return NextResponse.json(
+      { error: `Stake amount can't exceed ₦${(MAX_STAKE_AMOUNT / 100).toLocaleString("en-NG")}.` },
+      { status: 400 }
+    );
   }
   const streamUrlResult = parseOptionalUrl(body?.streamUrl);
   if (!streamUrlResult.ok) {
