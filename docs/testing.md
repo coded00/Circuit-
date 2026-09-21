@@ -35,9 +35,15 @@ against real transaction/locking behavior, not a fake.
 ## Running e2e tests
 
 ```bash
-npm run test:e2e       # runs both e2e specs headless (what CI would run)
+npm run test:e2e       # runs both e2e specs headless
 npm run test:e2e:ui    # Playwright's own UI mode, for debugging locally
 ```
+
+Not yet wired into `.github/workflows/ci.yml` — unlike `npm test`, this
+needs a running app server (`webServer` in `playwright.config.ts`) and a
+Chromium download, both real additions to CI runtime and complexity that
+haven't been made yet. Run it locally before a change that touches
+either flow.
 
 Drives a real Chromium browser against `npm run dev` (`playwright.config.ts`'s
 `webServer`, reused if you already have `npm run dev` running — same
