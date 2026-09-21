@@ -11,7 +11,9 @@
     "prisma:migrate": "prisma migrate dev",
     "test:storage": "node scripts/test-storage.mjs",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
@@ -27,6 +29,7 @@
     "resend": "^6.28.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^24",
