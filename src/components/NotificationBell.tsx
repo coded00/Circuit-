@@ -40,11 +40,21 @@ export function NotificationBell({ initialUnreadCount = 0 }: { initialUnreadCoun
   useEffect(() => {
     let cancelled = false;
     async function poll() {
-      const res = await fetch("/api/notifications?take=5");
-      if (!res.ok || cancelled) return;
-      const data = await res.json();
-      setNotifications(data.notifications);
-      setUnreadCount(data.unreadCount);
+      // A transient network blip (offline, a dev-server restart, the tab
+      // waking from sleep) shouldn't crash this background poll — it ran
+      // unguarded before, so any fetch failure became an unhandled
+      // rejection (Next's dev overlay surfaces this as a hard crash for
+      // what's really just "skip this tick, try again in 5s").
+      try {
+        const res = await fetch("/api/notifications?take=5");
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        if (cancelled) return;
+        setNotifications(data.notifications);
+        setUnreadCount(data.unreadCount);
+      } catch {
+        // Ignored — the next interval tick retries.
+      }
     }
     poll();
     const interval = setInterval(poll, POLL_INTERVAL_MS);

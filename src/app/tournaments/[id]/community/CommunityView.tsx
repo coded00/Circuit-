@@ -198,16 +198,23 @@ export function CommunityView({
   useEffect(() => {
     if (!isMember || !activeChannelId) return;
     const interval = setInterval(async () => {
-      const current = messagesByChannelRef.current[activeChannelId] ?? [];
-      const since = current.length > 0 ? current[current.length - 1].createdAt : new Date(0).toISOString();
-      const res = await fetch(`/api/channels/${activeChannelId}/messages?since=${encodeURIComponent(since)}`);
-      if (!res.ok) return;
-      const data: { messages: MessageInfo[] } = await res.json();
-      if (data.messages.length > 0) {
-        setMessagesByChannel((prev) => ({
-          ...prev,
-          [activeChannelId]: mergeMessages(prev[activeChannelId] ?? [], data.messages),
-        }));
+      // Same reasoning as NotificationBell's own poll — a transient
+      // network blip shouldn't crash this background poll; skip the
+      // tick and retry next interval instead of an unhandled rejection.
+      try {
+        const current = messagesByChannelRef.current[activeChannelId] ?? [];
+        const since = current.length > 0 ? current[current.length - 1].createdAt : new Date(0).toISOString();
+        const res = await fetch(`/api/channels/${activeChannelId}/messages?since=${encodeURIComponent(since)}`);
+        if (!res.ok) return;
+        const data: { messages: MessageInfo[] } = await res.json();
+        if (data.messages.length > 0) {
+          setMessagesByChannel((prev) => ({
+            ...prev,
+            [activeChannelId]: mergeMessages(prev[activeChannelId] ?? [], data.messages),
+          }));
+        }
+      } catch {
+        // Ignored — the next interval tick retries.
       }
     }, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
