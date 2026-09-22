@@ -3,16 +3,22 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Spinner } from "@/components/Spinner";
+import { useConfirmDialog } from "@/components/ConfirmDialogProvider";
 
 export default function CancelButton({ tournamentId }: { tournamentId: string }) {
   const router = useRouter();
+  const confirmDialog = useConfirmDialog();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleClick() {
-    if (!confirm("Cancel this tournament? Every paid registrant will be refunded automatically.")) {
-      return;
-    }
+    const confirmed = await confirmDialog({
+      title: "Cancel this tournament?",
+      message: "Every paid registrant will be refunded automatically.",
+      confirmLabel: "Cancel tournament",
+      cancelLabel: "Keep it",
+    });
+    if (!confirmed) return;
     setSubmitting(true);
     setError(null);
 

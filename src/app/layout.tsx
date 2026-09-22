@@ -7,6 +7,7 @@ import { AppSidebar } from "@/components/nav/AppSidebar";
 import { TopBar } from "@/components/nav/TopBar";
 import { MobileTabBar } from "@/components/nav/MobileTabBar";
 import { AppShell } from "@/components/AppShell";
+import { ConfirmDialogProvider } from "@/components/ConfirmDialogProvider";
 import { OneSignalInit } from "@/components/OneSignalInit";
 import { PresenceHeartbeat } from "@/components/PresenceHeartbeat";
 import { QuickMatchIncomingListener } from "@/components/QuickMatchIncomingListener";
@@ -127,15 +128,17 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             AppShell decides whether this shell renders at all — the four
             auth routes skip it entirely for their own full-bleed split
             layout (see AppShell.tsx / AuthSplitLayout.tsx). */}
-        <AppShell
-          sidebar={<AppSidebar user={navUser} />}
-          topBar={<TopBar user={user} disputeCount={disputeCount} />}
-          mobileTabBar={<MobileTabBar user={navUser} />}
-          maintenanceMode={platformSetting?.maintenanceMode ?? false}
-          isStaffUser={user?.isStaff ?? false}
-        >
-          {children}
-        </AppShell>
+        <ConfirmDialogProvider>
+          <AppShell
+            sidebar={<AppSidebar user={navUser} />}
+            topBar={<TopBar user={user} disputeCount={disputeCount} />}
+            mobileTabBar={<MobileTabBar user={navUser} />}
+            maintenanceMode={platformSetting?.maintenanceMode ?? false}
+            isStaffUser={user?.isStaff ?? false}
+          >
+            {children}
+          </AppShell>
+        </ConfirmDialogProvider>
         {user && <OneSignalInit userId={user.id} notifyNewContent={user.notifyNewContent} />}
         {user && <PresenceHeartbeat />}
         {user && <QuickMatchIncomingListener />}

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useConfirmDialog } from "@/components/ConfirmDialogProvider";
 
 type StaffUser = { id: string; displayName: string; handle: string; emailOrPhone: string; adminRole: string | null };
 
@@ -13,6 +14,7 @@ type StaffUser = { id: string; displayName: string; handle: string; emailOrPhone
  */
 export function AdminUsersManager({ staff, currentUserId }: { staff: StaffUser[]; currentUserId: string }) {
   const router = useRouter();
+  const confirmDialog = useConfirmDialog();
   const [identifier, setIdentifier] = useState("");
   const [role, setRole] = useState("MODERATOR");
   const [error, setError] = useState<string | null>(null);
@@ -48,7 +50,7 @@ export function AdminUsersManager({ staff, currentUserId }: { staff: StaffUser[]
   }
 
   async function revoke(id: string, name: string) {
-    if (!confirm(`Revoke admin access for ${name}?`)) return;
+    if (!(await confirmDialog({ title: `Revoke admin access for ${name}?`, confirmLabel: "Revoke access" }))) return;
     await fetch(`/api/admin/staff/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },

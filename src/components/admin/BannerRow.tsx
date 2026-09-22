@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronUp, ChevronDown, Trash2 } from "lucide-react";
+import { useConfirmDialog } from "@/components/ConfirmDialogProvider";
 import { BannerForm } from "./BannerForm";
 
 type Banner = {
@@ -29,6 +30,7 @@ export function BannerRow({
   onSwap: (id: string, direction: "up" | "down") => void;
 }) {
   const router = useRouter();
+  const confirmDialog = useConfirmDialog();
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -44,7 +46,7 @@ export function BannerRow({
   }
 
   async function handleDelete() {
-    if (!confirm(`Delete "${banner.headline}"?`)) return;
+    if (!(await confirmDialog({ title: `Delete "${banner.headline}"?`, confirmLabel: "Delete" }))) return;
     setBusy(true);
     await fetch(`/api/admin/banners/${banner.id}`, { method: "DELETE" });
     router.refresh();

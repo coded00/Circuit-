@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { UserPlus, UserCheck, UserX, Clock } from "lucide-react";
+import { useConfirmDialog } from "@/components/ConfirmDialogProvider";
 
 export type FriendButtonStatus =
   | { state: "none" }
@@ -12,6 +13,7 @@ export type FriendButtonStatus =
 
 export function FriendButton({ targetHandle, status }: { targetHandle: string; status: FriendButtonStatus }) {
   const router = useRouter();
+  const confirmDialog = useConfirmDialog();
   const [busy, setBusy] = useState(false);
 
   async function sendRequest() {
@@ -33,7 +35,7 @@ export function FriendButton({ targetHandle, status }: { targetHandle: string; s
   }
 
   async function remove(id: string, confirmMessage?: string) {
-    if (confirmMessage && !confirm(confirmMessage)) return;
+    if (confirmMessage && !(await confirmDialog({ title: confirmMessage, confirmLabel: "Remove" }))) return;
     setBusy(true);
     await fetch(`/api/friends/${id}`, { method: "DELETE" });
     setBusy(false);

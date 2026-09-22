@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
+import { useConfirmDialog } from "@/components/ConfirmDialogProvider";
 import { CalendarEventForm } from "./CalendarEventForm";
 
 type Event = { id: string; title: string; category: string; date: string; cancelled: boolean };
@@ -13,6 +14,7 @@ function categoryLabel(category: string): string {
 
 export function CalendarEventList({ events }: { events: Event[] }) {
   const router = useRouter();
+  const confirmDialog = useConfirmDialog();
   const [creating, setCreating] = useState(false);
 
   async function toggleCancelled(id: string, cancelled: boolean) {
@@ -25,7 +27,7 @@ export function CalendarEventList({ events }: { events: Event[] }) {
   }
 
   async function remove(id: string, title: string) {
-    if (!confirm(`Delete "${title}"?`)) return;
+    if (!(await confirmDialog({ title: `Delete "${title}"?`, confirmLabel: "Delete" }))) return;
     await fetch(`/api/admin/calendar-events/${id}`, { method: "DELETE" });
     router.refresh();
   }
