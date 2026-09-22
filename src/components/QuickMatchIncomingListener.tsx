@@ -14,7 +14,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { QuickMatchChallengeCard, type QuickMatchChallengeInfo } from "@/components/QuickMatchChallengeCard";
 
@@ -22,6 +22,7 @@ const POLL_INTERVAL_MS = 5000;
 
 export function QuickMatchIncomingListener() {
   const router = useRouter();
+  const pathname = usePathname();
   const [challenge, setChallenge] = useState<QuickMatchChallengeInfo | null>(null);
   const [dismissedId, setDismissedId] = useState<string | null>(null);
   const [unavailable, setUnavailable] = useState(false);
@@ -88,7 +89,15 @@ export function QuickMatchIncomingListener() {
     setChallenge(null);
   }
 
-  const open = !!challenge || unavailable;
+  // Suppress the modal while the recipient is already looking at this
+  // exact challenge's own dedicated page (src/app/quick-match/[id]/
+  // page.tsx renders the same Accept/Decline card there) — without this,
+  // a slow poll tick landing while that page is open renders a second,
+  // redundant Accept control on top of the first, which is confusing at
+  // best and, since both wire up to the same accept endpoint, a genuine
+  // double-submit risk at worst.
+  const onThisChallengesOwnPage = !!challenge && pathname === `/quick-match/${challenge.id}`;
+  const open = (!!challenge || unavailable) && !onThisChallengesOwnPage;
 
   return (
     mounted &&

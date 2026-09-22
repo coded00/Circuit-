@@ -6,6 +6,7 @@
  */
 
 import { prisma } from "@/lib/db";
+import { captureException } from "@/lib/observability";
 import type { Prisma, QuickMatchChallenge, User } from "@prisma/client";
 
 export const VALID_FORMATS = ["SINGLE", "BEST_OF_3"];
@@ -34,9 +35,6 @@ export const MAX_TIMEOUT_MS = 5 * 60_000;
 export const MAX_RECIPIENTS = 30;
 
 export class InsufficientWalletBalanceError extends Error {}
-export class ChallengeNotFoundError extends Error {}
-export class NotAPendingRecipientError extends Error {}
-export class ChallengeContendedError extends Error {}
 export class ChallengeUnavailableError extends Error {}
 
 type EligibleUser = Pick<User, "id" | "displayName" | "handle" | "avatarUrl" | "walletBalance">;
@@ -277,4 +275,72 @@ export async function recoverFailedAccept(challengeId: string, wasStillOpen: boo
     const challenge = await tx.quickMatchChallenge.findUniqueOrThrow({ where: { id: challengeId } });
     await closeChallengeAndRefund(tx, challenge, "EXPIRED");
   });
+}
+
+// How long a challenge is allowed to sit ACCEPTED with no battleId
+// before the sweep below treats it as permanently stuck rather than
+// "still resolving" — comfortably past any real request's duration.
+const STUCK_ACCEPTED_GRACE_MS = 2 * 60_000;
+
+/**
+ * Periodic safety net (called from the cron sweep, src/lib/matches.ts's
+ * runScheduledSweep) for two things a single request can't always
+ * resolve on its own:
+ *
+ * 1. A PENDING challenge past `expiresAt` that nothing has read since —
+ *    expireQuickMatchChallengeIfDue is lazy (it only runs when something
+ *    touches the challenge, primarily the host's own status poll), so a
+ *    host who closes the tab and never polls again would otherwise
+ *    leave their stake locked indefinitely.
+ * 2. A challenge stuck ACCEPTED with no battleId for longer than
+ *    STUCK_ACCEPTED_GRACE_MS. The accept route's own recoverFailedAccept
+ *    handles this synchronously in the same request that failed — but
+ *    if that recovery transaction *also* fails (the same connection
+ *    pressure that caused the original failure is a real, observed
+ *    scenario in this environment, not a hypothetical), the challenge
+ *    is left in a genuinely inconsistent state with nothing else ever
+ *    revisiting it. This sweep is what finally resolves it: refund the
+ *    host, and flag it via captureException so it's investigated rather
+ *    than silently forgotten — this should never happen under normal
+ *    operation, so every occurrence is worth a look, not routine noise.
+ */
+export async function sweepQuickMatchChallenges(): Promise<{ expired: number; recoveredStuck: number; errors: string[] }> {
+  const errors: string[] = [];
+  let expired = 0;
+  let recoveredStuck = 0;
+
+  const duePending = await prisma.quickMatchChallenge.findMany({
+    where: { status: "PENDING", expiresAt: { lt: new Date() } },
+    select: { id: true },
+  });
+  for (const { id } of duePending) {
+    try {
+      if (await expireQuickMatchChallengeIfDue(id)) expired++;
+    } catch (err) {
+      errors.push(`expire ${id}: ${err instanceof Error ? err.message : String(err)}`);
+      captureException(err, { source: "quickMatch/sweep/expire", challengeId: id });
+    }
+  }
+
+  const stuckAccepted = await prisma.quickMatchChallenge.findMany({
+    where: { status: "ACCEPTED", battleId: null, acceptedAt: { lt: new Date(Date.now() - STUCK_ACCEPTED_GRACE_MS) } },
+    select: { id: true },
+  });
+  for (const { id } of stuckAccepted) {
+    try {
+      // Comfortably past the grace period — treat as terminal/expired,
+      // not "might still resolve," and refund the host.
+      await recoverFailedAccept(id, false);
+      recoveredStuck++;
+      captureException(new Error("Recovered a Quick Match challenge stuck ACCEPTED with no Battle"), {
+        source: "quickMatch/sweep/recoverStuck",
+        challengeId: id,
+      });
+    } catch (err) {
+      errors.push(`recoverStuck ${id}: ${err instanceof Error ? err.message : String(err)}`);
+      captureException(err, { source: "quickMatch/sweep/recoverStuck", challengeId: id });
+    }
+  }
+
+  return { expired, recoveredStuck, errors };
 }

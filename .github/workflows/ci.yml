@@ -2,13 +2,15 @@ name: CI
 
 # Runs on every push and PR: typecheck, lint, the real Vitest suite
 # (against an ephemeral Postgres service — spun up fresh for this run,
-# migrated, then discarded; never the real Neon dev/prod database), and a
-# production build. The build step itself still doesn't need a *reachable*
-# database on its own (nothing in this repo performs a build-time DB
-# query — no generateStaticParams, no top-level `dynamic` overrides;
-# every page is request-time dynamic behind a real session cookie check),
-# but DATABASE_URL now points at a real one anyway since the service is
-# already up for the test step.
+# migrated, then discarded; never the real Neon dev/prod database), a
+# production build, and the Playwright e2e suite against that build
+# (`next start`, not `next dev` — see playwright.config.ts's own comment
+# on why CI runs a production server instead). The build step itself
+# still doesn't need a *reachable* database on its own (nothing in this
+# repo performs a build-time DB query — no generateStaticParams, no
+# top-level `dynamic` overrides; every page is request-time dynamic
+# behind a real session cookie check), but DATABASE_URL now points at a
+# real one anyway since the service is already up for the test/e2e steps.
 
 on:
   push:
@@ -82,3 +84,28 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Get installed Playwright version
+        id: playwright-version
+        run: echo "version=$(node -p "require('./package-lock.json').packages['node_modules/@playwright/test'].version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Install Playwright OS dependencies
+        # Skipped above when the browser cache hits (nothing to install
+        # against), but the OS-level shared libraries Chromium needs
+        # still have to be present on every fresh runner regardless.
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      - name: E2E test
+        run: npm run test:e2e

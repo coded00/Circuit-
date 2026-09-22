@@ -36,25 +36,37 @@ against real transaction/locking behavior, not a fake.
 ## Running e2e tests
 
 ```bash
-npm run test:e2e       # runs both e2e specs headless
+npm run test:e2e       # runs the whole e2e suite headless
 npm run test:e2e:ui    # Playwright's own UI mode, for debugging locally
 ```
 
-Not yet wired into `.github/workflows/ci.yml` — unlike `npm test`, this
-needs a running app server (`webServer` in `playwright.config.ts`) and a
-Chromium download, both real additions to CI runtime and complexity that
-haven't been made yet. Run it locally before a change that touches
-either flow.
-
-Drives a real Chromium browser against `npm run dev` (`playwright.config.ts`'s
-`webServer`, reused if you already have `npm run dev` running — same
-`DATABASE_URL` discipline as Vitest above). Next dev mode (Turbopack)
-compiles each route/API handler on its first real hit rather than ahead
-of time, so the first run against a route these tests haven't touched
-yet in the current dev-server process can itself take several real
-seconds before the assertion under test even starts — the config's
-`timeout: 90_000` and this suite's individual `waitForURL`/
-`waitForResponse` calls are sized for that, not for a slow test.
+- **Locally**: drives a real Chromium browser against `npm run dev`
+  (`playwright.config.ts`'s `webServer`, reused if you already have
+  `npm run dev` running — same `DATABASE_URL` discipline as Vitest
+  above). Next dev mode (Turbopack) compiles each route/API handler on
+  its first real hit rather than ahead of time, so the first run against
+  a route these tests haven't touched yet in the current dev-server
+  process can itself take several real seconds before the assertion
+  under test even starts — the config's `timeout: 90_000` and this
+  suite's individual `waitForURL`/`waitForResponse` calls are sized for
+  that, not for a slow test.
+- **In CI**: `.github/workflows/ci.yml` runs this suite too, after
+  `npm run build` — `playwright.config.ts` detects `CI` and points
+  `webServer` at `npm run start` (a real production server) instead of
+  `npm run dev`, which sidesteps the dev-mode cold-compile timing above
+  entirely and is what actually caught two real bugs before they shipped
+  (see the Quick Match feature's own commit history): `next start`
+  silently doesn't work correctly under this project's old
+  `output: "standalone"` config (removed from `next.config.ts` once this
+  was discovered), and a global UI listener could render a second,
+  redundant control on top of a page that already had its own — both
+  invisible against `next dev`'s slower, more forgiving timing, both
+  real under production speed. `retries: 1` in CI (0 locally) absorbs
+  genuine transient flakiness (a slow runner, a momentary hiccup against
+  the job's own ephemeral Postgres service) without masking a
+  consistently-failing test. Playwright's Chromium download is cached
+  across runs (`actions/cache`, keyed on the pinned `@playwright/test`
+  version) rather than re-downloaded every time.
 
 ## Where things live
 

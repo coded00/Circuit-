@@ -31,6 +31,7 @@ import { settleOrganizerRevenue } from "@/lib/settlement";
 import { trackEvent } from "@/lib/analytics";
 import { captureException } from "@/lib/observability";
 import { logAdminAction } from "@/lib/auditLog";
+import { sweepQuickMatchChallenges } from "@/lib/quickMatch";
 
 export class MatchError extends Error {
   code:
@@ -875,6 +876,8 @@ export async function runScheduledSweep(): Promise<{
   autoAccepted: number;
   escalated: number;
   organizerRevenueSettled: number;
+  quickMatchExpired: number;
+  quickMatchRecoveredStuck: number;
   errors?: string[];
 }> {
   const now = new Date();
@@ -959,11 +962,21 @@ export async function runScheduledSweep(): Promise<{
   const settlement = await settleOrganizerRevenue();
   if (settlement.errors) errors.push(...settlement.errors);
 
+  // Same "one sweep, several unrelated concerns folded in" reasoning —
+  // Quick Match's own safety net for a host who never polls again after
+  // closing the tab, and for a challenge stuck ACCEPTED with no Battle
+  // because its own in-request recovery also failed. See
+  // sweepQuickMatchChallenges's own doc comment.
+  const quickMatchSweep = await sweepQuickMatchChallenges();
+  if (quickMatchSweep.errors.length > 0) errors.push(...quickMatchSweep.errors);
+
   return {
     bracketsGenerated,
     autoAccepted,
     escalated,
     organizerRevenueSettled: settlement.settled,
+    quickMatchExpired: quickMatchSweep.expired,
+    quickMatchRecoveredStuck: quickMatchSweep.recoveredStuck,
     ...(errors.length > 0 ? { errors } : {}),
   };
 }

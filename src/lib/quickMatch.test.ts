@@ -10,6 +10,7 @@ import {
   getEligibleRecipients,
   recoverFailedAccept,
   resolveQuickMatchAcceptance,
+  sweepQuickMatchChallenges,
 } from "./quickMatch";
 
 /**
@@ -266,5 +267,64 @@ describe("getEligibleRecipients", () => {
     const eligibleIds = eligible.map((u) => u.id);
     expect(eligibleIds).not.toContain(busy.id);
     expect(eligibleIds).not.toContain(opponent.id);
+  });
+});
+
+describe("sweepQuickMatchChallenges: the periodic safety net", () => {
+  it("expires an overdue PENDING challenge nothing has polled since, and refunds the host", async () => {
+    const host = await createTestUser({ walletBalance: 200_000 });
+    const stakeAmount = 25_000;
+    const challenge = await createChallenge(host.id, { stakeAmount, expiresAt: new Date(Date.now() - 10_000) });
+    await prisma.user.update({ where: { id: host.id }, data: { walletBalance: { decrement: stakeAmount } } });
+    await prisma.escrowTransaction.create({
+      data: { quickMatchChallengeId: challenge.id, userId: host.id, type: "STAKE", amount: stakeAmount, status: "COMPLETE" },
+    });
+
+    const result = await sweepQuickMatchChallenges();
+    expect(result.expired).toBeGreaterThanOrEqual(1);
+    expect(result.errors).toHaveLength(0);
+
+    const swept = await prisma.quickMatchChallenge.findUniqueOrThrow({ where: { id: challenge.id } });
+    expect(swept.status).toBe("EXPIRED");
+    const refundedHost = await prisma.user.findUniqueOrThrow({ where: { id: host.id } });
+    expect(refundedHost.walletBalance).toBe(200_000);
+  });
+
+  it("recovers a challenge stuck ACCEPTED with no Battle past the grace period, but leaves a recent one alone", async () => {
+    const stuckHost = await createTestUser({ walletBalance: 100_000 });
+    const stakeAmount = 10_000;
+    const stuckChallenge = await createChallenge(stuckHost.id, { stakeAmount });
+    await prisma.user.update({ where: { id: stuckHost.id }, data: { walletBalance: { decrement: stakeAmount } } });
+    await prisma.escrowTransaction.create({
+      data: { quickMatchChallengeId: stuckChallenge.id, userId: stuckHost.id, type: "STAKE", amount: stakeAmount, status: "COMPLETE" },
+    });
+    // Simulates the accept route's own standalone CAS winning, then its
+    // consequence transaction AND the in-request recovery both failing —
+    // the exact scenario this sweep exists for. acceptedAt well in the
+    // past, past whatever grace period the sweep applies.
+    await prisma.quickMatchChallenge.update({
+      where: { id: stuckChallenge.id },
+      data: { status: "ACCEPTED", acceptedAt: new Date(Date.now() - 10 * 60_000) },
+    });
+
+    const recentHost = await createTestUser({ walletBalance: 100_000 });
+    const recentChallenge = await createChallenge(recentHost.id, { stakeAmount: 0 });
+    await prisma.quickMatchChallenge.update({
+      where: { id: recentChallenge.id },
+      data: { status: "ACCEPTED", acceptedAt: new Date() }, // still well within any real request's duration
+    });
+
+    const result = await sweepQuickMatchChallenges();
+    expect(result.recoveredStuck).toBeGreaterThanOrEqual(1);
+
+    const recoveredStuck = await prisma.quickMatchChallenge.findUniqueOrThrow({ where: { id: stuckChallenge.id } });
+    expect(recoveredStuck.status).toBe("EXPIRED");
+    const refundedHost = await prisma.user.findUniqueOrThrow({ where: { id: stuckHost.id } });
+    expect(refundedHost.walletBalance).toBe(100_000);
+
+    // Not touched — still within the grace window, so it's treated as
+    // "might still be resolving," not stuck.
+    const stillAccepted = await prisma.quickMatchChallenge.findUniqueOrThrow({ where: { id: recentChallenge.id } });
+    expect(stillAccepted.status).toBe("ACCEPTED");
   });
 });
