@@ -11,7 +11,21 @@
  */
 import type { FullConfig } from "@playwright/test";
 
-const WARMUP_PATHS = ["/login", "/tournaments/warmup/register", "/tournaments/warmup", "/matches/warmup"];
+const WARMUP_PATHS = [
+  "/login",
+  "/tournaments/warmup/register",
+  "/tournaments/warmup",
+  "/matches/warmup",
+  "/battles/new",
+  "/quick-match/warmup",
+  "/api/quick-match",
+  "/api/quick-match/pending",
+  "/api/quick-match/warmup",
+  "/api/quick-match/warmup/accept",
+  "/api/quick-match/warmup/cancel",
+  "/api/quick-match/warmup/decline",
+  "/api/presence/heartbeat",
+];
 
 export default async function globalSetup(config: FullConfig) {
   const baseURL = config.projects[0]?.use?.baseURL ?? "http://localhost:3000";

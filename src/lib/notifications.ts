@@ -41,7 +41,12 @@ export type NotificationType =
   | "TEAM_JOIN_REQUEST"
   | "NEW_TOURNAMENT"
   | "NEW_CHALLENGE"
-  | "ORGANIZER_REVENUE_SETTLED";
+  | "ORGANIZER_REVENUE_SETTLED"
+  | "QUICK_MATCH_CHALLENGE"
+  | "QUICK_MATCH_ACCEPTED"
+  | "QUICK_MATCH_UNAVAILABLE"
+  | "QUICK_MATCH_EXPIRED"
+  | "QUICK_MATCH_CANCELLED";
 
 export interface NotificationChannel {
   send(userId: string, type: NotificationType, payload: Record<string, unknown>): Promise<void>;

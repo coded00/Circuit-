@@ -85,6 +85,22 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
       return { message: `New open Challenge: ${str(p, "game")}`, href: `/battles/${str(p, "battleId")}` };
     case "ORGANIZER_REVENUE_SETTLED":
       return { message: "Your tournament revenue was credited to your wallet.", href: "/wallet" };
+    case "QUICK_MATCH_CHALLENGE":
+      return {
+        message: `${str(p, "hostHandle")} challenged you to a Quick Match: ${str(p, "game")}.`,
+        href: `/quick-match/${str(p, "challengeId")}`,
+      };
+    case "QUICK_MATCH_ACCEPTED":
+      return {
+        message: `Match found! ${str(p, "opponentHandle")} accepted your Quick Match.`,
+        href: `/battles/${str(p, "battleId")}`,
+      };
+    case "QUICK_MATCH_UNAVAILABLE":
+      return { message: "This Quick Match was already accepted by another player.", href: "/battles" };
+    case "QUICK_MATCH_EXPIRED":
+      return { message: "No opponent found. Your Quick Match expired.", href: "/battles/quick-match/new" };
+    case "QUICK_MATCH_CANCELLED":
+      return { message: `${str(p, "hostHandle")} cancelled their Quick Match challenge.`, href: "/battles" };
     default:
       return { message: "You have a new notification.", href: "/notifications" };
   }

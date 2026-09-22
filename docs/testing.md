@@ -2,9 +2,10 @@
 
 Vitest for unit and integration tests (`npm test`), matching
 `docs/circuit-stack.md`'s own commitment. Playwright (`npm run test:e2e`)
-covers the two flows Vitest structurally can't reach (see "Deliberately
-not yet covered" below): register → pay → escrow hold, and
-result-submit → auto-complete → payout-eligible.
+covers the flows Vitest structurally can't reach (see "Deliberately not
+yet covered" below): register → pay → escrow hold, result-submit →
+auto-complete → payout-eligible, and Quick Match's first-accept-wins race
+through the real UI.
 
 ## Running tests
 
@@ -118,6 +119,18 @@ concurrency-safety in money-moving code, not broad line coverage:
   rate).
 - `src/lib/rateLimit.test.ts` — the Postgres-backed rate limiter's core
   behavior (window expiry, per-key isolation, `clearAttempts`).
+- `src/lib/quickMatch.test.ts` — Quick Match's "first accept wins" design:
+  the standalone status compare-and-swap under several concurrent
+  attempts, `resolveQuickMatchAcceptance`'s full accept transaction under
+  concurrent full-accept attempts (money invariants: exactly one accepter
+  debited, the other pending recipients cancelled untouched), expiry
+  correctly blocking a late accept without depending on a sweep having
+  run, `expireQuickMatchChallengeIfDue`/`cancelQuickMatchChallenge`'s
+  refund-in-one-transaction shape (and idempotency — a second call must
+  not double-refund), the insufficient-balance-at-accept recovery path
+  reopening the challenge without touching the host's still-locked stake,
+  and `getEligibleRecipients`'s exclusions (self, suspended, offline,
+  can't-afford-the-stake, already in an active match).
 - `e2e/registration-wallet-pay.spec.ts` — register → pay → escrow hold,
   through the real `/tournaments/[id]/register` form: the wallet-pay
   radio (the one entry-fee path that needs no external payment-provider
@@ -134,6 +147,12 @@ concurrency-safety in money-moving code, not broad line coverage:
   agree (no real payment-provider transfer or bracket generation
   needed) — asserting `Match.status`, the winner's wallet-balance
   credit, and the `STAKE_PAYOUT` escrow row.
+- `e2e/quick-match.spec.ts` — the same "first accept wins" race
+  `src/lib/quickMatch.test.ts` proves at the library level, this time
+  through the real `/battles/new` → Quick Match form and the real
+  `/quick-match/[id]` accept page (two recipient browser contexts race a
+  real accept click), confirming the guarantee holds through the actual
+  API routes and UI, not just the underlying transaction logic.
 
 Deliberately not yet covered: most individual API route handlers.
 Several (auth-gated ones especially) call `next/headers`'s `cookies()`

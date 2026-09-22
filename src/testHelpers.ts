@@ -78,6 +78,13 @@ export async function cleanupAll(): Promise<void> {
     select: { id: true },
   });
   const battleIds = battles.map((b) => b.id);
+  const quickMatches = await prisma.quickMatchChallenge.findMany({
+    where: {
+      OR: [{ hostId: { in: userIds } }, { game: "Test Game" }, { recipients: { some: { recipientUserId: { in: userIds } } } }],
+    },
+    select: { id: true },
+  });
+  const quickMatchIds = quickMatches.map((q) => q.id);
 
   // Matched by player too, not just tournamentId/battleId — a match
   // created directly against two test players with neither association
@@ -94,6 +101,11 @@ export async function cleanupAll(): Promise<void> {
   };
   await prisma.dispute.deleteMany({ where: { match: matchWhere } });
   await prisma.match.deleteMany({ where: matchWhere });
+  // QuickMatchRecipient.challengeId and QuickMatchChallenge.hostId are
+  // both ON DELETE RESTRICT — recipients must go before challenges, and
+  // challenges before the users below, or those deletes fail outright.
+  await prisma.quickMatchRecipient.deleteMany({ where: { challengeId: { in: quickMatchIds } } });
+  await prisma.quickMatchChallenge.deleteMany({ where: { id: { in: quickMatchIds } } });
   await prisma.battle.deleteMany({ where: { id: { in: battleIds } } });
   await prisma.escrowTransaction.deleteMany({ where: { OR: [{ tournamentId: { in: tournamentIds } }, { userId: { in: userIds } }] } });
   await prisma.registration.deleteMany({ where: { tournamentId: { in: tournamentIds } } });

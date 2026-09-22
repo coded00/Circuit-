@@ -117,9 +117,15 @@ export async function getWalletActivity(userId: string): Promise<WalletActivity>
   // carry `userId` directly (no Registration indirection needed — see
   // `EscrowTransaction.userId`'s own schema comment), so one query covers
   // every STAKE/STAKE_PAYOUT/REFUND row this user was ever a party to.
+  //
+  // Also matches quickMatchChallengeId, not just battleId: a Quick Match
+  // host's stake lock is created before any Battle exists, and stays
+  // quickMatchChallengeId-only forever for a challenge that expires or
+  // gets cancelled unaccepted — without this OR, that real walletBalance
+  // movement would be invisible here.
   const battleTxns = await prisma.escrowTransaction.findMany({
-    where: { userId, battleId: { not: null } },
-    include: { battle: { select: { game: true } } },
+    where: { userId, OR: [{ battleId: { not: null } }, { quickMatchChallengeId: { not: null } }] },
+    include: { battle: { select: { game: true } }, quickMatchChallenge: { select: { game: true } } },
     orderBy: { createdAt: "desc" },
   });
 
@@ -151,7 +157,7 @@ export async function getWalletActivity(userId: string): Promise<WalletActivity>
       id: t.id,
       createdAt: t.createdAt,
       contextName: "Challenge",
-      contextGame: t.battle?.game ?? "",
+      contextGame: t.battle?.game ?? t.quickMatchChallenge?.game ?? "",
       type: t.type as "STAKE" | "STAKE_PAYOUT" | "REFUND",
       amount: t.amount,
       status: t.status,

@@ -8,6 +8,8 @@ import { TopBar } from "@/components/nav/TopBar";
 import { MobileTabBar } from "@/components/nav/MobileTabBar";
 import { AppShell } from "@/components/AppShell";
 import { OneSignalInit } from "@/components/OneSignalInit";
+import { PresenceHeartbeat } from "@/components/PresenceHeartbeat";
+import { QuickMatchIncomingListener } from "@/components/QuickMatchIncomingListener";
 import { SITE_NAME, SITE_URL, DEFAULT_DESCRIPTION } from "@/lib/seo";
 
 // Phase 14: Inter for UI text, Barlow Condensed ExtraBold for display/hero
@@ -135,6 +137,8 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           {children}
         </AppShell>
         {user && <OneSignalInit userId={user.id} notifyNewContent={user.notifyNewContent} />}
+        {user && <PresenceHeartbeat />}
+        {user && <QuickMatchIncomingListener />}
       </body>
     </html>
   );
