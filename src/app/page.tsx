@@ -2,7 +2,7 @@
  * Circuit — homepage (MVP rework spec sections 11-17). "Light to
  * discover, dark to compete": a dark cinematic hero, then a light
  * curated feed — Featured Competitions, Explore by Game, Upcoming
- * Competitions, Open Challenges, and (logged in) Your Circuit. The
+ * Competitions, and Open Challenges. The
  * exhaustive, filterable tournament browse experience lives on
  * `/compete` now; this page shows a curated slice of each, all real
  * data, no fabrication — including the sidebar's `GamerNews` widget,
@@ -23,11 +23,9 @@ import { ExploreTheCircuit } from "@/components/ExploreTheCircuit";
 import { OpenChallenges } from "@/components/OpenChallenges";
 import { UpcomingCompetitions } from "@/components/UpcomingCompetitions";
 import { GamerNews } from "@/components/GamerNews";
-import { YourCircuit } from "@/components/YourCircuit";
 import { CommunitiesCard } from "@/components/CommunitiesCard";
 import { getJoinedCommunities } from "@/lib/community";
 import { GAME_ACTIVITY } from "@/lib/circuitActivity";
-import { formatNotification } from "@/lib/notification-format";
 import { globalStandings } from "@/lib/standings";
 import { getFriendIds } from "@/lib/friends";
 import { getActiveAnnouncement } from "@/lib/announcements";
@@ -43,23 +41,6 @@ export const metadata = buildMetadata({
 });
 
 const RANK_COLORS = ["#eab308", "#9ca3af", "#b45309"]; // gold, silver, bronze — same as ladder/page.tsx
-
-const relativeTimeFormat = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
-// Same shape as notifications/page.tsx's own local formatRelative — no
-// shared lib for this one-line helper, matching that page's convention.
-function formatRelative(date: Date): string {
-  const diffMin = Math.round((date.getTime() - Date.now()) / 60000);
-  if (Math.abs(diffMin) < 60) return relativeTimeFormat.format(diffMin, "minute");
-  const diffHour = Math.round(diffMin / 60);
-  if (Math.abs(diffHour) < 24) return relativeTimeFormat.format(diffHour, "hour");
-  return relativeTimeFormat.format(Math.round(diffHour / 24), "day");
-}
-
-// Same convention as UpcomingCompetitions.tsx/FeaturedCompetitions.tsx's
-// own local formatShortDate.
-function formatShortDate(date: Date): string {
-  return date.toLocaleDateString("en-NG", { month: "short", day: "numeric" });
-}
 
 const cardSelect = {
   id: true,
@@ -122,10 +103,6 @@ export default async function Home({
     gameCounts,
     openBattles,
     leaderboard,
-    upcomingMatches,
-    registeredCompetitions,
-    activeChallenges,
-    recentActivity,
     homepageBanners,
     activeAnnouncement,
     joinedCommunities,
@@ -169,55 +146,6 @@ export default async function Home({
       },
     }),
     globalStandings(),
-    user
-      ? prisma.match.findMany({
-          where: { OR: [{ playerAId: user.id }, { playerBId: user.id }], status: "UPCOMING" },
-          orderBy: { createdAt: "desc" },
-          take: 3,
-          include: {
-            tournament: { select: { name: true, game: true } },
-            battle: { select: { game: true, format: true } },
-            playerA: { select: { displayName: true } },
-            playerB: { select: { displayName: true } },
-          },
-        })
-      : Promise.resolve([]),
-    user
-      ? prisma.registration.findMany({
-          where: { userId: user.id, status: "CONFIRMED" },
-          orderBy: { createdAt: "desc" },
-          take: 3,
-          include: {
-            tournament: {
-              select: {
-                id: true,
-                name: true,
-                game: true,
-                startAt: true,
-                prizeAmount: true,
-                entryFee: true,
-                participantCap: true,
-                _count: { select: { registrations: { where: { status: "CONFIRMED" } } } },
-              },
-            },
-          },
-        })
-      : Promise.resolve([]),
-    user
-      ? prisma.battle.findMany({
-          where: { OR: [{ creatorId: user.id }, { targetUserId: user.id }], status: { in: ["OPEN", "ACCEPTED"] } },
-          orderBy: { createdAt: "desc" },
-          take: 3,
-          include: { targetUser: { select: { displayName: true } } },
-        })
-      : Promise.resolve([]),
-    user
-      ? prisma.notification.findMany({
-          where: { userId: user.id },
-          orderBy: { createdAt: "desc" },
-          take: 3,
-        })
-      : Promise.resolve([]),
     prisma.homepageBanner.findMany({
       where: { enabled: true, OR: [{ publishAt: null }, { publishAt: { lte: new Date() } }] },
       orderBy: { order: "asc" },
@@ -247,47 +175,6 @@ export default async function Home({
           <OpenChallenges battles={openChallengesPreview} />
 
           <UpcomingCompetitions tournaments={upcomingTournaments} />
-
-          {user && (
-            <YourCircuit
-              viewerHandle={user.handle}
-              upcomingMatches={upcomingMatches.map((m) => ({
-                id: m.id,
-                matchCode: m.matchCode,
-                opponent: (m.playerAId === user.id ? m.playerB : m.playerA).displayName,
-                game: m.tournament?.game ?? m.battle?.game ?? null,
-                context: m.tournament ? m.tournament.name : m.battle ? (m.battle.format === "BEST_OF_3" ? "Best of 3" : "Single match") : null,
-              }))}
-              registeredCompetitions={registeredCompetitions.map((r) => ({
-                id: r.id,
-                tournamentId: r.tournament.id,
-                name: r.tournament.name,
-                game: r.tournament.game,
-                startsOn: formatShortDate(r.tournament.startAt),
-                prizeAmount: r.tournament.prizeAmount,
-                entryFee: r.tournament.entryFee,
-                registered: r.tournament._count.registrations,
-                participantCap: r.tournament.participantCap,
-              }))}
-              activeChallenges={activeChallenges.map((c) => ({
-                id: c.id,
-                game: c.game,
-                statusLabel:
-                  c.status === "ACCEPTED"
-                    ? "Accepted — ready to play"
-                    : c.targetUser
-                      ? `Waiting for ${c.targetUser.displayName}`
-                      : "Waiting for a challenger",
-                stakeAmount: c.stakeAmount,
-              }))}
-              recentActivity={recentActivity.map((n) => ({
-                id: n.id,
-                ...formatNotification(n.type, n.payload),
-                time: formatRelative(n.createdAt),
-                flagged: n.type.startsWith("DISPUTE") || n.type === "RESULT_DISPUTED",
-              }))}
-            />
-          )}
         </div>
 
         <div className="flex min-w-0 flex-col gap-6">
