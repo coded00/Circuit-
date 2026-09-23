@@ -56,6 +56,7 @@ export function FundWalletButton() {
           required
           autoFocus
           placeholder="Amount (₦)"
+          aria-label="Amount in naira"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           className="field-input w-36"

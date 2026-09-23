@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Barlow_Condensed, Geist_Mono } from "next/font/google";
+import { MotionConfig } from "framer-motion";
 import "./globals.css";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
@@ -105,6 +106,15 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           which otherwise logs a false-positive mismatch warning on every
           load for anyone with that extension installed. */}
       <body className="min-h-full" suppressHydrationWarning>
+        {/* MotionConfig reducedMotion="user" is the framer-motion-specific
+            counterpart to globals.css's own `prefers-reduced-motion` CSS
+            override just above — that override only silences CSS
+            transitions/animations, never the JS-driven `motion.*` components
+            (PageTransition, Modal, NotificationBell, QuickMatchIncomingListener,
+            MatchFoundHud, and AppShell's own transitions all use framer-motion).
+            One root-level wrapper covers all of them without touching each
+            component individually. */}
+        <MotionConfig reducedMotion="user">
         {/* Real, static site-level facts only — see this file's own
             ORGANIZATION_JSON_LD/WEBSITE_JSON_LD comment on why no
             SearchAction. Per-page structured data (Event on tournament
@@ -142,6 +152,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         {user && <OneSignalInit userId={user.id} notifyNewContent={user.notifyNewContent} />}
         {user && <PresenceHeartbeat />}
         {user && <QuickMatchIncomingListener />}
+        </MotionConfig>
       </body>
     </html>
   );
