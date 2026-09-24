@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* `dark:` utilities follow the site-wide theme (data-theme on <html>),
+   not the OS preference — the user's own toggle choice is what counts. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 /*
  * ============================================================================
  * CIRCUIT design system — "Light to discover. Dark to compete. Volt to
@@ -196,8 +200,15 @@
    text-color utility (e.g. a bare `<span>{name}</span>`) would otherwise
    inherit the light-theme color straight through, never re-evaluating
    `--foreground` at this scope. Re-declaring both here forces that
-   re-evaluation at the scope boundary. */
-[data-surface="dark"] {
+   re-evaluation at the scope boundary.
+
+   The same block also backs the site-wide dark mode: ThemeToggle sets
+   `data-theme="dark"` on <html> (persisted in localStorage, applied
+   before first paint by the inline script in layout.tsx), which turns
+   the whole app onto this palette the same way a `data-surface` wrapper
+   turns one section onto it. */
+[data-surface="dark"],
+:root[data-theme="dark"] {
   --background: #101318;
   --surface: #181c22;
   --surface-elevated: #222831;

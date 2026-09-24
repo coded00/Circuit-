@@ -7,6 +7,7 @@ import { CreateMenu } from "./CreateMenu";
 import { AccountMenu } from "./AccountMenu";
 import { MobileSearchToggle } from "./MobileSearchToggle";
 import { WalletBalanceChip } from "./WalletBalanceChip";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 /**
  * Circuit — top header. ~60px, integrated into the page rather than a
@@ -74,6 +75,11 @@ export async function TopBar({ user, disputeCount = 0 }: { user: User | null; di
 
           <div className="ml-auto flex shrink-0 items-center gap-3">
             <MobileSearchToggle />
+            {/* sm+ only, same reason as Create below — the phone header is
+                already full; phones get it in MobileTabBar's sheet. */}
+            <div className="hidden sm:block">
+              <ThemeToggle />
+            </div>
             {user ? (
               <>
                 <WalletBalanceChip balance={user.walletBalance} />

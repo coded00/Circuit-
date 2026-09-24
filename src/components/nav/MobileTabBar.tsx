@@ -19,6 +19,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Home,
@@ -163,6 +164,7 @@ export function MobileTabBar({ user }: { user: NavUser }) {
             <Link href="/calendar" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
               <Calendar size={18} /> Calendar
             </Link>
+            <ThemeToggle variant="row" />
             {user && (
               <>
                 <Link href="/notifications" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm">

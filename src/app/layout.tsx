@@ -13,6 +13,7 @@ import { OneSignalInit } from "@/components/OneSignalInit";
 import { PresenceHeartbeat } from "@/components/PresenceHeartbeat";
 import { QuickMatchIncomingListener } from "@/components/QuickMatchIncomingListener";
 import { SITE_NAME, SITE_URL, DEFAULT_DESCRIPTION } from "@/lib/seo";
+import { THEME_INIT_SCRIPT } from "@/lib/theme";
 
 // Phase 14: Inter for UI text, Barlow Condensed ExtraBold for display/hero
 // headlines — a tall, condensed weight suited to the CIRCUIT wordmark's
@@ -99,7 +100,14 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       data-scroll-behavior="smooth"
       className={`${bodyFont.variable} ${displayFont.variable} ${geistMono.variable} h-full antialiased`}
+      // THEME_INIT_SCRIPT below may set data-theme before React hydrates.
+      suppressHydrationWarning
     >
+      <head>
+        {/* Applies the saved dark-mode choice before first paint, so a
+            dark-mode user never sees a flash of the light theme. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       {/* suppressHydrationWarning is scoped to this element's own attributes
           only (not its children) — needed because extensions like Grammarly
           inject data-gr-* attributes onto <body> before React hydrates,
