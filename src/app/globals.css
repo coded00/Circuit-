@@ -227,6 +227,21 @@
   color-scheme: dark;
 }
 
+/* A whole page on the dark surface (Challenge + match pages): on phones,
+   AppShell reserves bottom padding for the fixed tab bar *outside* the
+   page, which would otherwise show as a strip of the light background
+   under a dark page. Pull the page's own background down through it. */
+.dark-page {
+  margin-bottom: calc(-7rem - env(safe-area-inset-bottom));
+  padding-bottom: calc(7rem + env(safe-area-inset-bottom));
+}
+@media (min-width: 40rem) {
+  .dark-page {
+    margin-bottom: 0;
+    padding-bottom: 0;
+  }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-surface: var(--surface);

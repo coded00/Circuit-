@@ -40,6 +40,9 @@ import { AddFriendForm } from "@/components/friends/AddFriendForm";
 import { TeamInviteRow } from "@/components/teams/TeamInviteRow";
 import { TeamRequestRow } from "@/components/teams/TeamRequestRow";
 import { CreateTeamForm } from "@/components/teams/CreateTeamForm";
+import { Panel, PanelEmpty } from "@/components/ui/Panel";
+import { StatStrip, type Stat } from "@/components/ui/StatStrip";
+import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
 import { ProfileTabs, ProfileTabLink, type ProfileTab } from "./ProfileTabs";
 
 // ---------------------------------------------------------------------------
@@ -138,44 +141,6 @@ function formatDate(date: Date): string {
   return date.toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" });
 }
 
-function Avatar({ person, size }: { person: Person; size: "sm" | "md" | "lg" }) {
-  const box = size === "lg" ? "h-16 w-16 text-2xl sm:h-24 sm:w-24 sm:text-3xl" : size === "md" ? "h-10 w-10 text-sm" : "h-8 w-8 text-xs";
-  return person.avatarUrl ? (
-    // eslint-disable-next-line @next/next/no-img-element -- uploaded or external avatar URL
-    <img src={person.avatarUrl} alt="" className={`${box} shrink-0 rounded-full object-cover`} />
-  ) : (
-    <span className={`${box} flex shrink-0 items-center justify-center rounded-full bg-surface-elevated font-display font-bold text-muted uppercase`}>
-      {person.displayName.slice(0, 1)}
-    </span>
-  );
-}
-
-/** One titled block. Rows inside are separated by hairlines, not nested cards. */
-function Panel({
-  title,
-  meta,
-  action,
-  children,
-}: {
-  title: string;
-  meta?: React.ReactNode;
-  action?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="card overflow-hidden p-0">
-      <div className="flex items-center justify-between gap-3 px-5 pt-4 pb-3">
-        <div className="flex min-w-0 items-baseline gap-2">
-          <h2 className="font-display text-base font-bold tracking-tight">{title}</h2>
-          {meta && <span className="font-mono text-xs text-muted tabular-nums">{meta}</span>}
-        </div>
-        {action}
-      </div>
-      {children}
-    </section>
-  );
-}
-
 function ViewAll({ tab, label = "View all" }: { tab: string; label?: string }) {
   return (
     <ProfileTabLink
@@ -186,10 +151,6 @@ function ViewAll({ tab, label = "View all" }: { tab: string; label?: string }) {
       <ChevronRight size={13} />
     </ProfileTabLink>
   );
-}
-
-function EmptyRow({ children }: { children: React.ReactNode }) {
-  return <p className="border-t border-border px-5 py-6 text-sm text-muted">{children}</p>;
 }
 
 const RESULT_STYLE: Record<Result, { bar: string; text: string; label: string }> = {
@@ -288,7 +249,7 @@ function ProfileHeader({ data }: { data: ProfileData }) {
   const { player, stats, isOwnProfile } = data;
   const joined = player.createdAt.toLocaleDateString("en-NG", { month: "long", year: "numeric" });
 
-  const statCells: { label: string; value: React.ReactNode; sub: string }[] = [
+  const statCells: Stat[] = [
     {
       label: "Record",
       value: (
@@ -332,7 +293,7 @@ function ProfileHeader({ data }: { data: ProfileData }) {
             the name column beside a taller avatar. */}
         <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4 gap-y-3 sm:gap-x-5">
           <div className="relative shrink-0 rounded-full p-[3px] ring-2 ring-accent-volt sm:row-span-2">
-            <Avatar person={player} size="lg" />
+            <PlayerAvatar person={player} size="lg" />
             {isOwnProfile && (
               <Link
                 href="/account"
@@ -397,15 +358,7 @@ function ProfileHeader({ data }: { data: ProfileData }) {
         </div>
       </div>
 
-      <dl className="grid grid-cols-2 gap-px border-t border-border bg-border sm:grid-cols-4">
-        {statCells.map((cell) => (
-          <div key={cell.label} className="flex flex-col gap-1 bg-surface px-5 py-4 sm:px-7">
-            <dt className="text-eyebrow text-muted">{cell.label}</dt>
-            <dd className="text-stat text-2xl leading-none">{cell.value}</dd>
-            <dd className="truncate text-xs text-muted">{cell.sub}</dd>
-          </div>
-        ))}
-      </dl>
+      <StatStrip stats={statCells} />
     </header>
   );
 }
@@ -541,7 +494,7 @@ function Overview({ data }: { data: ProfileData }) {
           }
         >
           {player.favoriteGames.length === 0 ? (
-            <EmptyRow>
+            <PanelEmpty>
               {isOwnProfile ? (
                 <Link href="/account" className="text-accent-blue hover:underline">
                   Add the games you play →
@@ -549,7 +502,7 @@ function Overview({ data }: { data: ProfileData }) {
               ) : (
                 "No favourite games listed."
               )}
-            </EmptyRow>
+            </PanelEmpty>
           ) : (
             <div className="flex flex-wrap gap-2 border-t border-border px-5 py-4">
               {player.favoriteGames.map((game) => (
@@ -578,7 +531,7 @@ function Overview({ data }: { data: ProfileData }) {
                       title={f.displayName}
                       className="rounded-full ring-2 ring-surface transition hover:z-10 hover:-translate-y-0.5"
                     >
-                      <Avatar person={f} size="sm" />
+                      <PlayerAvatar person={f} size="sm" />
                     </Link>
                   ))}
                 </div>
@@ -626,7 +579,7 @@ function MatchesTab({ data }: { data: ProfileData }) {
 
       <Panel title="Match history" meta={data.matches.length || undefined} action={<FormStrip form={data.form.slice(0, 5)} />}>
         {data.matches.length === 0 ? (
-          <EmptyRow>No completed matches yet.</EmptyRow>
+          <PanelEmpty>No completed matches yet.</PanelEmpty>
         ) : (
           <div className="divide-y divide-border border-t border-border">
             {data.matches.map((m) => (
@@ -643,7 +596,7 @@ function TournamentsTab({ data }: { data: ProfileData }) {
   return (
     <Panel title="Tournaments" meta={data.registrations.length || undefined}>
       {data.registrations.length === 0 ? (
-        <EmptyRow>
+        <PanelEmpty>
           {data.isOwnProfile ? (
             <>
               No tournaments yet.{" "}
@@ -654,7 +607,7 @@ function TournamentsTab({ data }: { data: ProfileData }) {
           ) : (
             "No tournaments yet."
           )}
-        </EmptyRow>
+        </PanelEmpty>
       ) : (
         <div className="divide-y divide-border border-t border-border">
           {data.registrations.map((r) => {
@@ -712,7 +665,7 @@ function FriendsTab({ data }: { data: ProfileData }) {
       )}
       <Panel title="Friends" meta={friends.accepted.length || undefined}>
         {friends.accepted.length === 0 ? (
-          <EmptyRow>{isOwnProfile ? "No friends yet — add one above, or from their profile." : `${player.displayName} hasn't added any friends yet.`}</EmptyRow>
+          <PanelEmpty>{isOwnProfile ? "No friends yet — add one above, or from their profile." : `${player.displayName} hasn't added any friends yet.`}</PanelEmpty>
         ) : isOwnProfile ? (
           <div className="flex flex-col gap-2 border-t border-border p-3">
             {friends.accepted.map((f) => (
@@ -727,7 +680,7 @@ function FriendsTab({ data }: { data: ProfileData }) {
                 href={`/players/${f.handle}`}
                 className="flex items-center gap-3 border-b border-border px-5 py-3 transition-colors hover:bg-surface-elevated/60 sm:odd:border-r"
               >
-                <Avatar person={f} size="md" />
+                <PlayerAvatar person={f} size="md" />
                 <div className="flex min-w-0 flex-col">
                   <span className="truncate text-sm font-medium">{f.displayName}</span>
                   <span className="text-metadata">@{f.handle}</span>
@@ -770,7 +723,7 @@ function TeamsTab({ data, viewerId }: { data: ProfileData; viewerId: string }) {
       )}
       <Panel title="Teams" meta={teams.mine.length || undefined}>
         {teams.mine.length === 0 ? (
-          <EmptyRow>{isOwnProfile ? "Not on a team yet — create one above." : `${player.displayName} isn't on a team yet.`}</EmptyRow>
+          <PanelEmpty>{isOwnProfile ? "Not on a team yet — create one above." : `${player.displayName} isn't on a team yet.`}</PanelEmpty>
         ) : (
           <div className="divide-y divide-border border-t border-border">
             {teams.mine.map((t) => (
