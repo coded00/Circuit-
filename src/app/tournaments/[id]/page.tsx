@@ -208,7 +208,8 @@ export default async function TournamentPage({
     eventAttendanceMode: "https://schema.org/OnlineEventAttendanceMode",
     location: { "@type": "VirtualLocation", url: canonicalUrl },
     url: canonicalUrl,
-    image: tournament.posterUrl ?? undefined,
+    // Uploaded posters are site-relative (/api/images/...); structured data needs an absolute URL.
+    image: tournament.posterUrl ? (tournament.posterUrl.startsWith("/") ? absoluteUrl(tournament.posterUrl) : tournament.posterUrl) : undefined,
     organizer: {
       "@type": "Person",
       name: tournament.organizer.user.displayName,

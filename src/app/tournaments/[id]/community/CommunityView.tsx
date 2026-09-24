@@ -155,7 +155,7 @@ export function CommunityView({
 
   const activeChannel = channels.find((c) => c.id === activeChannelId) ?? null;
   const activeMessages = messagesByChannel[activeChannelId] ?? [];
-  const channelLoading = activeChannelId !== "" && messagesByChannel[activeChannelId] === undefined;
+  const channelLoading = isMember && activeChannelId !== "" && messagesByChannel[activeChannelId] === undefined;
   const messageGroups = groupMessages(activeMessages);
 
   // Read inside the poll interval via a ref, not the `messagesByChannel`
@@ -181,18 +181,22 @@ export function CommunityView({
   // above is derived from `messagesByChannel` rather than a separate
   // state flag set here — nothing to set synchronously in the effect
   // body, only the async fetch result once it actually resolves.
+  // Non-members can't read channels (the API 403s), and an error must
+  // still store *something* — leaving the entry undefined would re-run
+  // this effect and refetch in an endless loop.
   useEffect(() => {
-    if (!activeChannelId || messagesByChannel[activeChannelId]) return;
+    if (!isMember || !activeChannelId || messagesByChannel[activeChannelId]) return;
     let cancelled = false;
     fetch(`/api/channels/${activeChannelId}/messages`)
-      .then((res) => res.json())
-      .then((data: { messages: MessageInfo[] }) => {
-        if (!cancelled) setMessagesByChannel((prev) => ({ ...prev, [activeChannelId]: data.messages }));
+      .then(async (res) => (res.ok ? ((await res.json()) as { messages: MessageInfo[] }).messages : []))
+      .catch(() => [] as MessageInfo[])
+      .then((messages) => {
+        if (!cancelled) setMessagesByChannel((prev) => ({ ...prev, [activeChannelId]: messages ?? [] }));
       });
     return () => {
       cancelled = true;
     };
-  }, [activeChannelId, messagesByChannel]);
+  }, [activeChannelId, messagesByChannel, isMember]);
 
   // Poll the active channel for anything newer than the last message
   // already shown — not a full refetch, and not the generic Poller
@@ -238,7 +242,12 @@ export function CommunityView({
     setError(null);
     const res = await fetch(`/api/communities/${communityId}/join`, { method: "POST" });
     const data = await res.json().catch(() => null);
-    if (res.ok) setIsMember(true);
+    if (res.ok) {
+      // Drop the empty placeholder lists a non-member was shown, so the
+      // history effect loads real messages now that reads are allowed.
+      setMessagesByChannel({});
+      setIsMember(true);
+    }
     else setError(data?.error ?? "Couldn't join. Try again.");
     setJoining(false);
   }

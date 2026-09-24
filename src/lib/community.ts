@@ -47,7 +47,9 @@ const MAX_MESSAGE_LENGTH = 2000;
 /** Chat images are downscaled/re-encoded client-side before upload (see
  *  CommunityView's prepareImage), so a normal photo lands well under this;
  *  the cap mostly bounds an animated GIF, which is uploaded as-is. */
-export const MAX_CHAT_IMAGE_BYTES = 8 * 1024 * 1024;
+/** Kept under Vercel's 4.5MB request-body limit, which rejects larger
+ *  uploads before this code runs (with a non-JSON error the client can't explain). */
+export const MAX_CHAT_IMAGE_BYTES = 4 * 1024 * 1024;
 
 /** Creates the Community + its four fixed channels if none exists yet,
  *  or flips an existing one back to enabled — either way returns the
@@ -359,7 +361,7 @@ export async function sendMessage(channelId: string, authorId: string, input: Se
   let imageType: string | null = null;
   if (input.kind === "IMAGE") {
     if (input.image.length > MAX_CHAT_IMAGE_BYTES) {
-      throw new CommunityError("IMAGE_TOO_LARGE", "Images are limited to 8MB.");
+      throw new CommunityError("IMAGE_TOO_LARGE", "Images are limited to 4MB.");
     }
     imageType = sniffImageType(input.image);
     if (!imageType) throw new CommunityError("INVALID_IMAGE", "Only JPG, PNG, GIF and WebP images can be sent.");

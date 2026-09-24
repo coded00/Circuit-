@@ -15,6 +15,11 @@ const BARE_ROUTES = ["/login", "/signup", "/forgot-password", "/reset-password",
  *  than the leaderboard page that used to live there — not creation/edit/
  *  register forms or browsing pages like /compete, and not `/new` (which
  *  would otherwise false-match the same `/tournaments/[id]` pattern). */
+/** Chat pages pin a `position: fixed` panel on mobile — see PageTransition's fadeOnly. */
+function isChatRoute(pathname: string): boolean {
+  return pathname === "/communities" || /^\/tournaments\/[^/]+\/community$/.test(pathname);
+}
+
 function isArenaRoute(pathname: string): boolean {
   if (/^\/tournaments\/(?!new$)[^/]+(\/bracket)?$/.test(pathname)) return true;
   if (/^\/battles\/(?!new$)[^/]+$/.test(pathname)) return true;
@@ -94,6 +99,7 @@ export function AppShell({
             <AnimatePresence mode="wait">
               <PageTransition
                 key={pathname}
+                fadeOnly={isChatRoute(pathname)}
                 className={`flex flex-1 flex-col ${isArenaRoute(pathname) ? "arena-transition" : ""}`}
               >
                 {children}

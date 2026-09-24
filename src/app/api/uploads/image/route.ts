@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Choose an image to upload." }, { status: 400 });
   }
   if (file.size > MAX_PUBLIC_IMAGE_BYTES) {
-    return NextResponse.json({ error: "Images are limited to 8MB." }, { status: 413 });
+    return NextResponse.json({ error: "Images are limited to 4MB." }, { status: 413 });
   }
 
   const rateLimitKey = `image-upload:${user.id}`;

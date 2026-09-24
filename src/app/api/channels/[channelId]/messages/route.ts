@@ -79,7 +79,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ cha
       return NextResponse.json({ error: "Choose an image to send." }, { status: 400 });
     }
     if (image.size > MAX_CHAT_IMAGE_BYTES) {
-      return NextResponse.json({ error: "Images are limited to 8MB." }, { status: 413 });
+      return NextResponse.json({ error: "Images are limited to 4MB." }, { status: 413 });
     }
 
     const rateLimitKey = `chat-image:${user.id}`;

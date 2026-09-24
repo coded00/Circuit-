@@ -66,10 +66,8 @@ function checkImageSize(width: number, height: number, bounds: ImageSizeBounds):
   return null;
 }
 
-type Status =
-  | { state: "uploading" }
-  | { state: "ok"; width: number; height: number }
-  | { state: "invalid"; message: string };
+/** Size check of whatever image the field currently holds. */
+type ValueCheck = { state: "ok"; width: number; height: number } | { state: "invalid"; message: string };
 
 export function ImageUploadField({
   label,
@@ -96,25 +94,30 @@ export function ImageUploadField({
 }) {
   const uid = useId();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [status, setStatus] = useState<Status | null>(null);
+  const [uploading, setUploading] = useState(false);
+  /** Why the last upload *attempt* failed. Informational only: a failed
+   *  attempt never changes `value`, so it must not block saving the form. */
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  /** Whether the image the field currently holds passes `bounds` — the
+   *  only thing (besides an upload in flight) that blocks submit. */
+  const [valueCheck, setValueCheck] = useState<ValueCheck | null>(null);
   const [linkMode, setLinkMode] = useState(() => value !== "" && !value.startsWith("/api/images/"));
   const [dragging, setDragging] = useState(false);
 
-  function report(next: Status | null) {
-    setStatus(next);
-    onValidityChange?.(next?.state === "uploading" || next?.state === "invalid");
+  function sync(next: { uploading: boolean; check: ValueCheck | null }) {
+    setUploading(next.uploading);
+    setValueCheck(next.check);
+    onValidityChange?.(next.uploading || next.check?.state === "invalid");
   }
 
   async function upload(file: File) {
-    report({ state: "uploading" });
+    setUploadError(null);
+    sync({ uploading: true, check: valueCheck });
     try {
-      const prepared = await prepareImage(file, { maxEdge: MAX_EDGE[purpose] });
+      const prepared = await prepareImage(file, { maxEdge: MAX_EDGE[purpose], format: "classic" });
       URL.revokeObjectURL(prepared.previewUrl);
       const problem = bounds ? checkImageSize(prepared.originalWidth, prepared.originalHeight, bounds) : null;
-      if (problem) {
-        report({ state: "invalid", message: problem });
-        return;
-      }
+      if (problem) throw new Error(problem);
 
       const form = new FormData();
       form.append("file", prepared.blob);
@@ -122,35 +125,46 @@ export function ImageUploadField({
       const res = await fetch("/api/uploads/image", { method: "POST", body: form });
       const data = await res.json().catch(() => null);
       if (!res.ok || typeof data?.url !== "string") {
-        report({ state: "invalid", message: data?.error ?? "Upload failed. Try again." });
-        return;
+        throw new Error(data?.error ?? (res.status === 413 ? "That image is too large (4MB max)." : "Upload failed. Try again."));
       }
       onChange(data.url);
-      report({ state: "ok", width: prepared.originalWidth, height: prepared.originalHeight });
+      sync({ uploading: false, check: { state: "ok", width: prepared.originalWidth, height: prepared.originalHeight } });
     } catch (err) {
-      report({ state: "invalid", message: err instanceof Error ? err.message : "Upload failed. Try again." });
+      setUploadError(err instanceof Error ? err.message : "Upload failed. Try again.");
+      sync({ uploading: false, check: valueCheck }); // the existing value (if any) is unchanged
     }
   }
 
-  // Dimension check for a pasted link or an existing value, once the
-  // preview actually loads (a URL string alone can't be measured).
+  // Size check for a pasted link or an existing value, once the preview
+  // actually loads (a URL string alone can't be measured). The <img> is
+  // keyed by `value`, so this re-runs for every new value.
   function handlePreviewLoad(e: React.SyntheticEvent<HTMLImageElement>) {
-    if (status?.state === "uploading" || status?.state === "ok") return;
     const { naturalWidth: width, naturalHeight: height } = e.currentTarget;
     const problem = bounds ? checkImageSize(width, height, bounds) : null;
-    report(problem ? { state: "invalid", message: problem } : linkMode ? { state: "ok", width, height } : null);
+    sync({ uploading, check: problem ? { state: "invalid", message: problem } : { state: "ok", width, height } });
   }
 
   function handlePreviewError() {
-    report({ state: "invalid", message: linkMode ? "Couldn't load an image from that link." : "Couldn't load this image." });
+    sync({
+      uploading,
+      check: { state: "invalid", message: linkMode ? "Couldn't load an image from that link." : "Couldn't load this image." },
+    });
   }
 
-  function clear() {
-    onChange("");
-    report(null);
+  function setValue(next: string) {
+    onChange(next);
+    setUploadError(null);
+    sync({ uploading: false, check: null }); // re-checked when the new preview loads
   }
 
-  const uploading = status?.state === "uploading";
+  function toggleMode() {
+    setUploadError(null);
+    // An uploaded image's /api/images/... path isn't a link anyone typed —
+    // don't drop it into the URL box (where `type="url"` would reject it).
+    if (!linkMode && value.startsWith("/api/images/")) setValue("");
+    setLinkMode(!linkMode);
+  }
+
   const previewClass =
     purpose === "avatar"
       ? "h-20 w-20 rounded-full"
@@ -170,10 +184,7 @@ export function ImageUploadField({
           type="url"
           required={required}
           value={value}
-          onChange={(e) => {
-            onChange(e.target.value);
-            report(null);
-          }}
+          onChange={(e) => setValue(e.target.value)}
           placeholder="https://…"
           className="field-input"
         />
@@ -225,7 +236,7 @@ export function ImageUploadField({
             >
               {uploading ? <Spinner size={20} className="text-muted" /> : <ImagePlus size={22} className="text-muted" />}
               <span className="font-medium">{uploading ? "Uploading…" : "Upload an image"}</span>
-              <span className="text-metadata">JPG, PNG, GIF or WebP · up to 8MB · or drag it here</span>
+              <span className="text-metadata">JPG, PNG, GIF or WebP · up to 4MB · or drag it here</span>
             </button>
           )}
         </>
@@ -238,7 +249,7 @@ export function ImageUploadField({
           <div className={`flex items-center gap-3 ${purpose === "avatar" || purpose === "game-icon" ? "" : "flex-col items-stretch"}`}>
             <div className={`relative shrink-0 overflow-hidden border border-border bg-surface-elevated ${previewClass}`}>
               {/* eslint-disable-next-line @next/next/no-img-element -- upload/pasted-link preview; dimensions read via onLoad */}
-              <img src={value} alt="" className="h-full w-full object-cover" onLoad={handlePreviewLoad} onError={handlePreviewError} />
+              <img key={value} src={value} alt="" className="h-full w-full object-cover" onLoad={handlePreviewLoad} onError={handlePreviewError} />
               {uploading && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/40">
                   <Spinner size={20} className="text-white" />
@@ -255,28 +266,26 @@ export function ImageUploadField({
                 >
                   <Upload size={14} /> Replace
                 </button>
-                <button type="button" onClick={clear} disabled={uploading} className="btn-secondary flex items-center gap-1.5 text-sm">
+                <button type="button" onClick={() => setValue("")} disabled={uploading} className="btn-secondary flex items-center gap-1.5 text-sm">
                   <Trash2 size={14} /> Remove
                 </button>
               </div>
             )}
           </div>
-          {status?.state === "ok" && (
+          {valueCheck?.state === "ok" && bounds && (
             <span className="text-xs text-success">
-              ✓ {status.width}×{status.height}px — good to use.
+              ✓ {valueCheck.width}×{valueCheck.height}px — good to use.
             </span>
           )}
         </div>
       )}
 
-      {status?.state === "invalid" && <p className="field-error">{status.message}</p>}
+      {valueCheck?.state === "invalid" && value && <p className="field-error">{valueCheck.message}</p>}
+      {uploadError && <p className="field-error">{uploadError}</p>}
 
       <button
         type="button"
-        onClick={() => {
-          setLinkMode(!linkMode);
-          report(null);
-        }}
+        onClick={toggleMode}
         className="flex items-center gap-1.5 self-start text-xs font-medium text-muted transition hover:text-foreground"
       >
         {linkMode ? <Upload size={12} /> : <Link2 size={12} />}

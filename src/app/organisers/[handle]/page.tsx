@@ -83,7 +83,8 @@ export async function generateMetadata({ params }: { params: Promise<{ handle: s
     title: `${organiser.displayName} — Tournament Organiser`,
     description: `${organiser.displayName} has organized ${organiser.tournaments.length} tournament${organiser.tournaments.length === 1 ? "" : "s"} on Circuit, hosting ${organiser.totalPlayersHosted} player${organiser.totalPlayersHosted === 1 ? "" : "s"}. Real Nigeria-first esports competitions.`,
     path: organiserPath(organiser.handle),
-    image: organiser.avatarUrl ?? undefined,
+    // Uploaded avatars are site-relative (/api/images/...); structured data needs an absolute URL.
+    image: organiser.avatarUrl ? (organiser.avatarUrl.startsWith("/") ? absoluteUrl(organiser.avatarUrl) : organiser.avatarUrl) : undefined,
   });
 }
 
@@ -97,7 +98,8 @@ export default async function OrganiserPage({ params }: { params: Promise<{ hand
     "@type": "Person",
     name: organiser.displayName,
     url: absoluteUrl(organiserPath(organiser.handle)),
-    image: organiser.avatarUrl ?? undefined,
+    // Uploaded avatars are site-relative (/api/images/...); structured data needs an absolute URL.
+    image: organiser.avatarUrl ? (organiser.avatarUrl.startsWith("/") ? absoluteUrl(organiser.avatarUrl) : organiser.avatarUrl) : undefined,
   };
 
   return (

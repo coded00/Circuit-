@@ -9,8 +9,8 @@
  * Browser-only (canvas, createImageBitmap) — call from client components.
  */
 
-/** Mirrors the server-side 8MB caps (MAX_CHAT_IMAGE_BYTES / MAX_PUBLIC_IMAGE_BYTES). */
-export const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
+/** Mirrors the server-side 4MB caps (MAX_CHAT_IMAGE_BYTES / MAX_PUBLIC_IMAGE_BYTES). */
+export const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
 export const ACCEPTED_IMAGE_TYPES = "image/png,image/jpeg,image/gif,image/webp";
 
 export type PreparedImage = {
@@ -39,13 +39,25 @@ function measureImage(url: string): Promise<{ width: number; height: number }> {
   });
 }
 
-export async function prepareImage(file: File, { maxEdge }: { maxEdge: number }): Promise<PreparedImage> {
+export async function prepareImage(
+  file: File,
+  {
+    maxEdge,
+    format = "webp",
+  }: {
+    maxEdge: number;
+    /** "webp" (smallest) for chat; "classic" (JPEG, or PNG for PNG sources)
+     *  for public images, because the share-card renderer (next/og) can't
+     *  decode WebP and those images end up on share cards. */
+    format?: "webp" | "classic";
+  }
+): Promise<PreparedImage> {
   if (!ACCEPTED_IMAGE_TYPES.split(",").includes(file.type)) {
     throw new Error("Only JPG, PNG, GIF and WebP images can be uploaded.");
   }
 
   if (file.type === "image/gif") {
-    if (file.size > MAX_UPLOAD_BYTES) throw new Error("GIFs are limited to 8MB.");
+    if (file.size > MAX_UPLOAD_BYTES) throw new Error("GIFs are limited to 4MB.");
     const previewUrl = URL.createObjectURL(file);
     const { width, height } = await measureImage(previewUrl).catch(() => {
       URL.revokeObjectURL(previewUrl);
@@ -74,9 +86,14 @@ export async function prepareImage(file: File, { maxEdge }: { maxEdge: number })
   // WebP keeps transparency at a small size; browsers that can't encode
   // it hand back a PNG instead, in which case fall back to JPEG for
   // photos (PNG sources stay PNG so transparency survives).
-  let blob = await canvasToBlob(canvas, "image/webp", 0.85);
+  let blob = format === "webp" ? await canvasToBlob(canvas, "image/webp", 0.85) : null;
   if (!blob || blob.type !== "image/webp") {
     blob = await canvasToBlob(canvas, file.type === "image/png" ? "image/png" : "image/jpeg", 0.85);
+  }
+  // A big PNG (e.g. a 2400px poster screenshot) can exceed the cap even
+  // after downscaling; JPEG trades its transparency for a fraction of the size.
+  if (blob && blob.size > MAX_UPLOAD_BYTES && blob.type === "image/png") {
+    blob = await canvasToBlob(canvas, "image/jpeg", 0.85);
   }
   if (!blob) throw new Error("That image couldn't be processed.");
   if (blob.size > MAX_UPLOAD_BYTES) throw new Error("That image is too large to upload.");

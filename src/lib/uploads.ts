@@ -16,7 +16,9 @@ import { proofStorage, storageKeyOf } from "@/lib/storage";
 import { sniffImageType } from "@/lib/imageSniff";
 
 export const PUBLIC_IMAGE_PATH = "/api/images/";
-export const MAX_PUBLIC_IMAGE_BYTES = 8 * 1024 * 1024;
+/** Kept under Vercel's 4.5MB request-body limit, which rejects larger
+ *  uploads before this code runs (with a non-JSON error the client can't explain). */
+export const MAX_PUBLIC_IMAGE_BYTES = 4 * 1024 * 1024;
 
 /** What each upload is for, and whether only staff may upload it
  *  (banners/game icons are admin-managed content). */
@@ -35,7 +37,7 @@ export function isImagePurpose(value: unknown): value is ImagePurpose {
 export class UploadError extends Error {}
 
 export async function storePublicImage(purpose: ImagePurpose, buffer: Buffer): Promise<string> {
-  if (buffer.length > MAX_PUBLIC_IMAGE_BYTES) throw new UploadError("Images are limited to 8MB.");
+  if (buffer.length > MAX_PUBLIC_IMAGE_BYTES) throw new UploadError("Images are limited to 4MB.");
   const type = sniffImageType(buffer);
   if (!type) throw new UploadError("Only JPG, PNG, GIF and WebP images can be uploaded.");
   const ref = await proofStorage.store(`public-${purpose}`, buffer, type);
@@ -59,6 +61,10 @@ export async function resolveImageForOg(url: string | null): Promise<string | nu
   if (!url?.startsWith(PUBLIC_IMAGE_PATH)) return url;
   try {
     const { buffer, contentType } = await readPublicImage(url.slice(PUBLIC_IMAGE_PATH.length));
+    // next/og throws on WebP (it would crash the whole card). Uploads are
+    // encoded as JPEG/PNG for exactly this reason, but a WebP could still
+    // arrive from a client that skipped prepareImage — degrade, don't crash.
+    if (contentType === "image/webp") return null;
     return `data:${contentType};base64,${buffer.toString("base64")}`;
   } catch {
     return null;
