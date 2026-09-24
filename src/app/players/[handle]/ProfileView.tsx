@@ -43,7 +43,7 @@ import { CreateTeamForm } from "@/components/teams/CreateTeamForm";
 import { Panel, PanelEmpty } from "@/components/ui/Panel";
 import { StatStrip, type Stat } from "@/components/ui/StatStrip";
 import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
-import { ProfileTabs, ProfileTabLink, type ProfileTab } from "./ProfileTabs";
+import { SectionTabs, SectionTabLink, type SectionTab } from "@/components/ui/SectionTabs";
 
 // ---------------------------------------------------------------------------
 // Data shape
@@ -143,13 +143,13 @@ function formatDate(date: Date): string {
 
 function ViewAll({ tab, label = "View all" }: { tab: string; label?: string }) {
   return (
-    <ProfileTabLink
+    <SectionTabLink
       tab={tab}
       className="flex shrink-0 items-center gap-0.5 text-xs font-medium text-accent-blue transition hover:gap-1"
     >
       {label}
       <ChevronRight size={13} />
-    </ProfileTabLink>
+    </SectionTabLink>
   );
 }
 
@@ -787,7 +787,7 @@ function WalletTab({ wallet }: { wallet: NonNullable<ProfileData["wallet"]> }) {
 // ---------------------------------------------------------------------------
 
 export function ProfileView({ data, viewerId }: { data: ProfileData; viewerId: string | null }) {
-  const tabs: ProfileTab[] = [
+  const tabs: SectionTab[] = [
     { key: "overview", label: "Overview", content: <Overview data={data} /> },
     { key: "matches", label: "Matches", count: data.matches.length, content: <MatchesTab data={data} /> },
     { key: "tournaments", label: "Tournaments", count: data.registrations.length, content: <TournamentsTab data={data} /> },
@@ -806,7 +806,7 @@ export function ProfileView({ data, viewerId }: { data: ProfileData; viewerId: s
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6 sm:px-8 sm:py-8">
       <ProfileHeader data={data} />
-      <ProfileTabs tabs={tabs} initialTab={data.initialTab} />
+      <SectionTabs tabs={tabs} initialTab={data.initialTab} label="Profile sections" idPrefix="profile" />
     </div>
   );
 }
