@@ -2,125 +2,52 @@
  * Circuit — public player profile (Build Plan P3-10, maps: BRK-8, ACC-6).
  * No login required — guest-visible like everything else (ACC-1).
  * `dateOfBirth` and `payoutMethodRef` stay private (edited at /account,
- * never rendered here) — the Wallet & Rewards tab (real balance + real
- * transaction totals) is gated to the profile owner for the same reason.
+ * never rendered here) — the Wallet tab (real balance + real transaction
+ * totals) and the "Needs your attention" list are owner-only.
  *
- * A few things worth noting about what's real here vs. deliberately not
- * invented:
- * - **"Level 24"** is the same flat, explicitly-decided decorative
- *   constant `AccountMenu.tsx` already ships (Circuit has no Level/XP
- *   system) — shown here too since the reference design puts it
- *   front-and-center on the profile, not because it's now real data.
- * - **Achievements are 4 real, derived badges** (First Match, 5 Wins,
- *   Tournament Player, Top 10), computed from actual match/registration/
- *   rank data — not a stored achievements/points system, which doesn't
- *   exist anywhere in this codebase.
- * - **Favorite games are real, self-curated** (`User.favoriteGames`,
- *   edited at /account) — not derived automatically from match history,
- *   matching the reference's manual "Edit Games"/"Add Game" affordance.
- * - **The share link is the real profile URL** (`NEXT_PUBLIC_APP_URL`),
- *   not an invented vanity short domain.
+ * This file does every query and derivation; ProfileView.tsx renders.
+ * Everything shown is derived from real rows:
+ * - Record / win rate / form / streak come from completed matches (a
+ *   match with no winner is a void and counts toward neither side).
+ * - Best rank and per-game ranks come from `playerRankInGame` (Battle
+ *   standings — the only ranking Circuit has).
+ * - Achievements are the same four derived badges as before, now with
+ *   real progress toward each one; there's no stored achievements system.
+ * - Favourite games are self-curated (`User.favoriteGames`, /account).
+ * - There is no level/XP system, so the profile shows none.
  */
 
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import {
-  Calendar,
-  Flag,
-  Gamepad2,
-  Lock,
-  Pencil,
-  PlusCircle,
-  Shield,
-  Star,
-  Swords,
-  TrendingUp,
-  Trophy,
-  Wallet as WalletIcon,
-} from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { playerRankInGame } from "@/lib/standings";
 import { getWalletActivity } from "@/lib/wallet";
 import { friendStatusBetween } from "@/lib/friends";
-import { GameArtTile } from "@/components/GameArtTile";
-import { ShareButton } from "@/components/ShareButton";
-import { StatusPill, matchStatusInfo } from "@/components/StatusPill";
-import { FriendButton } from "@/components/FriendButton";
-import { FriendRequestRow } from "@/components/friends/FriendRequestRow";
-import { AddFriendForm } from "@/components/friends/AddFriendForm";
-import { TeamInviteRow } from "@/components/teams/TeamInviteRow";
-import { TeamRequestRow } from "@/components/teams/TeamRequestRow";
-import { CreateTeamForm } from "@/components/teams/CreateTeamForm";
-import { CountUp } from "@/components/CountUp";
-import TournamentTabs, { type TournamentTab } from "@/app/tournaments/[id]/TournamentTabs";
+import { matchStatusInfo } from "@/components/StatusPill";
+import { ProfileView, type AttentionItem, type MatchSummary, type ProfileData } from "./ProfileView";
 
 const ACTIVE_MATCH_PRIORITY: Record<string, number> = { DISPUTED: 0, NEEDS_RESULT: 1, UPCOMING: 2 };
 
-function formatMatchDate(date: Date): string {
-  return date.toLocaleDateString("en-NG", { dateStyle: "medium" });
-}
-
-function formatNaira(kobo: number): string {
-  return `₦ ${(kobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 0 })}`;
-}
-
-function StatTile({
-  icon,
-  iconClass,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  iconClass: string;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="widget flex items-center gap-3">
-      <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] ${iconClass}`}>{icon}</span>
-      <div className="flex flex-col">
-        <span className="text-eyebrow">{label}</span>
-        <span className="text-stat text-xl">{value}</span>
-      </div>
-    </div>
-  );
-}
-
-type Achievement = { key: string; label: string; description: string; unlocked: boolean };
-
-function AchievementBadge({ achievement, order = 0 }: { achievement: Achievement; order?: number }) {
-  return (
-    <div
-      style={{ "--i": order } as React.CSSProperties}
-      // Only real, already-earned badges get the reveal — an unearned one
-      // has nothing to celebrate, so it stays static.
-      className={`flex flex-col items-center gap-2 text-center ${achievement.unlocked ? "motion-fade-in motion-stagger" : ""}`}
-    >
-      <span
-        className={`flex h-14 w-14 items-center justify-center rounded-[12px] border ${
-          achievement.unlocked ? "border-accent-volt/50 bg-accent-volt-soft text-accent-volt" : "border-border bg-surface-elevated text-muted"
-        }`}
-      >
-        {/* Locked/unlocked was only ever conveyed by which icon renders —
-            invisible to a screen reader without this. */}
-        <span className="sr-only">{achievement.unlocked ? "Unlocked: " : "Locked: "}</span>
-        {achievement.unlocked ? <Star size={22} aria-hidden className="trophy-pop" /> : <Lock size={18} aria-hidden />}
-      </span>
-      <div className="flex flex-col">
-        <span className="text-xs font-semibold">{achievement.label}</span>
-        <span className="text-[11px] text-muted">{achievement.description}</span>
-      </div>
-    </div>
-  );
-}
+/** Old tab keys (from links made before tabs were consolidated) → current tab. */
+const TAB_ALIASES: Record<string, string> = {
+  overview: "overview",
+  matches: "matches",
+  stats: "matches",
+  achievements: "overview",
+  tournaments: "tournaments",
+  friends: "friends",
+  teams: "teams",
+  wallet: "wallet",
+};
 
 export default async function PlayerProfilePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ handle: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }) {
-  const { handle } = await params;
+  const [{ handle }, { tab }] = await Promise.all([params, searchParams]);
 
   const player = await prisma.user.findUnique({ where: { handle } });
   if (!player) notFound();
@@ -129,7 +56,21 @@ export default async function PlayerProfilePage({
   const isOwnProfile = viewer?.id === player.id;
   const friendStatus = viewer && !isOwnProfile ? await friendStatusBetween(viewer.id, player.id) : null;
 
-  const [activeMatches, activeRegistrations, openBattles, allRegistrations, walletActivity] = await Promise.all([
+  const [
+    activeMatches,
+    activeRegistrations,
+    openBattles,
+    allRegistrations,
+    walletActivity,
+    matches,
+    incomingRequests,
+    outgoingRequests,
+    acceptedFriendships,
+    captainedTeams,
+    memberTeams,
+    teamInvites,
+    teamRequests,
+  ] = await Promise.all([
     isOwnProfile
       ? prisma.match.findMany({
           where: {
@@ -160,14 +101,18 @@ export default async function PlayerProfilePage({
       include: { tournament: { select: { id: true, name: true, game: true, status: true, startAt: true } } },
     }),
     isOwnProfile ? getWalletActivity(player.id) : Promise.resolve(null),
-  ]);
-  activeMatches.sort((a, b) => ACTIVE_MATCH_PRIORITY[a.status] - ACTIVE_MATCH_PRIORITY[b.status]);
-
-  // Friends & Teams tabs (moved here from the standalone /friends and
-  // /teams pages) — the accepted list is real and public on every
-  // profile, same as Facebook/Steam; pending requests/invites are only
-  // ever fetched (and only ever shown) on the profile owner's own view.
-  const [incomingRequests, outgoingRequests, acceptedFriendships, captainedTeams, memberTeams, teamInvites, teamRequests] = await Promise.all([
+    prisma.match.findMany({
+      where: { status: "COMPLETE", OR: [{ playerAId: player.id }, { playerBId: player.id }] },
+      orderBy: { createdAt: "desc" },
+      include: {
+        playerA: { select: { displayName: true, handle: true } },
+        playerB: { select: { displayName: true, handle: true } },
+        tournament: { select: { name: true, game: true } },
+        battle: { select: { game: true } },
+      },
+    }),
+    // Friends & Teams: the accepted lists are public on every profile;
+    // pending requests/invites are only ever fetched for the owner.
     isOwnProfile
       ? prisma.friendship.findMany({
           where: { addresseeId: player.id, accepted: false },
@@ -211,584 +156,163 @@ export default async function PlayerProfilePage({
         })
       : Promise.resolve([]),
   ]);
-  const myTeams = [
-    ...captainedTeams.map((t) => ({ ...t, isCaptain: true })),
-    ...memberTeams.map((m) => ({ ...m.team, isCaptain: false })),
-  ];
 
-  const matches = await prisma.match.findMany({
-    where: { status: "COMPLETE", OR: [{ playerAId: player.id }, { playerBId: player.id }] },
-    orderBy: { createdAt: "desc" },
-    include: {
-      playerA: { select: { displayName: true, handle: true } },
-      playerB: { select: { displayName: true, handle: true } },
-      tournament: { select: { name: true } },
-      battle: { select: { game: true } },
-    },
-  });
-
-  const wins = matches.filter((m) => m.winnerId === player.id).length;
-  const losses = matches.filter((m) => m.winnerId && m.winnerId !== player.id).length;
-  const played = wins + losses;
+  // --- Record, form, streak ------------------------------------------------
+  const matchSummaries: MatchSummary[] = matches.map((m) => ({
+    id: m.id,
+    opponent: m.playerAId === player.id ? m.playerB : m.playerA,
+    context: m.tournament?.name ?? "Challenge",
+    game: m.battle?.game ?? m.tournament?.game ?? null,
+    date: m.createdAt,
+    result: !m.winnerId ? "VOID" : m.winnerId === player.id ? "W" : "L",
+  }));
+  const decided = matchSummaries.filter((m) => m.result !== "VOID").map((m) => m.result as "W" | "L");
+  const wins = decided.filter((r) => r === "W").length;
+  const losses = decided.length - wins;
+  const played = decided.length;
   const winRate = played === 0 ? null : Math.round((wins / played) * 100);
+  let streakCount = 0;
+  while (streakCount < decided.length && decided[streakCount] === decided[0]) streakCount++;
+  const streak = decided.length > 0 ? { result: decided[0], count: streakCount } : null;
 
-  const games = [...new Set(matches.map((m) => m.battle?.game).filter((g): g is string => Boolean(g)))];
-  const rankChips = (
-    await Promise.all(games.map(async (game) => ({ game, rank: await playerRankInGame(game, player.id) })))
-  ).filter((chip) => chip.rank !== null);
+  // --- Per-game stats + ranks ---------------------------------------------
+  // Every completed match with a known game counts toward that game's
+  // record; ranks come from Battle standings (null where unranked).
+  const games = [...new Set(matchSummaries.map((m) => m.game).filter((g): g is string => Boolean(g)))];
+  const ranks = new Map(await Promise.all(games.map(async (game) => [game, await playerRankInGame(game, player.id)] as const)));
+  const gameStats = games
+    .map((game) => {
+      const results = matchSummaries.filter((m) => m.game === game);
+      const gWins = results.filter((m) => m.result === "W").length;
+      const gLosses = results.filter((m) => m.result === "L").length;
+      const gPlayed = gWins + gLosses;
+      return {
+        game,
+        wins: gWins,
+        losses: gLosses,
+        played: gPlayed,
+        winRate: gPlayed === 0 ? null : Math.round((gWins / gPlayed) * 100),
+        rank: ranks.get(game) ?? null,
+      };
+    })
+    .sort((a, b) => b.played - a.played);
+  const bestRank = gameStats
+    .filter((g): g is typeof g & { rank: number } => g.rank !== null)
+    .sort((a, b) => a.rank - b.rank)[0];
 
-  // Per-game breakdown for the Game Stats tab — grouped from the same
-  // real completed-match list, not a separate invented aggregation.
-  const gameStats = games.map((game) => {
-    const gameMatches = matches.filter((m) => m.battle?.game === game);
-    const gWins = gameMatches.filter((m) => m.winnerId === player.id).length;
-    const gLosses = gameMatches.filter((m) => m.winnerId && m.winnerId !== player.id).length;
-    const gPlayed = gWins + gLosses;
-    const rank = rankChips.find((c) => c.game === game)?.rank ?? null;
-    return { game, wins: gWins, losses: gLosses, played: gPlayed, winRate: gPlayed === 0 ? null : Math.round((gWins / gPlayed) * 100), rank };
-  });
-
-  const hasTournamentPlayed = allRegistrations.some((r) => r.status === "CONFIRMED");
-  const achievements: Achievement[] = [
-    { key: "first-match", label: "First Match", description: "Play your first match", unlocked: played >= 1 },
-    { key: "five-wins", label: "5 Wins", description: "Win 5 matches", unlocked: wins >= 5 },
-    { key: "tournament-player", label: "Tournament Player", description: "Join a tournament", unlocked: hasTournamentPlayed },
-    { key: "top-10", label: "Top 10", description: "Finish in top 10", unlocked: rankChips.some((c) => (c.rank ?? 99) <= 10) },
+  // --- Achievements (derived, with real progress) --------------------------
+  const tournamentsJoined = allRegistrations.filter((r) => r.status === "CONFIRMED").length;
+  const achievements: ProfileData["achievements"] = [
+    { key: "first-match", label: "First Match", description: "Played a first match", unlocked: played >= 1, progress: { current: played, target: 1 } },
+    { key: "five-wins", label: "5 Wins", description: "Won 5 matches", unlocked: wins >= 5, progress: { current: wins, target: 5 } },
+    {
+      key: "tournament-player",
+      label: "Tournament Player",
+      description: "Joined a tournament",
+      unlocked: tournamentsJoined >= 1,
+      progress: { current: tournamentsJoined, target: 1 },
+    },
+    { key: "top-10", label: "Top 10", description: "Ranked top 10 in a game", unlocked: (bestRank?.rank ?? 99) <= 10, progress: null },
   ];
 
-  const heroGame = player.favoriteGames[0] ?? games[0] ?? null;
-  const profileUrl = `${process.env.NEXT_PUBLIC_APP_URL}/players/${player.handle}`;
-  const profileHost = profileUrl.replace(/^https?:\/\//, "");
-
-  const overviewContent = (
-    <div className="flex flex-col gap-6">
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatTile icon={<Gamepad2 size={18} />} iconClass="bg-accent-blue-soft text-accent-blue" label="Matches Played" value={String(played)} />
-        <StatTile icon={<Trophy size={18} />} iconClass="bg-gold/15 text-gold" label="Wins" value={String(wins)} />
-        <StatTile icon={<TrendingUp size={18} />} iconClass="bg-success/15 text-success" label="Win Rate" value={winRate === null ? "—" : `${winRate}%`} />
-        <StatTile icon={<Gamepad2 size={18} />} iconClass="bg-danger/15 text-danger" label="Losses" value={String(losses)} />
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
-        <div className="card flex flex-col gap-3">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex min-w-0 flex-col gap-0.5">
-              <h2 className="text-card-title">Favourite Games</h2>
-              <p className="text-metadata truncate">
-                The games {isOwnProfile ? "you play" : `${player.displayName} plays`} on Circuit.
-              </p>
-            </div>
-            {isOwnProfile && (
-              <Link href="/account" className="btn-secondary shrink-0">
-                <Pencil size={13} />
-                Edit Games
-              </Link>
-            )}
-          </div>
-          {player.favoriteGames.length === 0 ? (
-            <p className="text-sm text-muted">
-              {isOwnProfile ? (
-                <>
-                  No favourite games yet —{" "}
-                  <Link href="/account" className="font-medium text-accent-blue hover:underline">
-                    add some
-                  </Link>
-                  .
-                </>
-              ) : (
-                "No favourite games listed yet."
-              )}
-            </p>
-          ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {player.favoriteGames.map((game) => (
-                <div key={game} className="relative flex h-20 flex-col justify-end overflow-hidden rounded-[10px]">
-                  <GameArtTile game={game} fill imgWidth={300} />
-                </div>
-              ))}
-              {isOwnProfile && player.favoriteGames.length < 6 && (
-                <Link
-                  href="/account"
-                  className="flex h-20 flex-col items-center justify-center gap-1 rounded-[10px] border border-dashed border-border-strong text-muted transition hover:text-foreground"
-                >
-                  <PlusCircle size={18} />
-                  <span className="text-xs font-medium">Add Game</span>
-                </Link>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="card flex flex-col gap-2">
-          <h2 className="text-card-title">Player Spotlight</h2>
-          <p className="text-metadata">Share {isOwnProfile ? "your" : `${player.displayName}'s`} Circuit profile with the community.</p>
-          <div className="flex min-w-0 items-center rounded-[10px] bg-surface-elevated px-3 py-2">
-            <span className="min-w-0 truncate font-mono text-xs text-muted">{profileHost}</span>
-          </div>
-          <ShareButton variant="inline" title={`${player.displayName} on Circuit`} url={profileUrl} />
-        </div>
-      </div>
-
-      <div className="card flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="text-card-title flex items-center gap-2">
-            <Star size={15} aria-hidden className="text-gold" />
-            Achievements
-          </h2>
-        </div>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          {achievements.map((a, i) => (
-            <AchievementBadge key={a.key} achievement={a} order={i} />
-          ))}
-        </div>
-      </div>
-
-      {isOwnProfile && (activeMatches.length > 0 || activeRegistrations.length > 0 || openBattles.length > 0) && (
-        <div className="flex flex-col gap-3">
-          <h2 className="text-section-heading">Active</h2>
-          <div className="flex flex-col gap-2">
-            {activeMatches.map((match) => {
-              const opponent = match.playerAId === player.id ? match.playerB : match.playerA;
-              const status = matchStatusInfo(match.status);
-              return (
-                <a key={match.id} href={`/matches/${match.id}`} className="card-row flex items-center gap-3 p-3">
-                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="truncate font-medium">
-                      {match.tournament?.name ?? `Challenge · ${match.battle?.game}`} vs {opponent.displayName}
-                    </span>
-                    <span className="text-metadata">Match code: {match.matchCode}</span>
-                  </div>
-                  <StatusPill tone={status.tone} pulse={status.pulse}>
-                    {status.label}
-                  </StatusPill>
-                </a>
-              );
-            })}
-            {activeRegistrations.map((reg) => (
-              <Link key={reg.tournamentId} href={`/tournaments/${reg.tournament.id}`} className="card-row flex items-center gap-3 p-3">
-                <Trophy size={18} className="shrink-0 text-muted" />
-                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="truncate font-medium">{reg.tournament.name}</span>
-                  <span className="text-metadata">You&apos;re registered · {reg.tournament.game}</span>
-                </div>
-              </Link>
-            ))}
-            {openBattles.map((battle) => (
-              <Link key={battle.id} href={`/battles/${battle.id}`} className="card-row flex items-center gap-3 p-3">
-                <Swords size={18} className="shrink-0 text-muted" />
-                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="truncate font-medium">Your open Challenge · {battle.game}</span>
-                  <span className="text-metadata">Waiting for an opponent</span>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="text-section-heading">Recent Matches</h2>
-          {matches.length > 0 && (
-            <span className="text-xs font-medium text-muted">{matches.length} total</span>
-          )}
-        </div>
-        {matches.length === 0 ? (
-          <div className="card flex flex-col items-center gap-2 py-10 text-center">
-            <Gamepad2 size={28} className="text-muted" />
-            <p className="text-sm font-semibold">No matches yet</p>
-            <p className="text-sm text-muted">Jump into a tournament or challenge to see your match history here.</p>
-            <Link href="/compete" className="btn-primary mt-2">
-              Find a Competition →
-            </Link>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {matches.slice(0, 5).map((match) => {
-              const opponent = match.playerAId === player.id ? match.playerB : match.playerA;
-              const won = match.winnerId === player.id;
-              const voided = !match.winnerId;
-              const resultBadgeClass = voided ? "badge-neutral" : won ? "badge-complete" : "badge-cancelled";
-              return (
-                <a key={match.id} href={`/matches/${match.id}`} className="card-row flex items-center gap-3 p-3">
-                  {match.battle?.game ? (
-                    <GameArtTile game={match.battle.game} className="h-12 w-12 shrink-0 rounded-[8px]" hideLabel />
-                  ) : (
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[8px] border border-border bg-surface-elevated text-muted">
-                      <Trophy size={18} />
-                    </div>
-                  )}
-                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="truncate font-medium">
-                      {match.tournament?.name ?? `Battle · ${match.battle?.game}`} vs {opponent.displayName}
-                    </span>
-                    <span className="text-metadata">{formatMatchDate(match.createdAt)}</span>
-                  </div>
-                  <span className={`badge ${resultBadgeClass} shrink-0`}>{voided ? "Void" : won ? "Win" : "Loss"}</span>
-                </a>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
-  const matchHistoryContent =
-    matches.length === 0 ? (
-      <p className="card text-center text-muted">No completed matches yet.</p>
-    ) : (
-      <div className="flex flex-col gap-2">
-        {matches.map((match) => {
-          const opponent = match.playerAId === player.id ? match.playerB : match.playerA;
-          const won = match.winnerId === player.id;
-          const voided = !match.winnerId;
-          const resultBadgeClass = voided ? "badge-neutral" : won ? "badge-complete" : "badge-cancelled";
-          return (
-            <a key={match.id} href={`/matches/${match.id}`} className="card-row flex items-center gap-3 p-3">
-              {match.battle?.game ? (
-                <GameArtTile game={match.battle.game} className="h-12 w-12 shrink-0 rounded-[8px]" hideLabel />
-              ) : (
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[8px] border border-border bg-surface-elevated text-muted">
-                  <Trophy size={18} />
-                </div>
-              )}
-              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="truncate font-medium">
-                  {match.tournament?.name ?? `Battle · ${match.battle?.game}`} vs {opponent.displayName}
-                </span>
-                <span className="text-metadata">{formatMatchDate(match.createdAt)}</span>
-              </div>
-              <span className={`badge ${resultBadgeClass} shrink-0`}>{voided ? "Void" : won ? "Win" : "Loss"}</span>
-            </a>
-          );
-        })}
-      </div>
-    );
-
-  const achievementsContent = (
-    <div className="card flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
-        {achievements.map((a, i) => (
-          <AchievementBadge key={a.key} achievement={a} order={i} />
-        ))}
-      </div>
-    </div>
-  );
-
-  const gameStatsContent =
-    gameStats.length === 0 ? (
-      <p className="card text-center text-muted">No per-game stats yet — they show up after your first completed match.</p>
-    ) : (
-      <div className="table-wrap">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Game</th>
-              <th>Played</th>
-              <th>Wins</th>
-              <th>Losses</th>
-              <th>Win Rate</th>
-              <th>Rank</th>
-            </tr>
-          </thead>
-          <tbody>
-            {gameStats.map((g) => (
-              <tr key={g.game}>
-                <td className="font-medium">{g.game}</td>
-                <td className="font-mono tabular-nums">{g.played}</td>
-                <td className="font-mono tabular-nums text-success">{g.wins}</td>
-                <td className="font-mono tabular-nums text-danger">{g.losses}</td>
-                <td className="font-mono tabular-nums">{g.winRate === null ? "—" : `${g.winRate}%`}</td>
-                <td>
-                  {g.rank == null ? (
-                    "—"
-                  ) : (
-                    <span className="badge badge-brand">
-                      #<CountUp value={g.rank} />
-                    </span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    );
-
-  const tournamentsContent =
-    allRegistrations.length === 0 ? (
-      <p className="card text-center text-muted">No tournament registrations yet.</p>
-    ) : (
-      <div className="flex flex-col gap-2">
-        {allRegistrations.map((reg) => (
-          <Link key={reg.id} href={`/tournaments/${reg.tournament.id}`} className="card-row flex items-center gap-3 p-3">
-            <Trophy size={18} className="shrink-0 text-muted" />
-            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="truncate font-medium">{reg.tournament.name}</span>
-              <span className="text-metadata">
-                {reg.tournament.game} · {reg.tournament.startAt.toLocaleDateString("en-NG", { dateStyle: "medium" })}
-              </span>
-            </div>
-            <span className="badge badge-neutral shrink-0">{reg.status}</span>
-          </Link>
-        ))}
-      </div>
-    );
-
-  const friendsContent = (
-    <div className="flex flex-col gap-6">
-      {isOwnProfile && (
-        <div className="card">
-          <AddFriendForm />
-        </div>
-      )}
-
-      {isOwnProfile && incomingRequests.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <h2 className="text-section-heading">Requests ({incomingRequests.length})</h2>
-          <div className="flex flex-col gap-2">
-            {incomingRequests.map((f) => (
-              <FriendRequestRow key={f.id} friendshipId={f.id} person={f.requester} kind="incoming" />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {isOwnProfile && outgoingRequests.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <h2 className="text-section-heading">Sent ({outgoingRequests.length})</h2>
-          <div className="flex flex-col gap-2">
-            {outgoingRequests.map((f) => (
-              <FriendRequestRow key={f.id} friendshipId={f.id} person={f.addressee} kind="outgoing" />
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="flex flex-col gap-2">
-        <h2 className="text-section-heading">Friends ({acceptedFriendships.length})</h2>
-        {acceptedFriendships.length === 0 ? (
-          <p className="card text-center text-muted">
-            {isOwnProfile ? "No friends yet — add one above, or from their profile." : `${player.displayName} hasn't added any friends yet.`}
-          </p>
-        ) : isOwnProfile ? (
-          <div className="flex flex-col gap-2">
-            {acceptedFriendships.map((f) => {
-              const person = f.requesterId === player.id ? f.addressee : f.requester;
-              return <FriendRequestRow key={f.id} friendshipId={f.id} person={person} kind="friend" />;
-            })}
-          </div>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {acceptedFriendships.map((f) => {
-              const person = f.requesterId === player.id ? f.addressee : f.requester;
-              return (
-                <Link key={f.id} href={`/players/${person.handle}`} className="card-row flex items-center gap-3 p-3">
-                  {person.avatarUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs
-                    <img src={person.avatarUrl} alt="" className="h-10 w-10 shrink-0 rounded-full border border-border object-cover" />
-                  ) : (
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-surface-elevated font-semibold text-muted">
-                      {person.displayName.slice(0, 1).toUpperCase()}
-                    </div>
-                  )}
-                  <div className="flex min-w-0 flex-col">
-                    <span className="truncate font-medium">{person.displayName}</span>
-                    <span className="text-metadata">@{person.handle}</span>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
-  const teamsContent = (
-    <div className="flex flex-col gap-6">
-      {isOwnProfile && (
-        <div className="card">
-          <CreateTeamForm />
-        </div>
-      )}
-
-      {isOwnProfile && teamInvites.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <h2 className="text-section-heading">Invites ({teamInvites.length})</h2>
-          <div className="flex flex-col gap-2">
-            {teamInvites.map((m) => (
-              <TeamInviteRow key={m.id} teamId={m.teamId} teamName={m.team.name} tag={m.team.tag} viewerId={player.id} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {isOwnProfile && teamRequests.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <h2 className="text-section-heading">Your requests ({teamRequests.length})</h2>
-          <div className="flex flex-col gap-2">
-            {teamRequests.map((m) => (
-              <TeamRequestRow key={m.id} teamId={m.teamId} teamName={m.team.name} tag={m.team.tag} viewerId={player.id} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="flex flex-col gap-2">
-        <h2 className="text-section-heading">Teams ({myTeams.length})</h2>
-        {myTeams.length === 0 ? (
-          <p className="card text-center text-muted">
-            {isOwnProfile ? "Not on a team yet — create one above." : `${player.displayName} isn't on a team yet.`}
-          </p>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {myTeams.map((t) => (
-              <Link key={t.id} href={`/teams/${t.id}`} className="card-row flex items-center gap-3 p-3">
-                <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate font-medium">{t.name}</span>
-                  {t.game && <span className="text-metadata">{t.game}</span>}
-                </div>
-                {t.tag && <span className="text-metadata">[{t.tag}]</span>}
-                {t.isCaptain && <span className="badge badge-brand shrink-0">Captain</span>}
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
-  const tabs: TournamentTab[] = [
-    { key: "overview", label: "Overview", content: overviewContent },
-    { key: "matches", label: "Match History", content: matchHistoryContent },
-    { key: "achievements", label: "Achievements", content: achievementsContent },
-    { key: "stats", label: "Game Stats", content: gameStatsContent },
-    { key: "tournaments", label: "Tournaments", content: tournamentsContent },
-    { key: "friends", label: "Friends", content: friendsContent },
-    { key: "teams", label: "Teams", content: teamsContent },
+  // --- Needs your attention (owner only) -----------------------------------
+  activeMatches.sort((a, b) => ACTIVE_MATCH_PRIORITY[a.status] - ACTIVE_MATCH_PRIORITY[b.status]);
+  const attention: AttentionItem[] = [
+    ...activeMatches.map((m): AttentionItem => {
+      const opponent = m.playerAId === player.id ? m.playerB : m.playerA;
+      const status = matchStatusInfo(m.status);
+      return {
+        id: `match-${m.id}`,
+        href: `/matches/${m.id}`,
+        kind: "match",
+        title: `vs ${opponent.displayName}`,
+        subtitle: `${m.tournament?.name ?? `Challenge · ${m.battle?.game}`} · Code ${m.matchCode}`,
+        status,
+      };
+    }),
+    ...activeRegistrations.map(
+      (r): AttentionItem => ({
+        id: `reg-${r.id}`,
+        href: `/tournaments/${r.tournament.id}`,
+        kind: "registration",
+        title: r.tournament.name,
+        subtitle: `You're registered · ${r.tournament.game}`,
+        status: r.tournament.status === "LIVE" ? { tone: "live", label: "Live", pulse: true } : { tone: "open", label: "Registered" },
+      })
+    ),
+    ...openBattles.map(
+      (b): AttentionItem => ({
+        id: `battle-${b.id}`,
+        href: `/battles/${b.id}`,
+        kind: "battle",
+        title: `Your open Challenge · ${b.game}`,
+        subtitle: "Waiting for an opponent",
+      })
+    ),
   ];
 
-  if (isOwnProfile && walletActivity) {
-    tabs.push({
-      key: "wallet",
-      label: "Wallet & Rewards",
-      content: (
-        <div className="flex flex-col gap-4">
-          <div data-surface="dark" className="card flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-col gap-0.5">
-              <span className="text-eyebrow text-muted">Available balance</span>
-              <span className="font-display text-3xl font-bold tracking-tight">{formatNaira(walletActivity.balance)}</span>
-            </div>
-            <Link href="/wallet" className="btn-primary shrink-0">
-              <WalletIcon size={14} />
-              Open Wallet
-            </Link>
-          </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div className="widget flex flex-col gap-1">
-              <span className="text-eyebrow">Fees &amp; stakes paid</span>
-              <span className="text-stat text-xl">{formatNaira(walletActivity.totalPaid)}</span>
-            </div>
-            <div className="widget flex flex-col gap-1">
-              <span className="text-eyebrow">Refunded</span>
-              <span className="text-stat text-xl">{formatNaira(walletActivity.totalRefunded)}</span>
-            </div>
-            <div className="widget flex flex-col gap-1">
-              <span className="text-eyebrow">Winnings</span>
-              <span className="text-stat text-xl text-gold">{formatNaira(walletActivity.totalWon)}</span>
-            </div>
-          </div>
-          <p className="card text-center text-sm text-muted">
-            Rewards (points, perks) aren&apos;t built yet — this tab is your real Circuit balance and transaction totals only.
-          </p>
-        </div>
-      ),
-    });
-  }
+  const data: ProfileData = {
+    player: {
+      handle: player.handle,
+      displayName: player.displayName,
+      avatarUrl: player.avatarUrl,
+      bio: player.bio,
+      region: player.region,
+      favoriteGames: player.favoriteGames,
+      createdAt: player.createdAt,
+    },
+    isOwnProfile,
+    viewerSignedIn: Boolean(viewer),
+    friendStatus,
+    profileUrl: `${process.env.NEXT_PUBLIC_APP_URL}/players/${player.handle}`,
+    stats: {
+      wins,
+      losses,
+      played,
+      winRate,
+      streak,
+      tournaments: tournamentsJoined,
+      bestRank: bestRank ? { rank: bestRank.rank, game: bestRank.game } : null,
+    },
+    form: decided.slice(0, 10),
+    matches: matchSummaries,
+    gameStats,
+    achievements,
+    attention,
+    registrations: allRegistrations.map((r) => ({
+      id: r.id,
+      tournamentId: r.tournament.id,
+      name: r.tournament.name,
+      game: r.tournament.game,
+      startAt: r.tournament.startAt,
+      status: r.status,
+    })),
+    friends: {
+      accepted: acceptedFriendships.map((f) => ({
+        friendshipId: f.id,
+        ...(f.requesterId === player.id ? f.addressee : f.requester),
+      })),
+      incoming: incomingRequests.map((f) => ({ friendshipId: f.id, ...f.requester })),
+      outgoing: outgoingRequests.map((f) => ({ friendshipId: f.id, ...f.addressee })),
+    },
+    teams: {
+      mine: [
+        ...captainedTeams.map((t) => ({ id: t.id, name: t.name, tag: t.tag, game: t.game, isCaptain: true })),
+        ...memberTeams.map((m) => ({ id: m.team.id, name: m.team.name, tag: m.team.tag, game: m.team.game, isCaptain: false })),
+      ],
+      invites: teamInvites.map((m) => ({ id: m.id, teamId: m.teamId, name: m.team.name, tag: m.team.tag })),
+      requests: teamRequests.map((m) => ({ id: m.id, teamId: m.teamId, name: m.team.name, tag: m.team.tag })),
+    },
+    wallet: walletActivity
+      ? {
+          balance: walletActivity.balance,
+          totalPaid: walletActivity.totalPaid,
+          totalRefunded: walletActivity.totalRefunded,
+          totalWon: walletActivity.totalWon,
+        }
+      : null,
+    initialTab: tab ? TAB_ALIASES[tab] : undefined,
+  };
 
-  return (
-    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 p-6 sm:p-8">
-      <div data-surface="dark" className="relative overflow-hidden rounded-[var(--radius-hero)] border border-border p-4 sm:p-5">
-        {heroGame && <GameArtTile game={heroGame} className="opacity-[0.18]" fill hideLabel imgWidth={1400} />}
-        <div
-          aria-hidden
-          className="absolute inset-0"
-          style={{ backgroundImage: "linear-gradient(100deg, var(--surface) 45%, transparent)" }}
-        />
-        {/* Avatar + details on the left, action button on the right —
-            one row once there's enough width; stacked on narrow phones
-            so the button doesn't crowd the bio/date text. */}
-        <div className="relative z-10 flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-4 text-left">
-            <div className="relative shrink-0">
-              {player.avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs
-                <img
-                  src={player.avatarUrl}
-                  alt=""
-                  className="h-16 w-16 rounded-full border-2 border-border-strong object-cover sm:h-20 sm:w-20"
-                />
-              ) : (
-                <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-border-strong bg-surface-elevated text-2xl font-semibold text-muted sm:h-20 sm:w-20">
-                  {player.displayName.slice(0, 1).toUpperCase()}
-                </div>
-              )}
-              {isOwnProfile && (
-                <Link
-                  href="/account"
-                  aria-label="Edit avatar"
-                  className="btn-icon absolute right-0 bottom-0 h-6 w-6 border border-border bg-surface"
-                >
-                  <Pencil size={11} />
-                </Link>
-              )}
-            </div>
-            <div className="flex min-w-0 flex-col items-start gap-1">
-              <span className="badge border border-gold/40 bg-gold/10 text-gold">
-                <Shield size={11} />
-                Level 24
-              </span>
-              <h1 className="font-display text-xl font-bold tracking-tight sm:text-2xl">{player.displayName}</h1>
-              <p className="text-metadata">@{player.handle}</p>
-              <p className="max-w-sm text-sm text-muted">
-                {player.bio ||
-                  (isOwnProfile ? (
-                    <Link href="/account" className="hover:underline">
-                      Add a short bio →
-                    </Link>
-                  ) : null)}
-              </p>
-              <span className="flex items-center gap-1 text-xs text-muted">
-                <Calendar size={11} />
-                Member since {player.createdAt.toLocaleDateString("en-NG", { month: "long", year: "numeric" })}
-              </span>
-            </div>
-          </div>
-
-          <div className="flex shrink-0 gap-2">
-            {isOwnProfile ? (
-              <Link href="/account" className="btn-secondary">
-                <Pencil size={13} />
-                Edit Profile
-              </Link>
-            ) : (
-              viewer && (
-                <>
-                  {friendStatus && <FriendButton targetHandle={player.handle} status={friendStatus} />}
-                  <Link href={`/players/${player.handle}/report`} className="btn-secondary">
-                    <Flag size={13} />
-                    Report
-                  </Link>
-                </>
-              )
-            )}
-          </div>
-        </div>
-      </div>
-
-      <TournamentTabs tabs={tabs} />
-    </div>
-  );
+  return <ProfileView data={data} viewerId={viewer?.id ?? null} />;
 }
