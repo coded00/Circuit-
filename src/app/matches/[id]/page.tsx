@@ -2,50 +2,27 @@
  * Circuit — match detail page (Build Plan P3-4/P3-8/P6-2, maps: BRK-2).
  * No login required to view (guest visibility, per BRK-2) — submitting a
  * result or ruling is what's gated, inside the forms/routes themselves.
+ *
+ * Queries and derives here; MatchView.tsx renders the head-to-head screen.
  */
 
 import { notFound } from "next/navigation";
-import Link from "next/link";
-import { Trophy, Flag, Share2, Swords, Wallet, Timer } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { isWagerBattleWin } from "@/lib/awards";
-import { StatusPill, matchStatusInfo } from "@/components/StatusPill";
-import { ActivityTimeline } from "@/components/ActivityTimeline";
+import { gameStandings } from "@/lib/standings";
+import { matchStatusInfo } from "@/components/StatusPill";
 import { buildMatchTimeline } from "@/lib/matchTimeline";
-import { CountdownTimer } from "@/components/CountdownTimer";
-import { Spinner } from "@/components/Spinner";
 import Poller from "@/app/Poller";
-import ResultForm from "./ResultForm";
-import RulingForm from "./RulingForm";
-import EnterMatchButton from "./EnterMatchButton";
+import { MatchView, type MatchPlayer, type MatchViewData } from "./MatchView";
 
-function playerLabel(user: { displayName: string; handle: string }): string {
-  return `${user.displayName} (@${user.handle})`;
-}
+type ResultPayload = { winnerId: string; score: string };
 
 function formatBattleFormat(format: string): string {
   return format === "BEST_OF_3" ? "Best of 3" : "Single match";
 }
 
-function formatNaira(kobo: number): string {
-  return `₦${(kobo / 100).toLocaleString("en-NG")}`;
-}
-
-/* Deterministic scatter (no Math.random — this renders server-side) for the
- * win banner's confetti burst. Purely decorative; carries no data. */
-const CONFETTI_COLORS = ["var(--accent-volt)", "var(--accent-orange)", "var(--accent-blue)", "var(--gold)"];
-const CONFETTI_PIECES = Array.from({ length: 10 }, (_, i) => ({
-  left: (i * 37 + 5) % 96,
-  color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
-  delayMs: (i % 5) * 80,
-}));
-
-export default async function MatchPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function MatchPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
   const match = await prisma.match.findUnique({
@@ -54,7 +31,7 @@ export default async function MatchPage({
       playerA: true,
       playerB: true,
       winner: true,
-      tournament: { select: { id: true, name: true, organizerId: true } },
+      tournament: { select: { id: true, name: true, game: true, organizerId: true } },
       battle: { select: { id: true, game: true, format: true, stakeAmount: true } },
       dispute: true,
     },
@@ -62,246 +39,82 @@ export default async function MatchPage({
   if (!match) notFound();
 
   const user = await getCurrentUser();
-  const isParticipant = user !== null && (user.id === match.playerAId || user.id === match.playerBId);
+  const side: "A" | "B" | null = user?.id === match.playerAId ? "A" : user?.id === match.playerBId ? "B" : null;
   const isOrganizer = user !== null && match.tournament?.organizerId === user.id;
-  const hasSubmitted =
-    (user?.id === match.playerAId && match.resultA !== null) ||
-    (user?.id === match.playerBId && match.resultB !== null);
+  const hasReported = (side === "A" && match.resultA !== null) || (side === "B" && match.resultB !== null);
 
-  const canRuleAsOrganizer =
-    isOrganizer && match.dispute?.status === "ORGANIZER_REVIEW" && !isParticipant;
+  // Rulings: the organizer during organizer review (never a participant),
+  // or staff once escalated — same rules as before.
+  const canRuleAsOrganizer = isOrganizer && match.dispute?.status === "ORGANIZER_REVIEW" && side === null;
   const canRuleAsStaff = user?.isStaff === true && match.dispute?.status === "ESCALATED";
-  const status = matchStatusInfo(match.status);
-  const wonThisMatch = isParticipant && match.winnerId === user?.id;
-  const lostThisMatch = isParticipant && match.winnerId !== null && match.winnerId !== user?.id;
+  const ruling = canRuleAsOrganizer
+    ? { endpoint: `/api/disputes/${match.dispute!.id}/rule` }
+    : canRuleAsStaff
+      ? { endpoint: `/api/staff/disputes/${match.dispute!.id}/rule` }
+      : null;
 
-  // The "Enter Match" ready-check only applies to real Challenge (Battle)
-  // matches — tournament matches are reached through registration +
-  // bracket generation, not a sudden Accept click, so there's no
-  // "already ready?" ceremony needed there; they keep showing ResultForm
-  // immediately on UPCOMING exactly as before.
-  const isBattleMatch = match.battleId !== null;
-  const isPlayerA = user?.id === match.playerAId;
-  const myReadyAt = isPlayerA ? match.playerAReadyAt : match.playerBReadyAt;
-  const opponent = isPlayerA ? match.playerB : match.playerA;
+  const game = match.battle?.game ?? match.tournament?.game ?? null;
+  const standings = match.battle ? await gameStandings(match.battle.game) : [];
+  const standingFor = (userId: string) => {
+    const index = standings.findIndex((s) => s.userId === userId);
+    return index === -1 ? null : { rank: index + 1, wins: standings[index].wins, losses: standings[index].losses };
+  };
+
+  const toPlayer = (p: typeof match.playerA, which: "A" | "B"): MatchPlayer => ({
+    id: p.id,
+    displayName: p.displayName,
+    handle: p.handle,
+    avatarUrl: p.avatarUrl,
+    standing: standingFor(p.id),
+    ready: (which === "A" ? match.playerAReadyAt : match.playerBReadyAt) !== null,
+    reported: (which === "A" ? match.resultA : match.resultB) !== null,
+    proofUrl: (which === "A" ? match.proofARef : match.proofBRef) ? `/api/matches/${match.id}/proof/${which.toLowerCase()}` : null,
+  });
+
+  // The accepted score: whichever report named the actual winner.
+  const reports = [match.resultA, match.resultB].filter(Boolean) as ResultPayload[];
+  const finalScore =
+    match.status === "COMPLETE" && match.winnerId ? (reports.find((r) => r.winnerId === match.winnerId)?.score ?? null) : null;
+
   const bothReady = match.playerAReadyAt !== null && match.playerBReadyAt !== null;
-  const showReadyCheck = isBattleMatch && match.status === "UPCOMING";
-  // Live-refresh while genuinely waiting on something to change — never
-  // once the outcome is settled.
-  const showPoller =
-    (showReadyCheck && !bothReady) || match.status === "NEEDS_RESULT";
-  // TRU-2/PRD §19: voiding is only unambiguous for a Battle (no stake,
-  // nothing to return) — see MatchError "VOID_UNSUPPORTED" in
-  // src/lib/matches.ts. Surfaced here (rather than just omitting the
-  // option) so whoever's ruling sees why, not a silently missing choice.
-  const voidUnsupportedReason = match.tournamentId
-    ? "Voiding a tournament bracket match isn't supported yet."
-    : undefined;
+  // Live-refresh while genuinely waiting on something to change.
+  const showPoller = (match.battleId !== null && match.status === "UPCOMING" && !bothReady) || match.status === "NEEDS_RESULT";
+
+  const data: MatchViewData = {
+    id: match.id,
+    code: match.matchCode,
+    status: match.status,
+    statusPill: matchStatusInfo(match.status),
+    kind: match.battleId ? "battle" : "tournament",
+    game,
+    formatLabel: match.battle ? formatBattleFormat(match.battle.format) : `Round ${match.round}`,
+    tournament: match.tournament ? { id: match.tournament.id, name: match.tournament.name } : null,
+    battleId: match.battleId,
+    stakeAmount: match.battle?.stakeAmount ?? 0,
+    createdAt: match.createdAt,
+    playerA: toPlayer(match.playerA, "A"),
+    playerB: toPlayer(match.playerB, "B"),
+    winnerId: match.winnerId,
+    finalScore,
+    viewer: {
+      signedIn: user !== null,
+      side,
+      hasReported,
+      canShareWin: side !== null && match.winnerId === user?.id && isWagerBattleWin(match),
+    },
+    reportWindowExpiresAt: match.reportWindowExpiresAt,
+    dispute: match.dispute ? { id: match.dispute.id } : null,
+    ruling,
+    // TRU-2/PRD §19: voiding is only unambiguous for a Battle — see
+    // MatchError "VOID_UNSUPPORTED" in src/lib/matches.ts.
+    voidUnsupportedReason: match.tournamentId ? "Voiding a tournament bracket match isn't supported yet." : undefined,
+    timeline: buildMatchTimeline(match),
+  };
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-8 px-6 py-10">
+    <>
       {showPoller && <Poller />}
-      <div className="flex flex-col gap-2">
-        <StatusPill tone={status.tone} pulse={status.pulse}>{status.label}</StatusPill>
-        <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
-          {match.tournament ? `${match.tournament.name} · Round ${match.round}` : "Battle match"}
-        </h1>
-        <p className="text-sm text-muted">
-          Match code · <span className="font-mono">{match.matchCode}</span>
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {[match.playerA, match.playerB].map((p, i) => {
-          const isWinner = match.winnerId === p.id;
-          return (
-            // motion-scale-in here (not celebrate-fade) is a neutral settle-in
-            // for whoever's viewing — spectators and the loser included, not
-            // just the "You won!" banner below, which is participant-only.
-            <div key={i} className={`card flex flex-col gap-1 ${isWinner ? "motion-scale-in border-success/40" : ""}`}>
-              <div className="flex items-center justify-between gap-2">
-                <div className="text-eyebrow">Player {i === 0 ? "A" : "B"}</div>
-                {user && user.id !== p.id && (
-                  <Link
-                    href={`/players/${p.handle}/report`}
-                    className="flex items-center gap-1 text-xs text-muted hover:text-foreground"
-                  >
-                    <Flag size={12} />
-                    Report
-                  </Link>
-                )}
-              </div>
-              <Link href={`/players/${p.handle}`} className="flex items-center gap-1.5 font-medium hover:underline">
-                {isWinner && (
-                  <>
-                    <Trophy size={14} className="trophy-pop shrink-0 text-gold" aria-hidden="true" />
-                    <span className="sr-only">Winner: </span>
-                  </>
-                )}
-                {playerLabel(p)}
-              </Link>
-            </div>
-          );
-        })}
-      </div>
-
-      {wonThisMatch && (
-        <div className="celebrate-fade relative overflow-hidden rounded-[var(--radius-lg)] border border-gold/30 bg-gold/10 px-5 py-4">
-          <div className="confetti-burst" aria-hidden>
-            {CONFETTI_PIECES.map((p, i) => (
-              <span
-                key={i}
-                className="confetti-piece"
-                style={{ left: `${p.left}%`, backgroundColor: p.color, animationDelay: `${p.delayMs}ms` }}
-              />
-            ))}
-          </div>
-          <div className="relative z-10 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <Trophy size={28} className="trophy-pop shrink-0 text-gold" aria-hidden="true" />
-              <div className="flex flex-col">
-                <span className="font-display text-lg font-bold tracking-tight">You won!</span>
-                <span className="text-sm text-muted">Nice one. This counts toward your ladder rank.</span>
-              </div>
-            </div>
-            {isWagerBattleWin(match) && (
-              <Link href={`/share/battle/${match.id}`} className="btn-secondary shrink-0">
-                <Share2 size={14} />
-                Share your win
-              </Link>
-            )}
-          </div>
-        </div>
-      )}
-      {lostThisMatch && (
-        <div className="celebrate-fade card flex items-center gap-3">
-          <span className="text-sm text-muted">GG, this one didn&apos;t go your way. Next one&apos;s yours.</span>
-        </div>
-      )}
-
-      {(match.proofARef || match.proofBRef) && (
-        <div className="flex flex-wrap gap-4">
-          {match.proofARef && (
-            <a
-              href={`/api/matches/${match.id}/proof/a`}
-              target="_blank"
-              rel="noreferrer"
-              className="text-sm font-medium text-accent-blue hover:underline"
-            >
-              View Player A&apos;s proof
-            </a>
-          )}
-          {match.proofBRef && (
-            <a
-              href={`/api/matches/${match.id}/proof/b`}
-              target="_blank"
-              rel="noreferrer"
-              className="text-sm font-medium text-accent-blue hover:underline"
-            >
-              View Player B&apos;s proof
-            </a>
-          )}
-        </div>
-      )}
-
-      {/* Real "Enter Match" ready-check — Battle challenges only. A fresh
-          UPCOMING match used to show the Submit Result form immediately,
-          with nothing acknowledging the challenge was just accepted. */}
-      {showReadyCheck && (
-        <div className="motion-fade-in card flex flex-col gap-3">
-          {!isParticipant ? (
-            <p className="text-sm text-muted">
-              {bothReady ? "Both players are ready — the match is live." : "Waiting for both players to get ready."}
-            </p>
-          ) : bothReady ? (
-            <>
-              <span className="badge badge-open w-fit">Match Live</span>
-              <p className="text-sm text-muted">
-                Both players are in. Go play your match, then come back here to submit your result.
-              </p>
-            </>
-          ) : myReadyAt ? (
-            <div className="flex items-center gap-3">
-              <Spinner size={20} className="shrink-0 text-muted" />
-              <div className="flex flex-col">
-                <span className="font-semibold">Waiting for {opponent.displayName}</span>
-                <span className="text-sm text-muted">
-                  You&apos;re in — this updates on its own once they enter too.
-                </span>
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="flex flex-col gap-1">
-                <span className="text-eyebrow text-accent-volt">Challenge Accepted</span>
-                <span className="font-display text-lg font-bold tracking-tight">{match.battle?.game}</span>
-                <div className="flex flex-wrap items-center gap-3 text-sm text-muted">
-                  {match.battle && (
-                    <span className="flex items-center gap-1">
-                      <Swords size={13} /> {formatBattleFormat(match.battle.format)}
-                    </span>
-                  )}
-                  {match.battle && match.battle.stakeAmount > 0 && (
-                    <span className="flex items-center gap-1 font-semibold text-gold">
-                      <Wallet size={13} />
-                      {formatNaira(match.battle.stakeAmount)} stake · {formatNaira(match.battle.stakeAmount * 2)} to the winner
-                    </span>
-                  )}
-                </div>
-              </div>
-              <p className="text-sm text-muted">
-                You&apos;re matched with {opponent.displayName}. Enter when you&apos;re ready to go play.
-              </p>
-              <EnterMatchButton matchId={match.id} />
-            </>
-          )}
-        </div>
-      )}
-
-      {(match.status === "NEEDS_RESULT" || (match.status === "UPCOMING" && (!isBattleMatch || bothReady))) &&
-        isParticipant &&
-        !hasSubmitted && <ResultForm matchId={match.id} playerA={match.playerA} playerB={match.playerB} />}
-      {isParticipant && hasSubmitted && match.status === "NEEDS_RESULT" && (
-        <div className="alert alert-info flex-col items-stretch gap-1.5">
-          <p>You&apos;ve submitted your result. Waiting on the other player.</p>
-          {match.reportWindowExpiresAt && (
-            <p className="flex items-center gap-1.5 text-xs">
-              <Timer size={12} />
-              Auto-resolves in{" "}
-              <CountdownTimer target={match.reportWindowExpiresAt.toISOString()} zeroLabel="momentarily" />
-            </p>
-          )}
-        </div>
-      )}
-
-      {match.status === "DISPUTED" && match.dispute && (
-        <div className="flex flex-col gap-4">
-          <p className="alert alert-warning">This match is under dispute review.</p>
-          {canRuleAsOrganizer && match.dispute && (
-            <RulingForm
-              disputeId={match.dispute.id}
-              endpoint={`/api/disputes/${match.dispute.id}/rule`}
-              playerA={match.playerA}
-              playerB={match.playerB}
-              voidUnsupportedReason={voidUnsupportedReason}
-            />
-          )}
-          {canRuleAsStaff && match.dispute && (
-            <RulingForm
-              disputeId={match.dispute.id}
-              endpoint={`/api/staff/disputes/${match.dispute.id}/rule`}
-              playerA={match.playerA}
-              playerB={match.playerB}
-              voidUnsupportedReason={voidUnsupportedReason}
-            />
-          )}
-        </div>
-      )}
-
-      <div className="flex flex-col gap-3">
-        <h2 className="text-section-heading">Activity</h2>
-        <ActivityTimeline events={buildMatchTimeline(match)} />
-      </div>
-    </div>
+      <MatchView data={data} />
+    </>
   );
 }

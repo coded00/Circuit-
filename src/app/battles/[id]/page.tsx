@@ -277,7 +277,7 @@ export default async function BattlePage({
         : "Waiting for a challenger";
 
   return (
-    <div data-surface="dark" className="w-full flex-1 bg-background">
+    <div data-surface="dark" className="dark-page w-full flex-1 bg-background">
       <div className="mx-auto grid w-full max-w-[1400px] gap-6 px-6 py-8 sm:px-8 sm:py-10 lg:grid-cols-[1fr_340px] lg:items-start">
         <div className="flex flex-col gap-6">
           <div className="flex items-center justify-between gap-3">

@@ -12,8 +12,11 @@ export default function RulingForm({
   playerA,
   playerB,
   voidUnsupportedReason,
+  bare = false,
 }: {
   disputeId: string;
+  /** Drop the card wrapper when rendered inside another panel (the match page). */
+  bare?: boolean;
   endpoint: string;
   playerA: PlayerOption;
   playerB: PlayerOption;
@@ -56,7 +59,7 @@ export default function RulingForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="card flex flex-col gap-5">
+    <form onSubmit={handleSubmit} className={bare ? "flex flex-col gap-5" : "card flex flex-col gap-5"}>
       <div className="flex flex-col gap-3">
         <span className="field-label">Ruling</span>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
