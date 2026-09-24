@@ -107,7 +107,7 @@ export default async function Home({
     activeAnnouncement,
     joinedCommunities,
   ] = await Promise.all([
-    getFeaturedTournaments(3),
+    getFeaturedTournaments(6),
     // "Upcoming" includes DRAFT on purpose (unlike Featured, which stays
     // OPEN/LIVE-only) — DRAFT here just means "hasn't reached its own
     // registrationOpenAt yet," not "not real." A tournament announced for
@@ -118,7 +118,7 @@ export default async function Home({
     prisma.tournament.findMany({
       where: { status: { in: ["DRAFT", "OPEN", "LIVE"] } },
       orderBy: { startAt: "asc" },
-      take: 3,
+      take: 6,
       select: cardSelect,
     }),
     // One query for every open/live tournament's game, then matched against

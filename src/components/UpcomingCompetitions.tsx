@@ -1,14 +1,16 @@
 import Link from "next/link";
 import { ArrowRight, Calendar, Swords, Users } from "lucide-react";
 import { GameArtTile } from "@/components/GameArtTile";
+import { CardCarousel } from "@/components/CardCarousel";
 import { StatusPill, tournamentStatusInfo } from "@/components/StatusPill";
 import { CapacityBar } from "@/components/CapacityBar";
 import { tournamentPath } from "@/lib/seo";
 
 /**
- * Circuit — "Upcoming Competitions" homepage section. A static grid, not
- * a carousel — same card proportions (`aspect-[4/3]` image, same grid
- * breakpoints) as `FeaturedCompetitions` right above it, so the two
+ * Circuit — "Upcoming Competitions" homepage section. A swipeable row on
+ * phones/tablets and a grid on desktop (CardCarousel) — same card
+ * proportions (`aspect-[4/3]` image, same breakpoints) as
+ * `FeaturedCompetitions` right above it, so the two
  * sections read as one consistent card system rather than two different
  * shapes. Every value shown is a real Tournament field (see the query in
  * page.tsx), including `teamSize` — the organizer-set players-per-side
@@ -144,11 +146,11 @@ export function UpcomingCompetitions({ tournaments }: { tournaments: Tournament[
           <p className="text-sm text-muted">Nothing upcoming right now — be the first.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <CardCarousel label="Upcoming Competitions">
           {tournaments.map((t) => (
             <UpcomingCard key={t.id} tournament={t} />
           ))}
-        </div>
+        </CardCarousel>
       )}
     </section>
   );

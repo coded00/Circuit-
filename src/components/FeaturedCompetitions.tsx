@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Calendar, Swords, ArrowRight } from "lucide-react";
 import { GameArtTile } from "@/components/GameArtTile";
+import { CardCarousel } from "@/components/CardCarousel";
 import { tournamentStatusInfo } from "@/components/StatusPill";
 import { CapacityBar } from "@/components/CapacityBar";
 import { tournamentPath } from "@/lib/seo";
@@ -171,11 +172,11 @@ export function FeaturedCompetitions({
         </Link>
       </div>
       <div className="border-b border-border" />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <CardCarousel label={title}>
         {tournaments.map((t) => (
           <FeaturedCard key={t.id} tournament={t} showFeaturedBadge={showFeaturedBadge} />
         ))}
-      </div>
+      </CardCarousel>
     </section>
   );
 }
