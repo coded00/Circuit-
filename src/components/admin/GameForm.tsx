@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
+import { ImageUploadField } from "@/components/ImageUploadField";
 import { useRouter } from "next/navigation";
 
 type Game = {
@@ -19,6 +20,7 @@ export function GameForm({ game, onDone }: { game?: Game; onDone: () => void }) 
   const uid = useId();
   const [name, setName] = useState(game?.name ?? "");
   const [iconUrl, setIconUrl] = useState(game?.iconUrl ?? "");
+  const [iconBlocked, setIconBlocked] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -59,23 +61,20 @@ export function GameForm({ game, onDone }: { game?: Game; onDone: () => void }) 
             className="field-input"
           />
         </div>
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor={`${uid}-icon`} className="field-label">Icon URL (optional)</label>
-          <input
-            id={`${uid}-icon`}
-            type="url"
-            placeholder="https://…"
-            value={iconUrl}
-            onChange={(e) => setIconUrl(e.target.value)}
-            className="field-input"
-          />
-        </div>
+        <ImageUploadField
+          label="Icon (optional)"
+          purpose="game-icon"
+          value={iconUrl}
+          onChange={setIconUrl}
+          onValidityChange={setIconBlocked}
+          hint="A square logo or icon."
+        />
       </div>
 
       {error && <p className="field-error">{error}</p>}
 
       <div className="flex gap-2">
-        <button type="submit" disabled={submitting} className="btn-primary text-sm">
+        <button type="submit" disabled={submitting || iconBlocked} className="btn-primary text-sm">
           {submitting ? "Saving…" : game ? "Save changes" : "Add game"}
         </button>
         <button type="button" onClick={onDone} className="btn-ghost text-sm">

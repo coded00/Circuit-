@@ -10,7 +10,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
-import { parseOptionalUrl } from "@/lib/validation";
+import { parseOptionalUrl, parseOptionalImageUrl } from "@/lib/validation";
 import { logAdminAction } from "@/lib/auditLog";
 import { ALL_TEAM_SIZE_VALUES } from "@/lib/gameFormats";
 
@@ -131,7 +131,7 @@ export async function PATCH(
     data.streamUrl = streamUrlResult.url;
   }
   if (body.posterUrl !== undefined) {
-    const posterUrlResult = parseOptionalUrl(body.posterUrl);
+    const posterUrlResult = parseOptionalImageUrl(body.posterUrl);
     if (!posterUrlResult.ok) {
       return NextResponse.json({ error: "Poster link must be a valid http(s) URL." }, { status: 400 });
     }

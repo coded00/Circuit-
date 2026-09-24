@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { ImageUploadField } from "@/components/ImageUploadField";
 
 type Bank = {
   name: string;
@@ -37,6 +38,7 @@ export default function AccountForm({
   const router = useRouter();
   const [displayName, setDisplayName] = useState(initialDisplayName);
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl);
+  const [avatarBlocked, setAvatarBlocked] = useState(false);
   const [payoutMethodRef, setPayoutMethodRef] = useState(initialPayoutMethodRef);
   const [dateOfBirth, setDateOfBirth] = useState(initialDateOfBirth);
   const [bio, setBio] = useState(initialBio);
@@ -163,19 +165,14 @@ export default function AccountForm({
         />
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="avatarUrl" className="field-label">
-          Avatar URL (optional)
-        </label>
-        <input
-          id="avatarUrl"
-          type="url"
-          placeholder="https://…"
-          value={avatarUrl}
-          onChange={(e) => setAvatarUrl(e.target.value)}
-          className="field-input"
-        />
-      </div>
+      <ImageUploadField
+        label="Profile photo (optional)"
+        purpose="avatar"
+        value={avatarUrl}
+        onChange={setAvatarUrl}
+        onValidityChange={setAvatarBlocked}
+        hint="Shown on your profile, in chat and on brackets. A square photo works best."
+      />
 
       <div className="flex flex-col gap-1.5">
         <label htmlFor="bio" className="field-label">
@@ -378,7 +375,7 @@ export default function AccountForm({
       {error && <p className="field-error">{error}</p>}
       {success && <p className="text-sm text-success">Saved.</p>}
 
-      <button type="submit" disabled={submitting} className="btn-primary self-start">
+      <button type="submit" disabled={submitting || avatarBlocked} className="btn-primary self-start">
         {submitting ? "Saving…" : "Save changes"}
       </button>
     </form>

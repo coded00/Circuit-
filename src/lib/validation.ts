@@ -46,3 +46,13 @@ export function parseOptionalUrl(value: unknown): { ok: true; url: string | null
     return { ok: false };
   }
 }
+
+/** Same as parseOptionalUrl, but also accepts an image uploaded through
+ *  Circuit itself — stored as a site-relative `/api/images/<ref>` path
+ *  (see src/lib/uploads.ts), which isn't an absolute URL. */
+export function parseOptionalImageUrl(value: unknown): { ok: true; url: string | null } | { ok: false } {
+  if (typeof value === "string" && /^\/api\/images\/[A-Za-z0-9_.-]+$/.test(value.trim())) {
+    return { ok: true, url: value.trim() };
+  }
+  return parseOptionalUrl(value);
+}

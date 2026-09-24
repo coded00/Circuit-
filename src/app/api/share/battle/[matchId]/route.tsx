@@ -4,6 +4,7 @@
  */
 
 import { ImageResponse } from "next/og";
+import { resolveImageForOg } from "@/lib/uploads";
 import { prisma } from "@/lib/db";
 import { realGameImage, unsplashUrl, gameAccent, CINEMATIC_GAMING_IMAGE } from "@/lib/gameImagery";
 import { gameTint } from "@/components/GameArtTile";
@@ -47,7 +48,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ mat
         badgeKind="battle"
         displayName={winner.displayName}
         handle={winner.handle}
-        avatarUrl={winner.avatarUrl}
+        avatarUrl={await resolveImageForOg(winner.avatarUrl)}
         statLine={`Beat ${opponent.displayName} · ${formatNaira(pot)} won`}
         game={game}
         backgroundImage={unsplashUrl(realGameImage(game) ?? CINEMATIC_GAMING_IMAGE, 1080)}

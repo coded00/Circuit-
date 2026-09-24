@@ -10,7 +10,7 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
-import { parseOptionalUrl, parseOptionalEmail } from "@/lib/validation";
+import { parseOptionalEmail, parseOptionalImageUrl } from "@/lib/validation";
 
 const MIN_AGE_PLAUSIBLE_YEARS = 130;
 
@@ -70,7 +70,7 @@ export async function PATCH(request: Request) {
   }
 
   if (body.avatarUrl !== undefined) {
-    const avatarUrlResult = parseOptionalUrl(body.avatarUrl);
+    const avatarUrlResult = parseOptionalImageUrl(body.avatarUrl);
     if (!avatarUrlResult.ok) {
       return NextResponse.json({ error: "Avatar must be a valid http(s) URL." }, { status: 400 });
     }

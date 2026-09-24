@@ -4,6 +4,7 @@
  */
 
 import { ImageResponse } from "next/og";
+import { resolveImageForOg } from "@/lib/uploads";
 import { prisma } from "@/lib/db";
 import { realGameImage, unsplashUrl, gameAccent, CINEMATIC_GAMING_IMAGE } from "@/lib/gameImagery";
 import { gameTint } from "@/components/GameArtTile";
@@ -37,7 +38,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tou
         badgeKind="kills"
         displayName={player.displayName}
         handle={player.handle}
-        avatarUrl={player.avatarUrl}
+        avatarUrl={await resolveImageForOg(player.avatarUrl)}
         statLine={`${topFragger.totalKills} kills · ${tournament.name}`}
         game={tournament.game}
         backgroundImage={unsplashUrl(realGameImage(tournament.game) ?? CINEMATIC_GAMING_IMAGE, 1080)}

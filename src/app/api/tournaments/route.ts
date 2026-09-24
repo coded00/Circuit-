@@ -11,7 +11,7 @@
 import { NextResponse, after } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
-import { parseOptionalUrl } from "@/lib/validation";
+import { parseOptionalUrl, parseOptionalImageUrl } from "@/lib/validation";
 import { ALL_TEAM_SIZE_VALUES } from "@/lib/gameFormats";
 import { notifyAllUsers } from "@/lib/notifications";
 import { enableCommunity } from "@/lib/community";
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
   const registrationCloseAt = parseDate(body.registrationCloseAt);
   const startAt = parseDate(body.startAt);
   const streamUrlResult = parseOptionalUrl(body.streamUrl);
-  const posterUrlResult = parseOptionalUrl(body.posterUrl);
+  const posterUrlResult = parseOptionalImageUrl(body.posterUrl);
 
   // TRN-1: all fields required except prize info.
   if (!name || !game || !rulesText) {

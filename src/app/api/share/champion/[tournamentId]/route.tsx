@@ -6,6 +6,7 @@
  */
 
 import { ImageResponse } from "next/og";
+import { resolveImageForOg } from "@/lib/uploads";
 import { prisma } from "@/lib/db";
 import { realGameImage, unsplashUrl, gameAccent, CINEMATIC_GAMING_IMAGE } from "@/lib/gameImagery";
 import { gameTint } from "@/components/GameArtTile";
@@ -53,7 +54,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tou
   // Always a real photo — the tournament's own poster, a known game's
   // verified photo, or the generic cinematic-setup fallback — never a
   // flat gradient with nothing behind it.
-  const backgroundImage = tournament.posterUrl ?? unsplashUrl(realGameImage(tournament.game) ?? CINEMATIC_GAMING_IMAGE, 1080);
+  const backgroundImage = (await resolveImageForOg(tournament.posterUrl)) ?? unsplashUrl(realGameImage(tournament.game) ?? CINEMATIC_GAMING_IMAGE, 1080);
   const fonts = await loadShareCardFonts();
 
   return new ImageResponse(
@@ -63,7 +64,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tou
         badgeKind="champion"
         displayName={champion.displayName}
         handle={champion.handle}
-        avatarUrl={champion.avatarUrl}
+        avatarUrl={await resolveImageForOg(champion.avatarUrl)}
         statLine={tournament.prizeAmount ? `${formatNaira(tournament.prizeAmount)} prize` : (tournament.prizeText ?? "Tournament Champion")}
         game={tournament.game}
         backgroundImage={backgroundImage}

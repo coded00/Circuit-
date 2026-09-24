@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ImageUrlField, POSTER_BOUNDS } from "@/components/ImageUrlField";
+import { ImageUploadField, POSTER_BOUNDS } from "@/components/ImageUploadField";
 import { gameFormatOptions } from "@/lib/gameFormats";
 import { defaultRulesFor } from "@/lib/gameRules";
 
@@ -321,7 +321,8 @@ export default function TournamentForm({
         </span>
       </label>
 
-      <ImageUrlField
+      <ImageUploadField
+        purpose="poster"
         label="Tournament poster (optional)"
         value={posterUrl}
         onChange={setPosterUrl}
