@@ -16,6 +16,9 @@ const STATUS_BY_CODE: Record<CommunityError["code"], number> = {
   ALREADY_MEMBER: 409,
   EMPTY_MESSAGE: 400,
   MESSAGE_TOO_LONG: 400,
+  INVALID_STICKER: 400,
+  INVALID_IMAGE: 400,
+  IMAGE_TOO_LARGE: 413,
 };
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {

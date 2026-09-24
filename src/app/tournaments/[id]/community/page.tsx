@@ -6,11 +6,17 @@
  * especially on mobile).
  */
 
+import type { Viewport } from "next";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { getChannelMessages, DEFAULT_CHANNELS } from "@/lib/community";
 import { CommunityView } from "./CommunityView";
+
+/** Android Chrome: let the on-screen keyboard shrink the layout viewport,
+ *  so CommunityView's fixed chat panel (and its composer) moves up above
+ *  the keyboard instead of being covered by it. Chat pages only. */
+export const viewport: Viewport = { interactiveWidget: "resizes-content" };
 
 export default async function CommunityPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

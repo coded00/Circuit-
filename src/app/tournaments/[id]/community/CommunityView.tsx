@@ -14,12 +14,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Hash, Menu, Send, X } from "lucide-react";
+import { ArrowLeft, Hash, Menu, X } from "lucide-react";
 import { Spinner } from "@/components/Spinner";
+import { ChatComposer, type ComposerSubmit } from "@/components/community/ChatComposer";
+import { MessageBody, type MessageContent } from "@/components/community/MessageBody";
 
 type ChannelInfo = { id: string; key: string; name: string };
 type Author = { id: string; displayName: string; handle: string; avatarUrl: string | null };
-type MessageInfo = { id: string; content: string; createdAt: string; isSystem: boolean; author: Author };
+type MessageInfo = MessageContent & { id: string; createdAt: string; isSystem: boolean; author: Author };
 
 const POLL_INTERVAL_MS = 4000;
 /** Consecutive messages from the same author within this window render
@@ -141,11 +143,15 @@ export function CommunityView({
   );
   const [isMember, setIsMember] = useState(initialIsMember);
   const [joining, setJoining] = useState(false);
-  const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  /** Whether the list was scrolled to (near) the bottom before the latest
+   *  render — only then do new messages auto-scroll, so reading older
+   *  history isn't yanked away by someone else's message arriving. */
+  const stickToBottomRef = useRef(true);
+  const forceScrollRef = useRef(true);
 
   const activeChannel = channels.find((c) => c.id === activeChannelId) ?? null;
   const activeMessages = messagesByChannel[activeChannelId] ?? [];
@@ -221,8 +227,11 @@ export function CommunityView({
   }, [activeChannelId, isMember]);
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [activeMessages.length]);
+    const el = scrollRef.current;
+    if (!el || !(stickToBottomRef.current || forceScrollRef.current)) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: forceScrollRef.current ? "auto" : "smooth" });
+    forceScrollRef.current = false;
+  }, [activeMessages.length, activeChannelId]);
 
   async function handleJoin() {
     setJoining(true);
@@ -234,36 +243,57 @@ export function CommunityView({
     setJoining(false);
   }
 
-  async function handleSend(event: React.FormEvent) {
-    event.preventDefault();
-    if (!draft.trim() || sending || !activeChannelId) return;
+  async function handleSend(message: ComposerSubmit): Promise<boolean> {
+    if (sending || !activeChannelId) return false;
     setSending(true);
     setError(null);
-    const res = await fetch(`/api/channels/${activeChannelId}/messages`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: draft }),
-    });
-    const data = await res.json().catch(() => null);
-    if (res.ok) {
-      setMessagesByChannel((prev) => ({ ...prev, [activeChannelId]: mergeMessages(prev[activeChannelId] ?? [], [data]) }));
-      setDraft("");
-    } else {
-      setError(data?.error ?? "Message didn't send. Try again.");
+    const channelId = activeChannelId;
+
+    let res: Response;
+    try {
+      if (message.kind === "IMAGE") {
+        const form = new FormData();
+        form.append("image", message.image.blob);
+        form.append("caption", message.caption);
+        form.append("width", String(message.image.width));
+        form.append("height", String(message.image.height));
+        res = await fetch(`/api/channels/${channelId}/messages`, { method: "POST", body: form });
+      } else {
+        res = await fetch(`/api/channels/${channelId}/messages`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(message.kind === "STICKER" ? { stickerId: message.stickerId } : { content: message.content }),
+        });
+      }
+    } catch {
+      setError("Message didn't send — check your connection and try again.");
+      setSending(false);
+      return false;
     }
+
+    const data = await res.json().catch(() => null);
     setSending(false);
+    if (!res.ok) {
+      setError(data?.error ?? "Message didn't send. Try again.");
+      return false;
+    }
+    forceScrollRef.current = true; // always jump to your own message
+    setMessagesByChannel((prev) => ({ ...prev, [channelId]: mergeMessages(prev[channelId] ?? [], [data]) }));
+    return true;
   }
 
   return (
-    // No fixed viewport-relative height on mobile — AppShell's own <main>
-    // already reserves space below for the fixed MobileTabBar (a 100dvh
-    // math here would double-count that and push the composer past the
-    // visible viewport, reachable only by scrolling the whole page, not
-    // just this panel). The message list's own max-h below is what keeps
-    // the composer in reach on mobile instead. sm+ has no bottom tab bar
-    // to fight with, so the app-like fixed-height panel is safe there.
-    <div className="mx-auto flex w-full max-w-6xl flex-col sm:h-[calc(100dvh-96px)] sm:p-6">
-      <div className="flex items-center gap-3 border-b border-border p-4 sm:rounded-t-[14px] sm:border sm:border-b-0 sm:bg-surface sm:px-5 sm:py-4">
+    // Mobile: pinned between the fixed TopBar (60px) and the fixed
+    // MobileTabBar (3.5rem + safe area), app-style — the message list
+    // scrolls on its own and the composer always sits right above the tab
+    // bar, instead of floating mid-screen under a short conversation.
+    // `fixed` (not a 100dvh height calc) so AppShell's own bottom padding
+    // for the tab bar can't double-count. The page exports
+    // `interactiveWidget: "resizes-content"`, so on Android the keyboard
+    // shrinks this box rather than covering the composer.
+    // sm+ has no bottom tab bar, so the in-flow fixed-height panel is fine.
+    <div className="fixed inset-x-0 top-[60px] bottom-[calc(3.5rem_+_env(safe-area-inset-bottom))] z-[1] flex flex-col bg-background sm:static sm:mx-auto sm:h-[calc(100dvh-96px)] sm:w-full sm:max-w-6xl sm:bg-transparent sm:p-6">
+      <div className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-3 sm:rounded-t-[14px] sm:border sm:border-b-0 sm:bg-surface sm:px-5 sm:py-4">
         <button type="button" onClick={() => setSidebarOpen(true)} className="btn-icon sm:hidden" aria-label="Open channels">
           <Menu size={18} />
         </button>
@@ -282,7 +312,7 @@ export function CommunityView({
         </div>
       </div>
 
-      <div className="relative flex min-h-0 flex-1 border border-border sm:rounded-b-[14px]">
+      <div className="relative flex min-h-0 flex-1 sm:rounded-b-[14px] sm:border sm:border-border sm:bg-surface">
         {/* Channel sidebar — a normal column at sm+, a slide-over below it.
             `relative` on the parent above is load-bearing: without a
             positioned ancestor, this `absolute inset-0` has nothing to
@@ -307,6 +337,7 @@ export function CommunityView({
                   key={channel.id}
                   type="button"
                   onClick={() => {
+                    forceScrollRef.current = true;
                     setActiveChannelId(channel.id);
                     setSidebarOpen(false);
                   }}
@@ -326,7 +357,14 @@ export function CommunityView({
 
         {/* Message pane */}
         <div className="flex min-w-0 flex-1 flex-col">
-          <div ref={scrollRef} className="scrollbar-hide flex max-h-[55vh] flex-1 flex-col gap-3 overflow-y-auto p-4 sm:max-h-none">
+          <div
+            ref={scrollRef}
+            onScroll={(e) => {
+              const el = e.currentTarget;
+              stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+            }}
+            className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pt-4 pb-6"
+          >
             {channelLoading ? (
               <div className="flex flex-1 items-center justify-center">
                 <Spinner size={20} className="text-muted" />
@@ -337,7 +375,7 @@ export function CommunityView({
               </p>
             ) : (
               messageGroups.map((group) => (
-                <div key={group.messages[0].id} className="flex flex-col gap-3">
+                <div key={group.messages[0].id} className="flex flex-col gap-1.5">
                   {group.dayLabel && (
                     <div className="flex items-center gap-3 py-1">
                       <div className="h-px flex-1 bg-border" />
@@ -345,14 +383,14 @@ export function CommunityView({
                       <div className="h-px flex-1 bg-border" />
                     </div>
                   )}
-                  <div className="flex items-start gap-2.5">
+                  <div className="flex items-start gap-2.5 pt-1">
                     <Avatar author={group.author} />
                     <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <div className="flex items-baseline gap-2">
                         <span className="truncate text-sm font-semibold">{group.author.displayName}</span>
                         <span className="text-metadata shrink-0">{formatTime(group.messages[0].createdAt)}</span>
                       </div>
-                      <p className="text-sm whitespace-pre-wrap break-words text-foreground/90">{group.messages[0].content}</p>
+                      <MessageBody message={group.messages[0]} />
                     </div>
                   </div>
                   {/* Same author, within GROUP_WINDOW_MS — no repeated
@@ -360,7 +398,9 @@ export function CommunityView({
                   {group.messages.slice(1).map((message) => (
                     <div key={message.id} className="flex items-start gap-2.5">
                       <span className="w-8 shrink-0" aria-hidden />
-                      <p className="min-w-0 flex-1 text-sm whitespace-pre-wrap break-words text-foreground/90">{message.content}</p>
+                      <div className="min-w-0 flex-1">
+                        <MessageBody message={message} />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -368,31 +408,22 @@ export function CommunityView({
             )}
           </div>
 
-          {error && <p className="field-error px-4 pb-1">{error}</p>}
+          {error && <p className="field-error shrink-0 px-4 pb-1">{error}</p>}
 
-          <div className="border-t border-border p-3">
+          <div className="shrink-0 border-t border-border bg-background sm:rounded-br-[14px] sm:bg-surface">
             {isMember ? (
-              <form onSubmit={handleSend} className="flex items-center gap-2">
-                <input
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  placeholder={`Message #${activeChannel?.name ?? ""}`}
-                  maxLength={2000}
-                  className="field-input !rounded-full flex-1"
-                />
-                <button
-                  type="submit"
-                  disabled={sending || !draft.trim()}
-                  aria-label="Send message"
-                  className="btn-primary !h-10 !w-10 !rounded-full !p-0"
-                >
-                  <Send size={16} />
-                </button>
-              </form>
+              <ChatComposer
+                channelName={activeChannel?.name ?? ""}
+                sending={sending}
+                onSubmit={handleSend}
+                onError={setError}
+              />
             ) : (
-              <button type="button" onClick={handleJoin} disabled={joining} className="btn-primary w-full">
-                {joining ? "Joining…" : "Join Community to Chat"}
-              </button>
+              <div className="p-3">
+                <button type="button" onClick={handleJoin} disabled={joining} className="btn-primary w-full">
+                  {joining ? "Joining…" : "Join Community to Chat"}
+                </button>
+              </div>
             )}
           </div>
         </div>

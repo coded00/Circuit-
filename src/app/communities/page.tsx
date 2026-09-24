@@ -11,11 +11,17 @@
  * distinct URL, not a replacement for it.
  */
 
+import type { Viewport } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
 import { getChannelMessages, getOrCreateGlobalCommunity, DEFAULT_CHANNELS, joinGlobalCommunity } from "@/lib/community";
 import { prisma } from "@/lib/db";
 import { CommunityView } from "../tournaments/[id]/community/CommunityView";
+
+/** Android Chrome: let the on-screen keyboard shrink the layout viewport,
+ *  so CommunityView's fixed chat panel (and its composer) moves up above
+ *  the keyboard instead of being covered by it. Chat pages only. */
+export const viewport: Viewport = { interactiveWidget: "resizes-content" };
 
 export default async function GlobalCommunityPage() {
   const user = await getCurrentUser();

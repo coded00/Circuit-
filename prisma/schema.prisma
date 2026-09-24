@@ -390,9 +390,8 @@ model Tournament {
   /// streaming build-out"); this is the lightweight V1 slice of it.
   streamUrl           String?
   /// The organizer's own real poster/banner for this specific tournament
-  /// — a pasted URL, not a file upload (Circuit has no object-storage/CDN
-  /// upload pipeline anywhere, same "paste a URL" convention as
-  /// HomepageBanner.imageUrl/User.avatarUrl). Null falls back to
+  /// — usually an upload (a site-relative `/api/images/<ref>` path, see
+  /// src/lib/uploads.ts), or an older/linked external URL. Null falls back to
   /// GameArtTile's generic per-game stock photo/gradient (see that
   /// component's own comment) rather than a broken image.
   posterUrl           String?
@@ -905,10 +904,9 @@ model Report {
 
 /// One slide in the homepage hero carousel — admin-authored, real content
 /// `CircuitHero` renders alongside its own real tournament-spotlight
-/// slides (see that component's own comment). `imageUrl` is a plain URL
-/// field, not a file upload: Circuit has no object-storage/CDN upload
-/// pipeline anywhere in the codebase (avatarUrl/streamUrl are the same
-/// "paste a URL" shape), and standing one up wasn't part of this request.
+/// slides (see that component's own comment). `imageUrl` is an uploaded
+/// image's `/api/images/<ref>` path (src/lib/uploads.ts) or a linked
+/// external URL — same shape as User.avatarUrl/Tournament.posterUrl.
 model HomepageBanner {
   id          String    @id @default(cuid())
   headline    String
@@ -1192,19 +1190,43 @@ model CommunityMember {
   @@unique([communityId, userId])
 }
 
-/// Plain text only for Phase 1 — no attachments, no edit history. `isSystem`
-/// is unused today (nothing sets it true yet) but exists so Phase 3's
-/// auto-generated match/tournament event messages don't need a schema
-/// change to be visually distinguished from a real user's message.
+/// What a chat Message carries beyond its text. TEXT is the original
+/// Phase 1 plain-text message; IMAGE has an uploaded picture/GIF
+/// (`attachmentRef`) with optional caption in `content`; STICKER is one
+/// of Circuit's built-in stickers (`stickerId`, see src/lib/stickers.ts)
+/// with empty `content`.
+enum MessageKind {
+  TEXT
+  IMAGE
+  STICKER
+}
+
+/// No edit history. `isSystem` is unused today (nothing sets it true yet)
+/// but exists so Phase 3's auto-generated match/tournament event messages
+/// don't need a schema change to be visually distinguished from a real
+/// user's message.
 model Message {
-  id        String   @id @default(cuid())
-  channelId String
-  channel   Channel  @relation(fields: [channelId], references: [id])
-  authorId  String
-  author    User     @relation(fields: [authorId], references: [id])
-  content   String
-  isSystem  Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id               String      @id @default(cuid())
+  channelId        String
+  channel          Channel     @relation(fields: [channelId], references: [id])
+  authorId         String
+  author           User        @relation(fields: [authorId], references: [id])
+  kind             MessageKind @default(TEXT)
+  /// The text, or an IMAGE's optional caption. Empty for a STICKER.
+  content          String      @default("")
+  /// IMAGE only — an opaque, signed proofStorage reference (never a
+  /// public URL), served through the membership-checked
+  /// /api/messages/[id]/attachment route, same access discipline as
+  /// match proof and report evidence.
+  attachmentRef    String?
+  /// IMAGE only — the uploaded file's real pixel size, so the client can
+  /// reserve the right box before the image loads (no scroll jump).
+  attachmentWidth  Int?
+  attachmentHeight Int?
+  /// STICKER only — a key into the fixed sticker set in src/lib/stickers.ts.
+  stickerId        String?
+  isSystem         Boolean     @default(false)
+  createdAt        DateTime    @default(now())
 
   @@index([channelId, createdAt])
 }

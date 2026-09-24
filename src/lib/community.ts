@@ -7,10 +7,24 @@
  * nothing to do with the unrelated `CommunityPost` model.
  */
 
+import type { Message, MessageKind } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { proofStorage } from "@/lib/storage";
+import { isSendableSticker } from "@/lib/stickers";
+import { sniffImageType } from "@/lib/imageSniff";
 
 export class CommunityError extends Error {
-  code: "NOT_FOUND" | "DISABLED" | "FORBIDDEN" | "NOT_A_MEMBER" | "ALREADY_MEMBER" | "EMPTY_MESSAGE" | "MESSAGE_TOO_LONG";
+  code:
+    | "NOT_FOUND"
+    | "DISABLED"
+    | "FORBIDDEN"
+    | "NOT_A_MEMBER"
+    | "ALREADY_MEMBER"
+    | "EMPTY_MESSAGE"
+    | "MESSAGE_TOO_LONG"
+    | "INVALID_STICKER"
+    | "INVALID_IMAGE"
+    | "IMAGE_TOO_LARGE";
   constructor(code: CommunityError["code"], message: string) {
     super(message);
     this.code = code;
@@ -29,6 +43,11 @@ export const DEFAULT_CHANNELS: { key: string; name: string }[] = [
 ];
 
 const MAX_MESSAGE_LENGTH = 2000;
+
+/** Chat images are downscaled/re-encoded client-side before upload (see
+ *  CommunityView's prepareImage), so a normal photo lands well under this;
+ *  the cap mostly bounds an animated GIF, which is uploaded as-is. */
+export const MAX_CHAT_IMAGE_BYTES = 8 * 1024 * 1024;
 
 /** Creates the Community + its four fixed channels if none exists yet,
  *  or flips an existing one back to enabled — either way returns the
@@ -227,14 +246,41 @@ export async function getAllCommunities(userId: string): Promise<CommunityListin
   );
 }
 
+const AUTHOR_SELECT = { select: { id: true, displayName: true, handle: true, avatarUrl: true } } as const;
+
+/** What the client sees for a message. `attachmentRef` (a signed storage
+ *  reference) never leaves the server — an IMAGE gets a URL to the
+ *  membership-checked attachment route instead. */
+export type ChatMessage = {
+  id: string;
+  kind: MessageKind;
+  content: string;
+  createdAt: Date;
+  isSystem: boolean;
+  imageUrl: string | null;
+  imageWidth: number | null;
+  imageHeight: number | null;
+  stickerId: string | null;
+  author: { id: string; displayName: string; handle: string; avatarUrl: string | null };
+};
+
+function toChatMessage(message: Message & { author: ChatMessage["author"] }): ChatMessage {
+  return {
+    id: message.id,
+    kind: message.kind,
+    content: message.content,
+    createdAt: message.createdAt,
+    isSystem: message.isSystem,
+    imageUrl: message.kind === "IMAGE" && message.attachmentRef ? `/api/messages/${message.id}/attachment` : null,
+    imageWidth: message.attachmentWidth,
+    imageHeight: message.attachmentHeight,
+    stickerId: message.stickerId,
+    author: message.author,
+  };
+}
+
 export type MessageCursorPage = {
-  messages: {
-    id: string;
-    content: string;
-    createdAt: Date;
-    isSystem: boolean;
-    author: { id: string; displayName: string; handle: string; avatarUrl: string | null };
-  }[];
+  messages: ChatMessage[];
   nextCursor: string | null;
 };
 
@@ -251,13 +297,13 @@ export async function getChannelMessages(channelId: string, userId: string, curs
     orderBy: { createdAt: "desc" },
     take: take + 1,
     ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-    include: { author: { select: { id: true, displayName: true, handle: true, avatarUrl: true } } },
+    include: { author: AUTHOR_SELECT },
   });
 
   const hasMore = messages.length > take;
   const page = hasMore ? messages.slice(0, take) : messages;
   return {
-    messages: page.reverse(), // oldest-first for rendering
+    messages: page.reverse().map(toChatMessage), // oldest-first for rendering
     nextCursor: hasMore ? page[0].id : null,
   };
 }
@@ -268,11 +314,12 @@ export async function getChannelMessages(channelId: string, userId: string, curs
 export async function getChannelMessagesSince(channelId: string, userId: string, since: Date): Promise<MessageCursorPage["messages"]> {
   await assertChannelMembership(channelId, userId);
 
-  return prisma.message.findMany({
+  const messages = await prisma.message.findMany({
     where: { channelId, createdAt: { gt: since } },
     orderBy: { createdAt: "asc" },
-    include: { author: { select: { id: true, displayName: true, handle: true, avatarUrl: true } } },
+    include: { author: AUTHOR_SELECT },
   });
+  return messages.map(toChatMessage);
 }
 
 /** Every channel action — reading messages or sending one — requires the
@@ -294,17 +341,65 @@ async function assertChannelMembership(channelId: string, userId: string): Promi
   return channel;
 }
 
-export async function sendMessage(channelId: string, authorId: string, content: string) {
-  const trimmed = content.trim();
-  if (!trimmed) throw new CommunityError("EMPTY_MESSAGE", "Message can't be empty.");
-  if (trimmed.length > MAX_MESSAGE_LENGTH) {
+export type SendMessageInput =
+  | { kind: "TEXT"; content: string }
+  | { kind: "STICKER"; stickerId: string }
+  | { kind: "IMAGE"; caption: string; image: Buffer; width: number | null; height: number | null };
+
+export async function sendMessage(channelId: string, authorId: string, input: SendMessageInput): Promise<ChatMessage> {
+  const text = input.kind === "TEXT" ? input.content.trim() : input.kind === "IMAGE" ? input.caption.trim() : "";
+  if (input.kind === "TEXT" && !text) throw new CommunityError("EMPTY_MESSAGE", "Message can't be empty.");
+  if (text.length > MAX_MESSAGE_LENGTH) {
     throw new CommunityError("MESSAGE_TOO_LONG", `Messages are limited to ${MAX_MESSAGE_LENGTH} characters.`);
   }
+  if (input.kind === "STICKER" && !isSendableSticker(input.stickerId)) {
+    throw new CommunityError("INVALID_STICKER", "That sticker isn't available.");
+  }
 
+  let imageType: string | null = null;
+  if (input.kind === "IMAGE") {
+    if (input.image.length > MAX_CHAT_IMAGE_BYTES) {
+      throw new CommunityError("IMAGE_TOO_LARGE", "Images are limited to 8MB.");
+    }
+    imageType = sniffImageType(input.image);
+    if (!imageType) throw new CommunityError("INVALID_IMAGE", "Only JPG, PNG, GIF and WebP images can be sent.");
+  }
+
+  // Membership before storing anything — a non-member's upload should
+  // never reach storage at all.
   await assertChannelMembership(channelId, authorId);
 
-  return prisma.message.create({
-    data: { channelId, authorId, content: trimmed },
-    include: { author: { select: { id: true, displayName: true, handle: true, avatarUrl: true } } },
+  const attachmentRef =
+    input.kind === "IMAGE" && imageType ? await proofStorage.store(`chat-${channelId}`, input.image, imageType) : null;
+
+  // Dimensions are client-measured (they only size the placeholder box
+  // before the image loads) — clamp to something sane rather than trust.
+  const dimension = (n: number | null) => (n && Number.isInteger(n) && n > 0 && n <= 10000 ? n : null);
+
+  const message = await prisma.message.create({
+    data: {
+      channelId,
+      authorId,
+      kind: input.kind,
+      content: text,
+      stickerId: input.kind === "STICKER" ? input.stickerId : null,
+      attachmentRef,
+      attachmentWidth: input.kind === "IMAGE" ? dimension(input.width) : null,
+      attachmentHeight: input.kind === "IMAGE" ? dimension(input.height) : null,
+    },
+    include: { author: AUTHOR_SELECT },
   });
+  return toChatMessage(message);
+}
+
+/** For the attachment route: the stored image behind a message, if the
+ *  requester is a member of that message's community. */
+export async function getMessageAttachment(messageId: string, userId: string): Promise<{ buffer: Buffer; contentType: string }> {
+  const message = await prisma.message.findUnique({
+    where: { id: messageId },
+    select: { channelId: true, attachmentRef: true },
+  });
+  if (!message?.attachmentRef) throw new CommunityError("NOT_FOUND", "Attachment not found.");
+  await assertChannelMembership(message.channelId, userId);
+  return proofStorage.read(message.attachmentRef);
 }
