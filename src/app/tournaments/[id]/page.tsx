@@ -6,22 +6,20 @@
  * guest, per TRN-3's acceptance criteria. Viewer-specific actions
  * (register, withdraw, cancel) only render once we know who's looking.
  *
- * Redesigned around a photo hero + tab shell (Overview/Brackets/Rules/
- * Prizes/Participants) with a sticky registration card, per a supplied
- * reference layout — but every value on the page is still a real
- * Tournament field or a real query, including `teamSize` (players per
- * side, organizer-set — e.g. Call of Duty Mobile runs 5v5 in ranked
- * multiplayer but solo/duo in Tournament Mode). One thing the reference
- * implied that Circuit has no data for is deliberately not invented: a
- * "Platform/Mode/Map" game-details block (no such fields on Tournament —
- * organizer-typed game name only, nothing more granular).
+ * Layout: a poster banner with the tournament's identity and a strip of
+ * the four numbers people decide by (prize, entry, players, start); then
+ * tabs (Overview — schedule, about, game and host · Participants ·
+ * Bracket · Rules · Prizes · Community) beside a sticky registration
+ * panel focused on price, slots and the one action that applies.
+ * Every value is a real Tournament field or a real query — nothing
+ * invented (no Platform/Mode/Map block: Circuit has no such fields).
  */
 
-import { Suspense, cache } from "react";
+import { cache } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { Tv, Calendar, Users, Layers, Swords, Trophy, Wallet, ShieldCheck, Timer, MessageCircle } from "lucide-react";
+import { Check, ChevronRight, MessageCircle, ShieldCheck, Timer, Trophy, Tv, Users } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { StatusPill, tournamentStatusInfo } from "@/components/StatusPill";
@@ -32,22 +30,29 @@ import { CapacityBar } from "@/components/CapacityBar";
 import { CountdownTimer } from "@/components/CountdownTimer";
 import { isStartingSoon } from "@/lib/tournamentTiming";
 import Poller from "@/app/Poller";
-import TournamentTabs, { type TournamentTab } from "./TournamentTabs";
+import { Panel, PanelBody, PanelEmpty, PanelRows, panelRowClass } from "@/components/ui/Panel";
+import { StatStrip } from "@/components/ui/StatStrip";
+import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
+import { SectionTabs, type SectionTab } from "@/components/ui/SectionTabs";
 import CancelButton from "./CancelButton";
 import WithdrawButton from "./WithdrawButton";
 import ClaimPrizeButton from "./ClaimPrizeButton";
 import { buildMetadata, parseIdSegment, tournamentPath, gamePath, organiserPath, absoluteUrl, DEFAULT_DESCRIPTION } from "@/lib/seo";
 
 function formatNaira(kobo: number): string {
-  return `₦ ${(kobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 0 })}`;
+  return `₦${(kobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 0 })}`;
 }
 
 function formatDate(date: Date): string {
-  return date.toLocaleString("en-NG", { dateStyle: "medium", timeStyle: "short" });
+  return date.toLocaleString("en-NG", { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 }
 
 function formatShortDate(date: Date): string {
-  return date.toLocaleDateString("en-NG", { dateStyle: "medium" });
+  return date.toLocaleDateString("en-NG", { day: "numeric", month: "short" });
+}
+
+function formatTime(date: Date): string {
+  return date.toLocaleTimeString("en-NG", { hour: "numeric", minute: "2-digit" });
 }
 
 function formatLabel(format: string): string {
@@ -58,39 +63,13 @@ function formatLabel(format: string): string {
     .join(" ");
 }
 
-function FactCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return (
-    <div className="widget flex items-center gap-3">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-blue-soft text-accent-blue">
-        {icon}
-      </span>
-      <div className="flex min-w-0 flex-col">
-        <span className="text-eyebrow">{label}</span>
-        <span className="truncate text-sm font-semibold">{value}</span>
-      </div>
-    </div>
-  );
-}
-
-function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3 text-sm">
-      <span className="flex items-center gap-2 text-muted">
-        {icon}
-        {label}
-      </span>
-      <span className="truncate font-medium">{value}</span>
-    </div>
-  );
-}
-
 // react's cache() dedupes this within a single request — generateMetadata
 // and the page component below both call it, but it only hits the DB once.
 const getTournament = cache(async (id: string) =>
   prisma.tournament.findUnique({
     where: { id },
     include: {
-      organizer: { include: { user: { select: { handle: true, displayName: true } } } },
+      organizer: { include: { user: { select: { handle: true, displayName: true, avatarUrl: true } } } },
       community: { select: { id: true, enabled: true } },
     },
   })
@@ -117,11 +96,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   });
 }
 
-export default async function TournamentPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function TournamentPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: rawId } = await params;
   const id = parseIdSegment(rawId);
   await openDueTournaments();
@@ -138,7 +113,7 @@ export default async function TournamentPage({
       where: { tournamentId: tournament.id, status: "CONFIRMED" },
       orderBy: { createdAt: "asc" },
       take: 50,
-      include: { user: { select: { displayName: true, handle: true } } },
+      include: { user: { select: { displayName: true, handle: true, avatarUrl: true } } },
     }),
   ]);
 
@@ -150,11 +125,8 @@ export default async function TournamentPage({
 
   const now = new Date();
   const isOrganizer = user !== null && tournament.organizerId === user.id;
-  // V1 audit follow-up: this page's own cancel button used to have no
-  // gating at all beyond "not already cancelled" — an organizer past the
-  // cancellation lock, or with funds frozen, would still see a working-
-  // looking button that would just 409 on click. Same guard as
-  // dashboard/tournaments/[id]/page.tsx and the cancel route itself.
+  // Same cancel guard as dashboard/tournaments/[id]/page.tsx and the
+  // cancel route itself: no working-looking button that would just 409.
   const pastCancellationLock = !!(tournament.cancellationLockAt && now >= tournament.cancellationLockAt);
   const cancellable =
     tournament.status !== "CANCELLED" &&
@@ -169,10 +141,9 @@ export default async function TournamentPage({
   const status = tournamentStatusInfo(tournament.status);
   const formatText = formatLabel(tournament.format);
   const hasBracket = tournament.status === "LIVE" || tournament.status === "COMPLETE";
-  // A real countdown only makes sense before the bracket actually starts —
-  // once it's LIVE/COMPLETE/CANCELLED, "starting in" is no longer true.
-  const startingSoon =
-    !hasBracket && tournament.status !== "CANCELLED" && isStartingSoon(tournament.startAt, now);
+  // A real countdown only makes sense before the bracket actually starts.
+  const startingSoon = !hasBracket && tournament.status !== "CANCELLED" && isStartingSoon(tournament.startAt, now);
+  const communityVisible = Boolean(tournament.community?.enabled || isOrganizer);
 
   let canClaimPrize = false;
   if (user && tournament.status === "COMPLETE" && tournament.prizeAmount && tournament.prizeAmount > 0) {
@@ -186,17 +157,16 @@ export default async function TournamentPage({
     canClaimPrize = finalMatch?.winnerId === user.id && !existingPayout;
   }
 
-  const aboutText = `Join ${tournament.name}, a ${formatText.toLowerCase()} tournament for ${tournament.game}. ${
+  const aboutText = `${tournament.name} is a ${formatText.toLowerCase()} ${tournament.game} tournament for up to ${tournament.participantCap} players (${tournament.teamSize}). ${
     tournament.prizeAmount
       ? `Compete for a ${formatNaira(tournament.prizeAmount)} prize pool.`
       : tournament.entryFee === 0
-        ? "Free to enter, no cost to compete."
+        ? "Free to enter."
         : `${formatNaira(tournament.entryFee)} entry fee.`
   }`;
 
-  // Real data only, per the "no fake ratings/reviews/prices/dates" rule —
-  // every field below is a genuine Tournament (or OrganizerProfile/User)
-  // column.
+  // Real data only — every field below is a genuine Tournament (or
+  // OrganizerProfile/User) column.
   const canonicalUrl = absoluteUrl(tournamentPath(tournament));
   const eventJsonLd = {
     "@context": "https://schema.org",
@@ -224,186 +194,203 @@ export default async function TournamentPage({
     },
   };
 
-  const tabs: TournamentTab[] = [
+  // --- Schedule: registration opens → closes → tournament starts ---------
+  const schedule = [
+    { label: now < tournament.registrationOpenAt ? "Registration opens" : "Registration opened", at: tournament.registrationOpenAt },
+    { label: now < tournament.registrationCloseAt ? "Registration closes" : "Registration closed", at: tournament.registrationCloseAt },
+    {
+      label: tournament.status === "COMPLETE" ? "Tournament finished" : hasBracket ? "Tournament live" : "Tournament starts",
+      at: tournament.startAt,
+    },
+  ];
+  const nextStep = tournament.status === "CANCELLED" ? -1 : schedule.findIndex((s) => now < s.at);
+
+  const prizeOrEntry = tournament.prizeAmount
+    ? { label: "Prize pool", value: formatNaira(tournament.prizeAmount), gold: true }
+    : { label: "Prize pool", value: "—", gold: false };
+
+  const tabs: SectionTab[] = [
     {
       key: "overview",
       label: "Overview",
       content: (
         <div className="flex flex-col gap-6">
-          <div className="flex flex-col gap-2">
-            <h2 className="text-section-heading">About This Tournament</h2>
-            <p className="text-sm text-muted">{aboutText}</p>
-            <p className="text-metadata">
-              Registration {now < tournament.registrationOpenAt ? "opens" : "opened"}{" "}
-              {formatDate(tournament.registrationOpenAt)} · closes {formatDate(tournament.registrationCloseAt)}
-            </p>
-          </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <FactCard icon={<Layers size={16} />} label="Format" value={formatText} />
-            <FactCard icon={<Swords size={16} />} label="Team Size" value={tournament.teamSize} />
-            <FactCard
-              icon={<Users size={16} />}
-              label="Registration"
-              value={`${registrantCount} / ${tournament.participantCap} players`}
-            />
-            <FactCard
-              icon={<Trophy size={16} />}
-              label={tournament.prizeAmount ? "Prize Pool" : "Entry"}
-              value={
-                tournament.prizeAmount
-                  ? formatNaira(tournament.prizeAmount)
-                  : tournament.entryFee === 0
-                    ? "Free"
-                    : formatNaira(tournament.entryFee)
-              }
-            />
-          </div>
-          <div className="flex flex-col gap-3 border-t border-border pt-6">
-            <h2 className="text-section-heading">Game</h2>
-            <Link href={gamePath(tournament.game)} className="card card-hover flex items-center gap-4">
-              <GameArtTile game={tournament.game} className="h-20 w-20 shrink-0 rounded-[var(--radius-md)]" hideLabel />
-              <div className="flex min-w-0 flex-col">
-                <span className="text-card-title truncate">{tournament.game}</span>
-                <p className="text-metadata">
-                  {formatText} · {tournament.teamSize} tournament
-                </p>
-                <p className="mt-1 text-xs font-medium text-accent-blue">See all {tournament.game} tournaments →</p>
-              </div>
-            </Link>
-          </div>
-          <div className="flex flex-col gap-3 border-t border-border pt-6">
-            <h2 className="text-section-heading">Organizer</h2>
-            <Link href={organiserPath(tournament.organizer.user.handle)} className="card-row flex items-center gap-3 p-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-surface-elevated text-xs font-semibold text-muted">
-                {tournament.organizer.user.displayName.slice(0, 1).toUpperCase()}
-              </span>
-              <div className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-sm font-medium">{tournament.organizer.user.displayName}</span>
-                <span className="text-metadata truncate">@{tournament.organizer.user.handle}</span>
-              </div>
-              {tournament.organizer.verified && <ShieldCheck size={14} className="shrink-0 text-accent-blue" />}
-            </Link>
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: "brackets",
-      label: "Brackets",
-      content: (
-        <div className="card flex flex-col items-center gap-3 py-12 text-center">
-          {hasBracket ? (
-            <>
-              <Trophy size={28} className="text-gold" />
-              <p className="max-w-sm text-sm text-muted">
-                The bracket is live. Follow every round as results come in.
-              </p>
-              <Link href={`/tournaments/${tournament.id}/bracket`} className="btn-primary">
-                View Full Bracket →
-              </Link>
-            </>
-          ) : (
-            <>
-              <Layers size={28} className="text-muted" />
-              <p className="max-w-sm text-sm text-muted">
-                The bracket will be generated once registration closes and players are seeded.
-              </p>
-            </>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: "rules",
-      label: "Rules",
-      content: (
-        <div className="card">
-          {tournament.rulesText ? (
-            <p className="text-sm whitespace-pre-wrap text-muted">{tournament.rulesText}</p>
-          ) : (
-            <p className="text-sm text-muted">The organizer hasn&apos;t published rules for this tournament yet.</p>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: "prizes",
-      label: "Prizes",
-      content: (
-        <div className="card flex flex-col gap-3">
-          {tournament.prizeAmount ? (
-            <>
-              <span className="text-eyebrow">Prize Pool</span>
-              <span className="font-display text-3xl font-bold text-gold">{formatNaira(tournament.prizeAmount)}</span>
+          <Panel title="Schedule">
+            <ol className="flex flex-col border-t border-border px-5 py-4">
+              {schedule.map((step, i) => {
+                const done = tournament.status !== "CANCELLED" && (nextStep === -1 ? true : i < nextStep);
+                const current = i === nextStep;
+                return (
+                  <li key={step.label} className="relative flex gap-3 pb-5 last:pb-0">
+                    {i < schedule.length - 1 && <span aria-hidden className="absolute top-5 bottom-0 left-[9px] w-px bg-border" />}
+                    <span
+                      className={`relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
+                        done ? "bg-accent-volt text-accent-volt-foreground" : current ? "border-2 border-accent-volt bg-surface" : "border border-border-strong bg-surface"
+                      }`}
+                    >
+                      {done && <Check size={11} strokeWidth={3} />}
+                    </span>
+                    <div className="flex min-w-0 flex-1 flex-wrap items-baseline justify-between gap-x-3">
+                      <span className={`text-sm ${current ? "font-semibold" : done ? "" : "text-muted"}`}>{step.label}</span>
+                      <span className="text-stat text-xs text-muted">{formatDate(step.at)}</span>
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          </Panel>
+
+          <Panel title="About">
+            <PanelBody className="flex flex-col gap-3">
+              <p className="text-sm text-foreground/85">{aboutText}</p>
               {tournament.prizeText && <p className="text-sm text-muted">{tournament.prizeText}</p>}
-            </>
-          ) : tournament.prizeText ? (
-            <p className="text-sm text-muted">{tournament.prizeText}</p>
-          ) : (
-            <p className="text-sm text-muted">No cash prize for this tournament: bragging rights only.</p>
-          )}
+            </PanelBody>
+          </Panel>
+
+          <Panel title="Game & host">
+            <PanelRows>
+              <Link href={gamePath(tournament.game)} className={panelRowClass}>
+                <GameArtTile game={tournament.game} className="h-11 w-11 shrink-0 rounded-[10px]" hideLabel imgWidth={120} />
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-sm font-medium">{tournament.game}</span>
+                  <span className="text-metadata">More {tournament.game} tournaments</span>
+                </div>
+                <ChevronRight size={15} className="shrink-0 text-muted" />
+              </Link>
+              <Link href={organiserPath(tournament.organizer.user.handle)} className={panelRowClass}>
+                <PlayerAvatar person={tournament.organizer.user} size="md" />
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <span className="flex items-center gap-1.5 truncate text-sm font-medium">
+                    {tournament.organizer.user.displayName}
+                    {tournament.organizer.verified && <ShieldCheck size={14} className="shrink-0 text-accent-blue" aria-label="Verified organiser" />}
+                  </span>
+                  <span className="text-metadata truncate">Organiser · @{tournament.organizer.user.handle}</span>
+                </div>
+                <ChevronRight size={15} className="shrink-0 text-muted" />
+              </Link>
+            </PanelRows>
+          </Panel>
         </div>
       ),
     },
     {
       key: "participants",
       label: "Participants",
-      content:
-        participants.length === 0 ? (
-          <p className="card text-center text-sm text-muted">No one has registered yet. Be the first.</p>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {participants.map((p) => (
-              <Link
-                key={p.userId}
-                href={`/players/${p.user.handle}`}
-                className="card-row flex items-center gap-3 p-3"
-              >
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-surface-elevated text-xs font-semibold text-muted">
-                  {p.user.displayName.slice(0, 1).toUpperCase()}
-                </span>
-                <div className="flex min-w-0 flex-col">
-                  <span className="truncate text-sm font-medium">{p.user.displayName}</span>
-                  <span className="text-metadata truncate">@{p.user.handle}</span>
-                </div>
-              </Link>
-            ))}
-          </div>
-        ),
+      count: registrantCount,
+      content: (
+        <Panel title="Participants" meta={`${registrantCount}/${tournament.participantCap}`}>
+          {participants.length === 0 ? (
+            <PanelEmpty>No one has registered yet. Be the first.</PanelEmpty>
+          ) : (
+            <div className="grid grid-cols-1 border-t border-border sm:grid-cols-2">
+              {participants.map((p, i) => (
+                <Link
+                  key={p.userId}
+                  href={`/players/${p.user.handle}`}
+                  className="flex items-center gap-3 border-b border-border px-5 py-3 transition-colors hover:bg-surface-elevated/60 sm:odd:border-r"
+                >
+                  <span className="w-6 shrink-0 text-right font-mono text-xs text-muted tabular-nums">{i + 1}</span>
+                  <PlayerAvatar person={p.user} size="sm" />
+                  <div className="flex min-w-0 flex-col">
+                    <span className="truncate text-sm font-medium">{p.user.displayName}</span>
+                    <span className="text-metadata truncate">@{p.user.handle}</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </Panel>
+      ),
     },
-    // Hidden entirely for a non-organizer if the community was never
-    // enabled — nothing to see, and no "enable" control they can use
-    // anyway. The organizer still sees it (even disabled) so Edit is
-    // reachable from a natural place instead of only from the sidebar.
-    ...(tournament.community?.enabled || isOrganizer
+    {
+      key: "bracket",
+      label: "Bracket",
+      content: (
+        <Panel title="Bracket">
+          <PanelBody className="flex flex-col items-start gap-3">
+            {hasBracket ? (
+              <>
+                <p className="text-sm text-muted">The bracket is live. Follow every round as results come in.</p>
+                <Link href={`/tournaments/${tournament.id}/bracket`} className="btn-primary">
+                  Open bracket
+                </Link>
+              </>
+            ) : (
+              <p className="text-sm text-muted">
+                The bracket is generated when registration closes on {formatDate(tournament.registrationCloseAt)} and players are seeded.
+              </p>
+            )}
+          </PanelBody>
+        </Panel>
+      ),
+    },
+    {
+      key: "rules",
+      label: "Rules",
+      content: (
+        <Panel title="Rules">
+          <PanelBody>
+            {tournament.rulesText ? (
+              <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/85">{tournament.rulesText}</p>
+            ) : (
+              <p className="text-sm text-muted">The organiser hasn&apos;t published rules for this tournament yet.</p>
+            )}
+          </PanelBody>
+        </Panel>
+      ),
+    },
+    {
+      key: "prizes",
+      label: "Prizes",
+      content: (
+        <Panel title="Prizes">
+          <PanelBody className="flex flex-col gap-2">
+            {tournament.prizeAmount ? (
+              <>
+                <span className="text-eyebrow text-muted">Prize pool</span>
+                <span className="text-stat text-4xl leading-none text-gold">{formatNaira(tournament.prizeAmount)}</span>
+                {tournament.prizeText && <p className="mt-1 text-sm text-muted">{tournament.prizeText}</p>}
+                <p className="mt-1 text-xs text-muted">Paid to the champion&apos;s payout account once the final is confirmed.</p>
+              </>
+            ) : tournament.prizeText ? (
+              <p className="text-sm text-foreground/85">{tournament.prizeText}</p>
+            ) : (
+              <p className="text-sm text-muted">No cash prize for this one — bragging rights only.</p>
+            )}
+          </PanelBody>
+        </Panel>
+      ),
+    },
+    // Hidden for a non-organizer if the community was never enabled —
+    // nothing to see there. The organizer still sees it, to reach Edit.
+    ...(communityVisible
       ? [
           {
             key: "community",
             label: "Community",
             content: (
-              <div className="card flex flex-col items-center gap-3 py-12 text-center">
-                {tournament.community?.enabled ? (
-                  <>
-                    <MessageCircle size={28} className="text-accent-blue" />
-                    <p className="max-w-sm text-sm text-muted">
-                      Chat with other players about this tournament — general, announcements, matches, and results.
-                    </p>
-                    <Link href={`/tournaments/${tournament.id}/community`} className="btn-primary">
-                      Open Community →
-                    </Link>
-                  </>
-                ) : (
-                  <>
-                    <MessageCircle size={28} className="text-muted" />
-                    <p className="max-w-sm text-sm text-muted">
-                      This tournament doesn&apos;t have a community yet.
-                    </p>
-                    <Link href={`/tournaments/${tournament.id}/edit`} className="btn-secondary">
-                      Enable from Edit
-                    </Link>
-                  </>
-                )}
-              </div>
+              <Panel title="Community">
+                <PanelBody className="flex flex-col items-start gap-3">
+                  {tournament.community?.enabled ? (
+                    <>
+                      <p className="text-sm text-muted">
+                        Chat with other players — general, announcements, matches and results.
+                      </p>
+                      <Link href={`/tournaments/${tournament.id}/community`} className="btn-primary">
+                        <MessageCircle size={14} />
+                        Open community
+                      </Link>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm text-muted">This tournament doesn&apos;t have a community yet.</p>
+                      <Link href={`/tournaments/${tournament.id}/edit`} className="btn-secondary">
+                        Enable from Edit
+                      </Link>
+                    </>
+                  )}
+                </PanelBody>
+              </Panel>
             ),
           },
         ]
@@ -411,215 +398,170 @@ export default async function TournamentPage({
   ];
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-6 sm:p-8">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-8 sm:py-8">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(eventJsonLd) }} />
-      {/* Real "live" page — a Poller-driven refresh is what makes the
-          capacity flash, FULL state, and status pill above genuinely
-          respond to someone else registering while this page is open,
-          not just on the next full page load. */}
+      {/* Poller-driven refresh keeps capacity, FULL state and status live
+          while someone else registers with this page open. */}
       <Poller />
-      <div
-        data-surface="dark"
-        className="relative flex min-h-[260px] w-full flex-col justify-end overflow-hidden rounded-[var(--radius-hero)] border border-border p-6 sm:min-h-[300px] sm:p-8"
-      >
-        <GameArtTile game={tournament.game} posterUrl={tournament.posterUrl} fill hideLabel imgWidth={1200} />
-        <div
-          aria-hidden
-          className="absolute inset-0"
-          style={{ backgroundImage: "linear-gradient(0deg, var(--background) 12%, transparent 65%)" }}
-        />
-        <div className="relative z-10 flex flex-col gap-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <StatusPill tone={status.tone} pulse={status.pulse}>
-              {status.label}
-            </StatusPill>
+
+      <header data-surface="dark" className="overflow-hidden rounded-[var(--radius-hero)] border border-border bg-surface">
+        <div className="relative aspect-[5/2] w-full sm:aspect-[4/1]">
+          <GameArtTile game={tournament.game} posterUrl={tournament.posterUrl} fill hideLabel imgWidth={1400} />
+          <div className="absolute top-4 left-4 z-10 flex flex-wrap items-center gap-2">
+            {/* Dark backing so the soft-tinted pill stays legible on any poster. */}
+            <span className="rounded-full bg-black/70 backdrop-blur-sm">
+              <StatusPill tone={status.tone} pulse={status.pulse}>
+                {status.label}
+              </StatusPill>
+            </span>
             {startingSoon && (
-              <span className="badge badge-attention">
+              <span className="badge bg-black/70 text-white backdrop-blur-sm">
                 <Timer size={11} />
-                Starting in <CountdownTimer target={tournament.startAt.toISOString()} />
+                Starts in <CountdownTimer target={tournament.startAt.toISOString()} />
               </span>
             )}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-end sm:justify-between sm:p-7">
+          <div className="flex min-w-0 flex-col gap-2">
+            <span className="text-xs text-muted">
+              <Link href={gamePath(tournament.game)} className="font-medium text-foreground/80 transition hover:text-accent-volt">
+                {tournament.game}
+              </Link>{" "}
+              · {formatText} · {tournament.teamSize}
+            </span>
+            <h1 className="font-display text-3xl leading-none font-bold tracking-tight uppercase sm:text-[40px]">{tournament.name}</h1>
+            <span className="flex items-center gap-1.5 text-sm text-muted">
+              Hosted by
+              <Link href={organiserPath(tournament.organizer.user.handle)} className="font-medium text-foreground/85 transition hover:text-accent-volt">
+                {tournament.organizer.user.displayName}
+              </Link>
+              {tournament.organizer.verified && <ShieldCheck size={14} className="text-accent-blue" aria-label="Verified organiser" />}
+            </span>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
             {hasBracket && (
-              <Link
-                href={`/tournaments/${tournament.id}/bracket`}
-                className="text-sm font-medium text-accent-blue hover:underline"
-              >
-                View bracket →
+              <Link href={`/tournaments/${tournament.id}/bracket`} className="btn-secondary">
+                <Trophy size={14} />
+                Bracket
               </Link>
             )}
             {tournament.streamUrl && (
-              <a
-                href={tournament.streamUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 text-sm font-medium text-accent-blue hover:underline"
-              >
+              <a href={tournament.streamUrl} target="_blank" rel="noreferrer" className="btn-secondary">
                 <Tv size={14} />
-                Watch stream
+                Watch
               </a>
             )}
-          </div>
-          <h1 className="font-display text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-            {tournament.name}
-          </h1>
-          <p className="text-sm text-foreground/70">{tournament.game}</p>
-          <div className="flex flex-wrap gap-2 pt-1">
-            <span className="badge badge-neutral bg-surface-elevated/80 text-foreground">
-              <Layers size={12} />
-              {formatText}
-            </span>
-            <span className="badge badge-neutral bg-surface-elevated/80 text-foreground">
-              <Swords size={12} />
-              {tournament.teamSize}
-            </span>
-            <span className="badge badge-neutral bg-surface-elevated/80 text-foreground">
-              <Calendar size={12} />
-              {formatShortDate(tournament.startAt)}
-            </span>
-            <span className="badge badge-neutral bg-surface-elevated/80 text-foreground">
-              <Users size={12} />
-              {registrantCount} / {tournament.participantCap} Players
-            </span>
-            <span className="badge badge-neutral bg-surface-elevated/80 text-foreground">
-              <Trophy size={12} />
-              {tournament.prizeAmount
-                ? `${formatNaira(tournament.prizeAmount)} Prize Pool`
-                : tournament.entryFee === 0
-                  ? "Free Entry"
-                  : `${formatNaira(tournament.entryFee)} Entry`}
-            </span>
+            <ShareButton variant="compact" title={`${tournament.name} on Circuit`} url={canonicalUrl} />
           </div>
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_340px]">
-        {/* Reserves real space so the tab bar + content pane resolving
-            (TournamentTabs needs a boundary for useSearchParams) doesn't
-            shift everything below it down — fallback={null} had nothing
-            to reserve with. */}
-        <Suspense
-          fallback={
-            <div className="flex min-w-0 flex-col gap-6">
-              <div className="flex items-center gap-2">
-                {[0, 1, 2, 3].map((i) => (
-                  <div key={i} className="skeleton h-8 w-24 rounded-[8px]" />
-                ))}
+        <StatStrip
+          stats={[
+            { label: prizeOrEntry.label, value: prizeOrEntry.value, valueClassName: prizeOrEntry.gold ? "text-gold" : "text-muted" },
+            {
+              label: "Entry",
+              value: tournament.entryFee === 0 ? "Free" : formatNaira(tournament.entryFee),
+              valueClassName: tournament.entryFee === 0 ? "text-success" : "",
+            },
+            {
+              label: "Players",
+              value: (
+                <>
+                  {registrantCount}
+                  <span className="text-muted">/{tournament.participantCap}</span>
+                </>
+              ),
+              sub: registrantCount >= tournament.participantCap ? "Full" : `${tournament.participantCap - registrantCount} spots left`,
+            },
+            { label: hasBracket ? "Started" : "Starts", value: formatShortDate(tournament.startAt), sub: formatTime(tournament.startAt) },
+          ]}
+        />
+      </header>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <SectionTabs tabs={tabs} label="Tournament sections" idPrefix="tournament" />
+
+        <aside className="order-first flex h-fit flex-col gap-4 lg:sticky lg:top-[76px] lg:order-none">
+          <Panel title="Registration">
+            <PanelBody className="flex flex-col gap-4">
+              <div className="flex items-end justify-between gap-3">
+                <div className="flex flex-col gap-1">
+                  <span className="text-eyebrow text-muted">Entry</span>
+                  <span className={`text-stat text-3xl leading-none ${tournament.entryFee === 0 ? "text-success" : ""}`}>
+                    {tournament.entryFee === 0 ? "Free" : formatNaira(tournament.entryFee)}
+                  </span>
+                </div>
+                <span className="flex items-center gap-1.5 text-sm text-muted">
+                  <Users size={14} />
+                  <span className="text-stat text-foreground">{registrantCount}</span>/{tournament.participantCap}
+                </span>
               </div>
-              <div className="skeleton h-64 w-full rounded-[12px]" />
-            </div>
-          }
-        >
-          <TournamentTabs tabs={tabs} />
-        </Suspense>
+              <CapacityBar registered={registrantCount} cap={tournament.participantCap} className="h-1.5" />
 
-        <aside className="flex h-fit flex-col gap-4 lg:sticky lg:top-[76px]">
-          <div className="card flex flex-col gap-4">
-            <div className="flex items-center gap-3">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gold/15 text-gold">
-                <Trophy size={20} />
-              </span>
-              <div className="flex min-w-0 flex-1 flex-col">
-                <h2 className="text-card-title">Register for Tournament</h2>
-                <p className="text-metadata">Secure your spot and be part of the action.</p>
-              </div>
-              <ShareButton
-                variant="compact"
-                title={`${tournament.name} on Circuit`}
-                url={canonicalUrl}
-              />
-            </div>
-
-            <div className="flex flex-col gap-2.5 border-t border-border pt-4">
-              <InfoRow icon={<Trophy size={14} />} label="Tournament" value={tournament.name} />
-              <InfoRow icon={<Layers size={14} />} label="Game" value={tournament.game} />
-              <InfoRow icon={<Calendar size={14} />} label="Date" value={formatShortDate(tournament.startAt)} />
-              <InfoRow icon={<Layers size={14} />} label="Format" value={formatText} />
-              <InfoRow icon={<Swords size={14} />} label="Team Size" value={tournament.teamSize} />
-              <InfoRow icon={<Users size={14} />} label="Players" value={`${tournament.participantCap} max`} />
-              <InfoRow
-                icon={<Wallet size={14} />}
-                label="Entry Fee"
-                value={tournament.entryFee === 0 ? "Free" : formatNaira(tournament.entryFee)}
-              />
-            </div>
-
-            <div className="flex flex-col gap-3 border-t border-border pt-4">
               {tournament.status === "CANCELLED" ? (
-                <p className="alert alert-danger">
-                  This tournament has been cancelled. Paid entries have been refunded.
-                </p>
+                <p className="alert alert-danger">This tournament has been cancelled. Paid entries have been refunded.</p>
               ) : isOrganizer ? (
                 <div className="flex flex-col gap-2">
-                  <Link href={`/dashboard/tournaments/${tournament.id}`} className="btn-secondary w-full">
-                    Manage
+                  <Link href={`/dashboard/tournaments/${tournament.id}`} className="btn-primary w-full">
+                    Manage tournament
                   </Link>
                   {now < tournament.registrationCloseAt && (
-                    <Link href={`/tournaments/${tournament.id}/edit`} className="btn-ghost w-full">
+                    <Link href={`/tournaments/${tournament.id}/edit`} className="btn-secondary w-full">
                       Edit
                     </Link>
                   )}
                   {cancellable && <CancelButton tournamentId={tournament.id} />}
                 </div>
               ) : myRegistration?.status === "CONFIRMED" ? (
-                <div className="alert alert-success flex-col items-stretch gap-3">
-                  <p>You&apos;re registered for this tournament.</p>
-                  {now < tournament.registrationCloseAt &&
-                    tournament.status !== "LIVE" &&
-                    tournament.status !== "COMPLETE" && <WithdrawButton registrationId={myRegistration.id} />}
+                <div className="flex flex-col gap-3 rounded-[var(--radius-md)] bg-success/10 p-3">
+                  <p className="flex items-center gap-2 text-sm font-medium text-success">
+                    <Check size={15} strokeWidth={3} />
+                    You&apos;re in
+                  </p>
+                  {now < tournament.registrationCloseAt && tournament.status !== "LIVE" && tournament.status !== "COMPLETE" && (
+                    <WithdrawButton registrationId={myRegistration.id} />
+                  )}
                 </div>
               ) : myRegistration?.status === "PENDING_PAYMENT" ? (
                 <p className="alert alert-warning">
                   Your payment is processing.{" "}
-                  <Link
-                    href={`/tournaments/${tournament.id}/register/callback?ref=${myRegistration.paymentRef}`}
-                    className="font-medium underline"
-                  >
+                  <Link href={`/tournaments/${tournament.id}/register/callback?ref=${myRegistration.paymentRef}`} className="font-medium underline">
                     Check status
                   </Link>
                 </p>
               ) : registrationOpen ? (
-                <>
+                <div className="flex flex-col gap-2">
                   <Link href={`/tournaments/${tournament.id}/register`} className="btn-primary w-full">
-                    Register Now →
+                    Register
                   </Link>
-                  <CapacityBar registered={registrantCount} cap={tournament.participantCap} className="h-1" />
-                  <p className="flex items-center gap-1.5 text-xs text-muted">
-                    <ShieldCheck size={12} className="shrink-0" />
-                    {tournament.entryFee === 0
-                      ? "No payment required, free to enter."
-                      : "Secure payment via Paystack or Flutterwave."}
+                  <p className="text-center text-xs text-muted">
+                    Closes in{" "}
+                    <span className="text-stat">
+                      <CountdownTimer target={tournament.registrationCloseAt.toISOString()} zeroLabel="a moment" />
+                    </span>
+                    {tournament.entryFee > 0 ? " · Paystack or Flutterwave" : ""}
                   </p>
-                </>
-              ) : now >= tournament.registrationOpenAt &&
-                now < tournament.registrationCloseAt &&
-                registrantCount >= tournament.participantCap ? (
-                <div className="alert alert-warning flex-col items-stretch gap-2">
-                  <p className="flex items-center gap-1.5 font-semibold">
-                    <Users size={14} className="shrink-0" />
-                    Registration is full — {tournament.participantCap}/{tournament.participantCap} players.
-                  </p>
-                  <CapacityBar registered={registrantCount} cap={tournament.participantCap} className="h-1" />
                 </div>
+              ) : now >= tournament.registrationOpenAt && now < tournament.registrationCloseAt && registrantCount >= tournament.participantCap ? (
+                <p className="rounded-[var(--radius-md)] bg-accent-orange-soft p-3 text-sm font-medium text-accent-orange">
+                  Registration is full.
+                </p>
               ) : (
-                <p className="text-center text-sm text-muted">
-                  {now < tournament.registrationOpenAt ? "Registration hasn't opened yet." : "Registration is closed."}
+                <p className="rounded-[var(--radius-md)] bg-surface-elevated p-3 text-sm text-muted">
+                  {now < tournament.registrationOpenAt ? `Registration opens ${formatDate(tournament.registrationOpenAt)}.` : "Registration is closed."}
                 </p>
               )}
-            </div>
-          </div>
+            </PanelBody>
+          </Panel>
 
           {canClaimPrize && <ClaimPrizeButton tournamentId={tournament.id} />}
 
-          <div className="card flex items-start gap-3 bg-surface-elevated">
-            <ShieldCheck size={16} className="mt-0.5 shrink-0 text-accent-blue" />
-            <div className="flex flex-col gap-0.5">
-              <span className="text-card-title">Fair Play Guaranteed</span>
-              <p className="text-metadata">
-                Results are reported by both players and verified. Disputes go to the organizer, then Circuit
-                staff.
-              </p>
-            </div>
-          </div>
+          <p className="flex items-start gap-2 px-1 text-xs text-muted">
+            <ShieldCheck size={13} className="mt-px shrink-0" />
+            Both players report every result. Disputes go to the organiser, then Circuit staff.
+          </p>
         </aside>
       </div>
     </div>

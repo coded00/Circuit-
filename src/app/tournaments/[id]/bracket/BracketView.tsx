@@ -10,7 +10,7 @@
  */
 
 import Link from "next/link";
-import { ArrowLeft, Calendar, Crown, Leaf, Settings2, Share2, Swords, Target, Trophy, Users, UsersRound } from "lucide-react";
+import { ArrowLeft, Share2, Trophy } from "lucide-react";
 import { GameArtTile } from "@/components/GameArtTile";
 import { ShareButton } from "@/components/ShareButton";
 import { StatusPill, matchStatusInfo } from "@/components/StatusPill";
@@ -94,14 +94,6 @@ export function Avatar({ player, size, ringClass }: { player: Player | null; siz
   );
 }
 
-function Tag({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <span className="flex items-center gap-1.5 rounded-full border border-border-strong bg-surface-elevated px-3 py-1.5 text-xs font-medium text-foreground">
-      {icon}
-      {children}
-    </span>
-  );
-}
 
 type Placement = { userId: string; label: string; roundReached: number; status: "champion" | "runner-up" | "eliminated" | "active" };
 
@@ -280,97 +272,58 @@ export function BracketView({
 
   return (
     <div className="flex w-full flex-1 flex-col gap-6">
-      <div data-surface="dark" className="relative overflow-hidden rounded-[var(--radius-hero)] border border-border p-6 sm:p-8">
-        <GameArtTile game={tournament.game} posterUrl={tournament.posterUrl} className="opacity-[0.16]" fill hideLabel imgWidth={1400} />
-        <div
-          aria-hidden
-          className="absolute inset-0"
-          style={{ backgroundImage: "linear-gradient(100deg, var(--surface) 40%, transparent)" }}
-        />
-        {/* Decorative accent only — no font asset exists for a literal
-            "graffiti" look, so this leans on the app's own display font
-            (Barlow Condensed) at a jaunty rotation instead of adding one. */}
-        <div aria-hidden className="absolute top-6 right-6 z-10 hidden -rotate-6 items-start gap-1.5 sm:flex">
-          <Crown size={22} className="mt-1 shrink-0 text-accent-volt" />
-          <span className="font-display text-xl leading-[0.9] font-bold tracking-tight text-accent-volt italic sm:text-2xl">
-            Bigger
-            <br />
-            Players
-          </span>
-        </div>
-        <div className="relative z-10 flex flex-col gap-3">
-          <Link href={backHref} className="inline-flex w-fit items-center gap-1.5 text-sm font-medium text-muted transition hover:text-foreground">
-            <ArrowLeft size={15} />
-            Back to Tournament
-          </Link>
-          <div className="flex flex-col gap-0.5">
-            <span className="text-sm text-muted">{tournament.name}</span>
-            <h1 className="font-display text-4xl leading-none font-bold tracking-tight uppercase sm:text-5xl">Bracket</h1>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Tag icon={<Swords size={12} />}>{tournament.game}</Tag>
-            <Tag icon={<Calendar size={12} />}>{tournament.startAt.toLocaleDateString("en-NG", { dateStyle: "medium" })}</Tag>
-            <Tag icon={<Users size={12} />}>{tournament.participantCap} Players</Tag>
-            <Tag icon={<Settings2 size={12} />}>Single Elimination</Tag>
-            <Tag icon={<UsersRound size={12} />}>{tournament.teamSize}</Tag>
+      <header data-surface="dark" className="flex flex-col gap-4 rounded-[var(--radius-hero)] border border-border bg-surface p-5 sm:flex-row sm:items-center sm:justify-between sm:p-7">
+        <div className="flex min-w-0 items-center gap-4">
+          <GameArtTile game={tournament.game} posterUrl={tournament.posterUrl} className="hidden h-16 w-24 shrink-0 rounded-[10px] sm:block" hideLabel imgWidth={240} />
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <Link href={backHref} className="inline-flex w-fit items-center gap-1.5 text-sm font-medium text-muted transition hover:text-foreground">
+              <ArrowLeft size={15} />
+              <span className="truncate">{tournament.name}</span>
+            </Link>
+            <h1 className="font-display text-3xl leading-none font-bold tracking-tight uppercase sm:text-4xl">Bracket</h1>
+            <span className="text-xs text-muted">
+              {tournament.game} · Single elimination · {tournament.teamSize} · {tournament.participantCap} players ·{" "}
+              {tournament.startAt.toLocaleDateString("en-NG", { day: "numeric", month: "short" })}
+            </span>
           </div>
         </div>
-      </div>
+      </header>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
         <TournamentTabs tabs={tabs} trailing={shareUrl ? <ShareButton key="share" title={`${tournament.name} bracket on Circuit`} url={shareUrl} /> : undefined} />
 
         <aside className="flex h-fit flex-col gap-4 lg:sticky lg:top-[76px]">
-          <div data-surface="dark" className="card flex flex-col items-center gap-3 overflow-hidden p-6 text-center">
-            {/* Reveal only when there's a real champion to crown — the
-                "still to be decided" placeholder has nothing to celebrate. */}
-            <Crown size={20} aria-hidden className={champion ? "trophy-pop text-gold" : "text-muted"} />
-            <div className="relative flex items-center justify-center py-1">
-              <Leaf size={26} className={`-rotate-[100deg] ${champion ? "text-gold/70" : "text-muted/40"}`} />
-              <div
-                className={`relative mx-1 rounded-full ${champion ? "motion-scale-in" : ""}`}
-                style={champion ? { boxShadow: "0 0 0 3px var(--gold), 0 0 32px 6px color-mix(in srgb, var(--gold) 55%, transparent)" } : undefined}
-              >
-                <Avatar player={championPlayer} size={84} ringClass={champion ? "border-gold" : "border-border-strong"} />
-              </div>
-              <Leaf size={26} className={`-scale-x-100 rotate-[100deg] ${champion ? "text-gold/70" : "text-muted/40"}`} />
+          <section className={`card flex flex-col items-center gap-3 p-6 text-center ${champion ? "border-gold/40" : ""}`}>
+            <span className="text-eyebrow text-gold">Champion</span>
+            <div className={`rounded-full p-[3px] ring-2 ${champion ? "motion-scale-in ring-gold" : "ring-border-strong"}`}>
+              <Avatar player={championPlayer} size={80} ringClass="border-transparent" />
             </div>
             <div className="flex flex-col gap-0.5">
-              <span className="text-eyebrow text-gold">Champion</span>
-              <span className="font-display text-2xl font-bold tracking-tight">{championPlayer?.displayName ?? "TBD"}</span>
+              <span className="font-display text-2xl font-bold tracking-tight uppercase">{championPlayer?.displayName ?? "TBD"}</span>
               {championPlayer && <span className="text-xs text-muted">@{championPlayer.handle}</span>}
+              {championRank != null && <span className="text-stat mt-1 text-xs text-gold">Rank #{championRank}</span>}
             </div>
-            {championRank != null && <span className="text-xs font-semibold text-gold">Rank #{championRank}</span>}
-            <p className="text-xs text-muted">{champion ? "Crowned after the Final." : "Still to be decided — check back once the Final is played."}</p>
+            <p className="text-xs text-muted">{champion ? "Crowned after the Final." : "Decided when the Final is played."}</p>
             {champion && (
-              <Link
-                href={`/share/champion/${tournament.id}`}
-                className="flex items-center gap-1.5 text-xs font-semibold text-accent-blue hover:underline"
-              >
-                <Share2 size={12} />
-                Share the champion card
+              <Link href={`/share/champion/${tournament.id}`} className="btn-secondary w-full text-sm">
+                <Share2 size={13} />
+                Share champion card
               </Link>
             )}
-            <p className="border-t border-border pt-3 text-xs text-muted italic">&ldquo;Same game. Bigger players.&rdquo;</p>
-          </div>
+          </section>
 
           {topFraggerPlayer && (
-            <div className="card flex flex-col items-center gap-2 p-5 text-center">
-              <Target size={18} aria-hidden className="text-accent-blue" />
-              <Avatar player={topFraggerPlayer} size={56} ringClass="border-accent-blue" />
-              <div className="flex flex-col gap-0.5">
-                <span className="text-eyebrow text-accent-blue">Top Fragger</span>
-                <span className="font-display text-lg font-bold tracking-tight">{topFraggerPlayer.displayName}</span>
-                <span className="text-xs text-muted">{topFragger!.totalKills} kills</span>
+            <section className="card flex items-center gap-3 p-4">
+              <Avatar player={topFraggerPlayer} size={44} ringClass="border-accent-blue" />
+              <div className="flex min-w-0 flex-1 flex-col">
+                <span className="text-eyebrow text-accent-blue">Top fragger</span>
+                <span className="truncate text-sm font-semibold">{topFraggerPlayer.displayName}</span>
+                <span className="text-stat text-xs text-muted">{topFragger!.totalKills} kills</span>
               </div>
-              <Link
-                href={`/share/kills/${tournament.id}`}
-                className="flex items-center gap-1.5 text-xs font-semibold text-accent-blue hover:underline"
-              >
-                <Share2 size={12} />
-                Share this card
+              <Link href={`/share/kills/${tournament.id}`} aria-label="Share top fragger card" className="btn-icon text-muted hover:text-foreground">
+                <Share2 size={15} />
               </Link>
-            </div>
+            </section>
           )}
         </aside>
       </div>

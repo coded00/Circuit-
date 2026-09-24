@@ -939,7 +939,7 @@ body {
     pointer-events: none;
   }
 
-  /* Tab content switch (TournamentTabs) — quicker than a full page
+  /* Tab content switch (TournamentTabs, SectionTabs) — quicker than a full page
      transition since it's a much smaller change of context. */
   .tab-content-enter {
     animation: motion-fade-in var(--duration-fast) var(--ease-standard) both;
