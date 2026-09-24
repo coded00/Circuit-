@@ -7,55 +7,42 @@
  * it (src/lib/wallet.ts, src/app/api/wallet/fund, src/app/api/wallet/
  * withdraw) — never a number invented independently of real rows.
  *
- * Below the balance sits the broader "activity statement" — every
- * tournament entry fee/refund/prize AND every Battle stake/payout/
- * refund, merged into one real `EscrowTransaction`-backed ledger (see
- * src/lib/wallet.ts's own comment on the one asymmetry: a tournament
- * prize still pays out externally to your linked payout method, never
- * landing in this wallet, while a Battle stake payout always does).
+ * Top-ups/withdrawals and competition money (entry fees, stakes, payouts,
+ * refunds — `EscrowTransaction`-backed) are merged into one statement.
+ * One asymmetry is kept visible in the copy: a tournament prize pays out
+ * externally to your linked payout method, never landing in this wallet,
+ * while a Battle stake payout always does (see src/lib/wallet.ts).
  */
 
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowDownToLine, ArrowUpFromLine, ReceiptText, Settings, Trophy, Wallet as WalletIcon } from "lucide-react";
+import { Landmark } from "lucide-react";
 import { getCurrentUser } from "@/lib/session";
 import { getWalletActivity } from "@/lib/wallet";
+import { StatStrip } from "@/components/ui/StatStrip";
 import { FundWalletButton } from "./FundWalletButton";
+import { WithdrawButton } from "./WithdrawButton";
+import { WalletActivityList, type WalletEntry } from "./WalletActivityList";
 
 // Private, per-user financial data — never real public content.
 export const metadata: Metadata = { robots: { index: false, follow: false } };
-import { WithdrawButton } from "./WithdrawButton";
 
 function formatNaira(kobo: number): string {
-  return `₦ ${(kobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 0 })}`;
+  return `₦${(kobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 0 })}`;
 }
 
-function statusTone(status: string): "attention" | "complete" | "cancelled" {
-  switch (status) {
-    case "COMPLETE":
-      return "complete";
-    case "FAILED":
-      return "cancelled";
-    default:
-      return "attention";
-  }
+function normalizeStatus(status: string): WalletEntry["status"] {
+  return status === "COMPLETE" ? "COMPLETE" : status === "FAILED" ? "FAILED" : "PENDING";
 }
 
-function statusLabel(status: string): string {
-  switch (status) {
-    case "COMPLETE":
-      return "Complete";
-    case "FAILED":
-      return "Failed";
-    default:
-      return "Processing";
-  }
-}
-
-function badgeClass(tone: "attention" | "complete" | "cancelled"): string {
-  return `badge badge-${tone}`;
-}
+const COMPETITION_TITLE: Record<string, string> = {
+  ENTRY_FEE: "Entry fee",
+  REFUND: "Refund",
+  PRIZE_PAYOUT: "Prize payout",
+  STAKE: "Stake locked",
+  STAKE_PAYOUT: "Challenge winnings",
+};
 
 export default async function WalletPage() {
   const user = await getCurrentUser();
@@ -63,161 +50,72 @@ export default async function WalletPage() {
 
   const { balance, fundingHistory, rows, totalPaid, totalRefunded, totalWon } = await getWalletActivity(user.id);
 
-  return (
-    <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-6 py-8 sm:px-8 sm:py-10">
-      <div className="flex flex-col gap-1">
-        <h1 className="font-display flex items-center gap-2 text-2xl font-bold tracking-tight sm:text-3xl">
-          <WalletIcon size={24} className="text-accent-volt" />
-          Wallet
-        </h1>
-        <p className="text-sm text-muted">Fund your balance, spend it on entry fees, withdraw it anytime.</p>
-      </div>
+  const entries: WalletEntry[] = [
+    ...fundingHistory.map(
+      (t): WalletEntry => ({
+        id: `w-${t.id}`,
+        at: t.createdAt.toISOString(),
+        kind: t.type,
+        title: t.type === "FUND" ? "Wallet top-up" : "Withdrawal",
+        subtitle: t.type === "FUND" ? "Card or bank transfer" : "To your payout account",
+        amount: t.amount,
+        credit: t.type === "FUND",
+        status: normalizeStatus(t.status),
+      })
+    ),
+    ...rows.map(
+      (r): WalletEntry => ({
+        id: `e-${r.id}`,
+        at: r.createdAt.toISOString(),
+        kind: r.type,
+        title: COMPETITION_TITLE[r.type] ?? r.type,
+        subtitle:
+          r.type === "PRIZE_PAYOUT"
+            ? `${r.contextName} · paid to your payout account`
+            : [r.contextName, r.contextGame].filter(Boolean).join(" · "),
+        amount: r.amount,
+        credit: r.type === "REFUND" || r.type === "PRIZE_PAYOUT" || r.type === "STAKE_PAYOUT",
+        status: normalizeStatus(r.status),
+      })
+    ),
+  ].sort((a, b) => b.at.localeCompare(a.at));
 
-      <div data-surface="dark" className="card flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-col gap-0.5">
-          <span className="text-eyebrow text-muted">Available balance</span>
-          <span className="font-display text-4xl font-bold tracking-tight">{formatNaira(balance)}</span>
+  return (
+    <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-4 py-6 sm:px-8 sm:py-10">
+      <section data-surface="dark" className="overflow-hidden rounded-[var(--radius-hero)] border border-border">
+        <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-end sm:justify-between sm:p-7">
+          <div className="flex flex-col gap-2">
+            <span className="text-eyebrow text-muted">Wallet balance</span>
+            <span className="text-stat text-4xl leading-none sm:text-5xl">{formatNaira(balance)}</span>
+            <span className="text-xs text-muted">Spend it on entry fees and stakes, or withdraw anytime.</span>
+          </div>
+          <div className="flex flex-wrap items-start gap-2">
+            <FundWalletButton />
+            <WithdrawButton hasPayoutMethod={Boolean(user.payoutMethodRef)} />
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <FundWalletButton />
-          <WithdrawButton hasPayoutMethod={Boolean(user.payoutMethodRef)} />
-        </div>
-      </div>
+        <StatStrip
+          columns="grid-cols-3"
+          compact
+          stats={[
+            { label: "Winnings", value: formatNaira(totalWon), valueClassName: "text-gold" },
+            { label: "Fees & stakes", value: formatNaira(totalPaid) },
+            { label: "Refunded", value: formatNaira(totalRefunded) },
+          ]}
+        />
+      </section>
 
       {!user.payoutMethodRef && (
-        <div className="card flex items-center justify-between gap-3">
-          <span className="text-metadata">Link a payout method to withdraw or claim tournament prizes.</span>
-          <Link href="/account" className="btn-secondary shrink-0">
-            <Settings size={14} />
-            Manage
+        <div className="flex items-center gap-3 rounded-[var(--radius-lg)] border border-dashed border-border-strong px-4 py-3">
+          <Landmark size={18} className="shrink-0 text-muted" />
+          <p className="min-w-0 flex-1 text-sm text-muted">Add a payout account to withdraw and receive tournament prizes.</p>
+          <Link href="/account" className="shrink-0 text-sm font-medium text-accent-blue hover:underline">
+            Add account
           </Link>
         </div>
       )}
 
-      <div className="flex flex-col gap-3">
-        <h2 className="text-section-heading">Wallet Activity</h2>
-        {fundingHistory.length === 0 ? (
-          <p className="card text-center text-muted">No funding or withdrawals yet.</p>
-        ) : (
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Type</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {fundingHistory.map((t) => (
-                  <tr key={t.id}>
-                    <td className="text-metadata whitespace-nowrap">{t.createdAt.toLocaleDateString("en-NG", { dateStyle: "medium" })}</td>
-                    <td>{t.type === "FUND" ? "Fund" : "Withdrawal"}</td>
-                    <td className={`font-mono tabular-nums ${t.type === "FUND" ? "text-success" : "text-foreground"}`}>
-                      {t.type === "FUND" ? "+" : "−"}
-                      {formatNaira(t.amount)}
-                    </td>
-                    <td>
-                      <span className={badgeClass(statusTone(t.status))}>{statusLabel(t.status)}</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="widget flex items-center gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-surface-elevated text-danger">
-            <ArrowUpFromLine size={18} />
-          </span>
-          <div className="flex flex-col">
-            <span className="text-eyebrow">Fees &amp; stakes paid</span>
-            <span className="text-stat text-xl">{formatNaira(totalPaid)}</span>
-          </div>
-        </div>
-        <div className="widget flex items-center gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-surface-elevated text-accent-blue">
-            <ArrowDownToLine size={18} />
-          </span>
-          <div className="flex flex-col">
-            <span className="text-eyebrow">Refunded</span>
-            <span className="text-stat text-xl">{formatNaira(totalRefunded)}</span>
-          </div>
-        </div>
-        <div className="widget flex items-center gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-gold/15 text-gold">
-            <Trophy size={18} />
-          </span>
-          <div className="flex flex-col">
-            <span className="text-eyebrow">Winnings</span>
-            <span className="text-stat text-xl text-gold">{formatNaira(totalWon)}</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-3">
-        <h2 className="text-section-heading flex items-center gap-2">
-          <ReceiptText size={17} className="text-muted" />
-          Transaction History
-        </h2>
-        {rows.length === 0 ? (
-          <p className="card text-center text-muted">
-            Nothing here yet — entry fees, Battle stakes, refunds, and payouts will show up once you compete.
-          </p>
-        ) : (
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Context</th>
-                  <th>Type</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => {
-                  const isCredit = row.type === "REFUND" || row.type === "PRIZE_PAYOUT" || row.type === "STAKE_PAYOUT";
-                  const label =
-                    row.type === "ENTRY_FEE"
-                      ? "Entry fee"
-                      : row.type === "REFUND"
-                        ? "Refund"
-                        : row.type === "PRIZE_PAYOUT"
-                          ? "Prize payout"
-                          : row.type === "STAKE"
-                            ? "Stake"
-                            : "Stake payout";
-                  return (
-                    <tr key={row.id}>
-                      <td className="text-metadata whitespace-nowrap">
-                        {row.createdAt.toLocaleDateString("en-NG", { dateStyle: "medium" })}
-                      </td>
-                      <td>
-                        <span className="font-medium">{row.contextName}</span>{" "}
-                        <span className="text-muted">· {row.contextGame}</span>
-                      </td>
-                      <td>{label}</td>
-                      <td className={`font-mono tabular-nums ${isCredit ? "text-success" : "text-foreground"}`}>
-                        {isCredit ? "+" : "−"}
-                        {formatNaira(row.amount)}
-                      </td>
-                      <td>
-                        <span className={badgeClass(statusTone(row.status))}>{statusLabel(row.status)}</span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      <WalletActivityList entries={entries} />
     </div>
   );
 }
