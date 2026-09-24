@@ -45,7 +45,7 @@ import { getFriendIds } from "@/lib/friends";
 import { GameArtTile } from "@/components/GameArtTile";
 import { CountUp } from "@/components/CountUp";
 
-const RANK_COLORS = ["#eab308", "#9ca3af", "#b45309"]; // gold, silver, bronze — same as homepage leaderboard
+const RANK_COLORS = ["#eab308", "#9ca3af", "#b45309"]; // gold, silver, bronze
 
 function Avatar({ avatarUrl, name, size, ringClass }: { avatarUrl: string | null; name: string; size: number; ringClass: string }) {
   const px = `${size}px`;

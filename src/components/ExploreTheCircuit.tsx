@@ -2,6 +2,7 @@ import Link from "next/link";
 import { LayoutGrid, ArrowRight } from "lucide-react";
 import { GameArtTile } from "@/components/GameArtTile";
 import { AutoScrollRow } from "@/components/AutoScrollRow";
+import { SectionHeader } from "@/components/ui/SectionHeader";
 
 /**
  * Circuit — "Explore by Game" homepage section (MVP rework spec section
@@ -25,7 +26,7 @@ function GameTile({ name, activeCompetitions }: GameCount) {
           stack this above it (bottom-6) rather than on the same row. */}
       <GameArtTile game={name} className="h-full w-full" />
       <span className="absolute right-3 bottom-6 left-3 z-10 truncate text-[10px] font-medium text-white/70">
-        {activeCompetitions} Active Competition{activeCompetitions === 1 ? "" : "s"}
+        {activeCompetitions === 0 ? "No open tournaments" : `${activeCompetitions} open`}
       </span>
     </Link>
   );
@@ -49,12 +50,7 @@ export function ExploreTheCircuit({ games }: { games: GameCount[] }) {
 
   return (
     <section className="flex flex-col gap-4">
-      <div className="flex flex-col gap-0.5">
-        <h2 className="text-section-heading">Explore by Game</h2>
-        <p className="text-metadata">Discover the games and competitions happening now.</p>
-      </div>
-      <div className="border-b border-border" />
-
+      <SectionHeader title="Games" href="/ladder" linkLabel="All games" />
       <AutoScrollRow items={items} ariaLabel="Explore by game" />
     </section>
   );

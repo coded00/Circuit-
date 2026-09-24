@@ -1,5 +1,6 @@
 import { Newspaper } from "lucide-react";
 import { fetchGamerNews } from "@/lib/gamerNews";
+import { Panel, PanelRows, panelRowClass } from "@/components/ui/Panel";
 
 /**
  * Circuit — homepage sidebar "Gamer News" widget. Real, live articles from
@@ -23,21 +24,10 @@ export async function GamerNews() {
   if (items.length === 0) return null;
 
   return (
-    <div className="card flex flex-col gap-3">
-      <h2 className="text-card-title flex items-center gap-2">
-        <Newspaper size={15} className="text-accent-blue" />
-        Gamer News
-      </h2>
-      <div className="border-b border-border" />
-      <div className="flex flex-col gap-1">
+    <Panel title="Gamer news">
+      <PanelRows>
         {items.map((item) => (
-          <a
-            key={item.link}
-            href={item.link}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-start gap-3 rounded-lg p-1.5 transition hover:bg-surface-elevated"
-          >
+          <a key={item.link} href={item.link} target="_blank" rel="noreferrer" className={`${panelRowClass} items-start py-3`}>
             {item.image ? (
               // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host article images
               <img src={item.image} alt="" className="h-14 w-14 shrink-0 rounded-[8px] object-cover" />
@@ -47,15 +37,14 @@ export async function GamerNews() {
               </div>
             )}
             <div className="flex min-w-0 flex-col gap-0.5">
-              <span className="text-[11px] font-medium text-muted">
-                <span className="text-accent-blue">{item.source}</span> · {formatRelative(item.publishedAt)}
+              <span className="text-[11px] text-muted">
+                <span className="font-medium text-foreground/80">{item.source}</span> · {formatRelative(item.publishedAt)}
               </span>
-              <span className="text-card-title line-clamp-2 leading-snug font-semibold">{item.title}</span>
-              {item.snippet && <span className="text-metadata line-clamp-1">{item.snippet}</span>}
+              <span className="line-clamp-2 text-sm leading-snug font-medium">{item.title}</span>
             </div>
           </a>
         ))}
-      </div>
-    </div>
+      </PanelRows>
+    </Panel>
   );
 }

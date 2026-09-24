@@ -13,8 +13,6 @@
 
 import { Suspense } from "react";
 import Link from "next/link";
-import { Trophy, Crown } from "lucide-react";
-import { CountUp } from "@/components/CountUp";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { CircuitHero } from "@/components/CircuitHero";
@@ -31,6 +29,8 @@ import { getFriendIds } from "@/lib/friends";
 import { getActiveAnnouncement } from "@/lib/announcements";
 import { openDueTournaments } from "@/lib/tournaments";
 import { AnnouncementBanner } from "@/components/AnnouncementBanner";
+import { Panel, PanelEmpty, PanelRows, panelRowClass } from "@/components/ui/Panel";
+import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
 import { buildMetadata } from "@/lib/seo";
 
 export const metadata = buildMetadata({
@@ -40,7 +40,6 @@ export const metadata = buildMetadata({
   path: "/",
 });
 
-const RANK_COLORS = ["#eab308", "#9ca3af", "#b45309"]; // gold, silver, bronze — same as ladder/page.tsx
 
 const cardSelect = {
   id: true,
@@ -106,6 +105,8 @@ export default async function Home({
     homepageBanners,
     activeAnnouncement,
     joinedCommunities,
+    openTournamentStats,
+    openChallengeCount,
   ] = await Promise.all([
     getFeaturedTournaments(6),
     // "Upcoming" includes DRAFT on purpose (unlike Featured, which stays
@@ -142,7 +143,6 @@ export default async function Home({
       take: 6,
       include: {
         creator: { select: { displayName: true, avatarUrl: true } },
-        targetUser: { select: { displayName: true } },
       },
     }),
     globalStandings(),
@@ -152,19 +152,35 @@ export default async function Home({
     }),
     getActiveAnnouncement(),
     user ? getJoinedCommunities(user.id) : Promise.resolve([]),
+    // Hero's live numbers — real counts/sums, same visibility rules as the lists.
+    prisma.tournament.aggregate({ where: { status: { in: ["OPEN", "LIVE"] } }, _count: { _all: true }, _sum: { prizeAmount: true } }),
+    prisma.battle.count({
+      where: {
+        status: "OPEN",
+        OR: [{ visibility: "OPEN" }, ...(friendIds.length ? [{ visibility: "FRIENDS" as const, creatorId: { in: friendIds } }] : [])],
+      },
+    }),
   ]);
 
   const scopedLeaderboard = friendLeaderboardActive
     ? leaderboard.filter((s) => s.userId === user!.id || friendIds.includes(s.userId))
     : leaderboard;
   const topLeaderboard = scopedLeaderboard.slice(0, 5);
-  const openChallengesPreview = openBattles.slice(0, 3);
+  const openChallengesPreview = openBattles.slice(0, 4);
 
   return (
-    <div className="flex w-full flex-1 flex-col gap-8 p-6 sm:p-8">
+    <div className="flex w-full flex-1 flex-col gap-8 px-4 py-6 sm:p-8">
       {activeAnnouncement && <AnnouncementBanner title={activeAnnouncement.title} body={activeAnnouncement.body} />}
 
-      <CircuitHero tournaments={featuredTournaments} banners={homepageBanners} />
+      <CircuitHero
+        tournaments={featuredTournaments}
+        banners={homepageBanners}
+        stats={{
+          openTournaments: openTournamentStats._count._all,
+          openChallenges: openChallengeCount,
+          prizeMoney: openTournamentStats._sum.prizeAmount ?? 0,
+        }}
+      />
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_var(--right-rail-width)]">
         <div className="flex min-w-0 flex-col gap-8">
@@ -172,7 +188,7 @@ export default async function Home({
 
           <ExploreTheCircuit games={gameCounts} />
 
-          <OpenChallenges battles={openChallengesPreview} />
+          <OpenChallenges battles={openChallengesPreview} viewerId={user?.id} />
 
           <UpcomingCompetitions tournaments={upcomingTournaments} />
         </div>
@@ -181,82 +197,55 @@ export default async function Home({
           {user && <CommunitiesCard communities={joinedCommunities} />}
 
           {(topLeaderboard.length > 0 || friendLeaderboardActive) && (
-            <div className="card flex flex-col gap-3">
-              <div className="flex items-center justify-between gap-2">
-                <h2 className="text-card-title flex items-center gap-2">
-                  <Trophy size={15} className="text-gold" />
-                  Leaderboard
-                </h2>
+            <Panel
+              title="Leaderboard"
+              action={
                 <Link href="/leaderboard" className="text-xs font-medium text-accent-blue hover:underline">
-                  View All →
+                  View all
                 </Link>
-              </div>
-              <div className="border-b border-border" />
-              <div className="tabs">
-                <Link href="/" className={`tab ${!friendLeaderboardActive ? "tab-active" : ""}`}>
+              }
+            >
+              <div className="flex gap-1.5 border-t border-border px-5 py-3">
+                <Link
+                  href="/"
+                  className={`rounded-full px-3 py-1 text-xs font-medium transition ${!friendLeaderboardActive ? "bg-foreground text-background" : "bg-surface-elevated text-muted hover:text-foreground"}`}
+                >
                   Global
                 </Link>
                 {user ? (
-                  <Link href="/?leaderboard=friends" className={`tab ${friendLeaderboardActive ? "tab-active" : ""}`}>
+                  <Link
+                    href="/?leaderboard=friends"
+                    className={`rounded-full px-3 py-1 text-xs font-medium transition ${friendLeaderboardActive ? "bg-foreground text-background" : "bg-surface-elevated text-muted hover:text-foreground"}`}
+                  >
                     Friends
                   </Link>
                 ) : (
-                  <span className="tab tab-disabled" title="Log in to see your friends' ranking">
+                  <span title="Log in to see your friends' ranking" className="cursor-not-allowed rounded-full bg-surface-elevated px-3 py-1 text-xs font-medium text-muted/50">
                     Friends
                   </span>
                 )}
-                <span className="tab tab-disabled" title="Coming soon">
-                  This Month
-                </span>
               </div>
               {friendLeaderboardActive && topLeaderboard.length === 0 ? (
-                <p className="motion-fade-in py-4 text-center text-sm text-muted">
-                  None of your friends have a completed Challenge yet.
-                </p>
+                <PanelEmpty>None of your friends have a completed Challenge yet.</PanelEmpty>
               ) : (
-              <div className="flex flex-col gap-1">
-                {topLeaderboard.map((s, i) => {
-                  const medal = RANK_COLORS[i];
-                  const isFirst = i === 0;
-                  return (
-                    <Link
-                      key={s.userId}
-                      href={`/players/${s.handle}`}
-                      style={{ "--i": i } as React.CSSProperties}
-                      className={`rank-row flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm transition hover:translate-x-0.5 hover:bg-surface-elevated ${
-                        isFirst ? "rank-first" : ""
-                      }`}
-                    >
-                      <span className="flex min-w-0 items-center gap-2">
-                        <span className="w-3.5 shrink-0 text-center font-mono text-[11px] text-muted">{i + 1}</span>
-                        <span className="relative shrink-0">
-                          <span
-                            className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
-                              medal ? "text-black" : "border border-border bg-surface-elevated text-muted"
-                            }`}
-                            style={medal ? { backgroundColor: medal } : undefined}
-                          >
-                            {s.displayName.slice(0, 1).toUpperCase()}
-                          </span>
-                          {isFirst && (
-                            <Crown
-                              size={12}
-                              aria-hidden
-                              className="crown-bounce absolute -top-2 left-1/2 -translate-x-1/2 text-gold"
-                            />
-                          )}
-                        </span>
-                        <span className="truncate">{s.displayName}</span>
+                <PanelRows>
+                  {topLeaderboard.map((s, i) => (
+                    <Link key={s.userId} href={`/players/${s.handle}`} className={`${panelRowClass} py-2.5`}>
+                      <span
+                        className={`w-5 shrink-0 text-center font-mono text-xs font-semibold tabular-nums ${i === 0 ? "text-gold" : i < 3 ? "text-foreground" : "text-muted"}`}
+                      >
+                        {i + 1}
                       </span>
-                      <span className="text-stat shrink-0 text-xs text-accent-blue">
-                        <CountUp value={s.wins} />
+                      <PlayerAvatar person={s} size="sm" className={i === 0 ? "ring-2 ring-gold" : ""} />
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium">{s.displayName}</span>
+                      <span className="text-stat shrink-0 text-xs text-muted">
+                        <span className="text-foreground">{s.wins}</span>W
                       </span>
                     </Link>
-                  );
-                })}
-              </div>
+                  ))}
+                </PanelRows>
               )}
-            </div>
+            </Panel>
           )}
 
           <Suspense
