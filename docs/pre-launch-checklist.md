@@ -40,10 +40,8 @@ Configure these in **Vercel Project Settings > Environment Variables** (or `.env
 | `JWT_SECRET` | **YES** | Generate via `openssl rand -base64 32`. Signs player session cookies and storage tokens. |
 | `NEXT_PUBLIC_APP_URL` | **YES** | Production domain with HTTPS, e.g. `https://circuit.gg`. |
 | `CRON_SECRET` | **YES** | Generate via `openssl rand -base64 32`. Vercel Cron uses this to authenticate sweeps. |
-| `PAYSTACK_SECRET_KEY` | **YES** | Paystack Live Secret Key (`sk_live_...`). Required for entry fees & transfers. |
-| `PAYSTACK_PUBLIC_KEY` | **YES** | Paystack Live Public Key (`pk_live_...`). Required for client-side popups. |
-| `FLUTTERWAVE_SECRET_KEY` | **YES** | Flutterwave Live Secret Key (`FLWSECK_LIVE-...`). |
-| `FLUTTERWAVE_PUBLIC_KEY` | **YES** | Flutterwave Live Public Key (`FLWPUBK_LIVE-...`). |
+| `PAYSTACK_SECRET_KEY` | **YES** | Paystack Live Secret Key (`sk_live_...`). Required for entry fees & transfers. Checkout is server-initiated hosted checkout (src/lib/payments/paystack.ts), not a client-side inline popup — there's no public key anywhere in the code. |
+| `FLUTTERWAVE_SECRET_KEY` | **YES** | Flutterwave Live Secret Key (`FLWSECK_LIVE-...`). Same server-initiated-checkout reasoning as Paystack above — no public key used. |
 | `FLUTTERWAVE_SECRET_HASH`| **YES** | Shared secret configured in Flutterwave Dashboard under Webhooks. |
 | `R2_BUCKET` | **YES** | Name of Cloudflare R2 bucket (e.g. `circuit-proofs-prod`). |
 | `R2_ACCOUNT_ID` | **YES** | Cloudflare Account ID from dashboard. |
@@ -79,6 +77,14 @@ Configure these in **Vercel Project Settings > Environment Variables** (or `.env
 ---
 
 ## 4. Automated Match Sweeper (Vercel Cron)
+
+**Requires a paid Vercel plan.** Vercel's Hobby (free) tier only allows
+Cron Jobs to run once per day — `*/2 * * * *` needs Pro or above. On
+Hobby, Vercel silently accepts this `vercel.json` at deploy time but
+only actually fires it once daily, well short of what bracket
+progression, auto-accept, dispute escalation, and organizer-revenue
+settlement all need. Confirm the project's Vercel plan before relying on
+this.
 
 Circuit includes `vercel.json` configured to sweep matches every 2 minutes:
 ```json
@@ -158,7 +164,10 @@ Run these 5 checks immediately after deploying:
    ```bash
    npx prisma migrate status
    ```
-   Must confirm all 20 migrations are applied.
+   Must report "Database schema is up to date!" — not a specific
+   migration count (that number only grows as the schema evolves and
+   goes stale the moment it does; the real go/no-go signal is whether
+   anything is still pending).
 
 3. **Super Admin Access**:
    - Access `https://<your-domain>/admin`.

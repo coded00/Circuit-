@@ -115,6 +115,21 @@ export function battleStatusInfo(status: string): StatusInfo {
   }
 }
 
+export function quickMatchStatusInfo(status: string): StatusInfo {
+  switch (status) {
+    case "PENDING":
+      return { tone: "live", label: "Searching", pulse: true };
+    case "ACCEPTED":
+      return { tone: "complete", label: "Matched" };
+    case "EXPIRED":
+      return { tone: "neutral", label: "Expired" };
+    case "CANCELLED":
+      return { tone: "cancelled", label: "Cancelled" };
+    default:
+      return { tone: "neutral", label: status };
+  }
+}
+
 export function disputeStatusInfo(status: string): StatusInfo {
   switch (status) {
     case "OPEN":

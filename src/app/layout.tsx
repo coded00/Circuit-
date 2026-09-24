@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Barlow_Condensed, Geist_Mono } from "next/font/google";
+import { MotionConfig } from "framer-motion";
 import "./globals.css";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
@@ -7,7 +8,10 @@ import { AppSidebar } from "@/components/nav/AppSidebar";
 import { TopBar } from "@/components/nav/TopBar";
 import { MobileTabBar } from "@/components/nav/MobileTabBar";
 import { AppShell } from "@/components/AppShell";
+import { ConfirmDialogProvider } from "@/components/ConfirmDialogProvider";
 import { OneSignalInit } from "@/components/OneSignalInit";
+import { PresenceHeartbeat } from "@/components/PresenceHeartbeat";
+import { QuickMatchIncomingListener } from "@/components/QuickMatchIncomingListener";
 import { SITE_NAME, SITE_URL, DEFAULT_DESCRIPTION } from "@/lib/seo";
 
 // Phase 14: Inter for UI text, Barlow Condensed ExtraBold for display/hero
@@ -93,9 +97,24 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
+      data-scroll-behavior="smooth"
       className={`${bodyFont.variable} ${displayFont.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full">
+      {/* suppressHydrationWarning is scoped to this element's own attributes
+          only (not its children) — needed because extensions like Grammarly
+          inject data-gr-* attributes onto <body> before React hydrates,
+          which otherwise logs a false-positive mismatch warning on every
+          load for anyone with that extension installed. */}
+      <body className="min-h-full" suppressHydrationWarning>
+        {/* MotionConfig reducedMotion="user" is the framer-motion-specific
+            counterpart to globals.css's own `prefers-reduced-motion` CSS
+            override just above — that override only silences CSS
+            transitions/animations, never the JS-driven `motion.*` components
+            (PageTransition, Modal, NotificationBell, QuickMatchIncomingListener,
+            MatchFoundHud, and AppShell's own transitions all use framer-motion).
+            One root-level wrapper covers all of them without touching each
+            component individually. */}
+        <MotionConfig reducedMotion="user">
         {/* Real, static site-level facts only — see this file's own
             ORGANIZATION_JSON_LD/WEBSITE_JSON_LD comment on why no
             SearchAction. Per-page structured data (Event on tournament
@@ -119,16 +138,21 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             AppShell decides whether this shell renders at all — the four
             auth routes skip it entirely for their own full-bleed split
             layout (see AppShell.tsx / AuthSplitLayout.tsx). */}
-        <AppShell
-          sidebar={<AppSidebar user={navUser} />}
-          topBar={<TopBar user={user} disputeCount={disputeCount} />}
-          mobileTabBar={<MobileTabBar user={navUser} />}
-          maintenanceMode={platformSetting?.maintenanceMode ?? false}
-          isStaffUser={user?.isStaff ?? false}
-        >
-          {children}
-        </AppShell>
+        <ConfirmDialogProvider>
+          <AppShell
+            sidebar={<AppSidebar user={navUser} />}
+            topBar={<TopBar user={user} disputeCount={disputeCount} />}
+            mobileTabBar={<MobileTabBar user={navUser} />}
+            maintenanceMode={platformSetting?.maintenanceMode ?? false}
+            isStaffUser={user?.isStaff ?? false}
+          >
+            {children}
+          </AppShell>
+        </ConfirmDialogProvider>
         {user && <OneSignalInit userId={user.id} notifyNewContent={user.notifyNewContent} />}
+        {user && <PresenceHeartbeat />}
+        {user && <QuickMatchIncomingListener />}
+        </MotionConfig>
       </body>
     </html>
   );

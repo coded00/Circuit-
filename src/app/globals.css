@@ -91,6 +91,16 @@
   --radius-md: 11px;
   --radius-lg: 15px;
   --radius-full: 999px;
+  /* Interactive controls (buttons, inputs) — one shared value distinct
+     from .card/.card-row's own radii, named here instead of the literal
+     10px repeated across every btn- and field- class below. */
+  --radius-control: 10px;
+  /* Large dark "hero" surfaces (homepage/tournament/leaderboard banners,
+     bracket header) — was an even split between 16px and 20px across
+     callers with no reasoning for which; 16px is the majority value, so
+     that's the one promoted to a token instead of a literal repeated
+     (inconsistently) at every call site. */
+  --radius-hero: 16px;
 
   /* ---- Layout (Phase 1) ---- */
   /* The real, live values (AppSidebar's tablet icon-rail / desktop
@@ -153,6 +163,26 @@
   --ease-reveal: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
+
+/* ---- Icon scale ----
+   lucide-react icons take a `size` prop (px, not a CSS class), so this
+   can't be enforced by Tailwind the way the radius/spacing tokens above
+   are — it's a convention new call sites should follow, same as any
+   other design-system rule that lives outside CSS:
+
+     11  Inline metadata   — small caption rows (a date/player-count next
+                              to text-metadata-sized text — 11px matches
+                              .text-metadata's own base size exactly).
+     14  Row / label        — inside a button, next to a field label, a
+                              single line of body-sized text.
+     16  Card header        — a section/card title's own leading icon.
+     20  Hero / prominent   — a stat tile, empty-state, or anything sized
+                              against a heading rather than body text.
+
+   Before this, sizes were picked ad hoc per call site (10-40px seen
+   across the app) — e.g. the same "verified" ShieldCheck badge at 12px,
+   14px, and 18px in different places. New code should pick from this
+   scale; existing call sites are migrated onto it as they're touched. */
 
 /* Dark override — "dark to compete." Applied via `data-surface="dark"` on
    the homepage hero and the challenge detail page this pass; other
@@ -245,6 +275,13 @@
   }
 }
 
+/* Smooth in-page scrolling (anchor links, scrollIntoView) app-wide —
+   turned back to instant under prefers-reduced-motion below, alongside
+   every other motion this file gates on that query. */
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
@@ -329,6 +366,19 @@ body {
   .surface-elevated {
     @apply rounded-[11px] border border-border bg-surface-elevated;
   }
+
+  /* Shared by every horizontally/vertically scrollable strip that wants
+     the underlying content's own scroll (touch/wheel/keyboard) without
+     a visible scrollbar track — carousels, tab strips, the community
+     chat pane, dropdown/modal lists. Two call sites each hand-rolled
+     this same pair of selectors before; this is the one place now. */
+  .scrollbar-hide {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 /*
@@ -344,7 +394,7 @@ body {
      a real focus indicator instead of relying on the browser's default
      outline, which several of these classes visually crowd out anyway. */
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-[10px] bg-accent-volt px-5 py-2.5
+    @apply inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-control)] bg-accent-volt px-5 py-2.5
       text-sm font-semibold text-accent-volt-foreground shadow-sm transition duration-[var(--duration-base)] ease-[var(--ease-standard)]
       hover:brightness-95 active:scale-[0.97] active:brightness-90 active:duration-[var(--duration-instant)]
       disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100
@@ -352,7 +402,7 @@ body {
   }
 
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-[10px] border border-border-strong
+    @apply inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-control)] border border-border-strong
       bg-transparent px-5 py-2.5 text-sm font-medium text-foreground transition duration-[var(--duration-base)] ease-[var(--ease-standard)]
       hover:bg-surface-elevated active:scale-[0.97] active:duration-[var(--duration-instant)]
       disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100
@@ -360,7 +410,7 @@ body {
   }
 
   .btn-ghost {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-[10px] bg-surface-elevated px-5 py-2.5
+    @apply inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-control)] bg-surface-elevated px-5 py-2.5
       text-sm font-medium text-muted transition duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:text-foreground
       active:scale-[0.97] active:duration-[var(--duration-instant)]
       disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100
@@ -368,7 +418,7 @@ body {
   }
 
   .btn-danger {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-[10px] border border-danger/40
+    @apply inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-control)] border border-danger/40
       px-5 py-2.5 text-sm font-medium text-danger transition duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:bg-danger/10
       active:scale-[0.97] active:duration-[var(--duration-instant)]
       disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100
@@ -379,7 +429,7 @@ body {
      only until the last two disabled buttons using it are removed
      (TopBar, YourChannel) as part of the homepage rework. */
   .btn-golive {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-[10px] border px-4 py-2 text-sm font-semibold
+    @apply inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-control)] border px-4 py-2 text-sm font-semibold
       text-foreground transition duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:bg-surface-elevated
       active:scale-[0.97] active:duration-[var(--duration-instant)]
       disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100;
@@ -434,7 +484,7 @@ body {
   }
 
   .field-input {
-    @apply w-full rounded-[10px] border border-border bg-surface-elevated px-3.5 py-2.5 text-sm
+    @apply w-full rounded-[var(--radius-control)] border border-border bg-surface-elevated px-3.5 py-2.5 text-sm
       outline-none transition duration-[var(--duration-fast)] ease-[var(--ease-standard)] placeholder:text-muted-strong
       focus:border-accent-blue focus:ring-2 focus:ring-accent-blue-soft
       disabled:cursor-not-allowed disabled:opacity-50;
@@ -447,7 +497,7 @@ body {
      CSS custom properties as a color keyword) restores it consistently,
      app-wide, one fix instead of a per-caller icon overlay. */
   .field-select {
-    @apply w-full appearance-none rounded-[10px] border border-border bg-surface-elevated bg-no-repeat px-3.5 py-2.5 pr-9
+    @apply w-full appearance-none rounded-[var(--radius-control)] border border-border bg-surface-elevated bg-no-repeat px-3.5 py-2.5 pr-9
       text-sm outline-none transition duration-[var(--duration-fast)] ease-[var(--ease-standard)]
       focus:border-accent-blue focus:ring-2 focus:ring-accent-blue-soft
       disabled:cursor-not-allowed disabled:opacity-50;
@@ -457,7 +507,7 @@ body {
   }
 
   .field-textarea {
-    @apply w-full resize-y rounded-[10px] border border-border bg-surface-elevated px-3.5 py-2.5 text-sm
+    @apply w-full resize-y rounded-[var(--radius-control)] border border-border bg-surface-elevated px-3.5 py-2.5 text-sm
       outline-none transition duration-[var(--duration-fast)] ease-[var(--ease-standard)] placeholder:text-muted-strong
       focus:border-accent-blue focus:ring-2 focus:ring-accent-blue-soft
       disabled:cursor-not-allowed disabled:opacity-50;
@@ -1035,5 +1085,9 @@ body {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  html {
+    scroll-behavior: auto;
   }
 }

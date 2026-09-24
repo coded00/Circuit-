@@ -60,11 +60,11 @@ export function TeamMembershipButton({
     return (
       <div className="flex gap-2">
         <button type="button" disabled={busy} onClick={acceptInvite} className="btn-primary">
-          <UserCheck size={13} />
+          <UserCheck size={14} />
           Accept
         </button>
         <button type="button" disabled={busy} onClick={cancelOrDecline} className="btn-secondary">
-          <UserX size={13} />
+          <UserX size={14} />
           Decline
         </button>
       </div>
@@ -74,7 +74,7 @@ export function TeamMembershipButton({
   if (status.state === "requested") {
     return (
       <button type="button" disabled={busy} onClick={cancelOrDecline} className="btn-secondary">
-        <Clock size={13} />
+        <Clock size={14} />
         Request Sent
       </button>
     );
@@ -82,7 +82,7 @@ export function TeamMembershipButton({
 
   return (
     <button type="button" disabled={busy} onClick={request} className="btn-secondary">
-      <UserPlus size={13} />
+      <UserPlus size={14} />
       Request to Join
     </button>
   );

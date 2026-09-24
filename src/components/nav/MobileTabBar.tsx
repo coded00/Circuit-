@@ -86,7 +86,7 @@ export function MobileTabBar({ user }: { user: NavUser }) {
   return (
     <>
       {inDashboard && (
-        <nav className="fixed inset-x-0 bottom-[calc(3.5rem_+_env(safe-area-inset-bottom))] z-10 flex gap-1 overflow-x-auto border-t border-border bg-background/95 px-2 py-1.5 backdrop-blur-md sm:hidden">
+        <nav className="scrollbar-hide fixed inset-x-0 bottom-[calc(3.5rem_+_env(safe-area-inset-bottom))] z-10 flex gap-1 overflow-x-auto border-t border-border bg-background/95 px-2 py-1.5 backdrop-blur-md sm:hidden">
           {DASHBOARD_ITEMS.map((item) => {
             const active = item.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(item.href);
             return (
@@ -122,7 +122,7 @@ export function MobileTabBar({ user }: { user: NavUser }) {
         <div className="fixed inset-0 z-30 flex items-end sm:hidden" onClick={() => setMenuOpen(false)}>
           <div className="sheet-backdrop-enter absolute inset-0 bg-black/60" />
           <div
-            className="sheet-panel-enter relative z-10 flex max-h-[75vh] w-full flex-col gap-1 overflow-y-auto rounded-t-2xl border-t border-border bg-surface p-4 pb-[calc(1rem_+_env(safe-area-inset-bottom))]"
+            className="sheet-panel-enter scrollbar-hide relative z-10 flex max-h-[75vh] w-full flex-col gap-1 overflow-y-auto rounded-t-2xl border-t border-border bg-surface p-4 pb-[calc(1rem_+_env(safe-area-inset-bottom))]"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-2 flex items-center justify-between">

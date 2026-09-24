@@ -40,7 +40,7 @@ export default async function DashboardTournamentsPage() {
       {tournaments.length === 0 ? (
         <p className="card text-center text-muted">You haven&apos;t created any tournaments yet.</p>
       ) : (
-        <div className="grid grid-cols-1 gap-4 overflow-x-auto sm:grid-cols-2 lg:grid-cols-5">
+        <div className="scrollbar-hide grid grid-cols-1 gap-4 overflow-x-auto sm:grid-cols-2 lg:grid-cols-5">
           {COLUMNS.map((column) => {
             const items = tournaments.filter((t) => (column.statuses as readonly string[]).includes(t.status));
             return (
@@ -62,7 +62,7 @@ export default async function DashboardTournamentsPage() {
                     </Link>
                   ))}
                   {items.length === 0 && (
-                    <div className="rounded-xl border border-dashed border-border p-3 text-center text-xs text-muted">
+                    <div className="rounded-[var(--radius-md)] border border-dashed border-border p-3 text-center text-xs text-muted">
                       Nothing here
                     </div>
                   )}

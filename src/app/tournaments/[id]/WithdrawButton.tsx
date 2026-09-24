@@ -3,16 +3,22 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Spinner } from "@/components/Spinner";
+import { useConfirmDialog } from "@/components/ConfirmDialogProvider";
 
 export default function WithdrawButton({ registrationId }: { registrationId: string }) {
   const router = useRouter();
+  const confirmDialog = useConfirmDialog();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleClick() {
-    if (!confirm("Withdraw from this tournament? A paid entry fee will be refunded.")) {
-      return;
-    }
+    const confirmed = await confirmDialog({
+      title: "Withdraw from this tournament?",
+      message: "A paid entry fee will be refunded.",
+      confirmLabel: "Withdraw",
+      cancelLabel: "Stay registered",
+    });
+    if (!confirmed) return;
     setSubmitting(true);
     setError(null);
 

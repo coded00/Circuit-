@@ -58,9 +58,14 @@ export default async function AdminChallengesPage({ searchParams }: { searchPara
 
   return (
     <div className="flex flex-1 flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="font-display text-2xl font-bold tracking-tight">Challenges</h1>
-        <p className="text-sm text-muted">{battles.length.toLocaleString("en-NG")} challenges.</p>
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-1">
+          <h1 className="font-display text-2xl font-bold tracking-tight">Challenges</h1>
+          <p className="text-sm text-muted">{battles.length.toLocaleString("en-NG")} challenges.</p>
+        </div>
+        <Link href="/admin/quick-matches" className="text-sm font-medium text-accent-volt hover:underline">
+          View Quick Matches →
+        </Link>
       </div>
 
       <form className="card flex flex-wrap items-end gap-3">

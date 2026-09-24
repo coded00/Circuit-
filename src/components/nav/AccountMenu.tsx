@@ -72,6 +72,8 @@ export function AccountMenu({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
+        aria-label={`Account menu for ${user.displayName}`}
+        aria-expanded={open}
         className="flex items-center gap-2.5 rounded-full py-1 pr-2 pl-1 transition hover:bg-surface-elevated"
       >
         {user.avatarUrl ? (

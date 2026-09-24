@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { X, Check } from "lucide-react";
+import { useConfirmDialog } from "@/components/ConfirmDialogProvider";
 
 type Person = { id: string; handle: string; displayName: string; avatarUrl: string | null };
 
@@ -27,10 +28,11 @@ export function MemberRow({
   canAccept?: boolean;
 }) {
   const router = useRouter();
+  const confirmDialog = useConfirmDialog();
   const [busy, setBusy] = useState(false);
 
   async function remove() {
-    if (!confirm(`Remove ${person.displayName} from the team?`)) return;
+    if (!(await confirmDialog({ title: `Remove ${person.displayName} from the team?`, confirmLabel: "Remove" }))) return;
     setBusy(true);
     await fetch(`/api/teams/${teamId}/members/${person.id}`, { method: "DELETE" });
     setBusy(false);

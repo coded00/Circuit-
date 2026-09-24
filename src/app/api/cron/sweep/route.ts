@@ -2,13 +2,17 @@
  * Circuit — the scheduled sweep (Build Plan P3-6, BRK-6's timeout,
  * BRK-1's deadline path). See docs/circuit-stack.md's Scheduled work
  * section for the design this implements: one periodic route, not a job
- * queue. Not actually wired to a scheduler yet — there's no deployment
- * target for Vercel Cron until this ships somewhere. Whoever sets that up
- * calls this route with `Authorization: Bearer $CRON_SECRET`.
+ * queue. Wired via vercel.json's `crons` entry (every 2 minutes) — like
+ * any Vercel Cron, that only actually fires once the app is deployed to
+ * Vercel (docs/pre-launch-checklist.md's own cron verification step
+ * covers confirming it after a real deploy). Vercel calls this route with
+ * `Authorization: Bearer $CRON_SECRET`; anything else calling it directly
+ * needs the same header.
  */
 
 import { NextResponse } from "next/server";
 import { runScheduledSweep } from "@/lib/matches";
+import { captureException } from "@/lib/observability";
 
 async function handleSweep(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -37,6 +41,11 @@ async function handleSweep(request: Request) {
   } catch (error) {
     const durationMs = Date.now() - startTime;
     console.error("[cron/sweep] Unexpected failure during scheduled sweep:", error);
+    // A failure that escapes runScheduledSweep's own per-item try/catches
+    // means the whole sweep run failed outright — even more worth
+    // knowing about than a single item's failure (which is already
+    // captured inside runScheduledSweep itself).
+    captureException(error, { source: "cron/sweep", durationMs });
     return NextResponse.json(
       {
         success: false,

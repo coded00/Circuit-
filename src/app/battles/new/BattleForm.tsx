@@ -9,6 +9,10 @@ function nairaToKobo(value: string): number {
   return Math.round(naira * 100);
 }
 
+// Mirrors MAX_STAKE_AMOUNT in src/app/api/battles/route.ts (kobo) — kept
+// as a display/UX-only ceiling here; the API route is the source of truth.
+const MAX_STAKE_NAIRA = 100_000;
+
 type Friend = { handle: string; displayName: string };
 
 export default function BattleForm({
@@ -23,7 +27,7 @@ export default function BattleForm({
   const [format, setFormat] = useState<"SINGLE" | "BEST_OF_3">("SINGLE");
   const [staked, setStaked] = useState(false);
   const [stakeNaira, setStakeNaira] = useState("");
-  const [visibility, setVisibility] = useState<"OPEN" | "TARGETED" | "FRIENDS">("OPEN");
+  const [visibility, setVisibility] = useState<"OPEN" | "TARGETED" | "FRIENDS" | "QUICK_MATCH">("OPEN");
   const [targetHandle, setTargetHandle] = useState("");
   const [streamUrl, setStreamUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -34,17 +38,22 @@ export default function BattleForm({
     setError(null);
     setSubmitting(true);
 
-    const res = await fetch("/api/battles", {
+    const isQuickMatch = visibility === "QUICK_MATCH";
+    const res = await fetch(isQuickMatch ? "/api/quick-match" : "/api/battles", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        game,
-        format,
-        visibility,
-        targetHandle: visibility === "TARGETED" ? targetHandle : undefined,
-        streamUrl: streamUrl || null,
-        stakeAmount: staked ? nairaToKobo(stakeNaira) : 0,
-      }),
+      body: JSON.stringify(
+        isQuickMatch
+          ? { game, format, stakeAmount: staked ? nairaToKobo(stakeNaira) : 0 }
+          : {
+              game,
+              format,
+              visibility,
+              targetHandle: visibility === "TARGETED" ? targetHandle : undefined,
+              streamUrl: streamUrl || null,
+              stakeAmount: staked ? nairaToKobo(stakeNaira) : 0,
+            }
+      ),
     });
     const data = await res.json().catch(() => null);
 
@@ -54,7 +63,7 @@ export default function BattleForm({
       return;
     }
 
-    router.push(`/battles/${data.id}`);
+    router.push(isQuickMatch ? `/quick-match/${data.id}` : `/battles/${data.id}`);
     router.refresh();
   }
 
@@ -112,6 +121,7 @@ export default function BattleForm({
               id="stakeNaira"
               type="number"
               min={1}
+              max={MAX_STAKE_NAIRA}
               step="0.01"
               required
               value={stakeNaira}
@@ -119,7 +129,8 @@ export default function BattleForm({
               className="field-input"
             />
             <span className="field-hint">
-              Locked from your wallet now. Your opponent matches it to accept — the winner takes both.
+              Locked from your wallet now. Your opponent matches it to accept — the winner takes both. Capped at ₦
+              {MAX_STAKE_NAIRA.toLocaleString("en-NG")} per Battle.
             </span>
           </div>
         )}
@@ -127,7 +138,13 @@ export default function BattleForm({
 
       <div className="flex flex-col gap-1.5">
         <span className="field-label">Who can accept</span>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <OptionCard
+            selected={visibility === "QUICK_MATCH"}
+            onSelect={() => setVisibility("QUICK_MATCH")}
+            title="Quick Match"
+            description="Challenge every eligible online player at once — first to accept gets the match"
+          />
           <OptionCard
             selected={visibility === "OPEN"}
             onSelect={() => setVisibility("OPEN")}
@@ -147,6 +164,12 @@ export default function BattleForm({
             description="They're notified directly"
           />
         </div>
+        {visibility === "QUICK_MATCH" && (
+          <span className="field-hint">
+            Your request goes out to every eligible online player right now. The first one to accept becomes your
+            opponent — everyone else&apos;s invite is cancelled automatically.
+          </span>
+        )}
       </div>
 
       {visibility === "TARGETED" && (
@@ -179,24 +202,32 @@ export default function BattleForm({
         </div>
       )}
 
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="streamUrl" className="field-label">
-          Stream link (optional)
-        </label>
-        <input
-          id="streamUrl"
-          type="url"
-          placeholder="https://twitch.tv/yourchannel"
-          value={streamUrl}
-          onChange={(e) => setStreamUrl(e.target.value)}
-          className="field-input"
-        />
-      </div>
+      {visibility !== "QUICK_MATCH" && (
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="streamUrl" className="field-label">
+            Stream link (optional)
+          </label>
+          <input
+            id="streamUrl"
+            type="url"
+            placeholder="https://twitch.tv/yourchannel"
+            value={streamUrl}
+            onChange={(e) => setStreamUrl(e.target.value)}
+            className="field-input"
+          />
+        </div>
+      )}
 
       {error && <p className="field-error">{error}</p>}
 
       <button type="submit" disabled={submitting} className="btn-primary">
-        {submitting ? "Opening…" : "Open Challenge"}
+        {submitting
+          ? visibility === "QUICK_MATCH"
+            ? "Searching…"
+            : "Opening…"
+          : visibility === "QUICK_MATCH"
+            ? "Challenge All Available Players"
+            : "Open Challenge"}
       </button>
     </form>
   );

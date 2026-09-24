@@ -203,7 +203,7 @@ export default async function LeaderboardPage({
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-6 py-8 sm:px-8 sm:py-10">
-      <div data-surface="dark" className="relative overflow-hidden rounded-[20px] border border-border bg-surface p-8 sm:p-10">
+      <div data-surface="dark" className="relative overflow-hidden rounded-[var(--radius-hero)] border border-border bg-surface p-8 sm:p-10">
         {games[0] && <GameArtTile game={games[0].game} className="opacity-[0.14]" fill hideLabel imgWidth={1200} />}
         <div
           aria-hidden

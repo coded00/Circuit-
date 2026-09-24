@@ -77,7 +77,7 @@ export function AutoScrollRow({
     <div className="group relative" role="region" aria-label={ariaLabel}>
       <div
         ref={scrollerRef}
-        className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="scrollbar-hide flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1"
       >
         {items.map((item, i) => (
           <div key={i} ref={(el) => { itemRefs.current[i] = el; }} className="shrink-0 snap-start">

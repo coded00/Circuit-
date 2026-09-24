@@ -41,7 +41,7 @@ export default function TournamentTabs({
         <div
           role="tablist"
           aria-label="Tournament details"
-          className="tabs overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="tabs scrollbar-hide overflow-x-auto"
         >
           {tabs.map((t) => (
             <button

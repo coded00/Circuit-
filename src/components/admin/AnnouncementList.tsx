@@ -3,6 +3,7 @@
 import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
+import { useConfirmDialog } from "@/components/ConfirmDialogProvider";
 
 type Announcement = { id: string; title: string; body: string; enabled: boolean; createdAt: string };
 
@@ -59,6 +60,7 @@ function AnnouncementForm({ onDone }: { onDone: () => void }) {
 
 export function AnnouncementList({ announcements }: { announcements: Announcement[] }) {
   const router = useRouter();
+  const confirmDialog = useConfirmDialog();
   const [creating, setCreating] = useState(false);
 
   async function toggle(id: string, enabled: boolean) {
@@ -71,7 +73,7 @@ export function AnnouncementList({ announcements }: { announcements: Announcemen
   }
 
   async function remove(id: string, title: string) {
-    if (!confirm(`Delete "${title}"?`)) return;
+    if (!(await confirmDialog({ title: `Delete "${title}"?`, confirmLabel: "Delete" }))) return;
     await fetch(`/api/admin/announcements/${id}`, { method: "DELETE" });
     router.refresh();
   }

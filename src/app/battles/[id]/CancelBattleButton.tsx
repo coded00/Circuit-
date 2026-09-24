@@ -2,14 +2,16 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useConfirmDialog } from "@/components/ConfirmDialogProvider";
 
 export default function CancelBattleButton({ battleId }: { battleId: string }) {
   const router = useRouter();
+  const confirmDialog = useConfirmDialog();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleClick() {
-    if (!confirm("Cancel this Battle?")) return;
+    if (!(await confirmDialog({ title: "Cancel this Battle?", confirmLabel: "Cancel Battle", cancelLabel: "Keep it" }))) return;
     setSubmitting(true);
     setError(null);
 

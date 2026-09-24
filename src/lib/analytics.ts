@@ -14,7 +14,11 @@ export type AnalyticsEvent =
   | "match_score_submitted"
   | "match_completed_verified"
   | "escrow_payout_released"
-  | "wallet_withdrawn";
+  | "wallet_withdrawn"
+  | "quick_match_created"
+  | "quick_match_accepted"
+  | "quick_match_expired"
+  | "quick_match_cancelled";
 
 export interface EventProperties {
   userId?: string;

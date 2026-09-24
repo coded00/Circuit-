@@ -1,0 +1,13 @@
+node_modules
+.next
+.git
+.github
+.env*
+!.env.example
+storage/proof/*
+!storage/proof/.gitkeep
+.playwright-mcp
+test-results
+playwright-report
+*.md
+docs

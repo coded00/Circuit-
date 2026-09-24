@@ -10,7 +10,7 @@ export function DiscoverySectionRow({ title, children }: { title: string; childr
   return (
     <div className="flex flex-col gap-3">
       <h2 className="text-section-heading">{title}</h2>
-      <div className="flex gap-4 overflow-x-auto pb-1">{children}</div>
+      <div className="scrollbar-hide flex gap-4 overflow-x-auto pb-1">{children}</div>
     </div>
   );
 }

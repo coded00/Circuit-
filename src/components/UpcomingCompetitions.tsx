@@ -53,7 +53,7 @@ function UpcomingCard({ tournament }: { tournament: Tournament }) {
   return (
     <Link
       href={tournamentPath(tournament)}
-      className="group flex h-full w-full flex-col overflow-hidden rounded-[16px] border border-border bg-surface transition duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] active:duration-[var(--duration-instant)]"
+      className="group flex h-full w-full flex-col overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface transition duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] active:duration-[var(--duration-instant)]"
     >
       <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden">
         <div className="h-full w-full transition-transform duration-[var(--duration-base)] ease-[var(--ease-standard)] group-hover:scale-[1.03]">

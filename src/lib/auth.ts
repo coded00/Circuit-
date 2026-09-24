@@ -39,10 +39,23 @@ export async function hashPassword(plainPassword: string): Promise<string> {
   return bcrypt.hash(plainPassword, BCRYPT_ROUNDS);
 }
 
-export async function verifyPassword(
+// A fixed, validly-formatted bcrypt hash compared against when no real
+// user/hash exists — hashed once at module load, same cost factor as a
+// real password. Login used to skip bcrypt.compare entirely for an
+// unknown identifier, so an unknown-identifier response returned
+// measurably faster than a known-identifier-with-wrong-password one,
+// enumerating valid accounts despite an identical error message. This
+// keeps every login attempt doing the same amount of work either way.
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync("circuit-timing-safety-dummy-password", BCRYPT_ROUNDS);
+
+export async function verifyPasswordTimingSafe(
   plainPassword: string,
-  passwordHash: string
+  passwordHash: string | null | undefined
 ): Promise<boolean> {
+  if (!passwordHash) {
+    await bcrypt.compare(plainPassword, DUMMY_PASSWORD_HASH);
+    return false;
+  }
   return bcrypt.compare(plainPassword, passwordHash);
 }
 

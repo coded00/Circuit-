@@ -200,7 +200,7 @@ export function FeedClient({
 
   return (
     <div className="flex h-full w-full flex-col bg-black">
-      <div className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-white/10 bg-black px-4 py-2.5">
+      <div className="scrollbar-hide flex shrink-0 items-center gap-2 overflow-x-auto border-b border-white/10 bg-black px-4 py-2.5">
         {TABS.map((t) => (
           <button
             key={t.key}
@@ -229,7 +229,7 @@ export function FeedClient({
         )}
       </div>
 
-      <div ref={scrollRef} className="relative flex-1 snap-y snap-mandatory overflow-y-auto overscroll-contain">
+      <div ref={scrollRef} className="scrollbar-hide relative flex-1 snap-y snap-mandatory overflow-y-auto overscroll-contain">
         {initialLoading ? (
           <FeedSkeleton />
         ) : error ? (

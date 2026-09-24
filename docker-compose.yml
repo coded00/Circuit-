@@ -1,0 +1,55 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: circuit-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://circuit_user:circuit_secure_pass@postgres:5432/circuit?schema=public
+      - JWT_SECRET=${JWT_SECRET:-change_this_to_a_random_32_byte_secret}
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      - CRON_SECRET=${CRON_SECRET:-circuit_cron_secret_vps}
+      - PAYSTACK_SECRET_KEY=${PAYSTACK_SECRET_KEY:-}
+      - PAYSTACK_PUBLIC_KEY=${PAYSTACK_PUBLIC_KEY:-}
+      - FLUTTERWAVE_SECRET_KEY=${FLUTTERWAVE_SECRET_KEY:-}
+      - FLUTTERWAVE_PUBLIC_KEY=${FLUTTERWAVE_PUBLIC_KEY:-}
+      - FLUTTERWAVE_SECRET_HASH=${FLUTTERWAVE_SECRET_HASH:-}
+      - RESEND_API_KEY=${RESEND_API_KEY:-}
+      - ONESIGNAL_API_KEY=${ONESIGNAL_API_KEY:-}
+      - NEXT_PUBLIC_ONESIGNAL_APP_ID=${NEXT_PUBLIC_ONESIGNAL_APP_ID:-}
+      - R2_BUCKET=${R2_BUCKET:-}
+      - R2_ACCOUNT_ID=${R2_ACCOUNT_ID:-}
+      - R2_ENDPOINT=${R2_ENDPOINT:-}
+      - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID:-}
+      - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - circuit-storage:/app/storage
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: circuit-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: circuit_user
+      POSTGRES_PASSWORD: circuit_secure_pass
+      POSTGRES_DB: circuit
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U circuit_user -d circuit"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+  circuit-storage:

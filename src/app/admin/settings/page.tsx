@@ -9,9 +9,10 @@
  * - Roles & Permissions: a static explainer of the two fixed roles —
  *   there's no per-permission matrix to browse, so this is documentation,
  *   not another actionable table.
- * - Platform Settings: the one real toggle Circuit has (maintenance
- *   mode) — see `PlatformSetting`'s own schema comment for why this
- *   isn't a longer list of half-real settings.
+ * - Platform Settings: the real platform-wide controls Circuit has —
+ *   maintenance mode, the platform fee rate, and the organizer-revenue
+ *   settlement window (see `PlatformSetting`'s own schema comment for why
+ *   these are admin-configurable rather than code constants).
  * - Audit Log: a real, read-only feed of every write the routes above
  *   (plus user-suspend/tournament-cancel/tournament-edit) have logged.
  */
@@ -21,6 +22,8 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { AdminUsersManager } from "@/components/admin/AdminUsersManager";
 import { MaintenanceModeToggle } from "@/components/admin/MaintenanceModeToggle";
+import { PlatformFeeControl } from "@/components/admin/PlatformFeeControl";
+import { OrganizerRevenueSettlementControl } from "@/components/admin/OrganizerRevenueSettlementControl";
 
 function timeAgo(date: Date): string {
   const ms = Date.now() - date.getTime();
@@ -124,10 +127,19 @@ export default async function AdminSettingsPage() {
         </div>
       </div>
 
-      <div className="card flex flex-col gap-3">
+      <div className="card flex flex-col gap-4">
         <h2 className="text-card-title">Platform Settings</h2>
         <MaintenanceModeToggle enabled={platformSetting?.maintenanceMode ?? false} canEdit={isSuperAdmin} />
-        {!isSuperAdmin && <p className="text-xs text-muted">Only a Super Admin can change this.</p>}
+        <div className="border-t border-border pt-4">
+          <PlatformFeeControl platformFeeBps={platformSetting?.platformFeeBps ?? 500} canEdit={isSuperAdmin} />
+        </div>
+        <div className="border-t border-border pt-4">
+          <OrganizerRevenueSettlementControl
+            hours={platformSetting?.organizerRevenueSettlementHours ?? 24}
+            canEdit={isSuperAdmin}
+          />
+        </div>
+        {!isSuperAdmin && <p className="text-xs text-muted">Only a Super Admin can change these.</p>}
       </div>
 
       <div className="card flex flex-col gap-3">

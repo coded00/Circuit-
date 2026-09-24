@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronUp, ChevronDown, Trash2 } from "lucide-react";
+import { useConfirmDialog } from "@/components/ConfirmDialogProvider";
 import { BannerForm } from "./BannerForm";
 
 type Banner = {
@@ -29,6 +30,7 @@ export function BannerRow({
   onSwap: (id: string, direction: "up" | "down") => void;
 }) {
   const router = useRouter();
+  const confirmDialog = useConfirmDialog();
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -44,7 +46,7 @@ export function BannerRow({
   }
 
   async function handleDelete() {
-    if (!confirm(`Delete "${banner.headline}"?`)) return;
+    if (!(await confirmDialog({ title: `Delete "${banner.headline}"?`, confirmLabel: "Delete" }))) return;
     setBusy(true);
     await fetch(`/api/admin/banners/${banner.id}`, { method: "DELETE" });
     router.refresh();
@@ -71,7 +73,16 @@ export function BannerRow({
 
         <div className="flex min-w-0 flex-1 flex-col">
           <span className="truncate text-sm font-semibold">{banner.headline}</span>
-          <span className="truncate text-xs text-muted">
+          {/* V1 audit follow-up: `scheduled` compares publishAt against
+              `new Date()` at render time — server and client render at
+              genuinely different instants, so this can legitimately
+              differ by the render's own latency (not a systematic
+              timezone gap like CommunityView.tsx's own fix). React's own
+              recommended fix for a real, expected, low-consequence
+              server/client value mismatch is suppressHydrationWarning,
+              not a heavier useEffect-deferred render for an admin-only
+              "Scheduled" badge. */}
+          <span className="truncate text-xs text-muted" suppressHydrationWarning>
             {scheduled ? `Scheduled for ${new Date(banner.publishAt!).toLocaleString("en-NG")}` : banner.description || "No description"}
           </span>
         </div>

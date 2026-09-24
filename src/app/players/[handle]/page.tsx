@@ -710,7 +710,7 @@ export default async function PlayerProfilePage({
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 p-6 sm:p-8">
-      <div data-surface="dark" className="relative overflow-hidden rounded-[20px] border border-border p-4 sm:p-5">
+      <div data-surface="dark" className="relative overflow-hidden rounded-[var(--radius-hero)] border border-border p-4 sm:p-5">
         {heroGame && <GameArtTile game={heroGame} className="opacity-[0.18]" fill hideLabel imgWidth={1400} />}
         <div
           aria-hidden

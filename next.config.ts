@@ -1,12 +1,14 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Traces each route's actual dependency graph and prunes node_modules
-  // down to just that, instead of bundling the whole (huge, Prisma-engine-
-  // binary-included) tree into every one of this app's ~30+ dynamic API
-  // route functions. Netlify's own documented fix for slow/timed-out
-  // "functions bundling" deploys — https://ntl.fyi/next-standalone.
-  output: "standalone",
+  // `output: "standalone"` was removed here — it was a leftover from a
+  // past Netlify-targeted config (this app deploys to Vercel per
+  // docs/pre-launch-checklist.md, whose own build pipeline already does
+  // the same per-route dependency tracing natively) and turned out not
+  // to be merely redundant: it actively breaks `next start`, which CI's
+  // e2e suite needs to smoke-test a real production build
+  // (playwright.config.ts) — confirmed by running that suite against
+  // this build locally before wiring it into CI.
   async headers() {
     return [
       {

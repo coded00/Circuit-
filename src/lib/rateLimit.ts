@@ -16,6 +16,20 @@
 
 import { prisma } from "@/lib/db";
 
+/**
+ * Best-effort client IP for rate-limiting an unauthenticated route (no
+ * userId to key on) — `x-forwarded-for`'s first entry is the original
+ * client on Vercel's proxy chain. Falls back to a fixed key when absent
+ * (local dev, or a header-stripping proxy) rather than throwing; worst
+ * case that shares one rate-limit bucket across such requests, which is
+ * strictly safer than not limiting them at all.
+ */
+export function getClientIp(request: Request): string {
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  const first = forwardedFor?.split(",")[0]?.trim();
+  return first || "unknown";
+}
+
 export async function isRateLimited(
   key: string,
   { max, windowMs }: { max: number; windowMs: number }

@@ -41,11 +41,11 @@ export function TeamInviteRow({
       </Link>
       <div className="flex shrink-0 gap-2">
         <button type="button" disabled={busy} onClick={accept} className="btn-primary px-3 py-1.5 text-xs">
-          <UserCheck size={13} />
+          <UserCheck size={14} />
           Accept
         </button>
         <button type="button" disabled={busy} onClick={decline} className="btn-secondary px-3 py-1.5 text-xs">
-          <UserX size={13} />
+          <UserX size={14} />
           Decline
         </button>
       </div>

@@ -11,6 +11,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import Poller from "@/app/Poller";
 import { playerRankInGame } from "@/lib/standings";
+import { computeTopFragger } from "@/lib/awards";
 import { BracketView, type BracketStructure } from "./BracketView";
 
 export default async function BracketPage({
@@ -66,6 +67,7 @@ export default async function BracketPage({
 
   const champion = structure.rounds[structure.totalRounds - 1]?.slots[0]?.winnerId ?? null;
   const championRank = champion ? await playerRankInGame(tournament.game, champion) : null;
+  const topFragger = await computeTopFragger(id);
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 p-6 sm:p-8">
@@ -76,8 +78,9 @@ export default async function BracketPage({
         users={users}
         matches={matches}
         championRank={championRank}
+        topFragger={topFragger}
         backHref={`/tournaments/${id}`}
-        matchHref={(matchId) => `/matches/${matchId}`}
+        matchHrefBase="/matches"
         playerHref={(_userId, handle) => `/players/${handle}`}
         tournamentHref={`/tournaments/${id}`}
         shareUrl={`${process.env.NEXT_PUBLIC_APP_URL}/tournaments/${id}/bracket`}

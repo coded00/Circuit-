@@ -6,9 +6,10 @@
 
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { Trophy, Flag, Swords, Wallet, Timer } from "lucide-react";
+import { Trophy, Flag, Share2, Swords, Wallet, Timer } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
+import { isWagerBattleWin } from "@/lib/awards";
 import { StatusPill, matchStatusInfo } from "@/components/StatusPill";
 import { ActivityTimeline } from "@/components/ActivityTimeline";
 import { buildMatchTimeline } from "@/lib/matchTimeline";
@@ -145,7 +146,7 @@ export default async function MatchPage({
       </div>
 
       {wonThisMatch && (
-        <div className="celebrate-fade relative overflow-hidden rounded-[14px] border border-gold/30 bg-gold/10 px-5 py-4">
+        <div className="celebrate-fade relative overflow-hidden rounded-[var(--radius-lg)] border border-gold/30 bg-gold/10 px-5 py-4">
           <div className="confetti-burst" aria-hidden>
             {CONFETTI_PIECES.map((p, i) => (
               <span
@@ -155,12 +156,20 @@ export default async function MatchPage({
               />
             ))}
           </div>
-          <div className="relative z-10 flex items-center gap-3">
-            <Trophy size={28} className="trophy-pop shrink-0 text-gold" aria-hidden="true" />
-            <div className="flex flex-col">
-              <span className="font-display text-lg font-bold tracking-tight">You won!</span>
-              <span className="text-sm text-muted">Nice one. This counts toward your ladder rank.</span>
+          <div className="relative z-10 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <Trophy size={28} className="trophy-pop shrink-0 text-gold" aria-hidden="true" />
+              <div className="flex flex-col">
+                <span className="font-display text-lg font-bold tracking-tight">You won!</span>
+                <span className="text-sm text-muted">Nice one. This counts toward your ladder rank.</span>
+              </div>
             </div>
+            {isWagerBattleWin(match) && (
+              <Link href={`/share/battle/${match.id}`} className="btn-secondary shrink-0">
+                <Share2 size={14} />
+                Share your win
+              </Link>
+            )}
           </div>
         </div>
       )}

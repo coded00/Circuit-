@@ -24,6 +24,8 @@ import { OpenChallenges } from "@/components/OpenChallenges";
 import { UpcomingCompetitions } from "@/components/UpcomingCompetitions";
 import { GamerNews } from "@/components/GamerNews";
 import { YourCircuit } from "@/components/YourCircuit";
+import { CommunitiesCard } from "@/components/CommunitiesCard";
+import { getJoinedCommunities } from "@/lib/community";
 import { GAME_ACTIVITY } from "@/lib/circuitActivity";
 import { formatNotification } from "@/lib/notification-format";
 import { globalStandings } from "@/lib/standings";
@@ -126,6 +128,7 @@ export default async function Home({
     recentActivity,
     homepageBanners,
     activeAnnouncement,
+    joinedCommunities,
   ] = await Promise.all([
     getFeaturedTournaments(3),
     // "Upcoming" includes DRAFT on purpose (unlike Featured, which stays
@@ -141,14 +144,18 @@ export default async function Home({
       take: 3,
       select: cardSelect,
     }),
-    Promise.all(
-      GAME_ACTIVITY.map(async (g) => ({
-        name: g.name,
-        activeCompetitions: await prisma.tournament.count({
-          where: { status: { in: ["OPEN", "LIVE"] }, game: { contains: g.name, mode: "insensitive" } },
-        }),
-      })),
-    ),
+    // One query for every open/live tournament's game, then matched against
+    // each GAME_ACTIVITY name in memory — not 5 concurrent `count()` calls
+    // (one per game), which was needlessly competing for connections
+    // against the rest of this same Promise.all on every page load.
+    prisma.tournament
+      .findMany({ where: { status: { in: ["OPEN", "LIVE"] } }, select: { game: true } })
+      .then((tournaments) =>
+        GAME_ACTIVITY.map((g) => ({
+          name: g.name,
+          activeCompetitions: tournaments.filter((t) => t.game.toLowerCase().includes(g.name.toLowerCase())).length,
+        })),
+      ),
     prisma.battle.findMany({
       where: {
         status: "OPEN",
@@ -216,6 +223,7 @@ export default async function Home({
       orderBy: { order: "asc" },
     }),
     getActiveAnnouncement(),
+    user ? getJoinedCommunities(user.id) : Promise.resolve([]),
   ]);
 
   const scopedLeaderboard = friendLeaderboardActive
@@ -283,6 +291,8 @@ export default async function Home({
         </div>
 
         <div className="flex min-w-0 flex-col gap-6">
+          {user && <CommunitiesCard communities={joinedCommunities} />}
+
           {(topLeaderboard.length > 0 || friendLeaderboardActive) && (
             <div className="card flex flex-col gap-3">
               <div className="flex items-center justify-between gap-2">

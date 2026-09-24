@@ -27,6 +27,8 @@ import { getCurrentUser } from "@/lib/session";
 import { getDefaultPaymentProvider, toCheckoutEmail } from "@/lib/payments";
 import { maybeGenerateBracketOnCapFill } from "@/lib/matches";
 import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
+import { computePlatformFee } from "@/lib/platformFee";
+import { trackEvent } from "@/lib/analytics";
 
 class InsufficientWalletBalanceError extends Error {}
 
@@ -106,6 +108,7 @@ export async function POST(
           data: { tournamentId, userId: user.id, inGameId, status: "CONFIRMED" },
         });
     await maybeGenerateBracketOnCapFill(tournamentId); // BRK-1's cap-fill path
+    trackEvent("tournament_joined", { userId: user.id, tournamentId, game: tournament.game, amountMinor: 0 });
     return NextResponse.json(
       { id: registration.id, status: registration.status },
       { status: 201 }
@@ -136,6 +139,8 @@ export async function POST(
   if (payFromWallet) {
     const reference = `wallet_entry_${randomUUID().slice(0, 12)}`;
     const provider = getDefaultPaymentProvider();
+    const platformSetting = await prisma.platformSetting.findUnique({ where: { id: "singleton" } });
+    const feeAmount = computePlatformFee(tournament.entryFee, platformSetting?.platformFeeBps ?? 0);
 
     try {
       const registration = await prisma.$transaction(async (tx) => {
@@ -171,6 +176,28 @@ export async function POST(
             status: "COMPLETE",
           },
         });
+        // Same fee logic as confirmEntryFeePayment's own comment — carved
+        // out of the entry fee that already arrived, not charged on top.
+        if (feeAmount > 0) {
+          await tx.escrowTransaction.create({
+            data: { tournamentId, registrationId: reg.id, type: "PLATFORM_FEE", amount: feeAmount, status: "COMPLETE" },
+          });
+        }
+        // The organizer's own cut — same PENDING-until-settled shape as
+        // confirmEntryFeePayment's own ORGANIZER_REVENUE row.
+        const organizerRevenueAmount = tournament.entryFee - feeAmount;
+        if (organizerRevenueAmount > 0) {
+          await tx.escrowTransaction.create({
+            data: {
+              tournamentId,
+              registrationId: reg.id,
+              userId: tournament.organizerId,
+              type: "ORGANIZER_REVENUE",
+              amount: organizerRevenueAmount,
+              status: "PENDING",
+            },
+          });
+        }
         await tx.walletTransaction.create({
           data: {
             userId: user.id,
@@ -185,6 +212,7 @@ export async function POST(
       });
 
       await maybeGenerateBracketOnCapFill(tournamentId); // BRK-1's cap-fill path
+      trackEvent("tournament_joined", { userId: user.id, tournamentId, game: tournament.game, amountMinor: tournament.entryFee });
       return NextResponse.json({ id: registration.id, status: "CONFIRMED" }, { status: 201 });
     } catch (err) {
       if (err instanceof InsufficientWalletBalanceError) {
@@ -243,6 +271,14 @@ export async function POST(
       },
     }),
   ]);
+
+  trackEvent("payment_initiated", {
+    userId: user.id,
+    tournamentId,
+    game: tournament.game,
+    amountMinor: tournament.entryFee,
+    currency: "NGN",
+  });
 
   return NextResponse.json(
     {

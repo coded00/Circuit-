@@ -102,7 +102,7 @@ export function AppSidebar({ user }: { user: NavUser }) {
   return (
     <aside
       data-surface="dark"
-      className="sticky top-0 hidden h-screen w-full flex-col gap-1 overflow-y-auto border-r border-border bg-background px-2 py-6 text-foreground sm:flex lg:px-3"
+      className="scrollbar-hide sticky top-0 hidden h-screen w-full flex-col gap-1 overflow-y-auto border-r border-border bg-background px-2 py-6 text-foreground sm:flex lg:px-3"
     >
       <Link href="/" title="Circuit" className="mb-6 flex shrink-0 items-center justify-center px-2 lg:justify-start">
         {/* eslint-disable-next-line @next/next/no-img-element -- local /public asset, no next/image usage elsewhere in this codebase */}

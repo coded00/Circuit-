@@ -14,6 +14,8 @@ import { prisma } from "@/lib/db";
 import { notify } from "@/lib/notifications";
 import { getPaymentProvider } from "@/lib/payments";
 import { maybeGenerateBracketOnCapFill } from "@/lib/matches";
+import { computePlatformFee } from "@/lib/platformFee";
+import { trackEvent } from "@/lib/analytics";
 
 export async function confirmEntryFeePayment(reference: string): Promise<void> {
   const registration = await prisma.registration.findUnique({
@@ -44,12 +46,46 @@ export async function confirmEntryFeePayment(reference: string): Promise<void> {
     return;
   }
 
+  trackEvent("payment_verified", {
+    userId: registration.userId,
+    tournamentId: registration.tournamentId,
+    game: registration.tournament.game,
+    amountMinor: result.amount,
+    currency: "NGN",
+  });
+
+  // Read outside the transaction — this rate rarely changes, and a
+  // registration landing on the old vs. new rate in the rare case an
+  // admin changes it in the exact instant this is running is not a
+  // correctness issue worth another query inside the transaction below.
+  const platformSetting = await prisma.platformSetting.findUnique({ where: { id: "singleton" } });
+  const feeAmount = computePlatformFee(registration.tournament.entryFee, platformSetting?.platformFeeBps ?? 0);
+
   const confirmed = await prisma.$transaction(async (tx) => {
+    // The top-of-function `status !== "PENDING_PAYMENT"` read is only a
+    // fast-path check, taken before the slow provider.verifyCharge() call
+    // above — not the actual guard (same reasoning as
+    // confirmWalletFunding's own comment). This conditional update is the
+    // real one: it's the single point that decides whether THIS call gets
+    // to create the PLATFORM_FEE/ORGANIZER_REVENUE rows below. Without
+    // it, a webhook delivery racing the redirect-callback page's poll
+    // (both funnel into this function, per this file's header comment)
+    // could both pass the fast-path read and both create those rows —
+    // double-crediting the organizer for one entry fee.
+    const claimed = await tx.registration.updateMany({
+      where: { id: registration.id, status: "PENDING_PAYMENT" },
+      data: { status: "CONFIRMED" },
+    });
+    if (claimed.count === 0) return "ALREADY_HANDLED" as const;
+
+    // Counted AFTER claiming this registration (it's already CONFIRMED
+    // above), so this row counts itself — `>` here is the same check as
+    // the original `confirmedCount >= cap` taken before confirming.
     const confirmedCount = await tx.registration.count({
       where: { tournamentId: registration.tournamentId, status: "CONFIRMED" },
     });
 
-    if (confirmedCount >= registration.tournament.participantCap) {
+    if (confirmedCount > registration.tournament.participantCap) {
       // The slot was filled by a concurrent payment while this charge was processing.
       // Refuse confirmation and mark for refund.
       await tx.registration.update({
@@ -60,21 +96,57 @@ export async function confirmEntryFeePayment(reference: string): Promise<void> {
         where: { id: escrowTxn.id },
         data: { status: "FAILED" },
       });
-      return false;
+      return "OVER_CAPACITY" as const;
     }
 
-    await tx.registration.update({
-      where: { id: registration.id },
-      data: { status: "CONFIRMED" },
-    });
     await tx.escrowTransaction.update({
       where: { id: escrowTxn.id },
       data: { status: "COMPLETE" },
     });
-    return true;
+    // Carved out of the entry fee that already arrived, not charged on
+    // top of it — see PLATFORM_FEE's own schema comment. Same
+    // transaction as the entry-fee confirmation itself: never recorded
+    // without it, never missing when it succeeds.
+    if (feeAmount > 0) {
+      await tx.escrowTransaction.create({
+        data: {
+          tournamentId: registration.tournamentId,
+          registrationId: registration.id,
+          type: "PLATFORM_FEE",
+          amount: feeAmount,
+          status: "COMPLETE",
+        },
+      });
+    }
+    // The organizer's own cut — the remainder after the platform fee, in
+    // full. Starts PENDING: settleOrganizerRevenue() (src/lib/
+    // settlement.ts) credits it to the organizer's wallet once this
+    // tournament's settlement window passes with no open dispute or
+    // funds freeze — see ORGANIZER_REVENUE's own schema comment.
+    const organizerRevenueAmount = registration.tournament.entryFee - feeAmount;
+    if (organizerRevenueAmount > 0) {
+      await tx.escrowTransaction.create({
+        data: {
+          tournamentId: registration.tournamentId,
+          registrationId: registration.id,
+          userId: registration.tournament.organizerId,
+          type: "ORGANIZER_REVENUE",
+          amount: organizerRevenueAmount,
+          status: "PENDING",
+        },
+      });
+    }
+    return "CONFIRMED" as const;
   });
 
-  if (!confirmed) {
+  if (confirmed === "ALREADY_HANDLED") {
+    // A concurrent call already confirmed (or refunded) this exact
+    // registration — its own success/refund path already ran once.
+    // Nothing left for this call to do.
+    return;
+  }
+
+  if (confirmed === "OVER_CAPACITY") {
     // Automatically issue the gateway refund so the player's funds are returned
     try {
       await provider.refundCharge(reference, registration.tournament.entryFee);
@@ -86,6 +158,13 @@ export async function confirmEntryFeePayment(reference: string): Promise<void> {
     });
     return;
   }
+
+  trackEvent("tournament_joined", {
+    userId: registration.userId,
+    tournamentId: registration.tournamentId,
+    game: registration.tournament.game,
+    amountMinor: registration.tournament.entryFee,
+  });
 
   await notify(registration.userId, "REGISTRATION_CONFIRMED", {
     tournamentId: registration.tournamentId,
@@ -117,8 +196,20 @@ export async function confirmWalletFunding(reference: string): Promise<void> {
     return;
   }
 
-  await prisma.$transaction([
-    prisma.walletTransaction.update({ where: { id: txn.id }, data: { status: "COMPLETE" } }),
-    prisma.user.update({ where: { id: txn.userId }, data: { walletBalance: { increment: txn.amount } } }),
-  ]);
+  // The "still PENDING" check above is only a fast-path read, taken before
+  // the (slow) provider call — not the actual guard. Two calls for the same
+  // reference (a webhook retry racing the redirect callback, or two webhook
+  // deliveries) could both pass that read before either commits. The real
+  // guard is this conditional update: only the call that actually flips
+  // PENDING→COMPLETE gets to increment the balance, so a genuine race
+  // credits the wallet once, not twice.
+  await prisma.$transaction(async (tx) => {
+    const updated = await tx.walletTransaction.updateMany({
+      where: { id: txn.id, status: "PENDING" },
+      data: { status: "COMPLETE" },
+    });
+    if (updated.count === 0) return; // a concurrent call already credited this reference
+
+    await tx.user.update({ where: { id: txn.userId }, data: { walletBalance: { increment: txn.amount } } });
+  });
 }

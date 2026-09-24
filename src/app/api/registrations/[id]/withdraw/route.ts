@@ -58,12 +58,25 @@ export async function POST(
   );
 
   if (registration.status === "CONFIRMED" && paidEntryFeeTxn) {
-    const provider = getPaymentProvider(paidEntryFeeTxn.provider!); // always set for an ENTRY_FEE row
-    const refund = await provider.refundCharge(paidEntryFeeTxn.providerRef!, paidEntryFeeTxn.amount);
+    // Claim atomically BEFORE calling the payment provider — refundCharge
+    // is the real-money-movement step, so the guard has to sit in front
+    // of it, not just around the DB write afterward. A plain
+    // read-then-write here (checked registration.status above, write
+    // later) would still let two concurrent withdraw requests both pass
+    // that read and both issue a real refund call to the provider before
+    // either DB write lands — a double refund of the same entry fee.
+    const claimed = await prisma.registration.updateMany({
+      where: { id: registration.id, status: "CONFIRMED" },
+      data: { status: "REFUNDED" },
+    });
+    if (claimed.count === 0) {
+      return NextResponse.json({ error: "Already withdrawn." }, { status: 409 });
+    }
 
-    await prisma.$transaction([
-      prisma.registration.update({ where: { id: registration.id }, data: { status: "REFUNDED" } }),
-      prisma.escrowTransaction.create({
+    const provider = getPaymentProvider(paidEntryFeeTxn.provider!); // always set for an ENTRY_FEE row
+    try {
+      const refund = await provider.refundCharge(paidEntryFeeTxn.providerRef!, paidEntryFeeTxn.amount);
+      await prisma.escrowTransaction.create({
         data: {
           tournamentId: registration.tournamentId,
           registrationId: registration.id,
@@ -73,13 +86,23 @@ export async function POST(
           providerRef: refund.providerReference,
           status: refund.status === "SUCCESS" ? "COMPLETE" : "PENDING",
         },
-      }),
-    ]);
+      });
+    } catch (err) {
+      // The refund call itself threw (network/provider error) — nothing
+      // confirmed to have left custody. Revert the claim so the player
+      // isn't shown "withdrawn" with no refund actually in flight, and a
+      // retry is possible.
+      await prisma.registration.update({ where: { id: registration.id }, data: { status: "CONFIRMED" } });
+      throw err;
+    }
   } else {
-    await prisma.registration.update({
-      where: { id: registration.id },
+    const claimed = await prisma.registration.updateMany({
+      where: { id: registration.id, status: { notIn: ["WITHDRAWN", "REFUNDED"] } },
       data: { status: "WITHDRAWN" },
     });
+    if (claimed.count === 0) {
+      return NextResponse.json({ error: "Already withdrawn." }, { status: 409 });
+    }
   }
 
   return NextResponse.json({ ok: true });

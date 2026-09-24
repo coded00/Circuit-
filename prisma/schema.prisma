@@ -60,6 +60,22 @@ enum EscrowType {
   /// Created once, to the match winner, for the full pot (both players'
   /// STAKE amounts) when a staked Battle's match completes.
   STAKE_PAYOUT
+  /// Circuit's own cut, carved out of an entry fee the moment it's
+  /// confirmed — see PlatformSetting.platformFeeBps. Recorded alongside
+  /// the ENTRY_FEE row for the same registration, same amount charged to
+  /// the player either way: this doesn't change what anyone pays, only
+  /// how the money that already arrived is allocated in the ledger.
+  PLATFORM_FEE
+  /// The organizer's own cut of an entry fee — entryFee minus PLATFORM_FEE,
+  /// in full (no separate configurable rate; the platform fee is the only
+  /// cut taken). Recorded PENDING alongside ENTRY_FEE/PLATFORM_FEE at
+  /// confirmation time, then flipped to COMPLETE by settleOrganizerRevenue
+  /// once the tournament's settlement window passes with no open dispute
+  /// or funds freeze — see Tournament.completedAt and
+  /// PlatformSetting.organizerRevenueSettlementHours. Unlike PLATFORM_FEE,
+  /// `userId` is set (the organizer) so the settlement sweep knows whose
+  /// wallet to credit.
+  ORGANIZER_REVENUE
 }
 
 enum EscrowStatus {
@@ -164,32 +180,54 @@ model User {
   /// that justifies it, kept in sync in the same DB transaction as every
   /// balance change so the two can never drift apart.
   walletBalance     Int        @default(0)
+  /// Quick Match presence (BTL-Q1): refreshed every ~25s by a client
+  /// heartbeat while a signed-in tab is open (`PresenceHeartbeat.tsx`) —
+  /// "online" for Quick Match eligibility means this timestamp is within
+  /// the last ~45-60s. Deliberately not a `lastSeenAt`-at-login field:
+  /// this codebase's own Discovery module explicitly avoids fabricating
+  /// an "online now" signal from stale login timestamps, so this is a
+  /// narrowly-scoped, frequently-refreshed field for Quick Match only,
+  /// not a general presence system other features should assume is fresh.
+  lastActiveAt      DateTime?
   createdAt         DateTime   @default(now())
+  /// V1 audit follow-up (money-relevant models) — walletBalance and the
+  /// suspension/staff flags above all mutate after creation with no
+  /// signal of when; useful for debugging a balance that looks stale and
+  /// for reconciliation, same reasoning as the other money-relevant
+  /// models this was added to alongside (WalletTransaction,
+  /// EscrowTransaction, Registration, Tournament, Battle).
+  updatedAt         DateTime   @updatedAt
 
-  organizerProfile    OrganizerProfile?
-  registrations       Registration[]
-  matchesAsPlayerA    Match[]              @relation("MatchPlayerA")
-  matchesAsPlayerB    Match[]              @relation("MatchPlayerB")
-  matchesWon          Match[]              @relation("MatchWinner")
-  battlesCreated      Battle[]             @relation("BattleCreator")
-  battlesTargeted     Battle[]             @relation("BattleTarget")
-  disputesRaised      Dispute[]            @relation("DisputeRaisedBy")
-  notifications       Notification[]
-  reportsFiled        Report[]             @relation("ReportFiledBy")
-  reportsReceived     Report[]             @relation("ReportAgainstUser")
-  communityPosts      CommunityPost[]      @relation("CommunityPostAuthor")
-  passwordResetTokens PasswordResetToken[]
-  walletTransactions  WalletTransaction[]
-  auditLogEntries     AuditLogEntry[]
-  friendshipsSent     Friendship[]         @relation("FriendshipRequester")
-  friendshipsReceived Friendship[]         @relation("FriendshipAddressee")
-  teamsCaptained      Team[]               @relation("TeamCaptain")
-  teamMemberships     TeamMembership[]
-  escrowTransactions  EscrowTransaction[]
-  videoLikes          VideoLike[]
-  videoSaves          VideoSave[]
+  organizerProfile     OrganizerProfile?
+  registrations        Registration[]
+  matchesAsPlayerA     Match[]               @relation("MatchPlayerA")
+  matchesAsPlayerB     Match[]               @relation("MatchPlayerB")
+  matchesWon           Match[]               @relation("MatchWinner")
+  battlesCreated       Battle[]              @relation("BattleCreator")
+  battlesTargeted      Battle[]              @relation("BattleTarget")
+  quickMatchesHosted   QuickMatchChallenge[] @relation("QuickMatchHost")
+  quickMatchesAccepted QuickMatchChallenge[] @relation("QuickMatchAcceptedBy")
+  quickMatchInvites    QuickMatchRecipient[] @relation("QuickMatchRecipient")
+  disputesRaised       Dispute[]             @relation("DisputeRaisedBy")
+  notifications        Notification[]
+  reportsFiled         Report[]              @relation("ReportFiledBy")
+  reportsReceived      Report[]              @relation("ReportAgainstUser")
+  communityPosts       CommunityPost[]       @relation("CommunityPostAuthor")
+  passwordResetTokens  PasswordResetToken[]
+  walletTransactions   WalletTransaction[]
+  auditLogEntries      AuditLogEntry[]
+  friendshipsSent      Friendship[]          @relation("FriendshipRequester")
+  friendshipsReceived  Friendship[]          @relation("FriendshipAddressee")
+  teamsCaptained       Team[]                @relation("TeamCaptain")
+  teamMemberships      TeamMembership[]
+  escrowTransactions   EscrowTransaction[]
+  videoLikes           VideoLike[]
+  videoSaves           VideoSave[]
+  communityMemberships CommunityMember[]
+  messages             Message[]
 
   @@index([emailOrPhone])
+  @@index([lastActiveAt])
 }
 
 /// The admin dashboard's two fixed roles (no per-permission matrix — a
@@ -232,6 +270,13 @@ enum WalletTransactionType {
   /// Battle stake always resolves straight back into the wallet — no
   /// organizer/claim flow for a peer-to-peer pot.
   STAKE_CREDIT
+  /// A settled `EscrowType.ORGANIZER_REVENUE` row credited to the
+  /// organizer's wallet balance by settleOrganizerRevenue() — always
+  /// wallet-only, no provider touched (same reasoning as ENTRY_FEE_DEBIT):
+  /// this is Circuit crediting an internal ledger allocation, not a fresh
+  /// payment. Withdrawing it afterward reuses the existing Withdraw from
+  /// Wallet flow unchanged — no separate organizer payout route needed.
+  ORGANIZER_REVENUE_CREDIT
 }
 
 enum WalletTransactionStatus {
@@ -256,6 +301,11 @@ model WalletTransaction {
   providerRef String?                 @unique
   status      WalletTransactionStatus @default(PENDING)
   createdAt   DateTime                @default(now())
+  /// V1 audit follow-up — `status` flips PENDING→COMPLETE/FAILED after
+  /// creation with no record of when, which matters for spotting a
+  /// transaction stuck PENDING and for reconciliation against the
+  /// provider's own records.
+  updatedAt   DateTime                @updatedAt
 
   @@index([userId, status])
 }
@@ -350,16 +400,54 @@ model Tournament {
   registrationOpenAt  DateTime
   registrationCloseAt DateTime
   startAt             DateTime
+  /// A separate timestamp from startAt/registrationCloseAt on purpose —
+  /// players who already paid need protection *before* the tournament
+  /// even begins, not just once it's live. Computed once at creation
+  /// (startAt minus PlatformSetting.cancellationLockHoursBeforeStart at
+  /// that moment) and stored concretely, so a later change to that
+  /// default doesn't retroactively move an already-set lock point.
+  /// Past this timestamp, tournaments/[id]/cancel/route.ts blocks the
+  /// organizer specifically — staff can still cancel (an intentional
+  /// "only admin/system action" escape hatch, same reasoning as
+  /// fundsFrozen). Null on any tournament created before this field
+  /// existed — treated as "no lock," same as today's behavior.
+  cancellationLockAt  DateTime?
   status              TournamentStatus @default(DRAFT)
+  /// Admin financial control (V1 audit's fund-freeze requirement) — set
+  /// via POST/DELETE /api/tournaments/[id]/freeze-funds, requireStaff()
+  /// gated. Blocks the prize-payout claim and cancel-with-refund routes
+  /// while true; who froze it, when, and why lives in AuditLogEntry
+  /// (action "tournament.freezeFunds"/"tournament.unfreezeFunds") rather
+  /// than duplicating actor/reason/timestamp fields here — same "reuse
+  /// the existing audit log" reasoning as every other admin action.
+  fundsFrozen         Boolean          @default(false)
+  /// Set once, the moment this tournament's final bracket match completes
+  /// (applyWinnerAdvancement in src/lib/matches.ts) — the anchor
+  /// settleOrganizerRevenue() waits PlatformSetting.
+  /// organizerRevenueSettlementHours past before crediting that
+  /// tournament's PENDING ORGANIZER_REVENUE rows to the organizer's
+  /// wallet. Null until then; null forever for a cancelled tournament
+  /// (cancellation voids the whole event before it ever reaches this
+  /// flip — see tournaments/[id]/cancel/route.ts).
+  completedAt         DateTime?
   createdAt           DateTime         @default(now())
+  /// V1 audit follow-up — status/fundsFrozen/cancellationLockAt all
+  /// mutate after creation; useful for reconciliation and for spotting
+  /// what changed and when on a specific tournament during a dispute.
+  updatedAt           DateTime         @updatedAt
 
   registrations Registration[]
   bracket       Bracket?
   matches       Match[]
   escrowTxns    EscrowTransaction[]
   videos        Video[]
+  community     Community?
 
   @@index([game, status])
+  // V1 audit follow-up — dashboard/payouts, dashboard's own overview, and
+  // the community route all filter by organizerId alone (no game/status
+  // alongside it), so the composite index above doesn't help those reads.
+  @@index([organizerId])
 }
 
 /// Links a User to a Tournament. Maps to REG-1..REG-7.
@@ -379,11 +467,20 @@ model Registration {
   /// what a webhook looks up a Registration by.
   paymentRef   String?            @unique
   createdAt    DateTime           @default(now())
+  /// V1 audit follow-up — status moves through the whole
+  /// PENDING_PAYMENT→CONFIRMED→WITHDRAWN/REFUNDED lifecycle with no
+  /// record of when each transition happened.
+  updatedAt    DateTime           @updatedAt
 
   escrowTxns EscrowTransaction[]
 
   @@unique([tournamentId, userId])
   @@index([tournamentId, status])
+  // V1 audit follow-up — the @@unique above leads with tournamentId, so
+  // it doesn't serve "every registration for this user" queries (the
+  // homepage, a player's public profile, admin's user detail page, and
+  // the discovery feed's personalization all run exactly that).
+  @@index([userId])
 }
 
 /// 1:1 with Tournament. Maps to BRK-1.
@@ -440,12 +537,24 @@ model Match {
   /// BRK-10: silent-side auto-accept deadline once one side has reported.
   reportWindowExpiresAt DateTime?
   createdAt             DateTime  @default(now())
+  /// V1 audit follow-up — status cycles UPCOMING→NEEDS_RESULT→DISPUTED→
+  /// COMPLETE with no record of when, which matters for reconciling a
+  /// stuck or disputed match (it directly gates a tournament's payout and
+  /// organizer-revenue settlement).
+  updatedAt             DateTime  @updatedAt
 
   dispute Dispute?
 
   @@index([tournamentId])
   @@index([battleId])
   @@index([status])
+  // V1 audit follow-up — the homepage's "your upcoming matches", a
+  // player's public profile, admin's user detail page, the wallet-history
+  // battle lookup, and discovery's personalization all filter on one of
+  // these two fields via an OR (a bitmap-or over two single-column
+  // indexes serves that better than one composite would).
+  @@index([playerAId])
+  @@index([playerBId])
 }
 
 /// Created by a User. Maps to BTL-1..BTL-6.
@@ -473,11 +582,101 @@ model Battle {
   streamUrl    String?
   status       BattleStatus     @default(OPEN)
   createdAt    DateTime         @default(now())
+  /// V1 audit follow-up — status moves OPEN→ACCEPTED→COMPLETE/CANCELLED,
+  /// and a staked Battle's stake sits locked the whole time; useful for
+  /// spotting how long a Battle has actually been in its current state.
+  updatedAt    DateTime         @updatedAt
 
-  matches    Match[]
-  escrowTxns EscrowTransaction[]
+  matches             Match[]
+  escrowTxns          EscrowTransaction[]
+  quickMatchChallenge QuickMatchChallenge?
 
   @@index([game, status])
+  // V1 audit follow-up — the homepage's open-challenge feed, a player's
+  // public profile, admin's user detail page, the dashboard's own
+  // Battles list, and discovery's personalization all filter by one of
+  // these two fields directly (often via an OR), same reasoning as
+  // Match.playerAId/playerBId above.
+  @@index([creatorId])
+  @@index([targetUserId])
+}
+
+enum QuickMatchStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  CANCELLED
+}
+
+enum QuickMatchRecipientStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  CANCELLED
+}
+
+/// A single host challenge fanned out to many eligible recipients at once
+/// (`QuickMatchRecipient`, one row per invitee) — the first to accept wins
+/// it, and every other still-`PENDING` recipient row flips to `CANCELLED`
+/// in the same transaction. Resolves into a completely ordinary `Battle` +
+/// `Match` the moment someone accepts (`battleId` below), created directly
+/// in `ACCEPTED` status rather than going through the OPEN board — nothing
+/// downstream of that point (result submission, disputes, settlement)
+/// knows or cares that a Battle originated from Quick Match. Same stake
+/// mechanics and the same not-launch-ready caveat as `Battle.stakeAmount`
+/// (see `EscrowTransaction`'s own comment) — Quick Match widens the same
+/// unresolved collusion-surface risk that comment already flags, since one
+/// host stake can now reach many more potential accepters at once.
+model QuickMatchChallenge {
+  id               String           @id @default(cuid())
+  hostId           String
+  host             User             @relation("QuickMatchHost", fields: [hostId], references: [id])
+  /// Same "admin-curated Game.name, not a foreign key" convention as
+  /// Battle.game/Tournament.game.
+  game             String
+  /// "SINGLE" | "BEST_OF_3" — same free-text convention as Battle.format.
+  format           String
+  /// Kobo. 0 = free. Above zero, locked from the host's wallet the moment
+  /// this challenge is created (not deferred to acceptance) — see
+  /// `EscrowType.STAKE`.
+  stakeAmount      Int              @default(0)
+  status           QuickMatchStatus @default(PENDING)
+  acceptedByUserId String?
+  acceptedBy       User?            @relation("QuickMatchAcceptedBy", fields: [acceptedByUserId], references: [id])
+  battleId         String?          @unique
+  battle           Battle?          @relation(fields: [battleId], references: [id])
+  expiresAt        DateTime
+  createdAt        DateTime         @default(now())
+  acceptedAt       DateTime?
+  cancelledAt      DateTime?
+
+  recipients QuickMatchRecipient[]
+  escrowTxns EscrowTransaction[]
+
+  @@index([hostId])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+/// One row per player a `QuickMatchChallenge` was fanned out to. The
+/// winning row (whoever's accept request wins the challenge's own
+/// PENDING→ACCEPTED compare-and-swap) flips to ACCEPTED; every other row
+/// still PENDING at that moment flips to CANCELLED in the same
+/// transaction — see the challenge's accept route for the exact sequence.
+model QuickMatchRecipient {
+  id              String                    @id @default(cuid())
+  challengeId     String
+  challenge       QuickMatchChallenge       @relation(fields: [challengeId], references: [id])
+  recipientUserId String
+  recipient       User                      @relation("QuickMatchRecipient", fields: [recipientUserId], references: [id])
+  status          QuickMatchRecipientStatus @default(PENDING)
+  sentAt          DateTime                  @default(now())
+  respondedAt     DateTime?
+
+  @@unique([challengeId, recipientUserId])
+  @@index([recipientUserId, status])
+  @@index([challengeId, status])
 }
 
 /// Belongs to a Match. Maps to BRK-5, BRK-6, TRU-1..TRU-2.
@@ -497,6 +696,12 @@ model Dispute {
   ruledById               String?
   ruledAt                 DateTime?
   createdAt               DateTime      @default(now())
+  /// V1 audit follow-up — status moves OPEN→ORGANIZER_REVIEW/ESCALATED→
+  /// RESOLVED/VOID, including a sweep step that flips OPEN→ESCALATED, with
+  /// no timestamp anywhere except `ruledAt` (only set at final
+  /// resolution). Staff couldn't tell how long a dispute had actually sat
+  /// in ESCALATED, which matters for an SLA-driven queue.
+  updatedAt               DateTime      @updatedAt
 
   @@index([status])
 }
@@ -512,32 +717,59 @@ model Dispute {
 /// reviewed staked-Battles feature. Shipped as the underlying mechanism
 /// only, per explicit product decision.)
 model EscrowTransaction {
-  id             String               @id @default(cuid())
-  tournamentId   String?
-  tournament     Tournament?          @relation(fields: [tournamentId], references: [id])
-  registrationId String?
-  registration   Registration?        @relation(fields: [registrationId], references: [id])
-  /// Set only for a Battle-stake row (STAKE/STAKE_PAYOUT/REFUND on a
-  /// Battle) — who paid a STAKE or received a STAKE_PAYOUT/REFUND. Always
-  /// null on the tournament side, where `registration.userId` already
-  /// answers this.
-  battleId       String?
-  battle         Battle?              @relation(fields: [battleId], references: [id])
-  userId         String?
-  user           User?                @relation(fields: [userId], references: [id])
-  type           EscrowType
+  id                    String               @id @default(cuid())
+  tournamentId          String?
+  tournament            Tournament?          @relation(fields: [tournamentId], references: [id])
+  registrationId        String?
+  registration          Registration?        @relation(fields: [registrationId], references: [id])
+  /// Set for a Battle-stake row (STAKE/STAKE_PAYOUT/REFUND — who paid or
+  /// received it) and for an ORGANIZER_REVENUE row (the organizer the
+  /// settlement sweep credits — see that EscrowType's own comment). Null
+  /// for every other tournament-side row, where `registration.userId`
+  /// already answers this.
+  battleId              String?
+  battle                Battle?              @relation(fields: [battleId], references: [id])
+  /// Set for a Quick Match host's stake lock/refund, from the moment the
+  /// challenge is created until it either resolves into a real Battle
+  /// (at which point `battleId` above is ALSO backfilled onto this same
+  /// row, not a new one) or expires/cancels unaccepted. Lets the wallet
+  /// history page (`src/lib/wallet.ts`) show this row even during the
+  /// window before any Battle exists.
+  quickMatchChallengeId String?
+  quickMatchChallenge   QuickMatchChallenge? @relation(fields: [quickMatchChallengeId], references: [id])
+  userId                String?
+  /// V1 audit follow-up — matches WalletTransaction.userId's onDelete
+  /// (RESTRICT): a User with financial history (a Battle payout, or
+  /// organizer revenue) shouldn't be deletable in a way that silently
+  /// orphans that history, even though nothing deletes a User today.
+  user                  User?                @relation(fields: [userId], references: [id], onDelete: Restrict)
+  type                  EscrowType
   /// Minor currency units (kobo).
-  amount         Int
+  amount                Int
   /// Null for a Battle-stake row — wallet-balance-only, no external
   /// provider touched (same reasoning as `WalletTransactionType.
   /// STAKE_DEBIT`/`STAKE_PAYOUT_CREDIT`).
-  provider       PaymentProviderName?
-  providerRef    String?
-  status         EscrowStatus         @default(PENDING)
-  createdAt      DateTime             @default(now())
+  provider              PaymentProviderName?
+  /// Unique like WalletTransaction.providerRef — a duplicate provider
+  /// reference (a literal webhook replay, or two writes racing to record
+  /// the same transfer/charge) fails at the DB, not just in application
+  /// logic. Multiple NULLs are fine (Postgres doesn't treat them as
+  /// duplicates) — only set once a provider call actually returns one.
+  providerRef           String?              @unique
+  status                EscrowStatus         @default(PENDING)
+  createdAt             DateTime             @default(now())
+  /// V1 audit follow-up — status flips PENDING→COMPLETE/FAILED (a payout
+  /// claim, a settlement) after creation with no record of when.
+  updatedAt             DateTime             @updatedAt
 
   @@index([tournamentId, type])
   @@index([battleId, type])
+  @@index([quickMatchChallengeId, type])
+  // V1 audit follow-up — the wallet page's own Battle-activity section
+  // filters by userId directly (`where: { userId, battleId: { not: null } }`),
+  // which neither composite index above serves.
+  @@index([userId])
+  @@index([registrationId])
 }
 
 /// Belongs to a User. Maps to NOT-1..NOT-4.
@@ -617,6 +849,11 @@ model Team {
   createdAt DateTime @default(now())
 
   members TeamMembership[]
+
+  // V1 audit follow-up — a player's public profile and the team-role
+  // lookup in src/lib/teams.ts both filter by captainId directly, with no
+  // supporting index (only `name` had one, via its own unique constraint).
+  @@index([captainId])
 }
 
 /// One row per (team, user) pair, including the captain's own membership
@@ -727,12 +964,40 @@ model CalendarEvent {
 }
 
 /// Singleton row (`id` is always "singleton") — real platform-wide
-/// toggles. Deliberately just the one real, meaningful setting
-/// (maintenance mode) rather than a grab-bag of unused fields invented to
-/// look complete; see `/admin/settings`'s own comment.
+/// toggles and defaults, each added only once there was a genuine
+/// feature behind it (maintenance mode; the platform fee rate; the
+/// cancellation-lock default below), not a grab-bag of unused fields
+/// invented to look complete; see `/admin/settings`'s own comment.
 model PlatformSetting {
-  id              String  @id @default("singleton")
-  maintenanceMode Boolean @default(false)
+  id                               String  @id @default("singleton")
+  maintenanceMode                  Boolean @default(false)
+  /// Circuit's cut of every paid tournament entry, in basis points (1/100
+  /// of a percent — 500 = 5.00%) rather than a plain integer percent, so
+  /// a future rate change never needs a fractional-percent migration.
+  /// Admin-configurable (Admin > Settings), not a code constant, on
+  /// purpose: the exact rate is a business decision that can change
+  /// without a deploy — see PlatformFeeControl.tsx. Applied only to new
+  /// entry-fee confirmations going forward; changing it never rewrites
+  /// already-recorded PLATFORM_FEE escrow rows.
+  platformFeeBps                   Int     @default(500)
+  /// Default lead time for Tournament.cancellationLockAt, computed once
+  /// at tournament creation (startAt minus this many hours) and stored
+  /// as a concrete timestamp on that row — not re-derived from this
+  /// setting later, so changing the default never moves the lock point
+  /// on a tournament that already has one. See cancellationLockAt's own
+  /// schema comment for why this exists as its own timestamp instead of
+  /// reusing startAt or registrationCloseAt.
+  cancellationLockHoursBeforeStart Int     @default(24)
+  /// Dispute/review buffer after a tournament's final match completes
+  /// (Tournament.completedAt) before its PENDING ORGANIZER_REVENUE escrow
+  /// rows settle into the organizer's wallet balance — see
+  /// settleOrganizerRevenue() in src/lib/settlement.ts. Same "computed
+  /// once, not re-derived later" caution doesn't apply here: unlike
+  /// cancellationLockAt, this is read fresh at sweep time (no per-
+  /// tournament snapshot column), so changing it via Admin > Settings
+  /// (OrganizerRevenueSettlementControl.tsx) does shift the settle point
+  /// for every still-PENDING row, not just new ones.
+  organizerRevenueSettlementHours  Int     @default(24)
 }
 
 /// Every real write an admin makes anywhere in `/admin` appends one row
@@ -850,4 +1115,96 @@ model VideoSave {
   createdAt DateTime @default(now())
 
   @@unique([videoId, userId])
+}
+
+// ---------------------------------------------------------------------------
+// Circuit Community, Phase 1 — a Discord-style chat attached to one specific
+// Tournament. Unrelated to `CommunityPost` above despite the name overlap:
+// that model is a flat, global, Twitter-like public feed with no channels,
+// no per-tournament scope, and no relation to any of the models below —
+// don't conflate the two when reading either.
+//
+// Deliberately minimal for Phase 1 (validate whether people actually talk
+// around a tournament before building reactions/roles/moderation nobody's
+// asked for yet): one Community per Tournament, four fixed channels, plain
+// text messages, join/leave, and a single last-read timestamp per member
+// for a basic unread indicator. No real-time transport — messages are read
+// via ordinary polling (see `Poller.tsx`'s own doc on why: no WebSocket
+// infra exists, Vercel serverless can't hold one open anyway, and the
+// stack docs already name Pusher/Ably as the escalation path if polling
+// ever stops feeling live enough).
+// ---------------------------------------------------------------------------
+
+/// 1:1 with Tournament for a normal community — `enabled` is the
+/// organizer's on/off switch (set at tournament creation or toggled
+/// later from the edit form), and the row itself, once created, is never
+/// deleted just by disabling, so re-enabling doesn't lose channel/
+/// message history. `tournamentId` is nullable for exactly one
+/// exception: the single platform-wide "Circuit" community every user
+/// is auto-joined to at signup (`isGlobal: true`, no tournament at all).
+/// Application code (`getOrCreateGlobalCommunity`), not a DB constraint,
+/// is what keeps that singleton to one row — see that function's own
+/// comment for why a schema-level constraint wasn't worth it at V1.
+model Community {
+  id           String      @id @default(cuid())
+  tournamentId String?     @unique
+  tournament   Tournament? @relation(fields: [tournamentId], references: [id])
+  isGlobal     Boolean     @default(false)
+  enabled      Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+
+  channels Channel[]
+  members  CommunityMember[]
+}
+
+/// The four fixed V1 channels (general/announcements/matches/results),
+/// created together when a Community is enabled. `key` (not just `name`)
+/// exists because Phase 3's auto-generated match/tournament event
+/// messages need to target "the matches channel" and "the results
+/// channel" programmatically by a stable identifier, not by matching on
+/// a human-editable display name.
+model Channel {
+  id          String    @id @default(cuid())
+  communityId String
+  community   Community @relation(fields: [communityId], references: [id])
+  key         String
+  name        String
+  createdAt   DateTime  @default(now())
+
+  messages Message[]
+
+  @@unique([communityId, key])
+}
+
+/// Join/leave membership — posting or reading requires a row here. A
+/// single `lastReadAt` per member (not per-channel) is Phase 1's
+/// deliberately basic unread signal: "anything new since I last opened
+/// this community," not a per-channel read receipt.
+model CommunityMember {
+  id          String    @id @default(cuid())
+  communityId String
+  community   Community @relation(fields: [communityId], references: [id])
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  joinedAt    DateTime  @default(now())
+  lastReadAt  DateTime  @default(now())
+
+  @@unique([communityId, userId])
+}
+
+/// Plain text only for Phase 1 — no attachments, no edit history. `isSystem`
+/// is unused today (nothing sets it true yet) but exists so Phase 3's
+/// auto-generated match/tournament event messages don't need a schema
+/// change to be visually distinguished from a real user's message.
+model Message {
+  id        String   @id @default(cuid())
+  channelId String
+  channel   Channel  @relation(fields: [channelId], references: [id])
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  content   String
+  isSystem  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([channelId, createdAt])
 }

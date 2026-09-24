@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
+import { useConfirmDialog } from "@/components/ConfirmDialogProvider";
 import { GameForm } from "./GameForm";
 
 type Game = {
@@ -14,6 +15,7 @@ type Game = {
 
 export function GameRow({ game }: { game: Game }) {
   const router = useRouter();
+  const confirmDialog = useConfirmDialog();
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -29,7 +31,12 @@ export function GameRow({ game }: { game: Game }) {
   }
 
   async function handleDelete() {
-    if (!confirm(`Delete "${game.name}"? Existing tournaments/challenges keep their game name — this only removes it from the creation form's options.`)) return;
+    const confirmed = await confirmDialog({
+      title: `Delete "${game.name}"?`,
+      message: "Existing tournaments/challenges keep their game name — this only removes it from the creation form's options.",
+      confirmLabel: "Delete",
+    });
+    if (!confirmed) return;
     setBusy(true);
     await fetch(`/api/admin/games/${game.id}`, { method: "DELETE" });
     router.refresh();

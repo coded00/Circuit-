@@ -56,6 +56,7 @@ export default async function BattleBoardPage({
           name="game"
           defaultValue={game ?? ""}
           placeholder="Filter by game"
+          aria-label="Filter by game"
           className="field-input max-w-xs"
         />
         <button type="submit" className="btn-secondary">

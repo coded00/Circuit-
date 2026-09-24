@@ -19,7 +19,7 @@ export default async function AdminNewCompetitionPage() {
       </Link>
       <h1 className="font-display text-2xl font-bold tracking-tight">Create a competition</h1>
       <div className="card max-w-2xl">
-        <TournamentForm redirectTo={(id) => `/admin/competitions/${id}`} games={games} />
+        <TournamentForm redirectBase="/admin/competitions" games={games} />
       </div>
     </div>
   );

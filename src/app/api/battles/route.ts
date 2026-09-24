@@ -17,9 +17,26 @@ import { getCurrentUser } from "@/lib/session";
 import { notify, notifyAllUsers } from "@/lib/notifications";
 import { parseOptionalUrl } from "@/lib/validation";
 import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
+import { isRateLimited, recordAttempt } from "@/lib/rateLimit";
+import { captureException } from "@/lib/observability";
 
 const VALID_FORMATS = ["SINGLE", "BEST_OF_3"];
 const VALID_VISIBILITIES = ["OPEN", "TARGETED", "FRIENDS"];
+
+// V1 audit follow-up: only an OPEN Battle triggers the same
+// platform-wide notifyAllUsers blast tournament creation does (see this
+// route's own comment on why FRIENDS/TARGETED don't) — scoped to that
+// path specifically, not every Battle creation, since a TARGETED/FRIENDS
+// Battle never reaches a wider audience regardless of how many get made.
+const OPEN_BATTLE_CREATE_MAX_ATTEMPTS = 10;
+const OPEN_BATTLE_CREATE_WINDOW_MS = 60 * 60 * 1000;
+
+// V1 audit follow-up: staked Battles shipped with the core escrow
+// mechanism only (see this file's own top comment) — no per-account
+// stake limits, collusion detection, or self-exclusion tooling yet. Pending
+// that, cap a single stake so one Battle's exposure stays bounded while
+// those responsible-gambling controls are still unbuilt.
+const MAX_STAKE_AMOUNT = 10_000_000; // ₦100,000
 
 class InsufficientWalletBalanceError extends Error {}
 
@@ -46,11 +63,32 @@ export async function POST(request: Request) {
       ? Math.max(0, Math.floor(body.stakeAmount))
       : 0;
 
+  if (visibility === "OPEN") {
+    const rateLimitKey = `open-battle-create:${user.id}`;
+    const { limited, retryAfterSeconds } = await isRateLimited(rateLimitKey, {
+      max: OPEN_BATTLE_CREATE_MAX_ATTEMPTS,
+      windowMs: OPEN_BATTLE_CREATE_WINDOW_MS,
+    });
+    if (limited) {
+      return NextResponse.json(
+        { error: "Too many open Challenges created recently. Try again shortly." },
+        { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } }
+      );
+    }
+    await recordAttempt(rateLimitKey);
+  }
+
   if (!game) {
     return NextResponse.json({ error: "Game is required." }, { status: 400 });
   }
   if (!VALID_FORMATS.includes(format)) {
     return NextResponse.json({ error: "Format must be a single match or best of three." }, { status: 400 });
+  }
+  if (stakeAmount > MAX_STAKE_AMOUNT) {
+    return NextResponse.json(
+      { error: `Stake amount can't exceed ₦${(MAX_STAKE_AMOUNT / 100).toLocaleString("en-NG")}.` },
+      { status: 400 }
+    );
   }
   const streamUrlResult = parseOptionalUrl(body?.streamUrl);
   if (!streamUrlResult.ok) {
@@ -143,7 +181,14 @@ export async function POST(request: Request) {
     // after() for the same not-blocking-the-response reason as tournament
     // creation.
     if (visibility === "OPEN") {
-      after(() => notifyAllUsers("NEW_CHALLENGE", { battleId: battle.id, game: battle.game }));
+      // V1 audit follow-up: same reasoning as tournament creation's own
+      // comment — an unhandled rejection inside after() was previously
+      // invisible to any error-monitoring dashboard.
+      after(() =>
+        notifyAllUsers("NEW_CHALLENGE", { battleId: battle.id, game: battle.game }).catch((err) =>
+          captureException(err, { source: "battles/route.ts:after", battleId: battle.id })
+        )
+      );
     }
 
     return NextResponse.json({ id: battle.id }, { status: 201 });

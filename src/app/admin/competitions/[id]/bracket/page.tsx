@@ -12,6 +12,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { playerRankInGame } from "@/lib/standings";
+import { computeTopFragger } from "@/lib/awards";
 import { BracketView, type BracketStructure } from "@/app/tournaments/[id]/bracket/BracketView";
 
 export default async function AdminBracketPage({ params }: { params: Promise<{ id: string }> }) {
@@ -62,6 +63,7 @@ export default async function AdminBracketPage({ params }: { params: Promise<{ i
 
   const champion = structure.rounds[structure.totalRounds - 1]?.slots[0]?.winnerId ?? null;
   const championRank = champion ? await playerRankInGame(tournament.game, champion) : null;
+  const topFragger = await computeTopFragger(id);
 
   return (
     <BracketView
@@ -70,8 +72,9 @@ export default async function AdminBracketPage({ params }: { params: Promise<{ i
       users={users}
       matches={matches}
       championRank={championRank}
+      topFragger={topFragger}
       backHref={`/admin/competitions/${id}`}
-      matchHref={(matchId) => `/admin/matches/${matchId}`}
+      matchHrefBase="/admin/matches"
       playerHref={(userId) => `/admin/users/${userId}`}
     />
   );

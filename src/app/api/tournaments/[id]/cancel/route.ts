@@ -15,6 +15,7 @@ import { getCurrentUser } from "@/lib/session";
 import { getPaymentProvider } from "@/lib/payments";
 import { notify } from "@/lib/notifications";
 import { logAdminAction } from "@/lib/auditLog";
+import { captureException } from "@/lib/observability";
 
 export async function POST(
   request: Request,
@@ -39,19 +40,60 @@ export async function POST(
   if (tournament.status === "CANCELLED") {
     return NextResponse.json({ error: "Already cancelled." }, { status: 409 });
   }
-  if (new Date() >= tournament.startAt) {
+  if (tournament.status === "COMPLETE") {
     return NextResponse.json(
-      { error: "Can't cancel after the tournament has started." },
+      { error: "Can't cancel a tournament that's already finished." },
       { status: 409 }
     );
+  }
+  if (tournament.fundsFrozen) {
+    return NextResponse.json(
+      { error: "Funds for this tournament are frozen pending review — cancelling would refund them." },
+      { status: 409 }
+    );
+  }
+  // Past the lock point, the organizer specifically loses the ability to
+  // cancel — staff retain it as the "only admin/system action" escape
+  // hatch. This is deliberately a *different* gate from the fundsFrozen
+  // one above: fundsFrozen is a staff-initiated hold for a specific
+  // investigation, cancellationLockAt is a standing, player-protecting
+  // rule that applies to every tournament automatically, organizer intent
+  // aside — see its own schema comment for why this can't just be
+  // startAt itself.
+  if (tournament.cancellationLockAt && new Date() >= tournament.cancellationLockAt && !user.isStaff) {
+    return NextResponse.json(
+      { error: "Past the cancellation lock — only Circuit staff can cancel this tournament now." },
+      { status: 409 }
+    );
+  }
+  // Cancelling after startAt voids the whole event, not just the
+  // remaining unplayed matches — every CONFIRMED registrant is refunded
+  // below regardless of how far their own match got, and nothing further
+  // can happen to any of this tournament's matches afterward (submitResult
+  // and ruleDispute both check for CANCELLED status; the sweep's own
+  // auto-accept/escalation queries exclude a cancelled tournament's
+  // matches too — see their own comments in src/lib/matches.ts).
+
+  // Atomic claim, not the plain update this used to be — the checks above
+  // (status/fundsFrozen/cancellationLockAt) are all plain reads, so two
+  // concurrent cancel requests (a double-click, or organizer + staff
+  // racing) could both pass every one of them and both reach this point.
+  // Without this being a compare-and-swap, both would go on to refund
+  // every confirmed registrant — a full double-refund of the tournament's
+  // entry fees. Only the call that actually flips the status gets to run
+  // the refund loop below.
+  const claimed = await prisma.tournament.updateMany({
+    where: { id, status: { notIn: ["CANCELLED", "COMPLETE"] }, fundsFrozen: false },
+    data: { status: "CANCELLED" },
+  });
+  if (claimed.count === 0) {
+    return NextResponse.json({ error: "This tournament can no longer be cancelled." }, { status: 409 });
   }
 
   const confirmedRegistrations = await prisma.registration.findMany({
     where: { tournamentId: id, status: "CONFIRMED" },
     include: { escrowTxns: true },
   });
-
-  await prisma.tournament.update({ where: { id }, data: { status: "CANCELLED" } });
 
   // Every confirmed registrant hears about it, not just the ones getting a
   // refund — a free registrant has no money moving but still had plans
@@ -70,6 +112,21 @@ export async function POST(
       (txn) => txn.type === "ENTRY_FEE" && txn.status === "COMPLETE"
     );
     if (!paidEntryFeeTxn) continue; // free registration — nothing to refund
+
+    // V1 audit follow-up: refunding the ENTRY_FEE alone left that
+    // registration's already-carved PLATFORM_FEE (still COMPLETE forever)
+    // and ORGANIZER_REVENUE (still PENDING forever, since a cancelled
+    // tournament never reaches completedAt — see that field's own schema
+    // comment) rows dangling. The platform kept "earning" a fee on money
+    // it just gave back, and /admin/finance's revenue tiles (which sum
+    // COMPLETE PLATFORM_FEE rows) overstated actual revenue after any
+    // cancelled-and-refunded tournament. Reusing FAILED — the same status
+    // an ENTRY_FEE/payout row already gets when its money movement didn't
+    // actually happen — rather than a new EscrowType or a negative-amount
+    // reversal entry: the simplest fit that correctly drops both out of
+    // every COMPLETE/PENDING sum this ledger is read through.
+    const platformFeeTxn = registration.escrowTxns.find((txn) => txn.type === "PLATFORM_FEE" && txn.status === "COMPLETE");
+    const organizerRevenueTxn = registration.escrowTxns.find((txn) => txn.type === "ORGANIZER_REVENUE" && txn.status === "PENDING");
 
     try {
       const provider = getPaymentProvider(paidEntryFeeTxn.provider!); // always set for an ENTRY_FEE row
@@ -94,9 +151,22 @@ export async function POST(
             status: refund.status === "SUCCESS" ? "COMPLETE" : "PENDING",
           },
         }),
+        ...(platformFeeTxn ? [prisma.escrowTransaction.update({ where: { id: platformFeeTxn.id }, data: { status: "FAILED" as const } })] : []),
+        ...(organizerRevenueTxn ? [prisma.escrowTransaction.update({ where: { id: organizerRevenueTxn.id }, data: { status: "FAILED" as const } })] : []),
       ]);
       refundedCount++;
-    } catch {
+    } catch (err) {
+      // V1 audit follow-up: this used to be a silent catch — real money
+      // not returned to a player, with zero server-side log or
+      // monitoring signal, only visible in the response body's
+      // failedRegistrationIds (which nobody's watching after the fact).
+      captureException(err, {
+        route: "tournaments/[id]/cancel",
+        tournamentId: id,
+        registrationId: registration.id,
+        userId: registration.userId,
+        amount: paidEntryFeeTxn.amount,
+      });
       failedRefunds.push(registration.id);
     }
   }
