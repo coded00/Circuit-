@@ -1,152 +1,171 @@
 import Link from "next/link";
-import { Calendar, Users, Trophy, Swords, ArrowRight, Megaphone, Gamepad2 } from "lucide-react";
+import { ArrowRight, Gamepad2, Megaphone, Trophy, Users } from "lucide-react";
 import { GameArtTile } from "@/components/GameArtTile";
 import { StatusPill, tournamentStatusInfo, battleStatusInfo } from "@/components/StatusPill";
-import { eventHref, eventDotClass, type CalendarEvent } from "./types";
+import { EVENT_KIND_META, eventColor, eventHref, eventTitle, eventTimeLabel, type CalendarEvent } from "./types";
 
 function formatNaira(kobo: number): string {
   return `₦${(kobo / 100).toLocaleString("en-NG")}`;
 }
 
-function formatTime(date: Date): string {
-  return date.toLocaleTimeString("en-NG", { hour: "numeric", minute: "2-digit" });
+function capitalize(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase().replace(/_/g, " ");
 }
 
 function formatBattleFormat(format: string): string {
   return format === "BEST_OF_3" ? "Best of 3" : "Single match";
 }
 
-function TournamentOrChallengeCard({ event }: { event: Extract<CalendarEvent, { kind: "tournament" | "challenge" }> }) {
-  const status = event.kind === "tournament" ? tournamentStatusInfo(event.status) : battleStatusInfo(event.status);
+/** One event's body — the card half of an agenda row. Shared with the
+ *  list view so the two never describe the same event differently. */
+export function AgendaEventBody({ event }: { event: CalendarEvent }) {
+  if (event.kind === "tournament" || event.kind === "challenge") {
+    const status = event.kind === "tournament" ? tournamentStatusInfo(event.status) : battleStatusInfo(event.status);
+    const prize =
+      event.kind === "tournament"
+        ? event.prizeAmount
+          ? formatNaira(event.prizeAmount)
+          : event.entryFee === 0
+            ? "Free entry"
+            : `${formatNaira(event.entryFee)} entry`
+        : "Free entry";
 
-  return (
-    <Link href={eventHref(event)!} className="card card-hover flex flex-col gap-3 p-3.5">
-      <div className="flex items-start gap-3">
-        <GameArtTile game={event.game} className="h-11 w-11 shrink-0 rounded-[var(--radius-sm)]" hideLabel imgWidth={120} />
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <div className="flex items-center justify-between gap-2">
-            <span className="truncate text-xs font-semibold text-muted uppercase">{event.game}</span>
+    return (
+      <Link
+        href={eventHref(event)!}
+        className="group flex min-w-0 flex-1 items-start gap-3 rounded-[12px] border border-border bg-surface p-3 transition duration-[var(--duration-base)] hover:border-border-hover hover:bg-surface-elevated/50"
+      >
+        <GameArtTile game={event.game} className="h-10 w-10 shrink-0 rounded-[9px]" hideLabel imgWidth={100} />
+        <span className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <span className="flex items-start justify-between gap-2">
+            <span className="flex min-w-0 flex-col">
+              <span className="line-clamp-2 text-sm leading-snug font-semibold text-foreground">
+                {eventTitle(event)}
+              </span>
+              <span className="truncate text-xs text-muted">
+                {event.kind === "tournament"
+                  ? `${event.game} · ${event.teamSize} · ${capitalize(event.format)}`
+                  : `${formatBattleFormat(event.format)} · by ${event.hostName}`}
+              </span>
+            </span>
+            <ArrowRight size={14} className="mt-0.5 shrink-0 text-muted-strong transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
+          </span>
+          <span className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
             <StatusPill tone={status.tone} pulse={status.pulse}>
               {status.label}
             </StatusPill>
-          </div>
-          <span className="truncate font-display text-sm font-bold text-foreground">
-            {event.kind === "tournament" ? event.name : `${event.game} Challenge`}
+            <span className="flex items-center gap-1 text-xs font-semibold text-foreground">
+              <Trophy size={12} className="text-gold" />
+              {prize}
+            </span>
+            {event.kind === "tournament" && (
+              <span className="flex items-center gap-1 font-mono text-[11px] text-muted tabular-nums">
+                <Users size={12} />
+                {event.registered}/{event.participantCap}
+              </span>
+            )}
           </span>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted">
-        <span className="flex items-center gap-1">
-          <Calendar size={11} />
-          {event.date.toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })} ·{" "}
-          {formatTime(event.date)}
         </span>
-        {event.kind === "tournament" ? (
-          <span className="flex items-center gap-1">
-            <Users size={11} />
-            {event.registered} / {event.participantCap} Players
-          </span>
-        ) : (
-          <span className="flex items-center gap-1">
-            <Users size={11} />
-            Hosted by {event.hostName}
-          </span>
-        )}
-      </div>
+      </Link>
+    );
+  }
 
-      <div className="flex flex-wrap items-center gap-1.5">
-        {event.kind === "tournament" ? (
-          <>
-            <span className="badge badge-neutral">{event.teamSize}</span>
-            <span className="badge badge-neutral capitalize">{event.format.toLowerCase()}</span>
-          </>
-        ) : (
-          <span className="badge badge-neutral">{formatBattleFormat(event.format)}</span>
-        )}
-      </div>
-
-      <div className="flex items-center justify-between gap-2 border-t border-border pt-3">
-        <span className="flex items-center gap-1.5 text-sm font-semibold text-gold">
-          <Trophy size={14} />
-          {event.kind === "tournament"
-            ? event.prizeAmount
-              ? formatNaira(event.prizeAmount)
-              : event.entryFee === 0
-                ? "Free entry"
-                : formatNaira(event.entryFee)
-            : "Free entry"}
-        </span>
-        <span className="btn-primary px-3 py-1.5 text-xs">
-          View Details
-          <ArrowRight size={12} />
-        </span>
-      </div>
-    </Link>
-  );
-}
-
-/** Community/Game Release rows: real admin-authored `CalendarEvent` rows
- *  (Admin > Calendar), but with no detail page of their own — the
- *  calendar day panel is the entire surface for these two, so this is a
- *  plain card, not a link. */
-function CommunityOrReleaseCard({ event }: { event: Extract<CalendarEvent, { kind: "community" | "game_release" }> }) {
+  // Community/Game Release: admin-authored rows with no detail page of
+  // their own — the calendar is their whole surface, so not a link.
   const Icon = event.kind === "community" ? Megaphone : Gamepad2;
-  const label = event.kind === "community" ? "Community" : "Game Release";
-
   return (
-    <div className="card flex items-center gap-3 p-3.5">
-      <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[9px] text-white ${eventDotClass(event)}`}>
-        <Icon size={18} />
+    <div className="flex min-w-0 flex-1 items-center gap-3 rounded-[12px] border border-dashed border-border-strong p-3">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[9px] bg-surface-elevated text-foreground">
+        <Icon size={17} />
       </span>
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="text-xs font-semibold text-muted uppercase">{label}</span>
-        <span className="truncate font-display text-sm font-bold text-foreground">{event.title}</span>
-        <span className="text-[11px] text-muted">{formatTime(event.date)}</span>
-      </div>
+      <span className="flex min-w-0 flex-col">
+        <span className="truncate text-sm font-semibold text-foreground">{event.title}</span>
+        <span className="text-xs text-muted">{EVENT_KIND_META[event.kind].label}</span>
+      </span>
     </div>
   );
 }
 
-function EventCard({ event }: { event: CalendarEvent }) {
-  if (event.kind === "tournament" || event.kind === "challenge") {
-    return <TournamentOrChallengeCard event={event} />;
-  }
-  return <CommunityOrReleaseCard event={event} />;
+/** Time column + coloured node on a vertical rail + the event body. */
+export function AgendaRow({ event, last }: { event: CalendarEvent; last: boolean }) {
+  return (
+    <li className="relative flex gap-3">
+      <span className="w-11 shrink-0 pt-3 text-right font-mono text-[11px] font-semibold text-foreground tabular-nums">
+        {eventTimeLabel(event)}
+      </span>
+      <span aria-hidden className="relative flex w-3 shrink-0 justify-center">
+        <span className={`absolute top-0 w-px bg-border ${last ? "h-4" : "bottom-[-12px]"}`} />
+        <span
+          className="cal-dot relative mt-[15px] h-2.5 w-2.5 rounded-full ring-4 ring-surface"
+          style={{ "--ev": eventColor(event) } as React.CSSProperties}
+        />
+      </span>
+      <AgendaEventBody event={event} />
+    </li>
+  );
 }
 
 export function CalendarDayPanel({
   date,
   events,
+  isToday,
+  nextUp,
 }: {
   date: Date;
   events: CalendarEvent[];
+  isToday: boolean;
+  /** The first event after this day, within the fetched range — gives an
+   *  empty day somewhere to send you instead of a dead end. */
+  nextUp: { event: CalendarEvent; href: string } | null;
 }) {
   return (
-    <div className="card flex max-h-[calc(100vh-92px)] flex-col gap-4 lg:sticky lg:top-[76px]">
-      <div className="flex shrink-0 items-center justify-between gap-2">
-        <h2 className="text-card-title">
-          {date.toLocaleDateString("en-NG", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
-        </h2>
-        <span className="text-xs font-medium text-muted">
+    <aside className="flex flex-col gap-4 rounded-[14px] border border-border bg-surface p-4 sm:p-5 xl:max-h-[calc(100vh-92px)]">
+      <header className="flex shrink-0 items-center gap-3.5">
+        <span className="font-display text-[40px] leading-none font-bold tracking-tight tabular-nums">{date.getDate()}</span>
+        <span className="flex flex-col">
+          <span className="text-sm font-semibold">
+            {date.toLocaleDateString("en-NG", { weekday: "long" })}
+            {isToday && <span className="ml-2 rounded-[4px] bg-accent-volt px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-[0.12em] text-accent-volt-foreground uppercase align-middle">Today</span>}
+          </span>
+          <span className="text-xs text-muted">{date.toLocaleDateString("en-NG", { month: "long", year: "numeric" })}</span>
+        </span>
+        <span className="ml-auto font-mono text-[11px] text-muted tabular-nums">
           {events.length} event{events.length === 1 ? "" : "s"}
         </span>
-      </div>
+      </header>
 
       {events.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 py-10 text-center">
-          <Swords size={22} className="text-muted-strong" />
-          <p className="text-sm text-muted">Nothing scheduled this day.</p>
+        <div className="flex flex-col gap-3 border-t border-border pt-4">
+          <p className="text-sm text-muted">Nothing on the schedule {isToday ? "today" : "this day"}.</p>
+          {nextUp && (
+            <Link
+              href={nextUp.href}
+              scroll={false}
+              className="group flex items-center gap-3 rounded-[12px] bg-surface-elevated/70 p-3 transition hover:bg-surface-elevated"
+            >
+              <span
+                className="cal-dot h-2 w-2 shrink-0 rounded-full"
+                style={{ "--ev": eventColor(nextUp.event) } as React.CSSProperties}
+                aria-hidden
+              />
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="font-mono text-[10px] font-semibold tracking-[0.14em] text-muted uppercase">
+                  Next up · {nextUp.event.date.toLocaleDateString("en-NG", { weekday: "short", day: "numeric", month: "short" })}
+                </span>
+                <span className="truncate text-sm font-semibold">{eventTitle(nextUp.event)}</span>
+              </span>
+              <ArrowRight size={14} className="shrink-0 text-muted transition-transform group-hover:translate-x-0.5" />
+            </Link>
+          )}
         </div>
       ) : (
-        /* The card's own header stays put; only this list scrolls — so
-           a busy day (11+ events) can't stretch the whole page instead. */
-        <div className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1">
-          {events.map((event) => (
-            <EventCard key={`${event.kind}-${event.id}`} event={event} />
+        /* Only the list scrolls on desktop — a busy day can't stretch the page. */
+        <ol className="scrollbar-hide -mx-1 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-1 pb-1">
+          {events.map((event, i) => (
+            <AgendaRow key={`${event.kind}-${event.id}`} event={event} last={i === events.length - 1} />
           ))}
-        </div>
+        </ol>
       )}
-    </div>
+    </aside>
   );
 }

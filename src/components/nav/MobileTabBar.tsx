@@ -121,11 +121,13 @@ export function MobileTabBar({ user }: { user: NavUser }) {
 
       {menuOpen && (
         <div className="fixed inset-0 z-30 flex items-end sm:hidden" onClick={() => setMenuOpen(false)}>
-          <div className="sheet-backdrop-enter absolute inset-0 bg-black/60" />
+          <div className="sheet-backdrop-enter overlay-backdrop absolute inset-0" />
           <div
-            className="sheet-panel-enter scrollbar-hide relative z-10 flex max-h-[75vh] w-full flex-col gap-1 overflow-y-auto rounded-t-2xl border-t border-border bg-surface p-4 pb-[calc(1rem_+_env(safe-area-inset-bottom))]"
+            className="sheet-panel-enter scrollbar-hide relative z-10 flex max-h-[80vh] w-full flex-col gap-1 overflow-y-auto rounded-t-[20px] bg-surface px-4 pt-2.5 pb-[calc(1rem_+_env(safe-area-inset-bottom))]"
+            style={{ boxShadow: "var(--shadow-dialog)" }}
             onClick={(e) => e.stopPropagation()}
           >
+            <span aria-hidden className="mx-auto mb-3 h-1 w-9 shrink-0 rounded-full bg-border-strong" />
             <div className="mb-2 flex items-center justify-between">
               <span className="text-sm font-semibold">Menu</span>
               <button type="button" onClick={() => setMenuOpen(false)} aria-label="Close">

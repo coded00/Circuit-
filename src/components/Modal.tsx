@@ -1,43 +1,31 @@
 "use client";
 
 /**
- * Circuit — generic modal shell: success/error/warning/info variants,
- * primary/secondary actions (with an optional loading state on the
- * primary one), Escape/backdrop/X close, body-scroll lock. Same
- * portal-to-body + framer-motion backdrop pattern as NotificationBell's
- * own panel and QuickMatch's incoming-challenge modal — see
- * NotificationBell.tsx's own comment on why the portal is needed
- * (TopBar's backdrop-blur establishes a containing block that would
- * otherwise clip a plain `position: fixed` child to the header's own
- * height).
+ * Circuit — generic modal: success/error/warning/info variants,
+ * primary/secondary actions (optional loading state on the primary),
+ * Escape/backdrop/X close. Sits in ui/Overlay.tsx's DialogOverlay, so it
+ * is a bottom sheet on phones and a centred dialog from `sm` up.
+ *
+ * Left-aligned header (icon chip beside the title, not a big centred
+ * circle over it) with the actions in their own footer strip — reads as
+ * a product dialog rather than a stock alert.
  *
  * The building block behind ConfirmDialogProvider.tsx's imperative
  * confirm() replacement for window.confirm() — used directly wherever a
  * one-off success/error/info modal (not a yes/no confirmation) is
  * needed instead.
- *
- * Portaling to document.body also means this escapes /admin's own
- * `data-surface="dark"` scope (globals.css's dark-mode override, applied
- * via that attribute on a wrapping div in admin/layout.tsx, not on
- * <html>/<body>) — without re-applying it here, a confirm dialog
- * triggered from the admin section would render with the light theme's
- * card while everything behind it stays dark. Same route-based check
- * AppShell.tsx already uses for admin-specific behavior.
  */
 
-import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
-import { usePathname } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, CheckCircle2, Info, X, XCircle } from "lucide-react";
 import { Spinner } from "@/components/Spinner";
+import { DialogOverlay } from "@/components/ui/Overlay";
 
 export type ModalVariant = "success" | "error" | "warning" | "info";
 
 const VARIANT_ICON: Record<ModalVariant, { Icon: typeof AlertTriangle; className: string }> = {
-  success: { Icon: CheckCircle2, className: "bg-success/15 text-success" },
-  error: { Icon: XCircle, className: "bg-danger/15 text-danger" },
-  warning: { Icon: AlertTriangle, className: "bg-warning/15 text-warning" },
+  success: { Icon: CheckCircle2, className: "bg-success/12 text-success" },
+  error: { Icon: XCircle, className: "bg-danger/12 text-danger" },
+  warning: { Icon: AlertTriangle, className: "bg-warning/15 text-warning-strong" },
   info: { Icon: Info, className: "bg-accent-blue-soft text-accent-blue" },
 };
 
@@ -45,7 +33,7 @@ export type ModalAction = {
   label: string;
   onClick: () => void;
   loading?: boolean;
-  /** Renders as `.btn-danger` instead of `.btn-primary` — for a destructive primary action. */
+  /** Solid red instead of `.btn-primary` — for a destructive primary action. */
   danger?: boolean;
 };
 
@@ -68,114 +56,48 @@ export function Modal({
   secondaryAction?: ModalAction;
   children?: React.ReactNode;
 }) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- deliberate one-time post-mount flag to gate the portal target (document.body), not a data-fetch/subscription effect
-    setMounted(true);
-  }, []);
-
-  const pathname = usePathname();
-  const isAdminSurface = pathname.startsWith("/admin");
-
-  useEffect(() => {
-    if (!open) return;
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [open, onClose]);
-
-  // Same "the backdrop dims the page but doesn't stop scroll" fix
-  // NotificationBell's panel needed — a modal sitting on top of
-  // scrollable content should feel modal, not like an overlay you can
-  // scroll straight past.
-  useEffect(() => {
-    if (!open) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [open]);
-
   const { Icon, className: iconClassName } = VARIANT_ICON[variant];
 
   return (
-    mounted &&
-    createPortal(
-      <AnimatePresence>
-        {open && (
-          <>
-            <motion.div
-              key="modal-backdrop"
-              className="fixed inset-0 z-40 bg-black/60"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
-              onClick={onClose}
-            />
-            <motion.div
-              key="modal-panel"
-              className="fixed inset-0 z-50 flex items-center justify-center p-4"
-              initial={{ opacity: 0, scale: 0.96 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.96 }}
-              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-              onClick={onClose}
+    <DialogOverlay open={open} onClose={onClose} label={title} maxWidth={440}>
+      <div className="relative flex flex-col gap-4 overflow-y-auto px-5 pt-2 pb-5 sm:px-6 sm:pt-6">
+        <button type="button" onClick={onClose} aria-label="Close" className="btn-icon absolute top-2 right-2 hidden h-9 w-9 sm:inline-flex">
+          <X size={16} />
+        </button>
+
+        <div className="flex items-start gap-3.5 sm:pr-8">
+          <span className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] ${iconClassName}`}>
+            <Icon size={20} strokeWidth={2.25} />
+          </span>
+          <div className="flex min-w-0 flex-col gap-1">
+            <h2 className="font-display text-[17px] leading-snug font-bold tracking-tight">{title}</h2>
+            {message && <p className="text-sm leading-relaxed text-muted">{message}</p>}
+          </div>
+        </div>
+
+        {children}
+      </div>
+
+      {(primaryAction || secondaryAction) && (
+        <div className="overlay-actions">
+          {secondaryAction && (
+            <button type="button" onClick={secondaryAction.onClick} className="btn-secondary">
+              {secondaryAction.label}
+            </button>
+          )}
+          {primaryAction && (
+            <button
+              type="button"
+              onClick={primaryAction.onClick}
+              disabled={primaryAction.loading}
+              className={primaryAction.danger ? "btn-danger-solid" : "btn-primary"}
             >
-              <div
-                role="dialog"
-                aria-modal="true"
-                aria-label={title}
-                data-surface={isAdminSurface ? "dark" : undefined}
-                className="card relative w-full max-w-[400px] p-6"
-                style={{ boxShadow: "0 16px 40px rgba(0, 0, 0, 0.45)" }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <button type="button" onClick={onClose} aria-label="Close" className="btn-icon absolute top-3 right-3">
-                  <X size={16} className="text-muted" />
-                </button>
-
-                <div className="flex flex-col items-center gap-3 pt-1 text-center">
-                  <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${iconClassName}`}>
-                    <Icon size={24} />
-                  </span>
-                  <div className="flex flex-col gap-1">
-                    <h2 className="text-lg font-semibold">{title}</h2>
-                    {message && <p className="text-sm text-muted">{message}</p>}
-                  </div>
-                </div>
-
-                {children}
-
-                {(primaryAction || secondaryAction) && (
-                  <div className="mt-5 flex gap-2">
-                    {secondaryAction && (
-                      <button type="button" onClick={secondaryAction.onClick} className="btn-secondary flex-1 justify-center">
-                        {secondaryAction.label}
-                      </button>
-                    )}
-                    {primaryAction && (
-                      <button
-                        type="button"
-                        onClick={primaryAction.onClick}
-                        disabled={primaryAction.loading}
-                        className={`flex-1 justify-center ${primaryAction.danger ? "btn-danger" : "btn-primary"}`}
-                      >
-                        {primaryAction.loading && <Spinner />}
-                        {primaryAction.label}
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>,
-      document.body
-    )
+              {primaryAction.loading && <Spinner />}
+              {primaryAction.label}
+            </button>
+          )}
+        </div>
+      )}
+    </DialogOverlay>
   );
 }

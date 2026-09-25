@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { CheckCheck } from "lucide-react";
 
 export default function MarkAllReadButton() {
   const router = useRouter();
@@ -15,7 +16,8 @@ export default function MarkAllReadButton() {
   }
 
   return (
-    <button type="button" onClick={handleClick} disabled={submitting} className="btn-secondary">
+    <button type="button" onClick={handleClick} disabled={submitting} className="btn-secondary gap-1.5 px-3.5 py-2 text-[13px]">
+      <CheckCheck size={15} />
       {submitting ? "Marking…" : "Mark all read"}
     </button>
   );

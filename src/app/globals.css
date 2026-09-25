@@ -161,6 +161,13 @@
      convention .rank-row already established. */
   --stagger-step: 70ms;
 
+  /* Floating surfaces (popovers, dialogs, sheets). Layered and tight —
+     a 1px contact edge plus a soft ambient falloff — instead of one big
+     flat black blur, which read heavy and generic on the light surface. */
+  --shadow-float: 0 0 0 1px rgba(17, 19, 24, 0.04), 0 2px 4px rgba(17, 19, 24, 0.04), 0 12px 32px -6px rgba(17, 19, 24, 0.16);
+  --shadow-dialog: 0 0 0 1px rgba(17, 19, 24, 0.05), 0 8px 16px -4px rgba(17, 19, 24, 0.08), 0 32px 64px -12px rgba(17, 19, 24, 0.28);
+  --overlay-scrim: rgba(12, 14, 18, 0.42);
+
   --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-out: cubic-bezier(0, 0, 0.2, 1);
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
@@ -221,6 +228,10 @@
   --foreground: #f8fafc;
   --muted: #9ca3af;
   --muted-strong: #6b7280;
+
+  --shadow-float: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 12px 32px -6px rgba(0, 0, 0, 0.6);
+  --shadow-dialog: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 32px 64px -12px rgba(0, 0, 0, 0.7);
+  --overlay-scrim: rgba(4, 6, 9, 0.66);
 
   background: var(--background);
   color: var(--foreground);
@@ -485,7 +496,7 @@ body {
        viewport edge (e.g. NotificationBell, mid-header) would otherwise
        clip off the opposite edge on narrow phones. */
     max-width: calc(100vw - 2rem);
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+    box-shadow: var(--shadow-float);
     animation: motion-panel-enter var(--duration-base) var(--ease-out) both;
     transform-origin: top right;
   }
@@ -1115,5 +1126,76 @@ body {
 
   html {
     scroll-behavior: auto;
+  }
+}
+
+/*
+ * ============================================================================
+ * Overlays — ui/Overlay.tsx's shell (dialogs, sheets) and the pieces the
+ * dialogs built on it share.
+ * ============================================================================
+ */
+@layer components {
+  .overlay-backdrop {
+    background: var(--overlay-scrim);
+    backdrop-filter: blur(3px) saturate(0.9);
+    -webkit-backdrop-filter: blur(3px) saturate(0.9);
+  }
+
+  .overlay-panel {
+    background: var(--surface);
+    color: var(--foreground);
+    box-shadow: var(--shadow-dialog);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  @media (min-width: 40rem) {
+    .overlay-panel {
+      padding-bottom: 0;
+    }
+  }
+
+  /* Footer action bar of a dialog: its own tinted strip, actions pushed
+     right on desktop; stacked full-width (primary on top) on phones. */
+  .overlay-actions {
+    @apply flex flex-col-reverse gap-2 border-t border-border bg-background/60 px-5 py-4 sm:flex-row sm:justify-end sm:px-6;
+  }
+  .overlay-actions > * {
+    @apply w-full justify-center sm:w-auto;
+  }
+
+  /* Solid destructive — the confirm step of a delete/cancel/withdraw.
+     .btn-danger (outlined) stays for the trigger buttons on the page. */
+  .btn-danger-solid {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-control)] bg-danger px-5 py-2.5
+      text-sm font-semibold text-white shadow-sm transition duration-[var(--duration-base)] ease-[var(--ease-standard)]
+      hover:bg-danger-strong active:scale-[0.97] active:duration-[var(--duration-instant)]
+      disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
+  }
+}
+
+/*
+ * ============================================================================
+ * Calendar (/calendar). Event colour arrives per element as `--ev` (see
+ * components/calendar/types.ts's EVENT_KIND_META) so one rule covers all
+ * four kinds.
+ * ============================================================================
+ */
+@layer components {
+  .cal-event {
+    background: color-mix(in srgb, var(--ev) 11%, var(--surface));
+    box-shadow: inset 2px 0 0 var(--ev);
+  }
+  .cal-dot {
+    background: var(--ev);
+  }
+  /* Days outside the visible month: hatched, not just faded, so the
+     month's real edges read at a glance. */
+  .cal-outside {
+    background-image: repeating-linear-gradient(
+      135deg,
+      transparent 0 6px,
+      color-mix(in srgb, var(--foreground) 4%, transparent) 6px 7px
+    );
   }
 }

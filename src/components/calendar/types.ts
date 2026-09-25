@@ -66,35 +66,38 @@ export function eventHref(event: CalendarEvent): string | null {
 
 export function eventTitle(event: CalendarEvent): string {
   if (event.kind === "tournament") return event.name;
-  if (event.kind === "challenge") return event.game;
+  if (event.kind === "challenge") return `${event.game} challenge`;
   return event.title;
 }
 
-/** Tailwind text-color class per kind — Tournament reuses the app's
- *  informational blue, Challenge reuses its established orange (see
- *  OpenChallenges.tsx); Community/Game Release use plain Tailwind
- *  palette colors since Circuit's own accent-token set doesn't have a
- *  dedicated purple/red pair for these two (admin-content) categories. */
-export function eventColorClass(event: CalendarEvent): string {
-  if (event.kind === "tournament") return "text-accent-blue";
-  if (event.kind === "challenge") return "text-accent-orange";
-  if (event.kind === "community") return "text-purple-500";
-  return "text-rose-500";
+export type EventKind = CalendarEvent["kind"];
+
+/**
+ * One colour per kind, all from Circuit's own accent tokens (the old
+ * Tailwind purple-500/rose-500 pair sat outside the palette): Tournament
+ * = Competition Blue, Challenge = Challenge Orange, Community = Volt,
+ * Game Release = ink. Exposed as a CSS value so the grid's event rows,
+ * dots and the filter chips (which double as the legend) all read the
+ * same `--ev` custom property — see `.cal-event` in globals.css.
+ */
+export const EVENT_KIND_META: Record<EventKind, { label: string; plural: string; color: string }> = {
+  tournament: { label: "Tournament", plural: "Tournaments", color: "var(--accent-blue)" },
+  challenge: { label: "Challenge", plural: "Challenges", color: "var(--accent-orange)" },
+  community: { label: "Community", plural: "Community", color: "var(--accent-volt)" },
+  game_release: { label: "Game release", plural: "Game Releases", color: "var(--foreground)" },
+};
+
+export function eventColor(event: CalendarEvent): string {
+  return EVENT_KIND_META[event.kind].color;
 }
 
-export function eventDotClass(event: CalendarEvent): string {
-  if (event.kind === "tournament") return "bg-accent-blue";
-  if (event.kind === "challenge") return "bg-accent-orange";
-  if (event.kind === "community") return "bg-purple-500";
-  return "bg-rose-500";
+export function formatEventTime(date: Date): string {
+  return date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 }
 
-/** Solid, saturated fill for the month/week grid's compact event chips —
- *  deliberately bolder than the soft-tint badges used elsewhere on
- *  Circuit, so a day cell reads at a glance in a dense grid. */
-export function eventPillClass(event: CalendarEvent): string {
-  if (event.kind === "tournament") return "bg-accent-blue text-white";
-  if (event.kind === "challenge") return "bg-accent-orange text-white";
-  if (event.kind === "community") return "bg-purple-500 text-white";
-  return "bg-rose-500 text-white";
+/** Admin-authored Community/Game Release rows are often date-only
+ *  (stored at midnight) — those read "All day" rather than "00:00". */
+export function eventTimeLabel(event: CalendarEvent): string {
+  const allDay = (event.kind === "community" || event.kind === "game_release") && event.date.getHours() === 0 && event.date.getMinutes() === 0;
+  return allDay ? "All day" : formatEventTime(event.date);
 }
