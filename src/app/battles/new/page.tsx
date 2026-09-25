@@ -10,7 +10,7 @@ export default async function NewBattlePage() {
     redirect("/login?next=/battles/new");
   }
   const [games, friendIds] = await Promise.all([
-    prisma.game.findMany({ where: { enabled: true }, orderBy: { name: "asc" } }),
+    prisma.game.findMany({ where: { enabled: true, publishedAt: { not: null } }, orderBy: { name: "asc" } }),
     getFriendIds(user.id),
   ]);
   const friends = friendIds.length

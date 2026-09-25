@@ -1,41 +1,20 @@
+"use client";
+
 /**
- * Circuit — cover-art tile. No Game catalog/cover-art model exists
- * (Tournament.game/Battle.game are free-text), so there's no real photo
- * library that could cover an arbitrary, organizer-typed game name.
- *
- * A real, organizer-uploaded `posterUrl` (Tournament's own field — see
- * that model's schema comment) always takes priority when passed: this
- * is the actual event's own art, not a generic stand-in, so it wins over
- * everything else below regardless of whether the game name is
- * recognized. Only once there's no real poster does this fall back to:
- * for the small, fixed set of well-known games this UI references by
- * name elsewhere (see gameImagery.ts), a real, verified stock photo; for
- * anything else, the same deterministic gradient-tint treatment as
- * before: no image request, same look every time for the same name.
+ * Circuit — cover-art tile. Image priority, most specific first:
+ * 1. `posterUrl` — the organizer's own art for this exact competition;
+ * 2. the game's admin-uploaded cover/icon from the Game catalog (via
+ *    GameImageProvider — this is what makes a newly published game's
+ *    image show up everywhere its name appears);
+ * 3. a verified stock photo for the few well-known games in
+ *    gameImagery.ts;
+ * 4. a deterministic gradient tint — no image request, same look every
+ *    time for the same name.
  */
 
 import { realGameImage, unsplashUrl } from "@/lib/gameImagery";
-
-const PALETTE: readonly string[] = [
-  "#1e3a8a", // deep blue
-  "#4c1d95", // deep violet
-  "#0e5a6b", // deep cyan-teal
-  "#312e81", // indigo
-  "#1e1b4b", // near-black indigo
-  "#164e63", // slate cyan
-];
-
-function hashGameName(game: string): number {
-  let hash = 0;
-  for (let i = 0; i < game.length; i++) {
-    hash = (hash * 31 + game.charCodeAt(i)) >>> 0;
-  }
-  return hash;
-}
-
-export function gameTint(game: string): string {
-  return PALETTE[hashGameName(game) % PALETTE.length];
-}
+import { useGameImage } from "@/components/GameImageProvider";
+import { gameTint } from "@/lib/gameTint";
 
 export function GameArtTile({
   game,
@@ -70,8 +49,9 @@ export function GameArtTile({
   fill?: boolean;
   children?: React.ReactNode;
 }) {
+  const catalogImage = useGameImage(game);
   const stockPhoto = realGameImage(game);
-  const imageSrc = posterUrl || (stockPhoto ? unsplashUrl(stockPhoto, imgWidth) : null);
+  const imageSrc = posterUrl || catalogImage || (stockPhoto ? unsplashUrl(stockPhoto, imgWidth) : null);
   const tint = gameTint(game);
 
   return (

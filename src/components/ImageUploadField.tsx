@@ -46,11 +46,21 @@ export const BANNER_BOUNDS: ImageSizeBounds = {
   recommended: "1600×500px (a landscape banner, roughly 3:1) works best across every screen size.",
 };
 
-export type ImagePurpose = "avatar" | "poster" | "banner" | "game-icon";
+/** A game's cover art — shown on game tiles and competition cards, so
+ *  landscape but not as extreme as a banner. */
+export const GAME_COVER_BOUNDS: ImageSizeBounds = {
+  minWidth: 800,
+  minHeight: 450,
+  minRatio: 1.2,
+  maxRatio: 2.4,
+  recommended: "1600×900px (16:9) — shown on this game's tiles and on competition cards.",
+};
+
+export type ImagePurpose = "avatar" | "poster" | "banner" | "game-icon" | "game-cover";
 
 /** Longest edge an upload is downscaled to, per purpose — big enough for
  *  where each is shown (and above POSTER_BOUNDS' 1200px minimum). */
-const MAX_EDGE: Record<ImagePurpose, number> = { avatar: 512, poster: 2400, banner: 2400, "game-icon": 256 };
+const MAX_EDGE: Record<ImagePurpose, number> = { avatar: 512, poster: 2400, banner: 2400, "game-icon": 256, "game-cover": 1600 };
 
 function checkImageSize(width: number, height: number, bounds: ImageSizeBounds): string | null {
   if (width < bounds.minWidth || height < bounds.minHeight) {

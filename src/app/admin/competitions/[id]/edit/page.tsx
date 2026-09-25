@@ -22,7 +22,7 @@ export default async function AdminCompetitionEditPage({ params }: { params: Pro
     tournament.entryFee > 0 &&
     (await prisma.registration.count({ where: { tournamentId: id, status: "CONFIRMED" } })) > 0;
   const [games, community] = await Promise.all([
-    prisma.game.findMany({ where: { enabled: true }, orderBy: { name: "asc" } }),
+    prisma.game.findMany({ where: { enabled: true, publishedAt: { not: null } }, orderBy: { name: "asc" } }),
     prisma.community.findUnique({ where: { tournamentId: id }, select: { enabled: true } }),
   ]);
 

@@ -14,6 +14,8 @@ import { PresenceHeartbeat } from "@/components/PresenceHeartbeat";
 import { QuickMatchIncomingListener } from "@/components/QuickMatchIncomingListener";
 import { SITE_NAME, SITE_URL, DEFAULT_DESCRIPTION } from "@/lib/seo";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
+import { gameImageMap } from "@/lib/gameCatalogQueries";
+import { GameImageProvider } from "@/components/GameImageProvider";
 
 // Phase 14: Inter for UI text, Barlow Condensed ExtraBold for display/hero
 // headlines — a tall, condensed weight suited to the CIRCUIT wordmark's
@@ -82,7 +84,7 @@ const WEBSITE_JSON_LD = {
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const user = await getCurrentUser();
-  const [disputeCount, platformSetting] = await Promise.all([
+  const [disputeCount, platformSetting, gameImages] = await Promise.all([
     user
       ? prisma.dispute.count({
           where: {
@@ -92,6 +94,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         })
       : 0,
     prisma.platformSetting.findUnique({ where: { id: "singleton" } }),
+    gameImageMap(),
   ]);
   const navUser = user ? { handle: user.handle, displayName: user.displayName, isStaff: user.isStaff } : null;
 
@@ -146,6 +149,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             AppShell decides whether this shell renders at all — the four
             auth routes skip it entirely for their own full-bleed split
             layout (see AppShell.tsx / AuthSplitLayout.tsx). */}
+        <GameImageProvider images={gameImages}>
         <ConfirmDialogProvider>
           <AppShell
             sidebar={<AppSidebar user={navUser} />}
@@ -157,6 +161,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             {children}
           </AppShell>
         </ConfirmDialogProvider>
+        </GameImageProvider>
         {user && <OneSignalInit userId={user.id} notifyNewContent={user.notifyNewContent} />}
         {user && <PresenceHeartbeat />}
         {user && <QuickMatchIncomingListener />}

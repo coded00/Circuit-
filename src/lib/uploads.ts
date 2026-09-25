@@ -27,6 +27,7 @@ export const IMAGE_PURPOSES = {
   poster: { staffOnly: false },
   banner: { staffOnly: true },
   "game-icon": { staffOnly: true },
+  "game-cover": { staffOnly: true },
 } as const;
 export type ImagePurpose = keyof typeof IMAGE_PURPOSES;
 

@@ -339,19 +339,116 @@ model OrganizerProfile {
 /// Maps to TRN-1..TRN-6.
 /// Admin-curated catalog of games organizers can pick from when creating a
 /// tournament or challenge (see Tournament.game / Battle.game) — Admin >
-/// Games manages these rows. Deliberately not a foreign key: Tournament.game
-/// and Battle.game stay plain strings so every existing row and every read
-/// site that already treats `game` as a string keeps working unchanged —
-/// this table only constrains what the *creation/edit forms* offer as
-/// options, not what's already stored or how it's queried elsewhere.
+/// Games manages these rows. Tournament.game and Battle.game stay plain
+/// strings so every existing row and read site keeps working unchanged.
+///
+/// Configuration-driven competition rules hang off this row:
+/// Game → GameMode → GameFormat. Nothing about how a game is played
+/// competitively (which modes exist, team sizes, lobby sizes, which
+/// tournament structures apply) lives in code — it's all these rows, so a
+/// brand-new game needs no code change. See src/lib/gameCatalog.ts.
 model Game {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  iconUrl   String?
-  enabled   Boolean  @default(true)
-  createdAt DateTime @default(now())
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  /// Square logo (upload purpose "game-icon").
+  iconUrl     String?
+  /// Wide cover art (upload purpose "game-cover") — what GameArtTile shows
+  /// for this game everywhere, ahead of the built-in stock photo map.
+  coverUrl    String?
+  /// Free text, e.g. "Battle Royale", "Sports", "Tactical Shooter".
+  category    String?
+  /// e.g. ["Mobile", "PC", "PlayStation"]. Free text, admin-entered.
+  platforms   String[]  @default([])
+  publisher   String?
+  /// Active/inactive — an inactive game is hidden from creation forms.
+  enabled     Boolean   @default(true)
+  /// Null = draft. Organizers only see games that are both enabled and
+  /// published; publishing requires at least one active mode with an
+  /// active format (enforced by the publish route).
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  /// DB default only so the column could be added to existing rows.
+  updatedAt   DateTime  @default(now()) @updatedAt
+
+  modes GameMode[]
 
   @@index([enabled])
+}
+
+/// How a mode is actually contested: two sides meeting in a bracket match,
+/// or many entries sharing one lobby and scored by placement.
+enum CompetitionStyle {
+  HEAD_TO_HEAD
+  LOBBY
+}
+
+enum EntryType {
+  INDIVIDUAL
+  TEAM
+}
+
+/// A way a game is played competitively (Battle Royale, Team Deathmatch,
+/// Search & Destroy...). Unlimited per game, admin-ordered.
+model GameMode {
+  id          String           @id @default(cuid())
+  gameId      String
+  game        Game             @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  style       CompetitionStyle @default(HEAD_TO_HEAD)
+  /// False = the mode has no separate format layer (Game → Mode →
+  /// Competition): it owns exactly one `isDefault` GameFormat holding its
+  /// player/team rules, edited inline on the mode. True = admins manage
+  /// any number of named formats under it (Solo/Duo/Squad...). Either way
+  /// a competition always points at a GameFormat, so nothing downstream
+  /// has to special-case the two shapes.
+  usesFormats Boolean          @default(true)
+  enabled     Boolean          @default(true)
+  sortOrder   Int              @default(0)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  formats GameFormat[]
+
+  @@unique([gameId, name])
+  @@index([gameId, sortOrder])
+}
+
+/// A player/team configuration within a mode (Solo, Duo, Squad, 5v5...).
+/// Every field is admin-set — none are implied by the game or mode name.
+model GameFormat {
+  id                 String     @id @default(cuid())
+  modeId             String
+  mode               GameMode   @relation(fields: [modeId], references: [id], onDelete: Cascade)
+  name               String
+  description        String?
+  entryType          EntryType  @default(INDIVIDUAL)
+  /// Players who actually play for one side at a time (1 for individual).
+  playersPerTeam     Int        @default(1)
+  /// Roster bounds for team entries (substitutes allowed when max >
+  /// playersPerTeam). Null = exactly playersPerTeam.
+  minRoster          Int?
+  maxRoster          Int?
+  /// Sides per match/lobby. 2 for head-to-head; null = "multiple" (a
+  /// lobby holds as many entries as maxPlayersPerMatch allows).
+  teamsPerMatch      Int?
+  /// Lobby/match player cap, e.g. 100 for a Battle Royale lobby.
+  maxPlayersPerMatch Int?
+  /// Competition structures organizers may run this format as — codes
+  /// from src/lib/competitionStructures.ts (e.g. "KNOCKOUT").
+  structures         String[]   @default([])
+  /// Starting rules text offered to organizers for this format.
+  defaultRules       String?
+  /// The single implicit format of a mode with usesFormats = false.
+  isDefault          Boolean    @default(false)
+  enabled            Boolean    @default(true)
+  sortOrder          Int        @default(0)
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  @@unique([modeId, name])
+  @@index([modeId, sortOrder])
 }
 
 model Tournament {

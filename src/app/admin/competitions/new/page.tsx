@@ -10,7 +10,7 @@ import { prisma } from "@/lib/db";
 import TournamentForm from "@/app/tournaments/new/TournamentForm";
 
 export default async function AdminNewCompetitionPage() {
-  const games = await prisma.game.findMany({ where: { enabled: true }, orderBy: { name: "asc" } });
+  const games = await prisma.game.findMany({ where: { enabled: true, publishedAt: { not: null } }, orderBy: { name: "asc" } });
 
   return (
     <div className="flex flex-1 flex-col gap-6">

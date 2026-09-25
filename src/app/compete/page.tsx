@@ -103,6 +103,15 @@ export default async function CompetePage({ searchParams }: { searchParams: Prom
     }),
   ]);
 
+  // Live first, then everything upcoming by soonest start, then finished
+  // ones most-recent first — a plain startAt sort put past tournaments on top.
+  const rank = (s: TournamentStatus) => (s === "LIVE" ? 0 : s === "COMPLETE" || s === "CANCELLED" ? 2 : 1);
+  tournaments.sort((a, b) => {
+    const r = rank(a.status) - rank(b.status);
+    if (r !== 0) return r;
+    return rank(a.status) === 2 ? b.startAt.getTime() - a.startAt.getTime() : a.startAt.getTime() - b.startAt.getTime();
+  });
+
   const hasFilters = Boolean(q || game || status || entry || teamSize);
   const chipClass = (active: boolean) =>
     `flex shrink-0 items-center rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
@@ -243,14 +252,16 @@ export default async function CompetePage({ searchParams }: { searchParams: Prom
                     </div>
                   </div>
 
-                  <div className="flex shrink-0 flex-col items-end gap-0.5 sm:w-28">
-                    <span className={`text-stat text-sm ${t.prizeAmount ? "text-gold" : t.entryFee === 0 ? "text-success" : ""}`}>
+                  <div className="flex w-[84px] shrink-0 flex-col items-end gap-0.5 text-right sm:w-28">
+                    <span className={`font-display text-[15px] font-bold tabular-nums ${t.prizeAmount ? "text-gold" : t.entryFee === 0 ? "text-success" : ""}`}>
                       {t.prizeAmount ? formatNaira(t.prizeAmount) : t.entryFee === 0 ? "Free" : formatNaira(t.entryFee)}
                     </span>
                     <span className="text-[11px] text-muted">{t.prizeAmount ? "Prize" : "Entry"}</span>
                   </div>
 
-                  <div className="hidden w-24 shrink-0 justify-end lg:flex">
+                  {/* Wide enough for the longest label ("Registration open") so
+                      the pill never spills left over the prize column. */}
+                  <div className="hidden w-[148px] shrink-0 justify-end lg:flex">
                     <StatusPill tone={statusInfo.tone} pulse={statusInfo.pulse}>
                       {statusInfo.label}
                     </StatusPill>

@@ -9,7 +9,7 @@ import { ImageResponse } from "next/og";
 import { resolveImageForOg } from "@/lib/uploads";
 import { prisma } from "@/lib/db";
 import { realGameImage, unsplashUrl, gameAccent, CINEMATIC_GAMING_IMAGE } from "@/lib/gameImagery";
-import { gameTint } from "@/components/GameArtTile";
+import { gameTint } from "@/lib/gameTint";
 import { loadShareCardFonts, MARKER_FONT_NAME } from "@/lib/ogFonts";
 import { ShareCard } from "@/lib/shareCard";
 

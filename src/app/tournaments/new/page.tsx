@@ -8,7 +8,7 @@ export default async function NewTournamentPage() {
   if (!user) {
     redirect("/login?next=/tournaments/new");
   }
-  const games = await prisma.game.findMany({ where: { enabled: true }, orderBy: { name: "asc" } });
+  const games = await prisma.game.findMany({ where: { enabled: true, publishedAt: { not: null } }, orderBy: { name: "asc" } });
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-6 sm:p-8">
