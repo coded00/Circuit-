@@ -18,8 +18,16 @@ import { CommunityView } from "./CommunityView";
  *  the keyboard instead of being covered by it. Chat pages only. */
 export const viewport: Viewport = { interactiveWidget: "resizes-content" };
 
-export default async function CommunityPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function CommunityPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  /** `channel` (key) + `message` (id): a mention notification's deep link. */
+  searchParams: Promise<{ channel?: string; message?: string }>;
+}) {
   const { id } = await params;
+  const { channel: channelKey, message: highlightMessageId } = await searchParams;
 
   const user = await getCurrentUser();
   if (!user) {
@@ -52,9 +60,11 @@ export default async function CommunityPage({ params }: { params: Promise<{ id: 
   const membership = await prisma.communityMember.findUnique({
     where: { communityId_userId: { communityId: community.id, userId: user.id } },
   });
+  const startChannel = channels.find((c) => c.key === channelKey) ?? channels[0];
+  const initialServerTime = new Date().toISOString();
   const initialMessages =
-    channels[0] && membership
-      ? await getChannelMessages(channels[0].id, user.id)
+    startChannel && membership
+      ? await getChannelMessages(startChannel.id, user.id)
       : { messages: [], nextCursor: null };
 
   return (
@@ -68,6 +78,10 @@ export default async function CommunityPage({ params }: { params: Promise<{ id: 
       // boundary as a plain prop is one more thing to keep straight than
       // a string, matching how CountdownTimer's own caller does it.
       initialChannelMessages={initialMessages.messages.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() }))}
+      initialChannelId={startChannel?.id}
+      initialServerTime={initialServerTime}
+      highlightMessageId={highlightMessageId}
+      viewerId={user.id}
       isMember={membership !== null}
     />
   );

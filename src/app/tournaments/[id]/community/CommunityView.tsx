@@ -1,15 +1,17 @@
 "use client";
 
 /**
- * Circuit Community — Phase 1's Discord-style chat UI. Channel sidebar
- * (collapses into a slide-over on mobile) + a single message pane.
+ * Circuit Community — chat UI. Channel sidebar (collapses into a
+ * slide-over on mobile) + a single message pane with @mentions and
+ * emoji reactions (see MessageRow / ChatComposer).
  *
- * No members column, no reactions, no roles — those are Phase 2. No
- * WebSocket — see `Poller.tsx`'s own doc and this feature's schema
+ * No WebSocket — see `Poller.tsx`'s own doc and this feature's schema
  * comment on why: this component runs its own short interval against
  * the messages API (not the generic `Poller`/`router.refresh()`
  * mechanism, which would blow away this component's own local state on
- * every tick) and only fetches messages newer than the last one it has.
+ * every tick). Each tick asks for messages newer than the last one it
+ * has, plus reaction changes since the previous tick's server time — so
+ * reactions and mentions travel on the same poll as messages.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -17,11 +19,14 @@ import Link from "next/link";
 import { ArrowLeft, Hash, Menu, X } from "lucide-react";
 import { Spinner } from "@/components/Spinner";
 import { ChatComposer, type ComposerSubmit } from "@/components/community/ChatComposer";
-import { MessageBody, type MessageContent } from "@/components/community/MessageBody";
+import type { MessageContent } from "@/components/community/MessageBody";
+import { MessageRow } from "@/components/community/MessageRow";
+import type { ReactionSummary } from "@/lib/communityReactions";
 
 type ChannelInfo = { id: string; key: string; name: string };
 type Author = { id: string; displayName: string; handle: string; avatarUrl: string | null };
-type MessageInfo = MessageContent & { id: string; createdAt: string; isSystem: boolean; author: Author };
+type MessageInfo = MessageContent & { id: string; createdAt: string; isSystem: boolean; author: Author; reactions: ReactionSummary[] };
+type ReactionUpdate = { messageId: string; reactions: ReactionSummary[] };
 
 const POLL_INTERVAL_MS = 4000;
 /** Consecutive messages from the same author within this window render
@@ -103,6 +108,27 @@ function mergeMessages(existing: MessageInfo[], incoming: MessageInfo[]): Messag
   return deduped.length > 0 ? [...existing, ...deduped] : existing;
 }
 
+/** Replaces the reactions of any message named in `updates`. */
+function applyReactionUpdates(messages: MessageInfo[], updates: ReactionUpdate[]): MessageInfo[] {
+  if (updates.length === 0) return messages;
+  const byId = new Map(updates.map((u) => [u.messageId, u.reactions]));
+  return messages.map((m) => (byId.has(m.id) ? { ...m, reactions: byId.get(m.id)! } : m));
+}
+
+/** The viewer's own toggle, applied locally before the server answers. */
+function toggleLocally(reactions: ReactionSummary[], emoji: string, on: boolean): ReactionSummary[] {
+  const existing = reactions.find((r) => r.emoji === emoji);
+  if (on) {
+    if (existing?.reacted) return reactions;
+    if (existing) return reactions.map((r) => (r.emoji === emoji ? { ...r, count: r.count + 1, reacted: true, names: [...r.names, "You"] } : r));
+    return [...reactions, { emoji, count: 1, reacted: true, names: ["You"] }];
+  }
+  if (!existing?.reacted) return reactions;
+  return reactions
+    .map((r) => (r.emoji === emoji ? { ...r, count: r.count - 1, reacted: false, names: r.names.filter((n) => n !== "You") } : r))
+    .filter((r) => r.count > 0);
+}
+
 function Avatar({ author }: { author: Author }) {
   return author.avatarUrl ? (
     // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs, same as BracketView's own Avatar
@@ -121,6 +147,10 @@ export function CommunityView({
   channels,
   memberCount,
   initialChannelMessages,
+  initialChannelId,
+  initialServerTime,
+  highlightMessageId,
+  viewerId,
   isMember: initialIsMember,
 }: {
   communityId: string;
@@ -135,12 +165,26 @@ export function CommunityView({
    *  just the header's own "X members" line. */
   memberCount: number;
   initialChannelMessages: MessageInfo[];
+  /** Channel the page opened on (a mention notification can deep-link to
+   *  one); defaults to the first. `initialChannelMessages` belong to it. */
+  initialChannelId?: string;
+  /** Server time the initial messages were read at — the first poll's
+   *  `reactionsSince`, so a reaction landing in between isn't missed. */
+  initialServerTime: string;
+  /** Message to scroll to and flash (from a mention notification). */
+  highlightMessageId?: string;
+  viewerId: string;
   isMember: boolean;
 }) {
-  const [activeChannelId, setActiveChannelId] = useState(channels[0]?.id ?? "");
+  const startChannelId = initialChannelId ?? channels[0]?.id ?? "";
+  const [activeChannelId, setActiveChannelId] = useState(startChannelId);
   const [messagesByChannel, setMessagesByChannel] = useState<Record<string, MessageInfo[]>>(() =>
-    channels[0] ? { [channels[0].id]: initialChannelMessages } : {}
+    startChannelId ? { [startChannelId]: initialChannelMessages } : {}
   );
+  /** Per channel: the server time of the last successful read — the next
+   *  poll's `reactionsSince`. */
+  const reactionsSinceRef = useRef<Record<string, string>>(startChannelId ? { [startChannelId]: initialServerTime } : {});
+  const [flashId, setFlashId] = useState<string | null>(highlightMessageId ?? null);
   const [isMember, setIsMember] = useState(initialIsMember);
   const [joining, setJoining] = useState(false);
   const [sending, setSending] = useState(false);
@@ -187,11 +231,16 @@ export function CommunityView({
   useEffect(() => {
     if (!isMember || !activeChannelId || messagesByChannel[activeChannelId]) return;
     let cancelled = false;
+    const requestedAt = new Date().toISOString();
     fetch(`/api/channels/${activeChannelId}/messages`)
       .then(async (res) => (res.ok ? ((await res.json()) as { messages: MessageInfo[] }).messages : []))
       .catch(() => [] as MessageInfo[])
       .then((messages) => {
-        if (!cancelled) setMessagesByChannel((prev) => ({ ...prev, [activeChannelId]: messages ?? [] }));
+        if (cancelled) return;
+        // Client time is fine as a starting point here: the server
+        // replaces it with its own clock on the first poll.
+        reactionsSinceRef.current[activeChannelId] ??= requestedAt;
+        setMessagesByChannel((prev) => ({ ...prev, [activeChannelId]: messages ?? [] }));
       });
     return () => {
       cancelled = true;
@@ -214,13 +263,18 @@ export function CommunityView({
       try {
         const current = messagesByChannelRef.current[activeChannelId] ?? [];
         const since = current.length > 0 ? current[current.length - 1].createdAt : new Date(0).toISOString();
-        const res = await fetch(`/api/channels/${activeChannelId}/messages?since=${encodeURIComponent(since)}`);
+        const reactionsSince = reactionsSinceRef.current[activeChannelId];
+        const res = await fetch(
+          `/api/channels/${activeChannelId}/messages?since=${encodeURIComponent(since)}` +
+            (reactionsSince ? `&reactionsSince=${encodeURIComponent(reactionsSince)}` : "")
+        );
         if (!res.ok) return;
-        const data: { messages: MessageInfo[] } = await res.json();
-        if (data.messages.length > 0) {
+        const data: { messages: MessageInfo[]; reactionUpdates: ReactionUpdate[]; serverTime: string } = await res.json();
+        reactionsSinceRef.current[activeChannelId] = data.serverTime;
+        if (data.messages.length > 0 || data.reactionUpdates.length > 0) {
           setMessagesByChannel((prev) => ({
             ...prev,
-            [activeChannelId]: mergeMessages(prev[activeChannelId] ?? [], data.messages),
+            [activeChannelId]: applyReactionUpdates(mergeMessages(prev[activeChannelId] ?? [], data.messages), data.reactionUpdates),
           }));
         }
       } catch {
@@ -229,6 +283,21 @@ export function CommunityView({
     }, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [activeChannelId, isMember]);
+
+  // A deep-linked message: bring it into view once, after the first
+  // render has laid it out (instead of the usual jump to the bottom).
+  useEffect(() => {
+    if (!highlightMessageId) return;
+    const el = document.getElementById(`msg-${highlightMessageId}`);
+    if (el) {
+      forceScrollRef.current = false;
+      stickToBottomRef.current = false;
+      el.scrollIntoView({ block: "center" });
+    }
+    const timer = setTimeout(() => setFlashId(null), 2600);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on arrival
+  }, []);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -250,6 +319,34 @@ export function CommunityView({
     }
     else setError(data?.error ?? "Couldn't join. Try again.");
     setJoining(false);
+  }
+
+  function updateMessageReactions(channelId: string, messageId: string, update: (r: ReactionSummary[]) => ReactionSummary[]) {
+    setMessagesByChannel((prev) => ({
+      ...prev,
+      [channelId]: (prev[channelId] ?? []).map((m) => (m.id === messageId ? { ...m, reactions: update(m.reactions) } : m)),
+    }));
+  }
+
+  /** Optimistic: the chip changes immediately, then the server's answer
+   *  (which includes anyone else's concurrent reactions) replaces it. */
+  async function handleReact(messageId: string, emoji: string, on: boolean) {
+    const channelId = activeChannelId;
+    const before = messagesByChannelRef.current[channelId]?.find((m) => m.id === messageId)?.reactions ?? [];
+    updateMessageReactions(channelId, messageId, (r) => toggleLocally(r, emoji, on));
+    try {
+      const res = await fetch(`/api/messages/${messageId}/reactions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emoji, on }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? "Couldn't update your reaction.");
+      updateMessageReactions(channelId, messageId, () => data.reactions);
+    } catch (err) {
+      updateMessageReactions(channelId, messageId, () => before);
+      setError(err instanceof Error ? err.message : "Couldn't update your reaction.");
+    }
   }
 
   async function handleSend(message: ComposerSubmit): Promise<boolean> {
@@ -372,7 +469,7 @@ export function CommunityView({
               const el = e.currentTarget;
               stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
             }}
-            className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pt-4 pb-6"
+            className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pt-5 pb-6"
           >
             {channelLoading ? (
               <div className="flex flex-1 items-center justify-center">
@@ -392,25 +489,26 @@ export function CommunityView({
                       <div className="h-px flex-1 bg-border" />
                     </div>
                   )}
-                  <div className="flex items-start gap-2.5 pt-1">
-                    <Avatar author={group.author} />
-                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <div className="flex items-baseline gap-2">
-                        <span className="truncate text-sm font-semibold">{group.author.displayName}</span>
-                        <span className="text-metadata shrink-0">{formatTime(group.messages[0].createdAt)}</span>
-                      </div>
-                      <MessageBody message={group.messages[0]} />
-                    </div>
-                  </div>
-                  {/* Same author, within GROUP_WINDOW_MS — no repeated
-                      avatar/name, just the text aligned under it. */}
-                  {group.messages.slice(1).map((message) => (
-                    <div key={message.id} className="flex items-start gap-2.5">
-                      <span className="w-8 shrink-0" aria-hidden />
-                      <div className="min-w-0 flex-1">
-                        <MessageBody message={message} />
-                      </div>
-                    </div>
+                  {group.messages.map((message, i) => (
+                    <MessageRow
+                      key={message.id}
+                      message={message}
+                      viewerId={viewerId}
+                      highlighted={flashId === message.id}
+                      onReact={handleReact}
+                      // Same author within GROUP_WINDOW_MS: no repeated avatar/name.
+                      leading={i === 0 ? <Avatar author={group.author} /> : <span className="w-8 shrink-0" aria-hidden />}
+                      header={
+                        i === 0 ? (
+                          <div className="flex items-baseline gap-2">
+                            <Link href={`/players/${group.author.handle}`} className="truncate text-sm font-semibold hover:underline">
+                              {group.author.displayName}
+                            </Link>
+                            <span className="text-metadata shrink-0">{formatTime(message.createdAt)}</span>
+                          </div>
+                        ) : undefined
+                      }
+                    />
                   ))}
                 </div>
               ))
@@ -422,6 +520,7 @@ export function CommunityView({
           <div className="shrink-0 border-t border-border bg-background sm:rounded-br-[14px] sm:bg-surface">
             {isMember ? (
               <ChatComposer
+                communityId={communityId}
                 channelName={activeChannel?.name ?? ""}
                 sending={sending}
                 onSubmit={handleSend}

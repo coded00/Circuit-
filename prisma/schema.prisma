@@ -225,6 +225,8 @@ model User {
   videoSaves           VideoSave[]
   communityMemberships CommunityMember[]
   messages             Message[]
+  messageMentions      MessageMention[]      @relation("MessageMentions")
+  messageReactions     MessageReaction[]     @relation("MessageReactions")
 
   @@index([emailOrPhone])
   @@index([lastActiveAt])
@@ -418,14 +420,14 @@ model GameMode {
 /// A player/team configuration within a mode (Solo, Duo, Squad, 5v5...).
 /// Every field is admin-set — none are implied by the game or mode name.
 model GameFormat {
-  id                 String     @id @default(cuid())
+  id                 String    @id @default(cuid())
   modeId             String
-  mode               GameMode   @relation(fields: [modeId], references: [id], onDelete: Cascade)
+  mode               GameMode  @relation(fields: [modeId], references: [id], onDelete: Cascade)
   name               String
   description        String?
-  entryType          EntryType  @default(INDIVIDUAL)
+  entryType          EntryType @default(INDIVIDUAL)
   /// Players who actually play for one side at a time (1 for individual).
-  playersPerTeam     Int        @default(1)
+  playersPerTeam     Int       @default(1)
   /// Roster bounds for team entries (substitutes allowed when max >
   /// playersPerTeam). Null = exactly playersPerTeam.
   minRoster          Int?
@@ -437,15 +439,15 @@ model GameFormat {
   maxPlayersPerMatch Int?
   /// Competition structures organizers may run this format as — codes
   /// from src/lib/competitionStructures.ts (e.g. "KNOCKOUT").
-  structures         String[]   @default([])
+  structures         String[]  @default([])
   /// Starting rules text offered to organizers for this format.
   defaultRules       String?
   /// The single implicit format of a mode with usesFormats = false.
-  isDefault          Boolean    @default(false)
-  enabled            Boolean    @default(true)
-  sortOrder          Int        @default(0)
-  createdAt          DateTime   @default(now())
-  updatedAt          DateTime   @updatedAt
+  isDefault          Boolean   @default(false)
+  enabled            Boolean   @default(true)
+  sortOrder          Int       @default(0)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   @@unique([modeId, name])
   @@index([modeId, sortOrder])
@@ -1303,27 +1305,72 @@ enum MessageKind {
 /// don't need a schema change to be visually distinguished from a real
 /// user's message.
 model Message {
-  id               String      @id @default(cuid())
-  channelId        String
-  channel          Channel     @relation(fields: [channelId], references: [id])
-  authorId         String
-  author           User        @relation(fields: [authorId], references: [id])
-  kind             MessageKind @default(TEXT)
+  id                 String      @id @default(cuid())
+  channelId          String
+  channel            Channel     @relation(fields: [channelId], references: [id])
+  authorId           String
+  author             User        @relation(fields: [authorId], references: [id])
+  kind               MessageKind @default(TEXT)
   /// The text, or an IMAGE's optional caption. Empty for a STICKER.
-  content          String      @default("")
+  content            String      @default("")
   /// IMAGE only — an opaque, signed proofStorage reference (never a
   /// public URL), served through the membership-checked
   /// /api/messages/[id]/attachment route, same access discipline as
   /// match proof and report evidence.
-  attachmentRef    String?
+  attachmentRef      String?
   /// IMAGE only — the uploaded file's real pixel size, so the client can
   /// reserve the right box before the image loads (no scroll jump).
-  attachmentWidth  Int?
-  attachmentHeight Int?
+  attachmentWidth    Int?
+  attachmentHeight   Int?
   /// STICKER only — a key into the fixed sticker set in src/lib/stickers.ts.
-  stickerId        String?
-  isSystem         Boolean     @default(false)
-  createdAt        DateTime    @default(now())
+  stickerId          String?
+  isSystem           Boolean     @default(false)
+  createdAt          DateTime    @default(now())
+  /// Bumped on every reaction add/remove. Polling only asks for messages
+  /// newer than the last one it has, so this is how a reaction change on
+  /// an older message reaches other viewers (`reactionsSince` on the
+  /// channel messages GET) — removals leave no row behind to find.
+  reactionsChangedAt DateTime?
+
+  mentions  MessageMention[]
+  reactions MessageReaction[]
 
   @@index([channelId, createdAt])
+  @@index([channelId, reactionsChangedAt])
+}
+
+/// One `@handle` in a message's text that resolved to a real, eligible
+/// user when it was sent (a community member who wasn't suspended).
+/// Resolved server-side from the text itself — never trusted from the
+/// client — and stored with its position so rendering doesn't re-parse
+/// (and so a later handle change can't re-point an old mention).
+model MessageMention {
+  id        String   @id @default(cuid())
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation("MessageMentions", fields: [userId], references: [id], onDelete: Cascade)
+  /// UTF-16 offset/length of the "@handle" inside Message.content.
+  start     Int
+  length    Int
+  createdAt DateTime @default(now())
+
+  @@unique([messageId, start])
+  @@index([userId])
+}
+
+/// One user's reaction with one emoji on one message. The unique key is
+/// the dedupe: set-on / set-off requests are idempotent, so double taps
+/// and concurrent reactions can't produce duplicates.
+model MessageReaction {
+  id        String   @id @default(cuid())
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation("MessageReactions", fields: [userId], references: [id], onDelete: Cascade)
+  emoji     String
+  createdAt DateTime @default(now())
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
 }

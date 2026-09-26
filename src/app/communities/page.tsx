@@ -23,7 +23,13 @@ import { CommunityView } from "../tournaments/[id]/community/CommunityView";
  *  the keyboard instead of being covered by it. Chat pages only. */
 export const viewport: Viewport = { interactiveWidget: "resizes-content" };
 
-export default async function GlobalCommunityPage() {
+export default async function GlobalCommunityPage({
+  searchParams,
+}: {
+  /** `channel` (key) + `message` (id): a mention notification's deep link. */
+  searchParams: Promise<{ channel?: string; message?: string }>;
+}) {
+  const { channel: channelKey, message: highlightMessageId } = await searchParams;
   const user = await getCurrentUser();
   if (!user) {
     redirect(`/login?next=${encodeURIComponent("/communities")}`);
@@ -47,8 +53,10 @@ export default async function GlobalCommunityPage() {
     (a, b) => (channelOrder.get(a.key) ?? 99) - (channelOrder.get(b.key) ?? 99)
   );
 
-  const initialMessages = orderedChannels[0]
-    ? await getChannelMessages(orderedChannels[0].id, user.id)
+  const startChannel = orderedChannels.find((c) => c.key === channelKey) ?? orderedChannels[0];
+  const initialServerTime = new Date().toISOString();
+  const initialMessages = startChannel
+    ? await getChannelMessages(startChannel.id, user.id)
     : { messages: [], nextCursor: null };
 
   return (
@@ -59,6 +67,10 @@ export default async function GlobalCommunityPage() {
       channels={orderedChannels.map((c) => ({ id: c.id, key: c.key, name: c.name }))}
       memberCount={memberCount}
       initialChannelMessages={initialMessages.messages.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() }))}
+      initialChannelId={startChannel?.id}
+      initialServerTime={initialServerTime}
+      highlightMessageId={highlightMessageId}
+      viewerId={user.id}
       isMember
     />
   );

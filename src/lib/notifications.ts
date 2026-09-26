@@ -46,7 +46,8 @@ export type NotificationType =
   | "QUICK_MATCH_ACCEPTED"
   | "QUICK_MATCH_UNAVAILABLE"
   | "QUICK_MATCH_EXPIRED"
-  | "QUICK_MATCH_CANCELLED";
+  | "QUICK_MATCH_CANCELLED"
+  | "COMMUNITY_MENTION";
 
 export interface NotificationChannel {
   send(userId: string, type: NotificationType, payload: Record<string, unknown>): Promise<void>;

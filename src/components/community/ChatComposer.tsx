@@ -8,18 +8,27 @@
  *
  * Images go through prepareImage (src/lib/prepareImage.ts) before upload
  * — downscaled, re-encoded, and stripped of EXIF/GPS metadata.
+ *
+ * Typing "@" opens a member suggestion list just above the input (so on
+ * phones it sits above the keyboard with the composer). Picking someone
+ * inserts "@handle "; the server resolves mentions from the text itself
+ * on send, so a hand-typed valid handle works too and an invalid one just
+ * stays text.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { activeMentionQuery } from "@/lib/communityMentions";
 import { ImagePlus, Send, Smile, Sticker as StickerIcon, X } from "lucide-react";
 import { STICKERS } from "@/lib/stickers";
 import { Spinner } from "@/components/Spinner";
-import { EMOJI_CATEGORIES } from "./emojiData";
+import { EMOJI_CATEGORIES } from "@/lib/emojiData";
 import { StickerArt } from "./StickerArt";
 import { ACCEPTED_IMAGE_TYPES, prepareImage, type PreparedImage } from "@/lib/prepareImage";
 
 const RECENT_EMOJI_KEY = "circuit-recent-emoji";
 const MAX_RECENT_EMOJI = 16;
+
+type MentionUser = { id: string; handle: string; displayName: string; avatarUrl: string | null };
 
 export type ComposerSubmit =
   | { kind: "TEXT"; content: string }
@@ -36,11 +45,14 @@ function readRecentEmoji(): string[] {
 }
 
 export function ChatComposer({
+  communityId,
   channelName,
   sending,
   onSubmit,
   onError,
 }: {
+  /** Scopes @-suggestions to this community's members. */
+  communityId: string;
   channelName: string;
   sending: boolean;
   /** Resolves true once the message is actually sent, so the composer
@@ -56,6 +68,74 @@ export function ChatComposer({
   const [recentEmoji, setRecentEmoji] = useState<string[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [mention, setMention] = useState<{ query: string; start: number } | null>(null);
+  const [suggestions, setSuggestions] = useState<MentionUser[]>([]);
+  const [activeSuggestion, setActiveSuggestion] = useState(0);
+  /** Start offset of an @word the user dismissed with Escape — it stays
+   *  closed until the caret moves to a different @word. */
+  const dismissedMentionRef = useRef<number | null>(null);
+  /** Caret position to restore once React has written a programmatic
+   *  draft change. Applied in a layout effect — before the browser can
+   *  handle another keystroke — so fast typing right after inserting a
+   *  mention or emoji can't land in front of a caret that moves later. */
+  const pendingCaretRef = useRef<number | null>(null);
+
+  useLayoutEffect(() => {
+    const el = textareaRef.current;
+    if (el && pendingCaretRef.current !== null) {
+      el.selectionStart = el.selectionEnd = pendingCaretRef.current;
+      pendingCaretRef.current = null;
+    }
+  }, [draft]);
+
+  /** Re-derives the @query from the text before the caret. */
+  function syncMention(value = draft, caret = textareaRef.current?.selectionStart ?? value.length) {
+    let next = activeMentionQuery(value.slice(0, caret));
+    if (next && next.start === dismissedMentionRef.current) next = null;
+    else dismissedMentionRef.current = null;
+    setMention((prev) => (prev?.query === next?.query && prev?.start === next?.start ? prev : next));
+  }
+
+  function clearMention() {
+    setMention(null);
+    setSuggestions([]);
+  }
+
+  // Debounced member search for the current @query; stale responses are
+  // aborted so fast typing can't show an older list over a newer one.
+  useEffect(() => {
+    if (!mention) return;
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/communities/${communityId}/mentionable?q=${encodeURIComponent(mention.query)}`, {
+          signal: controller.signal,
+        });
+        if (!res.ok) return;
+        const data: { users: MentionUser[] } = await res.json();
+        setSuggestions(data.users);
+        setActiveSuggestion(0);
+      } catch {
+        // Aborted or offline — keep whatever is showing.
+      }
+    }, 120);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [mention, communityId]);
+
+  const showSuggestions = mention !== null && suggestions.length > 0;
+
+  function pickMention(user: MentionUser) {
+    if (!mention) return;
+    const end = mention.start + 1 + mention.query.length;
+    const insert = `@${user.handle} `;
+    pendingCaretRef.current = mention.start + insert.length;
+    setDraft(draft.slice(0, mention.start) + insert + draft.slice(end));
+    clearMention();
+    textareaRef.current?.focus();
+  }
 
   // Read after mount (localStorage doesn't exist during SSR); fall back
   // to the first real category when there's no history yet.
@@ -98,12 +178,8 @@ export function ChatComposer({
     const el = textareaRef.current;
     const start = el?.selectionStart ?? draft.length;
     const end = el?.selectionEnd ?? draft.length;
+    pendingCaretRef.current = start + emoji.length;
     setDraft(draft.slice(0, start) + emoji + draft.slice(end));
-    // Put the caret after the inserted emoji once React has re-rendered.
-    requestAnimationFrame(() => {
-      if (!el) return;
-      el.selectionStart = el.selectionEnd = start + emoji.length;
-    });
 
     const nextRecent = [emoji, ...recentEmoji.filter((e) => e !== emoji)].slice(0, MAX_RECENT_EMOJI);
     setRecentEmoji(nextRecent);
@@ -120,9 +196,13 @@ export function ChatComposer({
       if (await onSubmit({ kind: "IMAGE", image, caption: draft })) {
         setImage(null);
         setDraft("");
+        clearMention();
       }
     } else if (draft.trim()) {
-      if (await onSubmit({ kind: "TEXT", content: draft })) setDraft("");
+      if (await onSubmit({ kind: "TEXT", content: draft })) {
+        setDraft("");
+        clearMention();
+      }
     }
   }
 
@@ -132,6 +212,25 @@ export function ChatComposer({
   }
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (showSuggestions) {
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        const delta = event.key === "ArrowDown" ? 1 : -1;
+        setActiveSuggestion((i) => (i + delta + suggestions.length) % suggestions.length);
+        return;
+      }
+      if ((event.key === "Enter" || event.key === "Tab") && !event.nativeEvent.isComposing) {
+        event.preventDefault();
+        pickMention(suggestions[activeSuggestion]);
+        return;
+      }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        dismissedMentionRef.current = mention?.start ?? null;
+        clearMention();
+        return;
+      }
+    }
     // Enter sends on a real keyboard; on touch devices Enter stays a
     // newline and the send button is how you send (the norm for mobile chat).
     if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
@@ -154,7 +253,45 @@ export function ChatComposer({
     emojiCategory === "recent" ? recentEmoji : (EMOJI_CATEGORIES.find((c) => c.key === emojiCategory)?.emojis ?? []);
 
   return (
-    <div className="flex flex-col">
+    <div className="relative flex flex-col">
+      {showSuggestions && (
+        <div
+          role="listbox"
+          aria-label="Mention someone"
+          className="absolute inset-x-2 bottom-full z-20 mb-1.5 overflow-hidden rounded-[14px] border border-border bg-surface py-1"
+          style={{ boxShadow: "var(--shadow-float)" }}
+        >
+          <p className="px-3 pt-1.5 pb-1 font-mono text-[10px] font-semibold tracking-[0.14em] text-muted uppercase">
+            Members{mention?.query ? ` matching “${mention.query}”` : ""}
+          </p>
+          {suggestions.map((user, i) => (
+            <button
+              key={user.id}
+              type="button"
+              role="option"
+              aria-selected={i === activeSuggestion}
+              // mousedown, not click: keeps focus (and the caret) in the textarea.
+              onMouseDown={(e) => {
+                e.preventDefault();
+                pickMention(user);
+              }}
+              onMouseEnter={() => setActiveSuggestion(i)}
+              className={`flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors ${i === activeSuggestion ? "bg-surface-elevated" : ""}`}
+            >
+              {user.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs
+                <img src={user.avatarUrl} alt="" className="h-7 w-7 shrink-0 rounded-full object-cover" />
+              ) : (
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-elevated text-xs font-semibold text-muted">
+                  {user.displayName.slice(0, 1).toUpperCase()}
+                </span>
+              )}
+              <span className="min-w-0 flex-1 truncate text-sm font-semibold">{user.displayName}</span>
+              <span className="max-w-[45%] shrink-0 truncate font-mono text-xs text-muted">@{user.handle}</span>
+            </button>
+          ))}
+        </div>
+      )}
       {(image || preparing) && (
         <div className="flex items-center gap-3 px-3 pt-3">
           <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-[10px] border border-border bg-surface-elevated">
@@ -207,7 +344,12 @@ export function ChatComposer({
           <textarea
             ref={textareaRef}
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              syncMention(e.target.value, e.target.selectionStart);
+            }}
+            onSelect={(e) => syncMention(e.currentTarget.value, e.currentTarget.selectionStart)}
+            onBlur={clearMention}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
             onFocus={() => setTray(null)}

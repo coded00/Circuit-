@@ -1,14 +1,19 @@
 /**
- * Circuit Community — Phase 1 (Discord-style chat attached to a
- * Tournament). Deliberately minimal: get real usage signal before
- * building reactions/roles/moderation nobody's validated wanting yet.
+ * Circuit Community — chat attached to a Tournament (plus the global
+ * Circuit community). Messages support @mentions (resolved server-side,
+ * stored as MessageMention rows, notified via notify()) and emoji
+ * reactions (MessageReaction rows). Real-time is the existing poll: new
+ * messages by `since`, reaction changes by `reactionsSince`.
  * See the schema's own header comment (prisma/schema.prisma, just above
  * `model Community`) for the full reasoning, including why this has
  * nothing to do with the unrelated `CommunityPost` model.
  */
 
-import type { Message, MessageKind } from "@prisma/client";
+import type { MessageKind, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { notify } from "@/lib/notifications";
+import { findMentionCandidates, MAX_MENTIONS_PER_MESSAGE } from "@/lib/communityMentions";
+import { isAllowedReaction, MAX_REACTION_TYPES_PER_MESSAGE, summarizeReactions, type ReactionSummary } from "@/lib/communityReactions";
 import { proofStorage } from "@/lib/storage";
 import { isSendableSticker } from "@/lib/stickers";
 import { sniffImageType } from "@/lib/imageSniff";
@@ -24,7 +29,9 @@ export class CommunityError extends Error {
     | "MESSAGE_TOO_LONG"
     | "INVALID_STICKER"
     | "INVALID_IMAGE"
-    | "IMAGE_TOO_LARGE";
+    | "IMAGE_TOO_LARGE"
+    | "INVALID_REACTION"
+    | "TOO_MANY_REACTIONS";
   constructor(code: CommunityError["code"], message: string) {
     super(message);
     this.code = code;
@@ -250,9 +257,25 @@ export async function getAllCommunities(userId: string): Promise<CommunityListin
 
 const AUTHOR_SELECT = { select: { id: true, displayName: true, handle: true, avatarUrl: true } } as const;
 
+/** Everything a message needs to render for a viewer: author, resolved
+ *  mentions (with the mentioned user's *current* handle/name), reactions. */
+const MESSAGE_INCLUDE = {
+  author: AUTHOR_SELECT,
+  mentions: {
+    orderBy: { start: "asc" as const },
+    select: { start: true, length: true, user: { select: { id: true, handle: true, displayName: true } } },
+  },
+  reactions: { select: { emoji: true, userId: true, createdAt: true, user: { select: { displayName: true } } } },
+} satisfies Prisma.MessageInclude;
+
+type MessageWithRelations = Prisma.MessageGetPayload<{ include: typeof MESSAGE_INCLUDE }>;
+
+export type ChatMention = { start: number; length: number; user: { id: string; handle: string; displayName: string } };
+
 /** What the client sees for a message. `attachmentRef` (a signed storage
  *  reference) never leaves the server — an IMAGE gets a URL to the
- *  membership-checked attachment route instead. */
+ *  membership-checked attachment route instead. Reactions are
+ *  viewer-specific (`reacted`). */
 export type ChatMessage = {
   id: string;
   kind: MessageKind;
@@ -264,9 +287,11 @@ export type ChatMessage = {
   imageHeight: number | null;
   stickerId: string | null;
   author: { id: string; displayName: string; handle: string; avatarUrl: string | null };
+  mentions: ChatMention[];
+  reactions: ReactionSummary[];
 };
 
-function toChatMessage(message: Message & { author: ChatMessage["author"] }): ChatMessage {
+function toChatMessage(message: MessageWithRelations, viewerId: string): ChatMessage {
   return {
     id: message.id,
     kind: message.kind,
@@ -278,6 +303,8 @@ function toChatMessage(message: Message & { author: ChatMessage["author"] }): Ch
     imageHeight: message.attachmentHeight,
     stickerId: message.stickerId,
     author: message.author,
+    mentions: message.mentions,
+    reactions: summarizeReactions(message.reactions, viewerId),
   };
 }
 
@@ -299,29 +326,64 @@ export async function getChannelMessages(channelId: string, userId: string, curs
     orderBy: { createdAt: "desc" },
     take: take + 1,
     ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-    include: { author: AUTHOR_SELECT },
+    include: MESSAGE_INCLUDE,
   });
 
   const hasMore = messages.length > take;
   const page = hasMore ? messages.slice(0, take) : messages;
   return {
-    messages: page.reverse().map(toChatMessage), // oldest-first for rendering
+    messages: page.reverse().map((m) => toChatMessage(m, userId)), // oldest-first for rendering
     nextCursor: hasMore ? page[0].id : null,
   };
 }
 
-/** The polling path's own query — "what's new since I last checked,"
- *  oldest-first, uncapped (a channel realistically won't produce enough
- *  messages in one poll interval to need a limit here). */
-export async function getChannelMessagesSince(channelId: string, userId: string, since: Date): Promise<MessageCursorPage["messages"]> {
-  await assertChannelMembership(channelId, userId);
+export type ReactionUpdate = { messageId: string; reactions: ReactionSummary[] };
 
-  const messages = await prisma.message.findMany({
-    where: { channelId, createdAt: { gt: since } },
-    orderBy: { createdAt: "asc" },
-    include: { author: AUTHOR_SELECT },
-  });
-  return messages.map(toChatMessage);
+/** Reaction changes are re-sent for this long past the previous poll.
+ *  A reaction's timestamp is taken before its write commits, so a poll
+ *  that reads in between would otherwise skip it for good; re-sending a
+ *  message's current reactions is harmless (the client replaces them). */
+const REACTION_POLL_OVERLAP_MS = 10_000;
+
+/** The polling path's own query: messages newer than `since` (oldest-
+ *  first, uncapped — a channel won't produce enough in one interval to
+ *  need a limit), plus the current reactions of any older message whose
+ *  reactions changed after `reactionsSince`. `serverTime` is the next
+ *  `reactionsSince` — the server's clock, so client clock skew can't
+ *  drop an update. */
+export async function getChannelUpdates(
+  channelId: string,
+  userId: string,
+  since: Date,
+  reactionsSince: Date | null
+): Promise<{ messages: ChatMessage[]; reactionUpdates: ReactionUpdate[]; serverTime: string }> {
+  await assertChannelMembership(channelId, userId);
+  const serverTime = new Date();
+
+  const [messages, changed] = await Promise.all([
+    prisma.message.findMany({
+      where: { channelId, createdAt: { gt: since } },
+      orderBy: { createdAt: "asc" },
+      include: MESSAGE_INCLUDE,
+    }),
+    reactionsSince
+      ? prisma.message.findMany({
+          where: {
+            channelId,
+            reactionsChangedAt: { gt: new Date(reactionsSince.getTime() - REACTION_POLL_OVERLAP_MS) },
+            createdAt: { lte: since },
+          },
+          take: 100,
+          select: { id: true, reactions: MESSAGE_INCLUDE.reactions },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  return {
+    messages: messages.map((m) => toChatMessage(m, userId)),
+    reactionUpdates: changed.map((m) => ({ messageId: m.id, reactions: summarizeReactions(m.reactions, userId) })),
+    serverTime: serverTime.toISOString(),
+  };
 }
 
 /** Every channel action — reading messages or sending one — requires the
@@ -341,6 +403,60 @@ async function assertChannelMembership(channelId: string, userId: string): Promi
   if (!membership) throw new CommunityError("NOT_A_MEMBER", "Join the community to view this channel.");
 
   return channel;
+}
+
+/** Who can be mentioned in a community: current members whose account
+ *  isn't suspended. Anyone else's `@handle` stays plain text. */
+function mentionableWhere(communityId: string): Prisma.UserWhereInput {
+  return { isSuspended: false, communityMemberships: { some: { communityId } } };
+}
+
+/** Keeps only the `@handle`s in `text` that belong to a mentionable user. */
+async function resolveMentions(communityId: string, text: string) {
+  const candidates = findMentionCandidates(text);
+  if (candidates.length === 0) return [];
+  const handles = [...new Set(candidates.map((c) => c.handle))].slice(0, MAX_MENTIONS_PER_MESSAGE);
+  const users = await prisma.user.findMany({
+    where: { handle: { in: handles }, ...mentionableWhere(communityId) },
+    select: { id: true, handle: true },
+  });
+  const idByHandle = new Map(users.map((u) => [u.handle, u.id]));
+  return candidates
+    .filter((c) => idByHandle.has(c.handle))
+    .map((c) => ({ userId: idByHandle.get(c.handle)!, start: c.start, length: c.length }));
+}
+
+/** Where a community lives, for notification links. */
+async function communityLocation(communityId: string) {
+  const community = await prisma.community.findUnique({
+    where: { id: communityId },
+    select: { isGlobal: true, tournament: { select: { id: true, name: true } } },
+  });
+  if (!community || community.isGlobal || !community.tournament) return { href: "/communities", title: "Circuit" };
+  return { href: `/tournaments/${community.tournament.id}/community`, title: community.tournament.name };
+}
+
+/** Members matching `query` by handle or display name — the composer's
+ *  @-suggestion list. Handle-prefix matches first. */
+export async function searchMentionableMembers(communityId: string, viewerId: string, query: string) {
+  const membership = await prisma.communityMember.findUnique({
+    where: { communityId_userId: { communityId, userId: viewerId } },
+  });
+  if (!membership) throw new CommunityError("NOT_A_MEMBER", "Join the community to mention people.");
+
+  const q = query.trim().toLowerCase().replace(/^@/, "").slice(0, 40);
+  const users = await prisma.user.findMany({
+    where: {
+      ...mentionableWhere(communityId),
+      ...(q ? { OR: [{ handle: { startsWith: q } }, { displayName: { contains: q, mode: "insensitive" as const } }] } : {}),
+    },
+    orderBy: [{ lastActiveAt: { sort: "desc", nulls: "last" } }, { handle: "asc" }],
+    take: 20,
+    select: { id: true, handle: true, displayName: true, avatarUrl: true },
+  });
+  return users
+    .sort((a, b) => Number(!a.handle.startsWith(q)) - Number(!b.handle.startsWith(q)))
+    .slice(0, 8);
 }
 
 export type SendMessageInput =
@@ -369,7 +485,8 @@ export async function sendMessage(channelId: string, authorId: string, input: Se
 
   // Membership before storing anything — a non-member's upload should
   // never reach storage at all.
-  await assertChannelMembership(channelId, authorId);
+  const { communityId } = await assertChannelMembership(channelId, authorId);
+  const mentions = await resolveMentions(communityId, text);
 
   const attachmentRef =
     input.kind === "IMAGE" && imageType ? await proofStorage.store(`chat-${channelId}`, input.image, imageType) : null;
@@ -388,10 +505,61 @@ export async function sendMessage(channelId: string, authorId: string, input: Se
       attachmentRef,
       attachmentWidth: input.kind === "IMAGE" ? dimension(input.width) : null,
       attachmentHeight: input.kind === "IMAGE" ? dimension(input.height) : null,
+      ...(mentions.length > 0 ? { mentions: { create: mentions } } : {}),
     },
-    include: { author: AUTHOR_SELECT },
+    include: { ...MESSAGE_INCLUDE, channel: { select: { key: true, name: true } } },
   });
-  return toChatMessage(message);
+
+  // One notification per mentioned person (never yourself), however many
+  // times they're named in the message.
+  const notifyIds = [...new Set(mentions.map((m) => m.userId))].filter((id) => id !== authorId);
+  if (notifyIds.length > 0) {
+    const location = await communityLocation(communityId);
+    const preview = text.length > 120 ? `${text.slice(0, 117)}…` : text;
+    await Promise.all(
+      notifyIds.map((userId) =>
+        notify(userId, "COMMUNITY_MENTION", {
+          messageId: message.id,
+          authorName: message.author.displayName,
+          channelName: message.channel.name,
+          communityTitle: location.title,
+          href: `${location.href}?channel=${encodeURIComponent(message.channel.key)}&message=${message.id}`,
+          preview,
+        })
+      )
+    );
+  }
+
+  return toChatMessage(message, authorId);
+}
+
+/** Turns one emoji reaction on or off for the caller. Idempotent — the
+ *  (message, user, emoji) unique key makes a repeated "on" or a
+ *  concurrent duplicate a no-op rather than a second row — and returns
+ *  the message's resulting reactions for the caller to render. */
+export async function setReaction(messageId: string, userId: string, emoji: unknown, on: boolean): Promise<ReactionUpdate> {
+  if (!isAllowedReaction(emoji)) throw new CommunityError("INVALID_REACTION", "That reaction isn't available.");
+
+  const message = await prisma.message.findUnique({ where: { id: messageId }, select: { channelId: true, isSystem: true } });
+  if (!message || message.isSystem) throw new CommunityError("NOT_FOUND", "Message not found.");
+  await assertChannelMembership(message.channelId, userId);
+
+  if (on) {
+    const types = await prisma.messageReaction.findMany({ where: { messageId }, distinct: ["emoji"], select: { emoji: true } });
+    if (types.length >= MAX_REACTION_TYPES_PER_MESSAGE && !types.some((t) => t.emoji === emoji)) {
+      throw new CommunityError("TOO_MANY_REACTIONS", "This message has as many different reactions as it can hold.");
+    }
+    await prisma.messageReaction.createMany({ data: [{ messageId, userId, emoji }], skipDuplicates: true });
+  } else {
+    await prisma.messageReaction.deleteMany({ where: { messageId, userId, emoji } });
+  }
+
+  const updated = await prisma.message.update({
+    where: { id: messageId },
+    data: { reactionsChangedAt: new Date() },
+    select: { reactions: MESSAGE_INCLUDE.reactions },
+  });
+  return { messageId, reactions: summarizeReactions(updated.reactions, userId) };
 }
 
 /** For the attachment route: the stored image behind a message, if the

@@ -71,6 +71,13 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
       return { message: "A dispute was escalated to staff.", href: "/staff/disputes" };
     case "REPORT_FILED":
       return { message: "A new abuse report was filed.", href: "/staff/reports" };
+    case "COMMUNITY_MENTION":
+      return {
+        message: `${str(p, "authorName") || "Someone"} mentioned you in #${str(p, "channelName") || "chat"}${
+          str(p, "communityTitle") ? ` · ${str(p, "communityTitle")}` : ""
+        }${str(p, "preview") ? `: “${str(p, "preview")}”` : ""}`,
+        href: str(p, "href") || "/communities",
+      };
     case "FRIEND_REQUEST":
       return { message: "You have a new friend request.", href: "/friends" };
     case "FRIEND_ACCEPTED":

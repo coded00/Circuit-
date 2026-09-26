@@ -1,17 +1,19 @@
 /**
  * Circuit Community — channel messages. GET is the polling endpoint the
  * client re-fetches on an interval (see `Poller.tsx`'s own comment on
- * why polling, not a WebSocket, for why nothing fancier is happening
- * here); POST sends a new one — JSON for text (`{ content }`) or a
+ * why polling, not a WebSocket): with `since` it returns only newer
+ * messages, plus — with `reactionsSince` — the current reactions of any
+ * older message whose reactions changed. POST sends a new one — JSON for text (`{ content }`) or a
  * sticker (`{ stickerId }`), multipart form data for an image (`image`
  * file + optional `caption`, `width`, `height`).
  */
 
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/session";
+import { communityErrorResponse } from "@/lib/communityHttp";
 import {
   getChannelMessages,
-  getChannelMessagesSince,
+  getChannelUpdates,
   sendMessage,
   CommunityError,
   MAX_CHAT_IMAGE_BYTES,
@@ -23,19 +25,6 @@ import { isRateLimited, recordAttempt } from "@/lib/rateLimit";
  *  generous for real chat, tight enough to stop someone scripting a
  *  bucket-filling loop. Text/sticker messages aren't limited here. */
 const IMAGE_RATE_LIMIT = { max: 20, windowMs: 10 * 60 * 1000 };
-
-const STATUS_BY_CODE: Record<CommunityError["code"], number> = {
-  NOT_FOUND: 404,
-  DISABLED: 409,
-  FORBIDDEN: 403,
-  NOT_A_MEMBER: 403,
-  ALREADY_MEMBER: 409,
-  EMPTY_MESSAGE: 400,
-  MESSAGE_TOO_LONG: 400,
-  INVALID_STICKER: 400,
-  INVALID_IMAGE: 400,
-  IMAGE_TOO_LARGE: 413,
-};
 
 function parseDimension(value: FormDataEntryValue | null): number | null {
   const n = Number(value);
@@ -50,17 +39,22 @@ export async function GET(request: Request, { params }: { params: Promise<{ chan
   const { searchParams } = new URL(request.url);
   const cursor = searchParams.get("cursor") ?? undefined;
   const since = searchParams.get("since"); // ISO timestamp — "only what's new" for the polling path
+  const reactionsSince = searchParams.get("reactionsSince");
 
   try {
     if (since) {
-      const messages = await getChannelMessagesSince(channelId, user.id, new Date(since));
-      return NextResponse.json({ messages });
+      const sinceDate = new Date(since);
+      const reactionsDate = reactionsSince ? new Date(reactionsSince) : null;
+      if (Number.isNaN(sinceDate.getTime()) || (reactionsDate && Number.isNaN(reactionsDate.getTime()))) {
+        return NextResponse.json({ error: "Invalid timestamp." }, { status: 400 });
+      }
+      return NextResponse.json(await getChannelUpdates(channelId, user.id, sinceDate, reactionsDate));
     }
 
     const page = await getChannelMessages(channelId, user.id, cursor);
     return NextResponse.json(page);
   } catch (err) {
-    if (err instanceof CommunityError) return NextResponse.json({ error: err.message }, { status: STATUS_BY_CODE[err.code] });
+    if (err instanceof CommunityError) return communityErrorResponse(err);
     throw err;
   }
 }
@@ -114,7 +108,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ cha
     const message = await sendMessage(channelId, user.id, input);
     return NextResponse.json(message, { status: 201 });
   } catch (err) {
-    if (err instanceof CommunityError) return NextResponse.json({ error: err.message }, { status: STATUS_BY_CODE[err.code] });
+    if (err instanceof CommunityError) return communityErrorResponse(err);
     throw err;
   }
 }
