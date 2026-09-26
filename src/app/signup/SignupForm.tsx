@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { safeNextPath } from "@/lib/safeRedirect";
 
 export default function SignupForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") || "/";
+  const next = safeNextPath(searchParams.get("next"));
 
   const [handle, setHandle] = useState("");
   const [emailOrPhone, setEmailOrPhone] = useState("");
@@ -92,12 +92,6 @@ export default function SignupForm() {
       <button type="submit" disabled={submitting} className="btn-primary w-full">
         {submitting ? "Creating account…" : "Create account"}
       </button>
-      <Link
-        href={`/login?next=${encodeURIComponent(next)}`}
-        className="text-center text-sm text-muted transition hover:text-foreground"
-      >
-        I already have an account
-      </Link>
     </form>
   );
 }

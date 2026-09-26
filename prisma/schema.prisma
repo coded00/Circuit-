@@ -227,6 +227,7 @@ model User {
   messages             Message[]
   messageMentions      MessageMention[]      @relation("MessageMentions")
   messageReactions     MessageReaction[]     @relation("MessageReactions")
+  authIdentities       AuthIdentity[]
 
   @@index([emailOrPhone])
   @@index([lastActiveAt])
@@ -317,6 +318,33 @@ model WalletTransaction {
 /// "never store the secret itself" discipline as `passwordHash` on User.
 /// Single-use: `usedAt` is set the moment a reset succeeds, and the reset
 /// route rejects any token that's expired, already used, or unknown.
+/// A way to sign in to an existing User other than their password —
+/// today only Google. One person = one User: an identity always points at
+/// an existing account (new Google users get their User created first,
+/// then this row), and a Google account can only ever be attached to one
+/// User. Adding another provider later is new rows, not a new table.
+///
+/// No provider tokens are stored — Circuit only needs to know *who* signed
+/// in (the verified ID token's claims at login), never to call Google on
+/// the user's behalf.
+model AuthIdentity {
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// "google"
+  provider          String
+  /// The provider's stable account id (Google's `sub`), never the email —
+  /// emails can change or be recycled.
+  providerAccountId String
+  /// The provider-verified email at the time of linking, for display only.
+  email             String?
+  createdAt         DateTime  @default(now())
+  lastUsedAt        DateTime?
+
+  @@unique([provider, providerAccountId])
+  @@unique([userId, provider])
+}
+
 model PasswordResetToken {
   id        String    @id @default(cuid())
   userId    String

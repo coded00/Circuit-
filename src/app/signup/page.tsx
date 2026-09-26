@@ -1,5 +1,8 @@
 import { Suspense } from "react";
 import { AuthSplitLayout } from "@/components/auth/AuthSplitLayout";
+import { AuthMethods } from "@/components/auth/AuthMethods";
+import { AuthSwitchLink } from "@/components/auth/AuthSwitchLink";
+import { isGoogleSignInEnabled } from "@/lib/oauth/google";
 import SignupForm from "./SignupForm";
 
 export default function SignupPage() {
@@ -11,11 +14,14 @@ export default function SignupPage() {
           <img src="/circuit-logo.png" alt="Circuit" width={700} height={347} className="h-12 w-auto max-w-none lg:hidden" />
           <div className="flex flex-col gap-1">
             <h1 className="text-section-heading">Create your Circuit account</h1>
-            <p className="text-sm text-muted">Two fields, no payment info. Start playing in seconds.</p>
+            <p className="text-sm text-muted">No payment info needed. Start playing in seconds.</p>
           </div>
         </div>
         <Suspense>
-          <SignupForm />
+          <AuthMethods from="signup" googleEnabled={isGoogleSignInEnabled()}>
+            <SignupForm />
+          </AuthMethods>
+          <AuthSwitchLink to="login" />
         </Suspense>
       </div>
     </AuthSplitLayout>

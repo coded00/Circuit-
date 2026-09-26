@@ -1,8 +1,12 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
+import { prisma } from "@/lib/db";
+import { isGoogleSignInEnabled } from "@/lib/oauth/google";
 import { getCurrentUser } from "@/lib/session";
 import { ConnectAccountsRow } from "@/components/ConnectAccountsRow";
 import AccountForm from "./AccountForm";
+import { SignInMethods } from "./SignInMethods";
 
 // Private, per-user settings — never real public content.
 export const metadata: Metadata = { robots: { index: false, follow: false } };
@@ -12,6 +16,10 @@ export default async function AccountPage() {
   if (!user) {
     redirect("/login?next=/account");
   }
+  const google = await prisma.authIdentity.findUnique({
+    where: { userId_provider: { userId: user.id, provider: "google" } },
+    select: { email: true },
+  });
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-8 px-6 py-10">
@@ -43,6 +51,10 @@ export default async function AccountPage() {
         initialNotifyNewContent={user.notifyNewContent}
         initialRegion={user.region ?? ""}
       />
+
+      <Suspense>
+        <SignInMethods hasPassword={!!user.passwordHash} google={google} googleEnabled={isGoogleSignInEnabled()} />
+      </Suspense>
 
       <div className="card flex flex-col gap-4">
         <ConnectAccountsRow />

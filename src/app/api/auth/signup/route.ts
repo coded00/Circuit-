@@ -17,9 +17,9 @@ import { prisma } from "@/lib/db";
 import { createSessionToken, hashPassword, sessionCookie } from "@/lib/auth";
 import { joinGlobalCommunity } from "@/lib/community";
 import { isRateLimited, recordAttempt, clearAttempts } from "@/lib/rateLimit";
+import { HANDLE_RULES_MESSAGE, validateHandle } from "@/lib/handles";
 
 const MIN_PASSWORD_LENGTH = 8;
-const HANDLE_PATTERN = /^[a-z0-9_]{3,20}$/;
 // Same shape as login's own limit — keyed by the submitted identifier, not
 // IP. This stops repeated automated attempts against one identifier (a
 // guessed pending signup, a retry-spam loop); it does NOT by itself stop
@@ -28,35 +28,6 @@ const HANDLE_PATTERN = /^[a-z0-9_]{3,20}$/;
 // follow-up rather than silently bundled into this fix.
 const SIGNUP_MAX_ATTEMPTS = 5;
 const SIGNUP_WINDOW_MS = 15 * 60 * 1000;
-
-// Names that would be confusing or impersonation-prone as a public handle.
-const RESERVED_HANDLES = new Set([
-  "admin",
-  "administrator",
-  "staff",
-  "support",
-  "help",
-  "circuit",
-  "official",
-  "moderator",
-  "mod",
-  "root",
-  "system",
-  "api",
-  "null",
-  "undefined",
-]);
-
-function validateHandle(raw: string): string | null {
-  const handle = raw.trim().toLowerCase();
-  if (!HANDLE_PATTERN.test(handle)) {
-    return null;
-  }
-  if (RESERVED_HANDLES.has(handle)) {
-    return null;
-  }
-  return handle;
-}
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -74,7 +45,7 @@ export async function POST(request: Request) {
   const handle = validateHandle(rawHandle);
   if (!handle) {
     return NextResponse.json(
-      { error: "Username must be 3-20 characters, using only letters, numbers, and underscores." },
+      { error: HANDLE_RULES_MESSAGE },
       { status: 400 }
     );
   }

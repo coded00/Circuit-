@@ -3,11 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { safeNextPath } from "@/lib/safeRedirect";
 
 export default function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") || "/";
+  const next = safeNextPath(searchParams.get("next"));
 
   const [emailOrPhone, setEmailOrPhone] = useState("");
   const [password, setPassword] = useState("");
@@ -75,12 +76,6 @@ export default function LoginForm() {
       <button type="submit" disabled={submitting} className="btn-primary w-full">
         {submitting ? "Logging in…" : "Log in"}
       </button>
-      <Link
-        href={`/signup?next=${encodeURIComponent(next)}`}
-        className="text-center text-sm text-muted transition hover:text-foreground"
-      >
-        Need an account? Sign up
-      </Link>
     </form>
   );
 }
