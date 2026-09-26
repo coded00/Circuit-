@@ -911,10 +911,13 @@ body {
 /*
  * ============================================================================
  * Phase 20 — navigation & page transitions. Circuit's motion hierarchy has
- * three levels (see PageTransition.tsx for Level 1's Framer Motion side):
+ * three levels:
  *
- *   Level 1 Every navigation — fade/rise/scale, ~350ms. Framer Motion,
- *           applied everywhere via AppShell's AnimatePresence.
+ *   Level 1 Every navigation — a React <ViewTransition> (browser View
+ *           Transitions API) keyed by pathname in AppShell: slides forward/
+ *           back by URL depth, crossfades otherwise; card art morphs into
+ *           the tournament hero; tabs crossfade. See "View transitions" at
+ *           the end of this file.
  *   Level 2 Game/tournament pages — a HUD scan line + slight glitch, layered
  *           on top of Level 1 rather than replacing it. `.arena-transition`
  *           below. Scoped in AppShell to tournament/battle detail + bracket
@@ -948,12 +951,6 @@ body {
     box-shadow: 0 0 12px var(--accent-volt);
     animation: arena-scan 0.4s var(--ease-out);
     pointer-events: none;
-  }
-
-  /* Tab content switch (TournamentTabs, SectionTabs) — quicker than a full page
-     transition since it's a much smaller change of context. */
-  .tab-content-enter {
-    animation: motion-fade-in var(--duration-fast) var(--ease-standard) both;
   }
 
   /* Bottom-sheet modal (MobileTabBar's profile/menu sheet) — the one real
@@ -1213,5 +1210,175 @@ body {
   }
   100% {
     background-color: transparent;
+  }
+}
+
+/*
+ * ============================================================================
+ * View transitions (React <ViewTransition> + the browser View Transitions
+ * API). Browsers without support just navigate instantly.
+ *
+ *   .page-exit / .page-enter  — AppShell's page wrapper, keyed by pathname.
+ *       <html data-nav-dir="forward"> (deeper URL): old slides left, new
+ *       comes in from the right; "back": the mirror image; no direction:
+ *       a quick crossfade with a small rise. See NavigationDirection.tsx.
+ *   .tournament-morph        — card art ↔ tournament hero (same `name`),
+ *       only on navigations to/from a tournament page (<html
+ *       data-nav-morph>); otherwise the art just fades with its page.
+ *   .content-swap            — same-page content swaps (tabs, filters,
+ *       calendar views): a short crossfade, no movement.
+ *   site-header / site-sidebar / site-tabbar — the app chrome is pinned:
+ *       it never slides, and stays above the moving page.
+ * ============================================================================
+ */
+:root {
+  --vt-exit: 140ms;
+  --vt-enter: 220ms;
+  --vt-move: 360ms;
+  --vt-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Clicks during a transition reach the live page instead of the overlay. */
+::view-transition {
+  pointer-events: none;
+}
+
+::view-transition-group(site-header),
+::view-transition-group(site-sidebar),
+::view-transition-group(site-tabbar) {
+  animation: none;
+  z-index: 100;
+}
+::view-transition-old(site-header),
+::view-transition-old(site-sidebar),
+::view-transition-old(site-tabbar) {
+  display: none;
+}
+::view-transition-new(site-header),
+::view-transition-new(site-sidebar),
+::view-transition-new(site-tabbar) {
+  animation: none;
+}
+
+/* ---- Pages: default crossfade ---- */
+::view-transition-old(.page-exit) {
+  animation: var(--vt-exit) ease-in both vt-fade-out;
+}
+::view-transition-new(.page-enter) {
+  animation:
+    var(--vt-enter) ease-out var(--vt-exit) both vt-fade-in,
+    var(--vt-move) var(--vt-ease) both vt-rise;
+}
+
+/* ---- Pages: directional ---- */
+html[data-nav-dir="forward"]::view-transition-old(.page-exit) {
+  --vt-offset: -48px;
+  animation:
+    var(--vt-exit) ease-in both vt-fade-out,
+    var(--vt-move) var(--vt-ease) both vt-slide-out;
+}
+html[data-nav-dir="forward"]::view-transition-new(.page-enter) {
+  --vt-offset: 48px;
+  animation:
+    var(--vt-enter) ease-out var(--vt-exit) both vt-fade-in,
+    var(--vt-move) var(--vt-ease) both vt-slide-in;
+}
+html[data-nav-dir="back"]::view-transition-old(.page-exit) {
+  --vt-offset: 48px;
+  animation:
+    var(--vt-exit) ease-in both vt-fade-out,
+    var(--vt-move) var(--vt-ease) both vt-slide-out;
+}
+html[data-nav-dir="back"]::view-transition-new(.page-enter) {
+  --vt-offset: -48px;
+  animation:
+    var(--vt-enter) ease-out var(--vt-exit) both vt-fade-in,
+    var(--vt-move) var(--vt-ease) both vt-slide-in;
+}
+
+/* ---- Browser back/forward: entrance only (no view transition runs) ---- */
+html[data-nav-pop] .page-shell {
+  animation:
+    var(--vt-enter) ease-out both vt-fade-in,
+    var(--vt-move) var(--vt-ease) both vt-slide-in;
+}
+html[data-nav-pop="back"] .page-shell {
+  --vt-offset: -48px;
+}
+html[data-nav-pop="forward"] .page-shell {
+  --vt-offset: 48px;
+}
+html[data-nav-pop="same"] .page-shell {
+  --vt-offset: 0px;
+}
+/* Any transform/translate would make this the containing block for the
+   chat page's fixed mobile panel mid-animation — opacity only there. */
+html[data-nav-pop] .page-shell.page-shell-fade {
+  animation: var(--vt-enter) ease-out both vt-fade-in;
+}
+
+/* ---- Shared element: card art → tournament hero ---- */
+::view-transition-group(.tournament-morph) {
+  animation-duration: 420ms;
+  animation-timing-function: var(--vt-ease);
+}
+::view-transition-image-pair(.tournament-morph) {
+  animation-name: vt-morph-blur;
+}
+/* Both snapshots fill the moving box (the card and hero crop differently). */
+::view-transition-old(.tournament-morph),
+::view-transition-new(.tournament-morph) {
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Between two list pages the same art pairs up too — don't fly it
+   across; hide the old copy and fade the new one in with its page. */
+html:not([data-nav-morph])::view-transition-group(.tournament-morph) {
+  animation: none;
+}
+html:not([data-nav-morph])::view-transition-old(.tournament-morph) {
+  display: none;
+}
+html:not([data-nav-morph])::view-transition-new(.tournament-morph) {
+  animation: var(--vt-enter) ease-out var(--vt-exit) both vt-fade-in;
+}
+
+/* ---- Same-page content swaps ---- */
+::view-transition-group(.content-swap) {
+  animation-duration: 200ms;
+}
+::view-transition-old(.content-swap) {
+  animation: 120ms ease-in both vt-fade-out;
+}
+::view-transition-new(.content-swap) {
+  animation: 200ms ease-out 60ms both vt-fade-in;
+}
+
+@keyframes vt-fade-in {
+  from { opacity: 0; }
+}
+@keyframes vt-fade-out {
+  to { opacity: 0; }
+}
+@keyframes vt-rise {
+  from { transform: translateY(10px); }
+}
+@keyframes vt-slide-in {
+  from { translate: var(--vt-offset) 0; }
+}
+@keyframes vt-slide-out {
+  to { translate: var(--vt-offset) 0; }
+}
+@keyframes vt-morph-blur {
+  35% { filter: blur(2px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
   }
 }

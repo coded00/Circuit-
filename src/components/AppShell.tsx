@@ -1,9 +1,9 @@
 "use client";
 
+import { useEffect, ViewTransition } from "react";
 import { usePathname } from "next/navigation";
-import { AnimatePresence } from "framer-motion";
 import { MaintenancePage } from "@/components/MaintenancePage";
-import PageTransition from "@/components/PageTransition";
+import { NavigationDirection, noteNavigationSettled } from "@/components/NavigationDirection";
 
 const BARE_ROUTES = ["/login", "/signup", "/forgot-password", "/reset-password", "/admin"];
 
@@ -15,7 +15,7 @@ const BARE_ROUTES = ["/login", "/signup", "/forgot-password", "/reset-password",
  *  than the leaderboard page that used to live there — not creation/edit/
  *  register forms or browsing pages like /compete, and not `/new` (which
  *  would otherwise false-match the same `/tournaments/[id]` pattern). */
-/** Chat pages pin a `position: fixed` panel on mobile — see PageTransition's fadeOnly. */
+/** Chat pages pin a `position: fixed` panel on mobile — see `.page-shell-fade`. */
 function isChatRoute(pathname: string): boolean {
   return pathname === "/communities" || /^\/tournaments\/[^/]+\/community$/.test(pathname);
 }
@@ -63,6 +63,7 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  useEffect(() => noteNavigationSettled(pathname), [pathname]);
   const isBareRoute = BARE_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`));
 
   if (isBareRoute) {
@@ -85,30 +86,31 @@ export function AppShell({
               spec height (~60px), so content starts right where the
               header visually ends instead of underneath it. */}
           <main className="flex flex-1 flex-col pt-[60px]">
-            {/* Keyed by pathname so Framer Motion treats every real
-                navigation as a mount/unmount pair, playing the outgoing
-                page's exit animation before the incoming one enters
-                (`mode="wait"`) — doesn't apply to in-place content changes
-                (tab switches, search params) since those don't change
-                `pathname`. Level 1, applied everywhere. `.arena-transition`
-                (Level 2, globals.css) layers a volt-green scan line + brief
-                glitch on top, scoped to isArenaRoute only — a fresh DOM
-                node mounts on every navigation (the changed `key`), so its
-                CSS animation naturally replays each time without any extra
-                JS trigger. */}
-            <AnimatePresence mode="wait">
-              <PageTransition
-                key={pathname}
-                fadeOnly={isChatRoute(pathname)}
-                className={`flex flex-1 flex-col ${isArenaRoute(pathname) ? "arena-transition" : ""}`}
-              >
-                {children}
-              </PageTransition>
-            </AnimatePresence>
+            {/* Level 1, every navigation: a view transition keyed by
+                pathname, so each real page change is an exit/enter pair.
+                `page-exit`/`page-enter` are styled in globals.css — slide
+                forward/back by <html data-nav-dir> (NavigationDirection),
+                crossfade otherwise. Same-path changes (tabs, filters,
+                search params) don't change the key, so the page itself
+                stays put and only keyed content inside it animates.
+                `.arena-transition` (Level 2, globals.css) layers a volt
+                scan line + brief glitch on top for isArenaRoute — the new
+                key mounts a fresh node, so its CSS animation replays. */}
+            <ViewTransition key={pathname} enter="page-enter" exit="page-exit" default="none">
+              {/* .page-shell: the CSS entrance for browser back/forward,
+                  which get no view transition (see NavigationDirection).
+                  Its own element, so it never competes with
+                  .arena-transition's animation. Chat routes fade only:
+                  a transform would re-anchor their fixed mobile panel. */}
+              <div className={`page-shell flex flex-1 flex-col ${isChatRoute(pathname) ? "page-shell-fade" : ""}`}>
+                <div className={`flex flex-1 flex-col ${isArenaRoute(pathname) ? "arena-transition" : ""}`}>{children}</div>
+              </div>
+            </ViewTransition>
           </main>
         </div>
       </div>
       {mobileTabBar}
+      <NavigationDirection />
     </>
   );
 }

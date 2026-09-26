@@ -7,7 +7,9 @@
  */
 
 import Link from "next/link";
+import { ViewTransition } from "react";
 import { GameArtTile } from "@/components/GameArtTile";
+import { tournamentArtName } from "@/lib/viewTransitions";
 import { StatusPill, tournamentStatusInfo } from "@/components/StatusPill";
 import { tournamentPath } from "@/lib/seo";
 
@@ -34,7 +36,18 @@ function formatShortDate(date: Date): string {
   return date.toLocaleDateString("en-NG", { month: "short", day: "numeric" });
 }
 
-export function TournamentCard({ tournament: t, featured = false }: { tournament: TournamentCardData; featured?: boolean }) {
+export function TournamentCard({
+  tournament: t,
+  featured = false,
+  morph = false,
+}: {
+  tournament: TournamentCardData;
+  featured?: boolean;
+  /** Claim this tournament's view-transition name, so the art morphs into
+   *  the tournament page hero. Only one card per tournament on a page may
+   *  set it (duplicate names cancel the transition). */
+  morph?: boolean;
+}) {
   // "Draft" is organizer language; on a public card an announced-but-not-
   // yet-open tournament reads as "Announced".
   const status = t.status === "DRAFT" ? { tone: "neutral" as const, label: "Announced" } : tournamentStatusInfo(t.status);
@@ -50,7 +63,13 @@ export function TournamentCard({ tournament: t, featured = false }: { tournament
     >
       <div className="relative aspect-[16/10] w-full shrink-0 overflow-hidden bg-surface-elevated">
         <div className="h-full w-full transition-transform duration-[var(--duration-moderate)] ease-[var(--ease-standard)] group-hover:scale-[1.03]">
-          <GameArtTile game={t.game} posterUrl={t.posterUrl} className="h-full w-full" hideLabel imgWidth={560} />
+          {morph ? (
+            <ViewTransition name={tournamentArtName(t.id)} share="tournament-morph" default="none">
+              <GameArtTile game={t.game} posterUrl={t.posterUrl} className="h-full w-full" hideLabel imgWidth={560} />
+            </ViewTransition>
+          ) : (
+            <GameArtTile game={t.game} posterUrl={t.posterUrl} className="h-full w-full" hideLabel imgWidth={560} />
+          )}
         </div>
         <div className="absolute top-3 left-3 flex gap-1.5">
           <span className="rounded-full bg-black/70 backdrop-blur-sm">

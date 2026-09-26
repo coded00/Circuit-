@@ -59,7 +59,8 @@ export async function TopBar({ user, disputeCount = 0 }: { user: User | null; di
     : [0, 0];
 
   return (
-    <header className="fixed inset-x-0 top-0 z-30 h-[60px]">
+    // Named so page view transitions leave it pinned (globals.css).
+    <header className="fixed inset-x-0 top-0 z-30 h-[60px]" style={{ viewTransitionName: "site-header" }}>
       {/* A single grid child placed into the second (`1fr`) column at
           sm+ — no empty first-column spacer div needed, which would
           otherwise force a second implicit row (and unwanted extra

@@ -104,7 +104,11 @@ export function MobileTabBar({ user }: { user: NavUser }) {
         </nav>
       )}
 
-      <nav className="fixed inset-x-0 bottom-0 z-10 flex border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md sm:hidden">
+      <nav
+        className="fixed inset-x-0 bottom-0 z-10 flex border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md sm:hidden"
+        // Pinned during page view transitions (globals.css).
+        style={{ viewTransitionName: "site-tabbar" }}
+      >
         <TabLink href="/" icon={Home} label="Home" active={pathname === "/"} />
         <TabLink href="/compete" icon={Trophy} label="Compete" active={pathname.startsWith("/compete")} />
         <TabLink href="/battles" icon={Swords} label="Challenges" active={pathname.startsWith("/battles")} />

@@ -15,7 +15,7 @@
  * invented (no Platform/Mode/Map block: Circuit has no such fields).
  */
 
-import { cache } from "react";
+import { cache, ViewTransition } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
@@ -24,6 +24,7 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { StatusPill, tournamentStatusInfo } from "@/components/StatusPill";
 import { GameArtTile } from "@/components/GameArtTile";
+import { tournamentArtName } from "@/lib/viewTransitions";
 import { ShareButton } from "@/components/ShareButton";
 import { openDueTournaments } from "@/lib/tournaments";
 import { CapacityBar } from "@/components/CapacityBar";
@@ -406,7 +407,10 @@ export default async function TournamentPage({ params }: { params: Promise<{ id:
 
       <header data-surface="dark" className="overflow-hidden rounded-[var(--radius-hero)] border border-border bg-surface">
         <div className="relative aspect-[5/2] w-full sm:aspect-[4/1]">
-          <GameArtTile game={tournament.game} posterUrl={tournament.posterUrl} fill hideLabel imgWidth={1400} />
+          {/* Same name as the card/row art it was opened from — morphs between them. */}
+          <ViewTransition name={tournamentArtName(tournament.id)} share="tournament-morph" default="none">
+            <GameArtTile game={tournament.game} posterUrl={tournament.posterUrl} fill hideLabel imgWidth={1400} />
+          </ViewTransition>
           <div className="absolute top-4 left-4 z-10 flex flex-wrap items-center gap-2">
             {/* Dark backing so the soft-tinted pill stays legible on any poster. */}
             <span className="rounded-full bg-black/70 backdrop-blur-sm">

@@ -18,7 +18,9 @@ import Link from "next/link";
 import { ArrowRight, Calendar, Search, Tv } from "lucide-react";
 import type { Prisma, TournamentStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { ViewTransition } from "react";
 import { GameArtTile } from "@/components/GameArtTile";
+import { tournamentArtName } from "@/lib/viewTransitions";
 import { StatusPill, tournamentStatusInfo } from "@/components/StatusPill";
 import { Panel, PanelEmpty, PanelRows, panelRowClass } from "@/components/ui/Panel";
 import { openDueTournaments } from "@/lib/tournaments";
@@ -193,86 +195,92 @@ export default async function CompetePage({ searchParams }: { searchParams: Prom
         )}
       </div>
 
-      <Panel
-        title={hasFilters ? "Results" : "All competitions"}
-        meta={tournaments.length || undefined}
-        action={
-          hasFilters ? (
-            <Link href="/compete" className="text-xs font-medium text-accent-blue hover:underline">
-              Clear filters
-            </Link>
-          ) : undefined
-        }
-      >
-        {tournaments.length === 0 ? (
-          <PanelEmpty>No competitions match those filters.</PanelEmpty>
-        ) : (
-          <PanelRows>
-            {tournaments.map((t) => {
-              const statusInfo = tournamentStatusInfo(t.status);
-              const registered = t._count.registrations;
-              const fill = t.participantCap > 0 ? Math.min(100, (registered / t.participantCap) * 100) : 0;
-              const full = registered >= t.participantCap;
-              return (
-                <Link key={t.id} href={tournamentPath(t)} className={`${panelRowClass} py-3.5`}>
-                  <GameArtTile
-                    game={t.game}
-                    posterUrl={t.posterUrl}
-                    className="h-12 w-16 shrink-0 rounded-[10px] sm:h-16 sm:w-28"
-                    hideLabel
-                    imgWidth={240}
-                  />
-                  <div className="flex min-w-0 flex-1 flex-col gap-1">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span className="truncate text-sm font-semibold sm:text-[15px]">{t.name}</span>
-                      {t.streamUrl && <Tv size={13} className="shrink-0 text-muted" aria-label="Streamed" />}
-                    </div>
-                    <span className="text-metadata truncate">
-                      {t.game} · {t.teamSize}
-                      {t.prizeAmount ? ` · ${t.entryFee === 0 ? "Free entry" : `${formatNaira(t.entryFee)} entry`}` : ""}
-                    </span>
-                    <span className="text-metadata flex items-center gap-1 sm:hidden">
-                      <Calendar size={11} />
-                      {formatDate(t.startAt)}
-                    </span>
-                  </div>
-
-                  <div className="hidden w-36 shrink-0 flex-col gap-1 md:flex">
-                    <span className="text-metadata flex items-center gap-1">
-                      <Calendar size={11} />
-                      {formatDate(t.startAt)}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-elevated" aria-hidden>
-                        <div className={`h-full rounded-full ${full ? "bg-accent-orange" : "bg-accent-blue"}`} style={{ width: `${fill}%` }} />
+      {/* Filter/tab links keep the pathname, so the page stays put and only
+          the results crossfade (keyed by the active filters). */}
+      <ViewTransition key={JSON.stringify(current)} name="compete-results" share="content-swap" enter="content-swap" default="none">
+        <Panel
+          title={hasFilters ? "Results" : "All competitions"}
+          meta={tournaments.length || undefined}
+          action={
+            hasFilters ? (
+              <Link href="/compete" className="text-xs font-medium text-accent-blue hover:underline">
+                Clear filters
+              </Link>
+            ) : undefined
+          }
+        >
+          {tournaments.length === 0 ? (
+            <PanelEmpty>No competitions match those filters.</PanelEmpty>
+          ) : (
+            <PanelRows>
+              {tournaments.map((t) => {
+                const statusInfo = tournamentStatusInfo(t.status);
+                const registered = t._count.registrations;
+                const fill = t.participantCap > 0 ? Math.min(100, (registered / t.participantCap) * 100) : 0;
+                const full = registered >= t.participantCap;
+                return (
+                  <Link key={t.id} href={tournamentPath(t)} className={`${panelRowClass} py-3.5`}>
+                    <ViewTransition name={tournamentArtName(t.id)} share="tournament-morph" default="none">
+                      <GameArtTile
+                        game={t.game}
+                        posterUrl={t.posterUrl}
+                        className="h-12 w-16 shrink-0 rounded-[10px] sm:h-16 sm:w-28"
+                        hideLabel
+                        imgWidth={240}
+                      />
+                    </ViewTransition>
+                    <div className="flex min-w-0 flex-1 flex-col gap-1">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="truncate text-sm font-semibold sm:text-[15px]">{t.name}</span>
+                        {t.streamUrl && <Tv size={13} className="shrink-0 text-muted" aria-label="Streamed" />}
                       </div>
-                      <span className="text-stat text-[11px] text-muted">
-                        {registered}/{t.participantCap}
+                      <span className="text-metadata truncate">
+                        {t.game} · {t.teamSize}
+                        {t.prizeAmount ? ` · ${t.entryFee === 0 ? "Free entry" : `${formatNaira(t.entryFee)} entry`}` : ""}
+                      </span>
+                      <span className="text-metadata flex items-center gap-1 sm:hidden">
+                        <Calendar size={11} />
+                        {formatDate(t.startAt)}
                       </span>
                     </div>
-                  </div>
 
-                  <div className="flex w-[84px] shrink-0 flex-col items-end gap-0.5 text-right sm:w-28">
-                    <span className={`font-display text-[15px] font-bold tabular-nums ${t.prizeAmount ? "text-gold" : t.entryFee === 0 ? "text-success" : ""}`}>
-                      {t.prizeAmount ? formatNaira(t.prizeAmount) : t.entryFee === 0 ? "Free" : formatNaira(t.entryFee)}
-                    </span>
-                    <span className="text-[11px] text-muted">{t.prizeAmount ? "Prize" : "Entry"}</span>
-                  </div>
+                    <div className="hidden w-36 shrink-0 flex-col gap-1 md:flex">
+                      <span className="text-metadata flex items-center gap-1">
+                        <Calendar size={11} />
+                        {formatDate(t.startAt)}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-elevated" aria-hidden>
+                          <div className={`h-full rounded-full ${full ? "bg-accent-orange" : "bg-accent-blue"}`} style={{ width: `${fill}%` }} />
+                        </div>
+                        <span className="text-stat text-[11px] text-muted">
+                          {registered}/{t.participantCap}
+                        </span>
+                      </div>
+                    </div>
 
-                  {/* Wide enough for the longest label ("Registration open") so
-                      the pill never spills left over the prize column. */}
-                  <div className="hidden w-[148px] shrink-0 justify-end lg:flex">
-                    <StatusPill tone={statusInfo.tone} pulse={statusInfo.pulse}>
-                      {statusInfo.label}
-                    </StatusPill>
-                  </div>
-                  <ArrowRight size={15} className="hidden shrink-0 text-muted transition group-hover:translate-x-0.5 group-hover:text-foreground sm:block" />
-                </Link>
-              );
-            })}
-          </PanelRows>
-        )}
-      </Panel>
+                    <div className="flex w-[84px] shrink-0 flex-col items-end gap-0.5 text-right sm:w-28">
+                      <span className={`font-display text-[15px] font-bold tabular-nums ${t.prizeAmount ? "text-gold" : t.entryFee === 0 ? "text-success" : ""}`}>
+                        {t.prizeAmount ? formatNaira(t.prizeAmount) : t.entryFee === 0 ? "Free" : formatNaira(t.entryFee)}
+                      </span>
+                      <span className="text-[11px] text-muted">{t.prizeAmount ? "Prize" : "Entry"}</span>
+                    </div>
+
+                    {/* Wide enough for the longest label ("Registration open") so
+                        the pill never spills left over the prize column. */}
+                    <div className="hidden w-[148px] shrink-0 justify-end lg:flex">
+                      <StatusPill tone={statusInfo.tone} pulse={statusInfo.pulse}>
+                        {statusInfo.label}
+                      </StatusPill>
+                    </div>
+                    <ArrowRight size={15} className="hidden shrink-0 text-muted transition group-hover:translate-x-0.5 group-hover:text-foreground sm:block" />
+                  </Link>
+                );
+              })}
+            </PanelRows>
+          )}
+        </Panel>
+      </ViewTransition>
     </div>
   );
 }

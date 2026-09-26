@@ -121,8 +121,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             counterpart to globals.css's own `prefers-reduced-motion` CSS
             override just above — that override only silences CSS
             transitions/animations, never the JS-driven `motion.*` components
-            (PageTransition, Modal, NotificationBell, QuickMatchIncomingListener,
-            MatchFoundHud, and AppShell's own transitions all use framer-motion).
+            (Modal, NotificationBell, QuickMatchIncomingListener and
+            MatchFoundHud use framer-motion; page transitions are CSS view
+            transitions, covered by globals.css's reduced-motion rule).
             One root-level wrapper covers all of them without touching each
             component individually. */}
         <MotionConfig reducedMotion="user">

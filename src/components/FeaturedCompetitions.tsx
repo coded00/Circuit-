@@ -32,7 +32,7 @@ export function FeaturedCompetitions({
       <SectionHeader title={title} href={viewAllHref} />
       <CardCarousel label={title}>
         {tournaments.map((t) => (
-          <TournamentCard key={t.id} tournament={t} featured={showFeaturedBadge} />
+          <TournamentCard key={t.id} tournament={t} featured={showFeaturedBadge} morph />
         ))}
       </CardCarousel>
     </section>

@@ -24,6 +24,7 @@
  * count for the month — the chips double as the colour legend.
  */
 
+import { ViewTransition } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { prisma } from "@/lib/db";
@@ -371,23 +372,31 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
           spanning both rows. */}
       <div className={`grid grid-cols-1 gap-5 xl:gap-x-6 xl:gap-y-8 ${view === "list" ? "" : "xl:grid-cols-[minmax(0,1fr)_360px]"}`}>
         <div className="min-w-0 xl:col-start-1 xl:row-start-1">
-          {view === "list" && <CalendarListView groups={listGroups} todayKey={todayKey} />}
-          {view === "month" && (
-            <CalendarGrid days={gridDays} eventsByDay={eventsByDay} currentMonth={month} selectedKey={selectedKey} todayKey={todayKey} dayHref={(key) => href({ day: key })} />
-          )}
-          {view === "week" && (
-            <CalendarGrid days={weekDays} eventsByDay={eventsByDay} currentMonth={null} selectedKey={selectedKey} todayKey={todayKey} dayHref={(key) => href({ day: key })} dense />
-          )}
+          {/* Month/view/filter changes crossfade the grid; picking a day
+              doesn't (only the agenda swaps). */}
+          <ViewTransition key={`${year}-${month}-${view}-${type}-${game}`} name="calendar-grid" share="content-swap" enter="content-swap" default="none">
+            <div>
+              {view === "list" && <CalendarListView groups={listGroups} todayKey={todayKey} />}
+              {view === "month" && (
+                <CalendarGrid days={gridDays} eventsByDay={eventsByDay} currentMonth={month} selectedKey={selectedKey} todayKey={todayKey} dayHref={(key) => href({ day: key })} />
+              )}
+              {view === "week" && (
+                <CalendarGrid days={weekDays} eventsByDay={eventsByDay} currentMonth={null} selectedKey={selectedKey} todayKey={todayKey} dayHref={(key) => href({ day: key })} dense />
+              )}
+            </div>
+          </ViewTransition>
         </div>
 
         {view !== "list" && (
           <div className="min-w-0 xl:col-start-2 xl:row-span-2 xl:row-start-1 xl:self-start xl:sticky xl:top-[76px]">
-            <CalendarDayPanel
-              date={selectedDate}
-              events={eventsByDay.get(selectedKey) ?? []}
-              isToday={selectedKey === todayKey}
-              nextUp={nextEvent ? { event: nextEvent, href: nextDayHref(nextEvent) } : null}
-            />
+            <ViewTransition key={selectedKey} name="calendar-day" share="content-swap" enter="content-swap" default="none">
+              <CalendarDayPanel
+                date={selectedDate}
+                events={eventsByDay.get(selectedKey) ?? []}
+                isToday={selectedKey === todayKey}
+                nextUp={nextEvent ? { event: nextEvent, href: nextDayHref(nextEvent) } : null}
+              />
+            </ViewTransition>
           </div>
         )}
 
