@@ -3,6 +3,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { CheckCircle2, Lock } from "lucide-react";
+import { PasswordField } from "@/components/auth/AuthField";
+import { Spinner } from "@/components/Spinner";
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -62,41 +65,39 @@ export default function ResetPasswordForm() {
   }
 
   if (done) {
-    return <p className="alert alert-success">Password updated. Redirecting you to log in…</p>;
+    return (
+      <div className="flex items-start gap-3 rounded-[12px] border border-success/25 bg-success/[0.08] p-4">
+        <CheckCircle2 size={20} className="mt-0.5 shrink-0 text-success" />
+        <p className="text-sm leading-relaxed">Password updated. Taking you to log in…</p>
+      </div>
+    );
   }
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="password" className="field-label">
-          New password
-        </label>
-        <input
-          id="password"
-          type="password"
-          required
-          autoComplete="new-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="field-input"
-        />
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="confirmPassword" className="field-label">
-          Confirm new password
-        </label>
-        <input
-          id="confirmPassword"
-          type="password"
-          required
-          autoComplete="new-password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          className="field-input"
-        />
-      </div>
-      {error && <p className="field-error">{error}</p>}
-      <button type="submit" disabled={submitting} className="btn-primary w-full">
+      <PasswordField
+        id="password"
+        label="New password"
+        icon={Lock}
+        required
+        autoComplete="new-password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+      />
+      <PasswordField
+        id="confirmPassword"
+        label="Confirm new password"
+        icon={Lock}
+        required
+        autoComplete="new-password"
+        value={confirmPassword}
+        onChange={(e) => setConfirmPassword(e.target.value)}
+        hint={confirmPassword && confirmPassword === password ? "Passwords match" : undefined}
+        hintTone="ok"
+      />
+      {error && <p className="field-error" role="alert">{error}</p>}
+      <button type="submit" disabled={submitting} className="btn-primary h-12 w-full text-[15px]">
+        {submitting && <Spinner />}
         {submitting ? "Updating…" : "Update password"}
       </button>
     </form>

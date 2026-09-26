@@ -4,7 +4,9 @@
  * Circuit — "Continue with Google". A plain link to the server route that
  * starts the OAuth flow (full navigation, not client routing — it leaves
  * the site for Google). Uses Google's own multicolour "G" mark per their
- * sign-in branding guidelines, on Circuit's own button shape.
+ * sign-in branding guidelines (white "light" button), on Circuit's own
+ * button shape — the familiar Google control, standing out on the dark
+ * auth panel.
  */
 
 import { useEffect, useState } from "react";
@@ -35,7 +37,7 @@ export function GoogleButton({ href, label = "Continue with Google" }: { href: s
       href={href}
       onClick={() => setRedirecting(true)}
       aria-busy={redirecting}
-      className={`relative flex h-12 w-full items-center justify-center gap-3 rounded-[var(--radius-control)] border border-border-strong bg-surface text-[15px] font-semibold text-foreground transition duration-[var(--duration-base)] hover:bg-surface-elevated active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)] ${
+      className={`relative flex h-12 w-full items-center justify-center gap-3 rounded-[var(--radius-control)] bg-white text-[15px] font-semibold text-[#1f1f1f] shadow-sm transition duration-[var(--duration-base)] hover:bg-white/90 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)] ${
         redirecting ? "pointer-events-none opacity-80" : ""
       }`}
     >

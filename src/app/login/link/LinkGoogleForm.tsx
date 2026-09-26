@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Link2 } from "lucide-react";
+import { Link2, Lock } from "lucide-react";
+import { PasswordField } from "@/components/auth/AuthField";
 import { GoogleMark } from "@/components/auth/GoogleButton";
 import { Spinner } from "@/components/Spinner";
 
@@ -47,7 +48,7 @@ export default function LinkGoogleForm({ handle, displayName, avatarUrl }: { han
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <div className="flex items-center gap-3 rounded-[12px] border border-border bg-surface-elevated/60 p-3">
+      <div className="flex items-center gap-3 rounded-[12px] border border-white/[0.08] bg-white/[0.03] p-3">
         {avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- user avatar, arbitrary host
           <img src={avatarUrl} alt="" referrerPolicy="no-referrer" className="h-11 w-11 shrink-0 rounded-full object-cover" />
@@ -66,27 +67,24 @@ export default function LinkGoogleForm({ handle, displayName, avatarUrl }: { han
         </span>
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <div className="flex items-center justify-between gap-2">
-          <label htmlFor="password" className="field-label">Circuit password</label>
-          <Link href="/forgot-password" className="text-xs font-medium text-accent-blue hover:underline">
+      <PasswordField
+        id="password"
+        label="Circuit password"
+        icon={Lock}
+        required
+        autoFocus
+        autoComplete="current-password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        labelAside={
+          <Link href="/forgot-password" className="text-xs font-medium text-muted transition hover:text-foreground">
             Forgot password?
           </Link>
-        </div>
-        <input
-          id="password"
-          type="password"
-          required
-          autoFocus
-          autoComplete="current-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="field-input"
-        />
-      </div>
+        }
+      />
 
       {error && <p className="field-error" role="alert">{error}</p>}
-      <button type="submit" disabled={submitting} className="btn-primary w-full">
+      <button type="submit" disabled={submitting} className="btn-primary h-12 w-full text-[15px]">
         {submitting && <Spinner />}
         {submitting ? "Linking…" : "Link Google & log in"}
       </button>

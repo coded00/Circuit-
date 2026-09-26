@@ -11,6 +11,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { AuthSplitLayout } from "@/components/auth/AuthSplitLayout";
+import { AuthHeading } from "@/components/auth/AuthHeading";
 import { PENDING_COOKIE, readPendingCookie } from "@/lib/oauth/flowCookies";
 import LinkGoogleForm from "./LinkGoogleForm";
 
@@ -25,14 +26,17 @@ export default async function LinkGooglePage() {
 
   return (
     <AuthSplitLayout>
-      <div className="card flex w-full flex-col gap-6">
-        <div className="flex flex-col gap-1 text-center">
-          <h1 className="text-section-heading">You already have an account</h1>
-          <p className="text-sm text-muted">
-            <span className="font-medium text-foreground">{pending.profile.email}</span> is already on Circuit. Confirm your password once to
-            sign in with Google from now on. Your profile, competitions and wallet stay exactly as they are.
-          </p>
-        </div>
+      <div className="flex flex-col gap-7">
+        <AuthHeading
+          eyebrow="Account found"
+          title="Welcome back"
+          sub={
+            <>
+              <span className="font-medium text-foreground">{pending.profile.email}</span> already has a Circuit account. Confirm its password
+              once to use Google from now on — your profile, competitions and wallet stay exactly as they are.
+            </>
+          }
+        />
         <LinkGoogleForm handle={user.handle} displayName={user.displayName} avatarUrl={user.avatarUrl} />
       </div>
     </AuthSplitLayout>

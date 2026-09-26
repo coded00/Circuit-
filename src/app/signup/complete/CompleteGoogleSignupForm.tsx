@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check } from "lucide-react";
+import { AtSign, Check, Globe2, UserRound } from "lucide-react";
+import { AuthField } from "@/components/auth/AuthField";
+import { HANDLE_PATTERN } from "@/lib/handles";
 import { GoogleMark } from "@/components/auth/GoogleButton";
 import { Spinner } from "@/components/Spinner";
 
@@ -68,7 +70,7 @@ export default function CompleteGoogleSignupForm({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <div className="flex items-center gap-3 rounded-[12px] border border-border bg-surface-elevated/60 p-3">
+      <div className="flex items-center gap-3 rounded-[12px] border border-white/[0.08] bg-white/[0.03] p-3">
         {googlePicture && useGooglePhoto ? (
           // eslint-disable-next-line @next/next/no-img-element -- Google-hosted profile photo
           <img src={googlePicture} alt="" referrerPolicy="no-referrer" className="h-11 w-11 shrink-0 rounded-full object-cover" />
@@ -86,39 +88,34 @@ export default function CompleteGoogleSignupForm({
         </div>
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="handle" className="field-label">Username</label>
-        <div className="relative">
-          <span className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-sm text-muted">@</span>
-          <input
-            id="handle"
-            required
-            autoFocus
-            minLength={3}
-            maxLength={20}
-            pattern="[A-Za-z0-9_]{3,20}"
-            autoCapitalize="none"
-            autoCorrect="off"
-            spellCheck={false}
-            value={handle}
-            onChange={(e) => setHandle(e.target.value.toLowerCase())}
-            className="field-input pl-8"
-          />
-        </div>
-        <span className="field-hint">3–20 letters, numbers or underscores. This is your public @name.</span>
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="displayName" className="field-label">Display name</label>
-        <input id="displayName" maxLength={40} value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder={handle} className="field-input" />
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="region" className="field-label">
-          Country <span className="font-normal text-muted">(optional)</span>
-        </label>
-        <input id="region" maxLength={60} value={region} onChange={(e) => setRegion(e.target.value)} placeholder="e.g. Nigeria" autoComplete="country-name" className="field-input" />
-      </div>
+      <AuthField
+        id="handle"
+        label="Username"
+        icon={AtSign}
+        required
+        autoFocus
+        minLength={3}
+        maxLength={20}
+        pattern="[a-z0-9_]{3,20}"
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
+        value={handle}
+        onChange={(e) => setHandle(e.target.value.toLowerCase())}
+        hint={HANDLE_PATTERN.test(handle) ? `You'll be @${handle}` : "3–20 letters, numbers or underscores."}
+        hintTone={HANDLE_PATTERN.test(handle) ? "ok" : handle ? "error" : "muted"}
+      />
+      <AuthField id="displayName" label="Display name" icon={UserRound} maxLength={40} value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder={handle} />
+      <AuthField
+        id="region"
+        label="Country (optional)"
+        icon={Globe2}
+        maxLength={60}
+        value={region}
+        onChange={(e) => setRegion(e.target.value)}
+        placeholder="e.g. Nigeria"
+        autoComplete="country-name"
+      />
 
       {gameOptions.length > 0 && (
         <fieldset className="flex flex-col gap-2">
@@ -155,7 +152,7 @@ export default function CompleteGoogleSignupForm({
       )}
 
       {error && <p className="field-error" role="alert">{error}</p>}
-      <button type="submit" disabled={submitting} className="btn-primary w-full">
+      <button type="submit" disabled={submitting} className="btn-primary h-12 w-full text-[15px]">
         {submitting && <Spinner />}
         {submitting ? "Creating your account…" : "Enter Circuit"}
       </button>

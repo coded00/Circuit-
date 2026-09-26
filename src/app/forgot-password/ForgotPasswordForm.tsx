@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { ArrowLeft, AtSign, MailCheck } from "lucide-react";
+import { AuthField } from "@/components/auth/AuthField";
+import { Spinner } from "@/components/Spinner";
 
 export default function ForgotPasswordForm() {
   const [emailOrPhone, setEmailOrPhone] = useState("");
@@ -33,10 +36,13 @@ export default function ForgotPasswordForm() {
 
   if (message) {
     return (
-      <div className="flex flex-col gap-4 text-center">
-        <p className="alert alert-success">{message}</p>
-        <Link href="/login" className="text-sm font-medium text-accent-blue hover:underline">
-          ← Back to login
+      <div className="flex flex-col gap-5">
+        <div className="flex items-start gap-3 rounded-[12px] border border-success/25 bg-success/[0.08] p-4">
+          <MailCheck size={20} className="mt-0.5 shrink-0 text-success" />
+          <p className="text-sm leading-relaxed">{message}</p>
+        </div>
+        <Link href="/login" className="flex items-center gap-1.5 text-sm font-semibold text-muted transition hover:text-foreground">
+          <ArrowLeft size={15} /> Back to log in
         </Link>
       </div>
     );
@@ -44,29 +50,26 @@ export default function ForgotPasswordForm() {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="emailOrPhone" className="field-label">
-          Email
-        </label>
-        <input
-          id="emailOrPhone"
-          type="text"
-          required
-          autoComplete="username"
-          value={emailOrPhone}
-          onChange={(e) => setEmailOrPhone(e.target.value)}
-          className="field-input"
-        />
-        <p className="field-hint">
-          Recovery by phone isn&apos;t available yet — use the email on your account if you have one.
-        </p>
-      </div>
-      {error && <p className="field-error">{error}</p>}
-      <button type="submit" disabled={submitting} className="btn-primary w-full">
+      <AuthField
+        id="emailOrPhone"
+        label="Email"
+        icon={AtSign}
+        type="text"
+        inputMode="email"
+        required
+        autoComplete="username"
+        placeholder="you@example.com"
+        value={emailOrPhone}
+        onChange={(e) => setEmailOrPhone(e.target.value)}
+        hint="Recovery by phone isn't available yet — use the email on your account if you have one."
+      />
+      {error && <p className="field-error" role="alert">{error}</p>}
+      <button type="submit" disabled={submitting} className="btn-primary h-12 w-full text-[15px]">
+        {submitting && <Spinner />}
         {submitting ? "Sending…" : "Send reset link"}
       </button>
-      <Link href="/login" className="text-center text-sm text-muted transition hover:text-foreground">
-        ← Back to login
+      <Link href="/login" className="flex items-center justify-center gap-1.5 text-sm font-semibold text-muted transition hover:text-foreground">
+        <ArrowLeft size={15} /> Back to log in
       </Link>
     </form>
   );

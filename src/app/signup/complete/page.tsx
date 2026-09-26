@@ -10,6 +10,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { AuthSplitLayout } from "@/components/auth/AuthSplitLayout";
+import { AuthHeading } from "@/components/auth/AuthHeading";
 import { PENDING_COOKIE, readPendingCookie } from "@/lib/oauth/flowCookies";
 import { suggestHandle } from "@/lib/oauth/accounts";
 import CompleteGoogleSignupForm from "./CompleteGoogleSignupForm";
@@ -27,11 +28,8 @@ export default async function CompleteGoogleSignupPage() {
 
   return (
     <AuthSplitLayout>
-      <div className="card flex w-full flex-col gap-6">
-        <div className="flex flex-col gap-1 text-center">
-          <h1 className="text-section-heading">One last step</h1>
-          <p className="text-sm text-muted">Pick how you&apos;ll show up on Circuit.</p>
-        </div>
+      <div className="flex flex-col gap-7">
+        <AuthHeading eyebrow="Almost there" title="Pick your tag" sub="This is how other players will see you on Circuit." />
         <CompleteGoogleSignupForm
           email={pending.profile.email}
           googleName={pending.profile.name}

@@ -38,7 +38,7 @@ export function AuthMethods({
   return (
     <div className="flex flex-col gap-4">
       {error && (
-        <p role="alert" className="rounded-[10px] border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-sm text-foreground">
+        <p role="alert" className="rounded-[11px] border border-danger/30 bg-danger/[0.12] px-3.5 py-3 text-sm leading-relaxed text-foreground">
           {error}
         </p>
       )}
@@ -49,10 +49,14 @@ export function AuthMethods({
         </>
       )}
       {showEmail ? (
-        children
+        <div className={googleEnabled ? "motion-slide-up" : undefined}>{children}</div>
       ) : (
-        <button type="button" onClick={() => setShowEmail(true)} className="btn-secondary h-12 w-full gap-3 text-[15px]">
-          <Mail size={18} />
+        <button
+          type="button"
+          onClick={() => setShowEmail(true)}
+          className="flex h-12 w-full items-center justify-center gap-3 rounded-[var(--radius-control)] border border-white/[0.1] bg-white/[0.03] text-[15px] font-semibold text-foreground transition hover:border-white/[0.18] hover:bg-white/[0.06] active:scale-[0.99]"
+        >
+          <Mail size={18} className="text-muted" />
           Continue with email
         </button>
       )}

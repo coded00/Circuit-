@@ -3,7 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { AtSign, Lock } from "lucide-react";
 import { safeNextPath } from "@/lib/safeRedirect";
+import { AuthField, PasswordField } from "@/components/auth/AuthField";
+import { Spinner } from "@/components/Spinner";
 
 export default function LoginForm() {
   const router = useRouter();
@@ -39,41 +42,39 @@ export default function LoginForm() {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="emailOrPhone" className="field-label">
-          Email or phone
-        </label>
-        <input
-          id="emailOrPhone"
-          type="text"
-          required
-          autoComplete="username"
-          value={emailOrPhone}
-          onChange={(e) => setEmailOrPhone(e.target.value)}
-          className="field-input"
-        />
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <div className="flex items-center justify-between gap-2">
-          <label htmlFor="password" className="field-label">
-            Password
-          </label>
-          <Link href="/forgot-password" className="text-xs font-medium text-accent-blue hover:underline">
+      <AuthField
+        id="emailOrPhone"
+        label="Email or phone"
+        icon={AtSign}
+        type="text"
+        required
+        autoComplete="username"
+        inputMode="email"
+        placeholder="you@example.com or 080…"
+        value={emailOrPhone}
+        onChange={(e) => setEmailOrPhone(e.target.value)}
+      />
+      <PasswordField
+        id="password"
+        label="Password"
+        icon={Lock}
+        required
+        autoComplete="current-password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        labelAside={
+          <Link href="/forgot-password" className="text-xs font-medium text-muted transition hover:text-foreground">
             Forgot password?
           </Link>
-        </div>
-        <input
-          id="password"
-          type="password"
-          required
-          autoComplete="current-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="field-input"
-        />
-      </div>
-      {error && <p className="field-error">{error}</p>}
-      <button type="submit" disabled={submitting} className="btn-primary w-full">
+        }
+      />
+      {error && (
+        <p className="field-error" role="alert">
+          {error}
+        </p>
+      )}
+      <button type="submit" disabled={submitting} className="btn-primary h-12 w-full text-[15px]">
+        {submitting && <Spinner />}
         {submitting ? "Logging in…" : "Log in"}
       </button>
     </form>
