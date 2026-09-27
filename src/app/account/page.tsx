@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
+import { loginPath } from "@/lib/safeRedirect";
 import { prisma } from "@/lib/db";
 import { isGoogleSignInEnabled } from "@/lib/oauth/google";
 import { getCurrentUser } from "@/lib/session";
 import { ConnectAccountsRow } from "@/components/ConnectAccountsRow";
+import { CommunityTagPicker } from "@/components/community/CommunityTagPicker";
+import { AppealForm } from "@/components/community/AppealForm";
+import { EmailVerificationBanner } from "@/components/EmailVerificationBanner";
 import AccountForm from "./AccountForm";
 import { SignInMethods } from "./SignInMethods";
 
@@ -14,27 +18,37 @@ export const metadata: Metadata = { robots: { index: false, follow: false } };
 export default async function AccountPage() {
   const user = await getCurrentUser();
   if (!user) {
-    redirect("/login?next=/account");
+    redirect(loginPath("/account"));
   }
-  const google = await prisma.authIdentity.findUnique({
-    where: { userId_provider: { userId: user.id, provider: "google" } },
-    select: { email: true },
-  });
+  const [google, taggedCommunities, openAppeals] = await Promise.all([
+    prisma.authIdentity.findUnique({
+      where: { userId_provider: { userId: user.id, provider: "google" } },
+      select: { email: true },
+    }),
+    prisma.community.findMany({
+      where: { enabled: true, tag: { not: null }, members: { some: { userId: user.id } } },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, tag: true },
+    }),
+    prisma.appeal.count({ where: { userId: user.id, kind: "ACCOUNT_SUSPENSION", status: "OPEN" } }),
+  ]);
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-8 px-6 py-10">
+    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-8 px-4 py-6 sm:px-8 sm:py-10">
       <div className="flex flex-col gap-1">
         <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Account settings</h1>
         <p className="text-sm text-muted">@{user.handle}</p>
       </div>
       {user.isSuspended && (
-        <div className="alert alert-danger">
+        <div className="alert alert-danger flex flex-col gap-3">
           <p>
             Your account is suspended: {user.suspensionReason ?? "contact support."} You can&apos;t register,
             pay, or accept Battles while suspended.
           </p>
+          <AppealForm kind="ACCOUNT_SUSPENSION" pending={openAppeals > 0} />
         </div>
       )}
+      {user.email && !user.emailVerifiedAt && <EmailVerificationBanner email={user.email} />}
       {!user.email && (
         <div className="alert alert-info">
           <p>Add your email below to get notified when new tournaments and Challenges go live.</p>
@@ -50,6 +64,11 @@ export default async function AccountPage() {
         initialEmail={user.email ?? ""}
         initialNotifyNewContent={user.notifyNewContent}
         initialRegion={user.region ?? ""}
+      />
+
+      <CommunityTagPicker
+        options={taggedCommunities.map((c) => ({ id: c.id, name: c.name ?? "Community", tag: c.tag! }))}
+        current={user.featuredCommunityId}
       />
 
       <Suspense>

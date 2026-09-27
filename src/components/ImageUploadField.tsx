@@ -56,11 +56,11 @@ export const GAME_COVER_BOUNDS: ImageSizeBounds = {
   recommended: "1600×900px (16:9) — shown on this game's tiles and on competition cards.",
 };
 
-export type ImagePurpose = "avatar" | "poster" | "banner" | "game-icon" | "game-cover";
+export type ImagePurpose = "avatar" | "poster" | "banner" | "game-icon" | "game-cover" | "community-icon" | "community-banner";
 
 /** Longest edge an upload is downscaled to, per purpose — big enough for
  *  where each is shown (and above POSTER_BOUNDS' 1200px minimum). */
-const MAX_EDGE: Record<ImagePurpose, number> = { avatar: 512, poster: 2400, banner: 2400, "game-icon": 256, "game-cover": 1600 };
+const MAX_EDGE: Record<ImagePurpose, number> = { avatar: 512, poster: 2400, banner: 2400, "game-icon": 256, "game-cover": 1600, "community-icon": 512, "community-banner": 2400 };
 
 function checkImageSize(width: number, height: number, bounds: ImageSizeBounds): string | null {
   if (width < bounds.minWidth || height < bounds.minHeight) {
@@ -178,8 +178,8 @@ export function ImageUploadField({
   const previewClass =
     purpose === "avatar"
       ? "h-20 w-20 rounded-full"
-      : purpose === "game-icon"
-        ? "h-20 w-20 rounded-[12px]"
+      : purpose === "game-icon" || purpose === "community-icon"
+        ? "h-20 w-20 rounded-[16px]"
         : "h-32 w-full rounded-[10px]";
 
   return (
@@ -256,7 +256,7 @@ export function ImageUploadField({
 
       {value && (
         <div className="flex flex-col gap-1.5">
-          <div className={`flex items-center gap-3 ${purpose === "avatar" || purpose === "game-icon" ? "" : "flex-col items-stretch"}`}>
+          <div className={`flex items-center gap-3 ${purpose === "avatar" || purpose === "game-icon" || purpose === "community-icon" ? "" : "flex-col items-stretch"}`}>
             <div className={`relative shrink-0 overflow-hidden border border-border bg-surface-elevated ${previewClass}`}>
               {/* eslint-disable-next-line @next/next/no-img-element -- upload/pasted-link preview; dimensions read via onLoad */}
               <img key={value} src={value} alt="" className="h-full w-full object-cover" onLoad={handlePreviewLoad} onError={handlePreviewError} />

@@ -399,7 +399,7 @@ export default async function TournamentPage({ params }: { params: Promise<{ id:
   ];
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-8 sm:py-8">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-8 sm:py-10">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(eventJsonLd) }} />
       {/* Poller-driven refresh keeps capacity, FULL state and status live
           while someone else registers with this page open. */}

@@ -11,7 +11,7 @@
  * doesn't need to repeat it.
  */
 import type { ComponentType } from "react";
-import { Trophy, Swords, Flag, Users, Wallet, Bell, AtSign } from "lucide-react";
+import { Trophy, Swords, Flag, Users, Wallet, Bell, AtSign, MessagesSquare, ShieldAlert } from "lucide-react";
 import type { NotificationType } from "@/lib/notifications";
 
 export type NotificationCategory = {
@@ -26,7 +26,9 @@ const MATCH: NotificationCategory = { label: "Match", Icon: Swords };
 const DISPUTE: NotificationCategory = { label: "Dispute", Icon: Flag };
 const SOCIAL: NotificationCategory = { label: "Team & friends", Icon: Users };
 const WALLET: NotificationCategory = { label: "Wallet", Icon: Wallet };
-const COMMUNITY: NotificationCategory = { label: "Community", Icon: AtSign };
+const COMMUNITY: NotificationCategory = { label: "Community", Icon: MessagesSquare };
+const MENTION: NotificationCategory = { label: "Mention", Icon: AtSign };
+const MODERATION: NotificationCategory = { label: "Moderation", Icon: ShieldAlert };
 const DEFAULT: NotificationCategory = { label: "Notification", Icon: Bell };
 
 const CATEGORY_BY_TYPE: Record<NotificationType, NotificationCategory> = {
@@ -58,7 +60,13 @@ const CATEGORY_BY_TYPE: Record<NotificationType, NotificationCategory> = {
   TEAM_INVITE: SOCIAL,
   TEAM_JOIN_REQUEST: SOCIAL,
   ORGANIZER_REVENUE_SETTLED: WALLET,
-  COMMUNITY_MENTION: COMMUNITY,
+  COMMUNITY_MENTION: MENTION,
+  COMMUNITY_APPLICATION: COMMUNITY,
+  COMMUNITY_APPLICATION_APPROVED: COMMUNITY,
+  COMMUNITY_REPORT: MODERATION,
+  COMMUNITY_SUSPENDED: MODERATION,
+  APPEAL_FILED: MODERATION,
+  APPEAL_DECIDED: MODERATION,
 };
 
 export function getNotificationCategory(type: string): NotificationCategory {

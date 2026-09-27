@@ -11,6 +11,7 @@ import { AppShell } from "@/components/AppShell";
 import { ConfirmDialogProvider } from "@/components/ConfirmDialogProvider";
 import { OneSignalInit } from "@/components/OneSignalInit";
 import { PresenceHeartbeat } from "@/components/PresenceHeartbeat";
+import { BackForwardRefresh } from "@/components/BackForwardRefresh";
 import { QuickMatchIncomingListener } from "@/components/QuickMatchIncomingListener";
 import { SITE_NAME, SITE_URL, DEFAULT_DESCRIPTION } from "@/lib/seo";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
@@ -165,6 +166,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         </GameImageProvider>
         {user && <OneSignalInit userId={user.id} notifyNewContent={user.notifyNewContent} />}
         {user && <PresenceHeartbeat />}
+        <BackForwardRefresh />
         {user && <QuickMatchIncomingListener />}
         </MotionConfig>
       </body>

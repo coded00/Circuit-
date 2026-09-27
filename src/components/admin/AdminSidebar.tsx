@@ -31,6 +31,7 @@ import {
   Banknote,
   Calendar,
   Settings,
+  MessagesSquare,
 } from "lucide-react";
 
 export const ADMIN_NAV_ITEMS = [
@@ -39,6 +40,7 @@ export const ADMIN_NAV_ITEMS = [
   { href: "/admin/competitions", label: "Competitions", icon: Trophy },
   { href: "/admin/challenges", label: "Challenges", icon: Swords },
   { href: "/admin/games", label: "Games", icon: Gamepad2 },
+  { href: "/admin/communities", label: "Communities", icon: MessagesSquare },
   { href: "/admin/content", label: "Content", icon: Newspaper },
   { href: "/admin/finance", label: "Finance", icon: Banknote },
   { href: "/admin/calendar", label: "Calendar", icon: Calendar },

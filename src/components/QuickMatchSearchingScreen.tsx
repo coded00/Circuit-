@@ -79,7 +79,7 @@ export function QuickMatchSearchingScreen({ challengeId, initial }: { challengeI
   }
 
   if (status.status === "ACCEPTED" && status.battleId) {
-    return <MatchFoundHud onComplete={() => router.push(`/battles/${status.battleId}`)} />;
+    return <MatchFoundHud onComplete={() => router.replace(`/battles/${status.battleId}`)} />;
   }
 
   if (status.status === "EXPIRED") {

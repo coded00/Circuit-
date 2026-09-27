@@ -217,7 +217,7 @@ export default async function AdminFinancePage({ searchParams }: { searchParams:
 
       {activeTab === "wallet" ? (
         <>
-          <form className="card flex flex-wrap items-end gap-3">
+          <form className="card filter-bar">
             <input type="hidden" name="tab" value="wallet" />
             <div className="flex min-w-[200px] flex-1 flex-col gap-1.5">
               <label className="field-label" htmlFor="q">
@@ -306,7 +306,7 @@ export default async function AdminFinancePage({ searchParams }: { searchParams:
         </>
       ) : (
         <>
-          <form className="card flex flex-wrap items-end gap-3">
+          <form className="card filter-bar">
             <input type="hidden" name="tab" value="escrow" />
             <div className="flex min-w-[200px] flex-1 flex-col gap-1.5">
               <label className="field-label" htmlFor="eq">

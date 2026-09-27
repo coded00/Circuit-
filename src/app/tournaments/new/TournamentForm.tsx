@@ -14,13 +14,21 @@ function nairaToKobo(value: string): number {
 export default function TournamentForm({
   redirectBase,
   games,
+  hostCommunities = [],
+  defaultHostCommunityId = "",
 }: {
   // A plain path prefix, not a function — Server Component callers
   // (e.g. the admin page) can't pass functions as props to this Client
   // Component.
   redirectBase?: string;
   games: { id: string; name: string }[];
+  /** Communities they run — the tournament can be one of their events. */
+  hostCommunities?: { id: string; name: string | null }[];
+  defaultHostCommunityId?: string;
 } = { games: [] }) {
+  const [hostCommunityId, setHostCommunityId] = useState(
+    hostCommunities.some((c) => c.id === defaultHostCommunityId) ? defaultHostCommunityId : ""
+  );
   const router = useRouter();
 
   const [name, setName] = useState("");
@@ -62,6 +70,7 @@ export default function TournamentForm({
         rulesText,
         streamUrl: streamUrl || null,
         enableCommunity,
+        hostCommunityId: hostCommunityId || null,
         posterUrl: posterUrl || null,
         registrationOpenAt: registrationOpenAt
           ? new Date(registrationOpenAt).toISOString()
@@ -81,7 +90,8 @@ export default function TournamentForm({
       return;
     }
 
-    router.push(redirectBase ? `${redirectBase}/${data.id}` : `/tournaments/${data.id}`);
+    // replace: Back shouldn't reopen a form that was already submitted.
+    router.replace(redirectBase ? `${redirectBase}/${data.id}` : `/tournaments/${data.id}`);
     router.refresh();
   }
 
@@ -304,6 +314,23 @@ export default function TournamentForm({
         />
         <span className="field-hint">Shown as a &quot;Watch stream&quot; link on the tournament page.</span>
       </div>
+
+      {hostCommunities.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="hostCommunity" className="field-label">
+            Host as a community event (optional)
+          </label>
+          <select id="hostCommunity" value={hostCommunityId} onChange={(e) => setHostCommunityId(e.target.value)} className="field-select">
+            <option value="">Not a community event</option>
+            {hostCommunities.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <span className="field-hint">It&apos;s announced in the community and listed under its events.</span>
+        </div>
+      )}
 
       <label className="flex items-start gap-2.5 rounded-[10px] border border-border bg-surface-elevated px-3.5 py-3">
         <input

@@ -5,7 +5,7 @@
  */
 export default function PlayerProfileLoading() {
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6 sm:px-8 sm:py-8">
+    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6 sm:px-8 sm:py-10">
       <div className="overflow-hidden rounded-[var(--radius-hero)] border border-border">
         <div className="flex items-center gap-5 p-5 sm:p-7">
           <div className="skeleton h-20 w-20 shrink-0 rounded-full sm:h-24 sm:w-24" />

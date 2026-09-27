@@ -36,7 +36,8 @@ export default function LoginForm() {
       return;
     }
 
-    router.push(next);
+    // replace, not push: Back from here must not return to the auth form.
+    router.replace(next);
     router.refresh();
   }
 

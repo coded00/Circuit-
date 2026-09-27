@@ -10,6 +10,8 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { getCurrentUser } from "@/lib/session";
+import { safeNextPath } from "@/lib/safeRedirect";
 import { AuthSplitLayout } from "@/components/auth/AuthSplitLayout";
 import { AuthHeading } from "@/components/auth/AuthHeading";
 import { PENDING_COOKIE, readPendingCookie } from "@/lib/oauth/flowCookies";
@@ -19,6 +21,8 @@ export const metadata: Metadata = { title: "Link your Google account", robots: {
 
 export default async function LinkGooglePage() {
   const pending = await readPendingCookie((await cookies()).get(PENDING_COOKIE)?.value);
+  // Already signed in (e.g. finished this step in another tab): nothing left to do here.
+  if (await getCurrentUser()) redirect(safeNextPath(pending?.next));
   if (!pending || pending.kind !== "link") redirect("/login?error=google_expired");
 
   const user = await prisma.user.findUnique({ where: { id: pending.userId }, select: { handle: true, displayName: true, avatarUrl: true } });

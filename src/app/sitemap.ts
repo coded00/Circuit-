@@ -22,6 +22,7 @@ import type { MetadataRoute } from "next";
 import { prisma } from "@/lib/db";
 import { SITE_URL, tournamentPath, battlePath, gamePath, organiserPath, videoPath } from "@/lib/seo";
 import { realGameNames } from "@/lib/games";
+import { LISTED_WHERE } from "@/lib/communityDirectory";
 
 // Without this, Next prerenders sitemap.xml once at build time (it has no
 // cookies()/headers() call to make it dynamic on its own) — a tournament
@@ -37,12 +38,11 @@ const STATIC_ROUTES: { path: string; changeFrequency: MetadataRoute.Sitemap[numb
   { path: "/leaderboard", changeFrequency: "daily", priority: 0.6 },
   { path: "/battles", changeFrequency: "hourly", priority: 0.7 },
   { path: "/calendar", changeFrequency: "daily", priority: 0.6 },
-  { path: "/discover", changeFrequency: "daily", priority: 0.6 },
-  { path: "/community", changeFrequency: "daily", priority: 0.5 },
+  { path: "/communities", changeFrequency: "daily", priority: 0.6 },
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [tournaments, battles, gameNames, organizedByCounts, videos] = await Promise.all([
+  const [tournaments, battles, gameNames, organizedByCounts, videos, communities] = await Promise.all([
     prisma.tournament.findMany({
       where: { status: { in: [...TOURNAMENT_STATUSES] } },
       select: { id: true, name: true, createdAt: true },
@@ -63,6 +63,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       where: { status: "PUBLISHED" },
       select: { slug: true, createdAt: true },
     }),
+    // Listed communities only (invite-only ones are private).
+    prisma.community.findMany({ where: LISTED_WHERE, select: { slug: true, lastActivityAt: true, createdAt: true } }),
   ]);
 
   const staticEntries: MetadataRoute.Sitemap = STATIC_ROUTES.map(({ path, changeFrequency, priority }) => ({
@@ -106,5 +108,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.5,
   }));
 
-  return [...staticEntries, ...gameEntries, ...organiserEntries, ...battleEntries, ...tournamentEntries, ...videoEntries];
+  const communityEntries: MetadataRoute.Sitemap = communities.map((c) => ({
+    url: `${SITE_URL}/communities/${c.slug}`,
+    lastModified: c.lastActivityAt ?? c.createdAt,
+    changeFrequency: "daily",
+    priority: 0.5,
+  }));
+
+  return [...staticEntries, ...gameEntries, ...organiserEntries, ...battleEntries, ...tournamentEntries, ...videoEntries, ...communityEntries];
 }

@@ -23,7 +23,7 @@ export function TeamActionButton({ teamId, userId, kind }: { teamId: string; use
     setBusy(true);
     if (kind === "disband") {
       await fetch(`/api/teams/${teamId}`, { method: "DELETE" });
-      router.push("/teams");
+      router.replace("/teams"); // the disbanded team's page is gone
     } else {
       await fetch(`/api/teams/${teamId}/members/${userId}`, { method: "DELETE" });
       router.refresh();

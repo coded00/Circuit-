@@ -1407,3 +1407,28 @@ html:not([data-nav-morph])::view-transition-new(.tournament-morph) {
     animation-delay: 0s !important;
   }
 }
+
+/* Admin/list filter forms: on phones the first field (search) and the last
+   control (submit) span the row and the rest pair up two per row, instead
+   of each wrapping to whatever width its min-width happens to allow. */
+@layer components {
+  .filter-bar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: end;
+    gap: 0.75rem;
+  }
+  .filter-bar > * {
+    min-width: 0;
+  }
+  .filter-bar > :first-child,
+  .filter-bar > :last-child {
+    grid-column: 1 / -1;
+  }
+  @media (min-width: 640px) {
+    .filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+    }
+  }
+}

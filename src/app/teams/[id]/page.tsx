@@ -4,10 +4,14 @@
  * `TeamMembership`'s own schema comments for the underlying model.
  */
 
+import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
+import { loginPath } from "@/lib/safeRedirect";
 import { getCurrentUser } from "@/lib/session";
 import { prisma } from "@/lib/db";
 import { teamRoleFor } from "@/lib/teams";
+import { communityHref } from "@/lib/community";
+import { CommunityAvatar } from "@/components/community/CommunityAvatar";
 import { MemberRow } from "@/components/teams/MemberRow";
 import { InviteMemberForm } from "@/components/teams/InviteMemberForm";
 import { TeamSettingsForm } from "@/components/teams/TeamSettingsForm";
@@ -19,7 +23,7 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ id:
   const { id } = await params;
   const user = await getCurrentUser();
   if (!user) {
-    redirect(`/login?next=${encodeURIComponent(`/teams/${id}`)}`);
+    redirect(loginPath(`/teams/${id}`));
   }
 
   const team = await prisma.team.findUnique({
@@ -29,6 +33,10 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ id:
       members: {
         include: { user: { select: { id: true, handle: true, displayName: true, avatarUrl: true } } },
         orderBy: { createdAt: "asc" },
+      },
+      communities: {
+        where: { community: { enabled: true } },
+        include: { community: { select: { id: true, name: true, slug: true, iconUrl: true, tag: true, kind: true, tournamentId: true } } },
       },
     },
   });
@@ -44,8 +52,22 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ id:
   // (created alongside the team), so its length alone is the real total.
   const totalMembers = team.members.length;
 
+  const communitiesSection = team.communities.length > 0 && (
+    <section className="flex flex-col gap-2">
+      <h2 className="text-eyebrow">Communities</h2>
+      <div className="flex flex-wrap gap-2">
+        {team.communities.map(({ community: c }) => (
+          <Link key={c.id} href={communityHref(c)} className="flex items-center gap-2 rounded-full border border-border bg-surface py-1 pr-3 pl-1 text-sm font-medium transition hover:border-border-hover">
+            <CommunityAvatar name={c.name ?? "?"} iconUrl={c.iconUrl} tag={c.tag} size="sm" className="!h-7 !w-7 !rounded-full" />
+            {c.name}
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 p-6 sm:p-8">
+    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 py-6 sm:px-8 sm:py-10">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
           <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
@@ -65,6 +87,8 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ id:
           <TeamMembershipButton teamId={id} viewerId={user.id} status={{ state: "requested", membershipId: role.membershipId }} />
         )}
       </div>
+
+      {communitiesSection}
 
       {isInvited && <TeamInviteBanner teamId={id} viewerId={user.id} />}
 

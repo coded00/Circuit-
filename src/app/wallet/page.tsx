@@ -17,6 +17,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { loginPath } from "@/lib/safeRedirect";
 import { Landmark } from "lucide-react";
 import { getCurrentUser } from "@/lib/session";
 import { getWalletActivity } from "@/lib/wallet";
@@ -46,7 +47,7 @@ const COMPETITION_TITLE: Record<string, string> = {
 
 export default async function WalletPage() {
   const user = await getCurrentUser();
-  if (!user) redirect("/login?next=/wallet");
+  if (!user) redirect(loginPath("/wallet"));
 
   const { balance, fundingHistory, rows, totalPaid, totalRefunded, totalWon } = await getWalletActivity(user.id);
 

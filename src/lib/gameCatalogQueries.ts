@@ -27,3 +27,12 @@ export async function gameImageMap(): Promise<Record<string, string>> {
   for (const g of games) map[g.name.trim().toLowerCase()] = (g.coverUrl ?? g.iconUrl)!;
   return map;
 }
+
+/** Games players can see and pick: enabled and published in Admin → Games. */
+export async function publishedGames() {
+  return prisma.game.findMany({
+    where: { enabled: true, publishedAt: { not: null } },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true },
+  });
+}

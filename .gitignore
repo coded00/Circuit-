@@ -56,3 +56,4 @@ next-env.d.ts
 /playwright-report/
 /blob-report/
 
+.dev-login.txt

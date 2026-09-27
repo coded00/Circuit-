@@ -37,6 +37,7 @@ export async function PATCH(request: Request) {
     bio?: string | null;
     favoriteGames?: string[];
     email?: string | null;
+    emailVerifiedAt?: Date | null;
     notifyNewContent?: boolean;
     oneSignalPlayerId?: string | null;
     region?: string | null;
@@ -122,6 +123,8 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
     }
     data.email = emailResult.email;
+    // A different address hasn't been proven yet.
+    if ((emailResult.email ?? "").toLowerCase() !== (user.email ?? "").toLowerCase()) data.emailVerifiedAt = null;
   }
 
   if (body.notifyNewContent !== undefined) {

@@ -103,7 +103,7 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
   const announced = active.filter((t) => t.status === "DRAFT");
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 p-6 sm:p-8">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-6 sm:px-8 sm:py-10">
       <div
         data-surface="dark"
         className="relative flex min-h-[180px] w-full flex-col justify-end overflow-hidden rounded-[var(--radius-hero)] border border-border p-6 sm:p-8"

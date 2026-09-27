@@ -7,6 +7,7 @@ import { CreateMenu } from "./CreateMenu";
 import { AccountMenu } from "./AccountMenu";
 import { MobileSearchToggle } from "./MobileSearchToggle";
 import { WalletBalanceChip } from "./WalletBalanceChip";
+import { GuestAuthLink } from "./GuestAuthLink";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 /**
@@ -142,12 +143,15 @@ export async function TopBar({ user, disputeCount = 0 }: { user: User | null; di
                 <div className="hidden sm:block">
                   <ThemeToggle />
                 </div>
-                <Link href="/login" className="rounded-[9px] px-3 py-2 text-sm font-semibold text-white/80 transition hover:bg-white/[0.07] hover:text-white">
+                <GuestAuthLink mode="login" className="rounded-[9px] px-3 py-2 text-sm font-semibold text-white/80 transition hover:bg-white/[0.07] hover:text-white">
                   Log in
-                </Link>
-                <Link href="/signup" className="flex h-9 items-center rounded-[9px] bg-accent-volt px-3.5 text-sm font-semibold text-accent-volt-foreground transition hover:brightness-95">
+                </GuestAuthLink>
+                <GuestAuthLink
+                  mode="signup"
+                  className="flex h-9 items-center rounded-[9px] bg-accent-volt px-3.5 text-sm font-semibold text-accent-volt-foreground transition hover:brightness-95"
+                >
                   Sign up
-                </Link>
+                </GuestAuthLink>
               </div>
             )}
           </div>

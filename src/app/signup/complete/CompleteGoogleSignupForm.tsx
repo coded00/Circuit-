@@ -62,7 +62,7 @@ export default function CompleteGoogleSignupForm({
       setSubmitting(false);
       return;
     }
-    router.replace(data?.next ?? "/");
+    router.replace(`/welcome?next=${encodeURIComponent(data?.next ?? "/")}`);
     router.refresh();
   }
 

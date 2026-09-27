@@ -5,16 +5,11 @@ import { AutoScrollRow } from "@/components/AutoScrollRow";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 
 /**
- * Circuit — "Explore by Game" homepage section (MVP rework spec section
- * 14). Games shown are the small, fixed, curated set with real cover
- * photos (see gameImagery.ts) — the same set `GameCounts` below is
- * computed for in page.tsx via a real per-game count of OPEN/LIVE
- * tournaments, replacing the old "X connected now" illustrative figure
- * with "X Active Competitions" (real data).
- *
- * These tiles are real functionality: each links into `/compete`'s real
- * `?game=` filter, so exploring by game actually filters the real
- * tournament feed.
+ * Circuit — homepage "Games" row: the published game catalog (Admin →
+ * Games), each with its real number of open tournaments, cover art from
+ * the catalog (GameArtTile). A tile opens that game's tournaments on
+ * /compete; the last tile goes to its official community hubs. Hidden
+ * when nothing is published yet.
  */
 
 export type GameCount = { name: string; activeCompetitions: number };
@@ -33,24 +28,25 @@ function GameTile({ name, activeCompetitions }: GameCount) {
 }
 
 export function ExploreTheCircuit({ games }: { games: GameCount[] }) {
+  if (games.length === 0) return null;
   const items = [
     ...games.map((g) => <GameTile key={g.name} {...g} />),
     <Link
       key="view-all"
-      href="/ladder"
+      href="/communities"
       className="card-media flex h-[105px] w-[170px] flex-col items-center justify-center gap-1 text-muted transition hover:text-foreground"
     >
       <LayoutGrid size={20} />
-      <span className="text-sm font-semibold text-foreground">More Games</span>
+      <span className="text-sm font-semibold text-foreground">Game hubs</span>
       <span className="flex items-center gap-1 text-xs font-medium text-accent-blue">
-        Explore All <ArrowRight size={11} />
+        Find your game&apos;s community <ArrowRight size={11} />
       </span>
     </Link>,
   ];
 
   return (
     <section className="flex flex-col gap-4">
-      <SectionHeader title="Games" href="/ladder" linkLabel="All games" />
+      <SectionHeader title="Games" href="/compete" linkLabel="All tournaments" />
       <AutoScrollRow items={items} ariaLabel="Explore by game" />
     </section>
   );

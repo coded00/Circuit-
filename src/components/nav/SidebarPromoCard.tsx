@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { GuestAuthLink } from "./GuestAuthLink";
 import { Gamepad2 } from "lucide-react";
 
 /**
@@ -25,12 +25,12 @@ export function SidebarPromoCard() {
         Compete.
       </span>
       <span className="text-xs text-muted">Real tournaments, real opponents, real payouts.</span>
-      <Link
-        href="/signup"
+      <GuestAuthLink
+        mode="signup"
         className="mt-1 flex w-full items-center justify-center gap-1 rounded-full border border-accent-volt py-2 text-xs font-semibold text-accent-volt transition hover:bg-accent-volt-soft"
       >
         Join the Circuit →
-      </Link>
+      </GuestAuthLink>
     </div>
   );
 }

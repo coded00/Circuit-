@@ -31,7 +31,7 @@ export function GameFilterSelect({
     <select
       value={game}
       onChange={(e) => go(e.target.value)}
-      className="field-select w-auto min-w-[150px]"
+      className="field-select w-auto min-w-0 flex-1 sm:min-w-[150px] sm:flex-none"
       aria-label="Filter by game"
     >
       <option value="">All Games</option>

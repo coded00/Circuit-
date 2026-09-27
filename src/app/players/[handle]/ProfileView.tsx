@@ -80,6 +80,8 @@ export type ProfileData = {
     region: string | null;
     favoriteGames: string[];
     createdAt: Date;
+    /** The community tag they chose to wear. */
+    communityTag: { tag: string; name: string; href: string } | null;
   };
   isOwnProfile: boolean;
   viewerSignedIn: boolean;
@@ -308,7 +310,18 @@ function ProfileHeader({ data }: { data: ProfileData }) {
             <h1 className="truncate font-display text-3xl leading-none font-bold tracking-tight uppercase sm:text-[40px]">
               {player.displayName}
             </h1>
-            <span className="truncate text-sm font-medium text-foreground/80">@{player.handle}</span>
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="truncate text-sm font-medium text-foreground/80">@{player.handle}</span>
+              {player.communityTag && (
+                <Link
+                  href={player.communityTag.href}
+                  title={player.communityTag.name}
+                  className="shrink-0 rounded-[6px] border border-border bg-surface/60 px-1.5 py-0.5 font-mono text-[11px] font-semibold tracking-wide transition hover:border-border-hover"
+                >
+                  {player.communityTag.tag}
+                </Link>
+              )}
+            </span>
           </div>
           <div className="col-span-2 flex min-w-0 flex-col gap-2 sm:col-span-1 sm:col-start-2 sm:self-start">
             {player.bio ? (
@@ -804,7 +817,7 @@ export function ProfileView({ data, viewerId }: { data: ProfileData; viewerId: s
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6 sm:px-8 sm:py-8">
+    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6 sm:px-8 sm:py-10">
       <ProfileHeader data={data} />
       <SectionTabs tabs={tabs} initialTab={data.initialTab} label="Profile sections" idPrefix="profile" />
     </div>

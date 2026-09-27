@@ -16,11 +16,13 @@ import Poller from "@/app/Poller";
 import { Spinner } from "@/components/Spinner";
 
 export default async function RegistrationCallbackPage({
+  params,
   searchParams,
 }: {
+  params: Promise<{ id: string }>;
   searchParams: Promise<{ ref?: string }>;
 }) {
-  const { ref } = await searchParams;
+  const [{ id }, { ref }] = await Promise.all([params, searchParams]);
 
   if (ref) {
     await confirmEntryFeePayment(ref).catch(() => {});
@@ -53,11 +55,10 @@ export default async function RegistrationCallbackPage({
           </p>
         </>
       )}
-      {registration && (
-        <Link href={`/tournaments/${registration.tournamentId}`} className="btn-secondary">
-          Back to tournament
-        </Link>
-      )}
+      {/* Always offer a way out — without a (valid) ref this page could otherwise spin forever. */}
+      <Link href={`/tournaments/${registration?.tournamentId ?? id}`} className="btn-secondary">
+        Back to tournament
+      </Link>
     </div>
   );
 }

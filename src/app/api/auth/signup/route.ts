@@ -16,6 +16,7 @@
 
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
+import { sendVerificationEmail } from "@/lib/emailVerification";
 import { prisma } from "@/lib/db";
 import { createSessionToken, hashPassword, sessionCookie } from "@/lib/auth";
 import { joinGlobalCommunity } from "@/lib/community";
@@ -90,6 +91,8 @@ export async function POST(request: Request) {
     // Every account is a member of Circuit's own platform-wide community
     // from the moment it exists.
     await joinGlobalCommunity(user.id);
+    // Best-effort: a failed send just means they resend from Account settings.
+    await sendVerificationEmail(user).catch(() => undefined);
 
     const token = await createSessionToken({ userId: user.id });
     const response = NextResponse.json({ id: user.id, handle: user.handle }, { status: 201 });

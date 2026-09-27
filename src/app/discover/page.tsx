@@ -9,6 +9,7 @@
 
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { loginPath } from "@/lib/safeRedirect";
 import { MapPin, Search, Users, X } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
@@ -25,7 +26,7 @@ type SearchParams = { tab?: string; q?: string; game?: string; region?: string }
 
 export default async function DiscoverPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const user = await getCurrentUser();
-  if (!user) redirect("/login?next=/discover");
+  if (!user) redirect(loginPath("/discover"));
 
   const { tab, q, game, region } = await searchParams;
   const onTeams = tab === "teams";
@@ -89,7 +90,7 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Pro
           ))}
         </nav>
 
-        <form className="flex flex-col gap-2 sm:flex-row">
+        <form className="flex flex-col gap-2 lg:flex-row">
           {onTeams && <input type="hidden" name="tab" value="teams" />}
           <label className="relative flex min-w-0 flex-1 items-center">
             <Search size={17} className="pointer-events-none absolute left-3.5 text-muted" />
@@ -102,13 +103,13 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Pro
               className="h-12 w-full rounded-[12px] border border-border bg-surface pr-4 pl-11 text-[15px] outline-none transition placeholder:text-muted-strong focus:border-border-strong"
             />
           </label>
-          <div className="grid grid-cols-[1fr_1fr_auto] gap-2 sm:flex">
+          <div className="grid grid-cols-[1fr_1fr_auto] gap-2 lg:flex">
             {games.length > 0 ? (
               <select
                 name="game"
                 defaultValue={game ?? ""}
                 aria-label="Game"
-                className="field-select h-12 min-w-0 rounded-[12px] border-border bg-surface sm:w-44"
+                className="field-select h-12 min-w-0 rounded-[12px] border-border bg-surface lg:w-44"
               >
                 <option value="">Any game</option>
                 {games.map((g) => (
@@ -123,7 +124,7 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Pro
                 defaultValue={game ?? ""}
                 placeholder="Game"
                 aria-label="Game"
-                className="h-12 min-w-0 rounded-[12px] border border-border bg-surface px-4 text-sm outline-none focus:border-border-strong sm:w-40"
+                className="h-12 min-w-0 rounded-[12px] border border-border bg-surface px-4 text-sm outline-none focus:border-border-strong lg:w-40"
               />
             )}
             <label className="relative flex min-w-0 items-center">
@@ -133,12 +134,12 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Pro
                 name="region"
                 defaultValue={region ?? ""}
                 placeholder="City or state"
-                className="h-12 w-full min-w-0 rounded-[12px] border border-border bg-surface pr-3 pl-9 text-sm outline-none placeholder:text-muted-strong focus:border-border-strong sm:w-40"
+                className="h-12 w-full min-w-0 rounded-[12px] border border-border bg-surface pr-3 pl-9 text-sm outline-none placeholder:text-muted-strong focus:border-border-strong lg:w-40"
               />
             </label>
-            <button type="submit" aria-label="Search" className="btn-primary h-12 w-12 rounded-[12px] p-0 sm:w-auto sm:px-5">
+            <button type="submit" aria-label="Search" className="btn-primary h-12 w-12 rounded-[12px] p-0 lg:w-auto lg:px-5">
               <Search size={17} />
-              <span className="hidden sm:inline">Search</span>
+              <span className="hidden lg:inline">Search</span>
             </button>
           </div>
         </form>

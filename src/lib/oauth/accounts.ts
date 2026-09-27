@@ -81,6 +81,11 @@ export async function attachGoogleIdentity(userId: string, profile: GoogleProfil
     await prisma.user
       .updateMany({ where: { id: userId, email: null }, data: { email: profile.email } })
       .catch(() => undefined);
+    // Google verified this address: if it's the account's email, that's now verified too.
+    await prisma.user.updateMany({
+      where: { id: userId, emailVerifiedAt: null, email: { equals: profile.email, mode: "insensitive" } },
+      data: { emailVerifiedAt: new Date() },
+    });
     return created;
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") throw new IdentityConflictError("taken");
@@ -133,6 +138,8 @@ export async function createGoogleUser(profile: GoogleProfile, input: NewGoogleU
           displayName: input.displayName,
           emailOrPhone: profile.email,
           email: profile.email,
+          // Google only hands over verified addresses (see google.ts).
+          emailVerifiedAt: new Date(),
           passwordHash: null,
           phone: input.phone,
           dateOfBirth: input.dateOfBirth,

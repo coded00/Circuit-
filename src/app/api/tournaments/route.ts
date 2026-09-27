@@ -14,7 +14,8 @@ import { getCurrentUser } from "@/lib/session";
 import { parseOptionalUrl, parseOptionalImageUrl } from "@/lib/validation";
 import { ALL_TEAM_SIZE_VALUES } from "@/lib/gameFormats";
 import { notifyAllUsers } from "@/lib/notifications";
-import { enableCommunity } from "@/lib/community";
+import { enableCommunity, postSystemMessage } from "@/lib/community";
+import { hostableCommunities } from "@/lib/communityDirectory";
 import { trackEvent } from "@/lib/analytics";
 import { isRateLimited, recordAttempt } from "@/lib/rateLimit";
 import { captureException } from "@/lib/observability";
@@ -148,6 +149,16 @@ export async function POST(request: Request) {
     );
   }
 
+  // Hosting as a community event: only a community they own/moderate.
+  let hostCommunityId: string | null = null;
+  if (typeof body.hostCommunityId === "string" && body.hostCommunityId) {
+    const allowed = await hostableCommunities(user);
+    if (!allowed.some((c) => c.id === body.hostCommunityId)) {
+      return NextResponse.json({ error: "You can only host for a community you run." }, { status: 403 });
+    }
+    hostCommunityId = body.hostCommunityId;
+  }
+
   const organizerProfile = await prisma.organizerProfile.upsert({
     where: { userId: user.id },
     update: {},
@@ -182,8 +193,15 @@ export async function POST(request: Request) {
       streamUrl: streamUrlResult.url,
       posterUrl: posterUrlResult.url,
       status,
+      hostCommunityId,
     },
   });
+
+  if (hostCommunityId) {
+    await postSystemMessage(hostCommunityId, user.id, `🏆 New tournament: ${tournament.name} (${tournament.game}). Details and registration: /tournaments/${tournament.id}`).catch((err) =>
+      captureException(err, { source: "tournaments/route.ts:announce", tournamentId: tournament.id })
+    );
+  }
 
   trackEvent("tournament_created", { userId: user.id, tournamentId: tournament.id, game: tournament.game });
 

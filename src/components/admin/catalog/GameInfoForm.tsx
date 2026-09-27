@@ -69,7 +69,7 @@ export function GameInfoForm({ game }: { game?: GameInfo }) {
     const data = await res.json().catch(() => null);
     setSaving(false);
     if (!res.ok) return setError(data?.error ?? "Something went wrong.");
-    router.push(`/admin/games/${data.id}`);
+    router.replace(`/admin/games/${data.id}`);
   }
 
   return (

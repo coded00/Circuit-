@@ -18,7 +18,8 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { SmilePlus } from "lucide-react";
+import { CornerUpLeft, Flag, Lock, MessagesSquare, Pin, PinOff, SmilePlus, Trash2 } from "lucide-react";
+import { ReportDialog } from "./ReportDialog";
 import type { ReactionSummary } from "@/lib/communityReactions";
 import { DialogOverlay, useIsDesktop, useMounted } from "@/components/ui/Overlay";
 import { MessageBody, type MessageContent } from "./MessageBody";
@@ -29,7 +30,13 @@ const TOOLBAR_QUICK = ["❤️", "🔥", "😂"];
 const POPOVER_WIDTH = 320;
 const POPOVER_HEIGHT = 330;
 
-export type RowMessage = MessageContent & { id: string; reactions: ReactionSummary[] };
+export type RowMessage = MessageContent & {
+  id: string;
+  reactions: ReactionSummary[];
+  replyTo?: { id: string; authorName: string; snippet: string; removed: boolean } | null;
+  pinned?: boolean;
+  thread?: { id: string; title: string; messageCount: number; locked: boolean } | null;
+};
 
 function PickerPopover({ anchor, onClose, children }: { anchor: DOMRect; onClose: () => void; children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -79,6 +86,13 @@ export function MessageRow({
   header,
   highlighted,
   onReact,
+  onDelete,
+  canReport = false,
+  onReply,
+  onStartThread,
+  onTogglePin,
+  onOpenThread,
+  onJumpTo,
 }: {
   message: RowMessage;
   viewerId: string;
@@ -89,7 +103,19 @@ export function MessageRow({
   /** Deep-linked from a notification — flashes briefly. */
   highlighted?: boolean;
   onReact: (messageId: string, emoji: string, on: boolean) => void;
+  /** Present when the viewer may remove this message (theirs, or they moderate). */
+  onDelete?: (messageId: string) => void;
+  /** Someone else's message: offer "Report". */
+  canReport?: boolean;
+  onReply?: () => void;
+  onStartThread?: () => void;
+  /** Moderators: pin/unpin to the channel. */
+  onTogglePin?: () => void;
+  onOpenThread?: (threadId: string) => void;
+  /** Scroll to the quoted message. */
+  onJumpTo?: (messageId: string) => void;
 }) {
+  const [reporting, setReporting] = useState(false);
   const mounted = useMounted();
   const isDesktop = useIsDesktop();
   const [picker, setPicker] = useState<DOMRect | "sheet" | null>(null);
@@ -154,9 +180,44 @@ export function MessageRow({
     >
       {leading}
       <div className="min-w-0 flex-1">
+        {message.replyTo && (
+          <button
+            type="button"
+            onClick={() => message.replyTo && !message.replyTo.removed && onJumpTo?.(message.replyTo.id)}
+            className="mb-0.5 flex max-w-full items-center gap-1.5 text-left text-[12.5px] text-muted hover:text-foreground"
+          >
+            <CornerUpLeft size={12} className="shrink-0" />
+            {message.replyTo.removed ? (
+              <span className="italic">Original message removed</span>
+            ) : (
+              <span className="truncate">
+                <span className="font-semibold">{message.replyTo.authorName}</span> {message.replyTo.snippet}
+              </span>
+            )}
+          </button>
+        )}
         {header}
+        {message.pinned && (
+          <span className="mb-0.5 flex items-center gap-1 text-[11px] font-semibold text-muted">
+            <Pin size={11} /> Pinned
+          </span>
+        )}
         <MessageBody message={message} viewerId={viewerId} />
         <ReactionChips reactions={message.reactions} onToggle={(emoji, on) => onReact(message.id, emoji, on)} onAdd={openPicker} />
+        {message.thread && (
+          <button
+            type="button"
+            onClick={() => message.thread && onOpenThread?.(message.thread.id)}
+            className="mt-1 flex max-w-full items-center gap-2 rounded-[10px] border border-border bg-surface px-2.5 py-1.5 text-left text-[13px] transition hover:border-border-hover"
+          >
+            <MessagesSquare size={14} className="shrink-0 text-muted" />
+            <span className="truncate font-semibold">{message.thread.title}</span>
+            {message.thread.locked && <Lock size={11} className="shrink-0 text-muted" />}
+            <span className="shrink-0 text-muted">
+              {message.thread.messageCount} {message.thread.messageCount === 1 ? "reply" : "replies"}
+            </span>
+          </button>
+        )}
       </div>
 
       {/* Hover toolbar — pointer devices only; sits in the row's top-right
@@ -189,6 +250,46 @@ export function MessageRow({
         >
           <SmilePlus size={16} />
         </button>
+        {onReply && (
+          <button type="button" onClick={onReply} aria-label="Reply" className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted transition hover:bg-surface-elevated hover:text-foreground">
+            <CornerUpLeft size={15} />
+          </button>
+        )}
+        {onStartThread && (
+          <button type="button" onClick={onStartThread} aria-label="Start thread" className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted transition hover:bg-surface-elevated hover:text-foreground">
+            <MessagesSquare size={15} />
+          </button>
+        )}
+        {onTogglePin && (
+          <button
+            type="button"
+            onClick={onTogglePin}
+            aria-label={message.pinned ? "Unpin message" : "Pin message"}
+            className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted transition hover:bg-surface-elevated hover:text-foreground"
+          >
+            {message.pinned ? <PinOff size={15} /> : <Pin size={15} />}
+          </button>
+        )}
+        {canReport && (
+          <button
+            type="button"
+            onClick={() => setReporting(true)}
+            aria-label="Report message"
+            className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted transition hover:bg-surface-elevated hover:text-foreground"
+          >
+            <Flag size={14} />
+          </button>
+        )}
+        {onDelete && (
+          <button
+            type="button"
+            onClick={() => onDelete(message.id)}
+            aria-label="Remove message"
+            className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted transition hover:bg-danger/10 hover:text-danger"
+          >
+            <Trash2 size={15} />
+          </button>
+        )}
       </div>
 
       {mounted && picker instanceof DOMRect && (
@@ -199,7 +300,55 @@ export function MessageRow({
       <DialogOverlay open={picker === "sheet"} onClose={() => setPicker(null)} label="React to message">
         <p className="px-5 pb-2 text-center font-mono text-[10px] font-semibold tracking-[0.16em] text-muted uppercase">React</p>
         <ReactionPicker reacted={reacted} onPick={pick} />
+        {(onReply || onStartThread || onTogglePin) && (
+          <div className="grid grid-cols-3 gap-2 border-t border-border px-4 pt-2">
+            {onReply && (
+              <button type="button" onClick={() => (setPicker(null), onReply())} className="flex h-11 items-center justify-center gap-1.5 rounded-[10px] text-sm font-semibold hover:bg-surface-elevated">
+                <CornerUpLeft size={15} /> Reply
+              </button>
+            )}
+            {onStartThread && (
+              <button type="button" onClick={() => (setPicker(null), onStartThread())} className="flex h-11 items-center justify-center gap-1.5 rounded-[10px] text-sm font-semibold hover:bg-surface-elevated">
+                <MessagesSquare size={15} /> Thread
+              </button>
+            )}
+            {onTogglePin && (
+              <button type="button" onClick={() => (setPicker(null), onTogglePin())} className="flex h-11 items-center justify-center gap-1.5 rounded-[10px] text-sm font-semibold hover:bg-surface-elevated">
+                {message.pinned ? <PinOff size={15} /> : <Pin size={15} />} {message.pinned ? "Unpin" : "Pin"}
+              </button>
+            )}
+          </div>
+        )}
+        {canReport && (
+          <div className="border-t border-border px-4 pt-2">
+            <button
+              type="button"
+              onClick={() => {
+                setPicker(null);
+                setReporting(true);
+              }}
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-[10px] text-sm font-semibold transition hover:bg-surface-elevated"
+            >
+              <Flag size={16} /> Report message
+            </button>
+          </div>
+        )}
+        {onDelete && (
+          <div className="border-t border-border px-4 pt-2 pb-4">
+            <button
+              type="button"
+              onClick={() => {
+                setPicker(null);
+                onDelete(message.id);
+              }}
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-[10px] text-sm font-semibold text-danger transition hover:bg-danger/10"
+            >
+              <Trash2 size={16} /> Remove message
+            </button>
+          </div>
+        )}
       </DialogOverlay>
+      {canReport && <ReportDialog open={reporting} onClose={() => setReporting(false)} target={{ targetType: "MESSAGE", messageId: message.id }} title="Report this message" />}
     </div>
   );
 }

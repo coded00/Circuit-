@@ -174,20 +174,27 @@ export function CircuitHero({
           {[
             {
               label: "Open tournaments",
+              short: "Tournaments",
               value: stats.openTournaments.toLocaleString("en-NG"),
             },
             {
               label: "Challenges waiting",
+              short: "Challenges",
               value: stats.openChallenges.toLocaleString("en-NG"),
             },
             {
               label: "Prize money",
+              short: "Prizes",
               value: formatNaira(stats.prizeMoney),
               gold: true,
             },
           ].map((item) => (
             <div key={item.label} className="flex min-w-0 flex-col gap-1 bg-surface px-4 py-3 sm:px-8 sm:py-4">
-              <dt className="truncate text-[10px] font-medium tracking-wide text-muted uppercase sm:text-[11px]">{item.label}</dt>
+              <dt className="truncate text-[10px] font-medium tracking-wide text-muted uppercase sm:text-[11px]">
+                {/* Short labels on phones: three columns leave ~100px each. */}
+                <span className="sm:hidden">{item.short}</span>
+                <span className="hidden sm:inline">{item.label}</span>
+              </dt>
               <dd className={`text-stat truncate text-base sm:text-xl ${item.gold ? "text-gold" : ""}`}>{item.value}</dd>
             </div>
           ))}

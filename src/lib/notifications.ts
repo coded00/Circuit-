@@ -47,7 +47,13 @@ export type NotificationType =
   | "QUICK_MATCH_UNAVAILABLE"
   | "QUICK_MATCH_EXPIRED"
   | "QUICK_MATCH_CANCELLED"
-  | "COMMUNITY_MENTION";
+  | "COMMUNITY_MENTION"
+  | "COMMUNITY_APPLICATION"
+  | "COMMUNITY_APPLICATION_APPROVED"
+  | "COMMUNITY_REPORT"
+  | "COMMUNITY_SUSPENDED"
+  | "APPEAL_FILED"
+  | "APPEAL_DECIDED";
 
 export interface NotificationChannel {
   send(userId: string, type: NotificationType, payload: Record<string, unknown>): Promise<void>;

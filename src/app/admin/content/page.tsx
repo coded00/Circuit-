@@ -17,13 +17,22 @@ import { fetchGamerNews } from "@/lib/gamerNews";
 import { prisma } from "@/lib/db";
 import { BannerList } from "@/components/admin/BannerList";
 import { AnnouncementList } from "@/components/admin/AnnouncementList";
+import { VideoQueue } from "@/components/admin/VideoQueue";
 
 export default async function AdminContentPage() {
-  const [banners, announcements, newsItems] = await Promise.all([
+  const [banners, announcements, newsItems, videos, videoCounts] = await Promise.all([
     prisma.homepageBanner.findMany({ orderBy: { order: "asc" } }),
     prisma.announcement.findMany({ orderBy: { createdAt: "desc" } }),
     fetchGamerNews().catch(() => []),
+    prisma.video.findMany({
+      where: { status: { in: ["DRAFT", "PUBLISHED"] } },
+      orderBy: [{ publishedAt: { sort: "desc", nulls: "last" } }],
+      take: 120,
+      select: { id: true, title: true, thumbnailUrl: true, sourceAuthor: true, sourceUrl: true, game: true, status: true },
+    }),
+    prisma.video.groupBy({ by: ["status"], _count: { _all: true } }),
   ]);
+  const countOf = (s: "DRAFT" | "PUBLISHED") => videoCounts.find((c) => c.status === s)?._count._all ?? 0;
 
   return (
     <div className="flex flex-1 flex-col gap-6">
@@ -43,6 +52,19 @@ export default async function AdminContentPage() {
             ...b,
             publishAt: b.publishAt?.toISOString() ?? null,
           }))}
+        />
+      </div>
+
+      <div className="card flex flex-col gap-2">
+        <h2 className="text-card-title">Feed videos</h2>
+        <p className="text-xs text-muted">
+          Clips in the player Feed. Imports pull the latest shorts from the approved YouTube channels as drafts — nothing appears in the
+          Feed until it&apos;s published here.
+        </p>
+        <VideoQueue
+          videos={videos}
+          counts={{ DRAFT: countOf("DRAFT"), PUBLISHED: countOf("PUBLISHED") }}
+          youtubeConfigured={!!process.env.YOUTUBE_API_KEY}
         />
       </div>
 

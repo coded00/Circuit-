@@ -9,6 +9,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { loginPath } from "@/lib/safeRedirect";
 import { BellOff } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
@@ -29,7 +30,7 @@ const PAGE_SIZE = 20;
 export default async function NotificationsPage({ searchParams }: { searchParams: Promise<{ filter?: string }> }) {
   const user = await getCurrentUser();
   if (!user) {
-    redirect("/login?next=/notifications");
+    redirect(loginPath("/notifications"));
   }
   const unreadOnly = (await searchParams).filter === "unread";
 
@@ -49,7 +50,7 @@ export default async function NotificationsPage({ searchParams }: { searchParams
   const groups = groupNotificationsByDay(items);
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-5 px-4 py-6 sm:p-8">
+    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-5 px-4 py-6 sm:px-8 sm:py-10">
       <header className="flex items-end justify-between gap-3">
         <div className="flex flex-col gap-1">
           <h1 className="font-display text-2xl font-bold tracking-tight sm:text-[28px]">Notifications</h1>

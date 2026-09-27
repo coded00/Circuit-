@@ -6,6 +6,7 @@
 
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { loginPath } from "@/lib/safeRedirect";
 import { AlertTriangle } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
@@ -28,7 +29,7 @@ export default async function DashboardTournamentDetailPage({
   const { id } = await params;
   const user = await getCurrentUser();
   if (!user) {
-    redirect(`/login?next=${encodeURIComponent(`/dashboard/tournaments/${id}`)}`);
+    redirect(loginPath(`/dashboard/tournaments/${id}`));
   }
 
   const tournament = await prisma.tournament.findUnique({ where: { id } });

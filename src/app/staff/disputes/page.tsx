@@ -12,6 +12,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { loginPath } from "@/lib/safeRedirect";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { StatusPill, disputeStatusInfo } from "@/components/StatusPill";
@@ -30,7 +31,7 @@ function timeSince(date: Date): string {
 export default async function StaffDisputeQueuePage() {
   const user = await getCurrentUser();
   if (!user) {
-    redirect("/login?next=/staff/disputes");
+    redirect(loginPath("/staff/disputes"));
   }
   if (!user.isStaff) {
     redirect("/");
@@ -52,7 +53,7 @@ export default async function StaffDisputeQueuePage() {
   });
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-6 py-10">
+    <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-4 py-6 sm:px-8 sm:py-10">
       <div className="flex items-center justify-between gap-4">
         <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Escalated disputes</h1>
         <Link href="/staff/reports" className="text-sm font-medium text-accent-blue hover:underline">

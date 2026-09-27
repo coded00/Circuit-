@@ -166,7 +166,9 @@ export default function SignupForm() {
       setSubmitting(false);
       return;
     }
-    router.push(next);
+    // replace, not push: Back from here must not return to the auth form.
+    // New accounts go through onboarding first, then on to `next`.
+    router.replace(`/welcome?next=${encodeURIComponent(next)}`);
     router.refresh();
   }
 

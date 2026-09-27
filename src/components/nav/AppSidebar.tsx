@@ -38,7 +38,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Trophy, Gamepad2, Swords, Calendar, User as UserIcon, Wallet, Settings } from "lucide-react";
+import { Home, Trophy, Gamepad2, Swords, Calendar, MessagesSquare, User as UserIcon, Wallet, Settings } from "lucide-react";
+import { loginPath, signupPath } from "@/lib/safeRedirect";
 import { SidebarPromoCard } from "./SidebarPromoCard";
 
 type NavUser = { handle: string; displayName: string; isStaff: boolean } | null;
@@ -50,6 +51,7 @@ const PRIMARY: Item[] = [
   { href: "/compete", label: "Compete", icon: Trophy },
   { href: "/ladder", label: "Feed", icon: Gamepad2 },
   { href: "/battles", label: "Challenges", icon: Swords },
+  { href: "/communities", label: "Communities", icon: MessagesSquare },
   { href: "/calendar", label: "Calendar", icon: Calendar },
 ];
 
@@ -132,10 +134,10 @@ export function AppSidebar({ user }: { user: NavUser }) {
         <SidebarPromoCard />
         {!user && (
           <div className="flex flex-col gap-2">
-            <Link href="/login" className="btn-secondary w-full">
+            <Link href={loginPath(pathname)} className="btn-secondary w-full">
               Log in
             </Link>
-            <Link href="/signup" className="btn-primary w-full">
+            <Link href={signupPath(pathname)} className="btn-primary w-full">
               Sign up
             </Link>
           </div>

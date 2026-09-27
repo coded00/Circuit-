@@ -60,7 +60,7 @@ export default function RegistrationForm({
     return (
       <MatchFoundHud
         onComplete={() => {
-          router.push(`/tournaments/${tournamentId}`);
+          router.replace(`/tournaments/${tournamentId}`);
           router.refresh();
         }}
       />

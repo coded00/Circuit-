@@ -7,7 +7,7 @@
 
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/session";
-import { safeNextPath } from "@/lib/safeRedirect";
+import { loginPath, safeNextPath } from "@/lib/safeRedirect";
 import { buildAuthorizationUrl, createAuthSecrets, getGoogleConfig } from "@/lib/oauth/google";
 import { flowCookie, oauthErrorPath, type FlowState } from "@/lib/oauth/flowCookies";
 
@@ -22,11 +22,14 @@ export async function GET(request: Request) {
   const config = getGoogleConfig();
   if (!config) return back("google_unavailable");
 
+  const user = await getCurrentUser();
   let linkUserId: string | undefined;
   if (intent === "link") {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.redirect(new URL(`/login?next=${encodeURIComponent("/account")}`, url));
+    if (!user) return NextResponse.redirect(new URL(loginPath("/account"), url));
     linkUserId = user.id;
+  } else if (user) {
+    // Already signed in (a stale login tab): don't start a second sign-in.
+    return NextResponse.redirect(new URL(next, url));
   }
 
   const secrets = createAuthSecrets();

@@ -103,7 +103,7 @@ export default function EditForm({
       });
     }
 
-    router.push(redirectTo ?? `/tournaments/${tournament.id}`);
+    router.replace(redirectTo ?? `/tournaments/${tournament.id}`);
     router.refresh();
   }
 

@@ -14,7 +14,7 @@
  * functionality) to keep the row from crowding on a narrow phone.
  */
 
-import { useRouter } from "next/navigation";
+import { logout } from "@/lib/logout";
 import Link from "next/link";
 import { LogOut, ExternalLink } from "lucide-react";
 import { AdminMobileNav } from "./AdminMobileNav";
@@ -24,12 +24,9 @@ export function AdminTopBar({
 }: {
   admin: { displayName: string; avatarUrl: string | null };
 }) {
-  const router = useRouter();
 
-  async function handleLogout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
-    router.refresh();
+  function handleLogout() {
+    void logout("/login");
   }
 
   return (

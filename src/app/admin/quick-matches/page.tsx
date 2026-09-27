@@ -55,7 +55,7 @@ export default async function AdminQuickMatchesPage({ searchParams }: { searchPa
         <p className="text-sm text-muted">{challenges.length.toLocaleString("en-NG")} Quick Matches.</p>
       </div>
 
-      <form className="card flex flex-wrap items-end gap-3">
+      <form className="card filter-bar">
         <div className="flex min-w-[200px] flex-1 flex-col gap-1.5">
           <label className="field-label" htmlFor="q">
             Game

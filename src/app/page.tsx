@@ -23,7 +23,7 @@ import { UpcomingCompetitions } from "@/components/UpcomingCompetitions";
 import { GamerNews } from "@/components/GamerNews";
 import { CommunitiesCard } from "@/components/CommunitiesCard";
 import { getJoinedCommunities } from "@/lib/community";
-import { GAME_ACTIVITY } from "@/lib/circuitActivity";
+import { publishedGames } from "@/lib/gameCatalogQueries";
 import { globalStandings } from "@/lib/standings";
 import { getFriendIds } from "@/lib/friends";
 import { getActiveAnnouncement } from "@/lib/announcements";
@@ -122,18 +122,14 @@ export default async function Home({
       take: 6,
       select: cardSelect,
     }),
-    // One query for every open/live tournament's game, then matched against
-    // each GAME_ACTIVITY name in memory — not 5 concurrent `count()` calls
-    // (one per game), which was needlessly competing for connections
-    // against the rest of this same Promise.all on every page load.
-    prisma.tournament
-      .findMany({ where: { status: { in: ["OPEN", "LIVE"] } }, select: { game: true } })
-      .then((tournaments) =>
-        GAME_ACTIVITY.map((g) => ({
-          name: g.name,
-          activeCompetitions: tournaments.filter((t) => t.game.toLowerCase().includes(g.name.toLowerCase())).length,
-        })),
-      ),
+    // The published game catalog (Admin → Games), each with its real count
+    // of open/live tournaments — games with something happening first.
+    Promise.all([publishedGames(), prisma.tournament.groupBy({ by: ["game"], where: { status: { in: ["OPEN", "LIVE"] } }, _count: { _all: true } })]).then(
+      ([games, counts]) =>
+        games
+          .map((g) => ({ name: g.name, activeCompetitions: counts.find((c) => c.game === g.name)?._count._all ?? 0 }))
+          .sort((a, b) => b.activeCompetitions - a.activeCompetitions || a.name.localeCompare(b.name)),
+    ),
     prisma.battle.findMany({
       where: {
         status: "OPEN",
@@ -169,7 +165,7 @@ export default async function Home({
   const openChallengesPreview = openBattles.slice(0, 4);
 
   return (
-    <div className="flex w-full flex-1 flex-col gap-8 px-4 py-6 sm:p-8">
+    <div className="flex w-full flex-1 flex-col gap-8 px-4 py-6 sm:px-8 sm:py-10">
       {activeAnnouncement && <AnnouncementBanner title={activeAnnouncement.title} body={activeAnnouncement.body} />}
 
       <CircuitHero

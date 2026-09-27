@@ -78,6 +78,29 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
         }${str(p, "preview") ? `: “${str(p, "preview")}”` : ""}`,
         href: str(p, "href") || "/communities",
       };
+    case "COMMUNITY_APPLICATION":
+      return {
+        message: `${str(p, "applicantName") || "Someone"} applied to join ${str(p, "communityTitle") || "your community"}.`,
+        href: str(p, "href") || "/communities",
+      };
+    case "COMMUNITY_APPLICATION_APPROVED":
+      return { message: `You're in! ${str(p, "communityTitle") || "A community"} approved your application.`, href: str(p, "href") || "/communities" };
+    case "COMMUNITY_REPORT":
+      return { message: `Something was reported in ${str(p, "communityTitle") || "your community"}.`, href: str(p, "href") || "/communities" };
+    case "COMMUNITY_SUSPENDED":
+      return {
+        message: `Circuit suspended ${str(p, "communityTitle") || "your community"}${str(p, "reason") ? `: ${str(p, "reason")}` : "."} You can appeal.`,
+        href: str(p, "href") || "/communities",
+      };
+    case "APPEAL_FILED":
+      return { message: "A new appeal is waiting for review.", href: "/staff/reports?tab=appeals" };
+    case "APPEAL_DECIDED":
+      return {
+        message: p.overturned
+          ? `Your appeal was accepted — ${str(p, "subject") || "access"} is restored.`
+          : `Your appeal about ${str(p, "subject") || "the suspension"} was reviewed and upheld.${str(p, "response") ? ` ${str(p, "response")}` : ""}`,
+        href: str(p, "href") || "/account",
+      };
     case "FRIEND_REQUEST":
       return { message: "You have a new friend request.", href: "/friends" };
     case "FRIEND_ACCEPTED":
@@ -105,7 +128,7 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
     case "QUICK_MATCH_UNAVAILABLE":
       return { message: "This Quick Match was already accepted by another player.", href: "/battles" };
     case "QUICK_MATCH_EXPIRED":
-      return { message: "No opponent found. Your Quick Match expired.", href: "/battles/quick-match/new" };
+      return { message: "No opponent found. Your Quick Match expired.", href: "/battles/new" };
     case "QUICK_MATCH_CANCELLED":
       return { message: `${str(p, "hostHandle")} cancelled their Quick Match challenge.`, href: "/battles" };
     default:

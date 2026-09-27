@@ -1,8 +1,7 @@
 /**
  * Circuit — homepage "Communities" card: every community the viewer has
- * joined (Circuit's own platform-wide one, which every account is a
- * member of automatically, plus any tournament communities they've
- * joined), each with a per-community unread badge. Sits above the
+ * joined (Circuit's own, game hubs, player and tournament communities),
+ * each with a per-community unread badge. Sits above the
  * Leaderboard card in the right rail (see page.tsx).
  *
  * Shown even when it'd only have the one Circuit entry — Circuit
@@ -13,8 +12,8 @@
  */
 
 import Link from "next/link";
-import { MessageCircle } from "lucide-react";
 import type { JoinedCommunity } from "@/lib/community";
+import { CommunityAvatar } from "@/components/community/CommunityAvatar";
 import { Panel, PanelEmpty, PanelRows, panelRowClass } from "@/components/ui/Panel";
 
 export function CommunitiesCard({ communities }: { communities: JoinedCommunity[] }) {
@@ -22,8 +21,8 @@ export function CommunitiesCard({ communities }: { communities: JoinedCommunity[
     <Panel
       title="Communities"
       action={
-        <Link href="/communities/browse" className="text-xs font-medium text-accent-blue hover:underline">
-          Browse
+        <Link href="/communities" className="text-xs font-medium text-accent-blue hover:underline">
+          Discover
         </Link>
       }
     >
@@ -33,9 +32,7 @@ export function CommunitiesCard({ communities }: { communities: JoinedCommunity[
         <PanelRows>
           {communities.map((c) => (
             <Link key={c.id} href={c.href} className={`${panelRowClass} py-2.5`}>
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-blue-soft text-accent-blue">
-                <MessageCircle size={14} />
-              </span>
+              <CommunityAvatar name={c.title} iconUrl={c.iconUrl} tag={c.tag} size="sm" />
               <div className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate text-sm font-medium">{c.title}</span>
                 <span className="text-metadata truncate">{c.subtitle}</span>

@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { loginPath } from "@/lib/safeRedirect";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import EditForm from "./EditForm";
@@ -11,7 +12,7 @@ export default async function EditTournamentPage({
   const { id } = await params;
   const user = await getCurrentUser();
   if (!user) {
-    redirect(`/login?next=${encodeURIComponent(`/tournaments/${id}/edit`)}`);
+    redirect(loginPath(`/tournaments/${id}/edit`));
   }
 
   const tournament = await prisma.tournament.findUnique({ where: { id } });
@@ -32,7 +33,7 @@ export default async function EditTournamentPage({
   ]);
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-6 sm:p-8">
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-6 sm:px-8 sm:py-10">
       <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Edit {tournament.name}</h1>
       <div className="card">
         <EditForm

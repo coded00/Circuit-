@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { MaintenancePage } from "@/components/MaintenancePage";
 import { NavigationDirection, noteNavigationSettled } from "@/components/NavigationDirection";
 
-const BARE_ROUTES = ["/login", "/signup", "/forgot-password", "/reset-password", "/admin"];
+const BARE_ROUTES = ["/login", "/signup", "/forgot-password", "/reset-password", "/welcome", "/admin"];
 
 /** Level 2 of Circuit's motion hierarchy (globals.css's own comment on
  *  `.arena-transition` has the full breakdown) is deliberately scoped to

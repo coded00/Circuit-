@@ -1,16 +1,15 @@
 /**
- * Circuit Community — Phase 1's dedicated full-width page (same reason
- * the bracket has its own page instead of living inside the tournament
- * tab shell: a real Discord-style layout needs more room than the
- * `1fr` tab column next to the sticky registration sidebar gives it,
- * especially on mobile).
+ * Circuit Community — a tournament's own community, on a full-width page
+ * (a Discord-style layout needs more room than the tournament tab column).
+ * The organizer owns it; players join from here.
  */
 
 import type { Viewport } from "next";
 import { notFound, redirect } from "next/navigation";
+import { loginPath } from "@/lib/safeRedirect";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
-import { getChannelMessages, DEFAULT_CHANNELS } from "@/lib/community";
+import { loadCommunityPage } from "@/lib/communityPage";
 import { CommunityView } from "./CommunityView";
 
 /** Android Chrome: let the on-screen keyboard shrink the layout viewport,
@@ -24,65 +23,50 @@ export default async function CommunityPage({
 }: {
   params: Promise<{ id: string }>;
   /** `channel` (key) + `message` (id): a mention notification's deep link. */
-  searchParams: Promise<{ channel?: string; message?: string }>;
+  searchParams: Promise<{ channel?: string; message?: string; thread?: string }>;
 }) {
   const { id } = await params;
-  const { channel: channelKey, message: highlightMessageId } = await searchParams;
+  const { channel: channelKey, message: highlightMessageId, thread: threadParam } = await searchParams;
 
   const user = await getCurrentUser();
   if (!user) {
-    redirect(`/login?next=${encodeURIComponent(`/tournaments/${id}/community`)}`);
+    redirect(loginPath(`/tournaments/${id}/community`));
   }
 
   const [tournament, community] = await Promise.all([
     prisma.tournament.findUnique({ where: { id }, select: { id: true, name: true } }),
-    prisma.community.findUnique({
-      where: { tournamentId: id },
-      include: { channels: true, _count: { select: { members: true } } },
-    }),
+    prisma.community.findUnique({ where: { tournamentId: id }, include: { tournament: { select: { organizerId: true } } } }),
   ]);
   if (!tournament || !community || !community.enabled) notFound();
 
-  // Fixed V1 order (general/announcements/matches/results) regardless of
-  // DB row order — `channels` was `createMany`'d together, but nothing
-  // guarantees Postgres hands them back in insertion order without an
-  // explicit orderBy, and there's no `order` column to sort by yet.
-  const channelOrder = new Map(DEFAULT_CHANNELS.map((c, i) => [c.key, i]));
-  const channels = [...community.channels].sort(
-    (a, b) => (channelOrder.get(a.key) ?? 99) - (channelOrder.get(b.key) ?? 99)
-  );
-
-  // Membership has to be known BEFORE fetching messages, not fetched in
-  // parallel with them — getChannelMessages now asserts membership itself
-  // (see its own comment), and a non-member viewing this page (the
-  // community/tournament being public doesn't imply the channel's
-  // messages are) should see the join prompt, not a thrown error.
-  const membership = await prisma.communityMember.findUnique({
-    where: { communityId_userId: { communityId: community.id, userId: user.id } },
-  });
-  const startChannel = channels.find((c) => c.key === channelKey) ?? channels[0];
-  const initialServerTime = new Date().toISOString();
-  const initialMessages =
-    startChannel && membership
-      ? await getChannelMessages(startChannel.id, user.id)
-      : { messages: [], nextCursor: null };
+  // Membership is known before messages are fetched: a non-member sees
+  // the join prompt, not a thrown membership error.
+  const data = await loadCommunityPage(community, user, { channelKey });
 
   return (
     <CommunityView
       communityId={community.id}
       backHref={`/tournaments/${tournament.id}`}
       title={tournament.name}
-      channels={channels.map((c) => ({ id: c.id, key: c.key, name: c.name }))}
-      memberCount={community._count.members}
-      // Serialized to ISO strings — a Date crossing the server/client
-      // boundary as a plain prop is one more thing to keep straight than
-      // a string, matching how CountdownTimer's own caller does it.
-      initialChannelMessages={initialMessages.messages.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() }))}
-      initialChannelId={startChannel?.id}
-      initialServerTime={initialServerTime}
+      channels={data.channels.map((c) => ({ id: c.id, key: c.key, name: c.name, modOnly: c.modOnly }))}
+      memberCount={data.memberCount}
+      // Serialized to ISO strings for the client boundary.
+      initialChannelMessages={data.initialMessages}
+      initialThreadId={threadParam}
+      initialChannelId={data.startChannel?.id}
+      initialServerTime={data.initialServerTime}
       highlightMessageId={highlightMessageId}
       viewerId={user.id}
-      isMember={membership !== null}
+      isMember={data.isMember}
+      viewerRole={data.role}
+      roleBadges={data.roleBadges}
+      mutedUntil={data.mutedUntil}
+      menu={{
+        communityId: community.id,
+        communityName: tournament.name,
+        canInvite: false,
+        canLeave: data.role !== "OWNER",
+      }}
     />
   );
 }

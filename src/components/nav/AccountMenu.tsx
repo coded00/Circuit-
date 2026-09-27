@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { logout } from "@/lib/logout";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ChevronDown, ShoppingBag, Gift, Trophy, Swords, Shield, Wallet, Compass } from "lucide-react";
 
@@ -50,7 +50,6 @@ export function AccountMenu({
   disputeCount?: number;
   friendRequestCount?: number;
 }) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -62,10 +61,8 @@ export function AccountMenu({
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
-  async function handleLogout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/");
-    router.refresh();
+  function handleLogout() {
+    void logout("/");
   }
 
   return (

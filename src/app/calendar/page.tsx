@@ -13,7 +13,7 @@
  * URL-is-the-state, same model `/compete`'s filter form already uses:
  * `y`/`m` (visible month), `view` (month/week/list), `type` (all/
  * tournaments/challenges/community/game_releases), `game` (free-text-ish
- * filter over the small curated GAME_ACTIVITY set — only meaningful for
+ * filter over the published game catalog — only meaningful for
  * Tournament/Challenge rows, Community/Game Release have no `game`
  * field), `day` (the day selected in the side panel / week anchor).
  * Every link on this page is a plain server-rendered navigation; the
@@ -28,7 +28,7 @@ import { ViewTransition } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { prisma } from "@/lib/db";
-import { GAME_ACTIVITY } from "@/lib/circuitActivity";
+import { publishedGames } from "@/lib/gameCatalogQueries";
 import {
   addMonths,
   dateKey,
@@ -271,7 +271,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const chipActive = "border-foreground bg-foreground text-background";
 
   return (
-    <div className="flex w-full flex-1 flex-col gap-5 px-4 py-5 sm:gap-6 sm:p-8">
+    <div className="flex w-full flex-1 flex-col gap-5 px-4 py-6 sm:gap-6 sm:px-8 sm:py-10">
       <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="flex flex-col gap-2">
           <span className="font-mono text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">Calendar</span>
@@ -334,7 +334,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
               </Link>
             ))}
           </div>
-          <GameFilterSelect game={game} options={GAME_ACTIVITY.map((g) => g.name)} baseQuery={baseParams} />
+          <GameFilterSelect game={game} options={(await publishedGames()).map((g) => g.name)} baseQuery={baseParams} />
         </div>
       </header>
 

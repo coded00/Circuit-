@@ -63,7 +63,8 @@ export default function BattleForm({
       return;
     }
 
-    router.push(isQuickMatch ? `/quick-match/${data.id}` : `/battles/${data.id}`);
+    // replace: Back shouldn't reopen a form that was already submitted.
+    router.replace(isQuickMatch ? `/quick-match/${data.id}` : `/battles/${data.id}`);
     router.refresh();
   }
 

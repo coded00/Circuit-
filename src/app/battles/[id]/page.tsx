@@ -38,6 +38,7 @@ import type { Metadata } from "next";
 import { ArrowLeft, CheckCircle2, Tv, Zap } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
+import { loginPath, signupPath } from "@/lib/safeRedirect";
 import { GameArtTile } from "@/components/GameArtTile";
 import { ShareButton } from "@/components/ShareButton";
 import { StatusPill, battleStatusInfo } from "@/components/StatusPill";
@@ -278,7 +279,7 @@ export default async function BattlePage({
 
   return (
     <div data-surface="dark" className="dark-page w-full flex-1 bg-background">
-      <div className="mx-auto grid w-full max-w-[1400px] gap-6 px-6 py-8 sm:px-8 sm:py-10 lg:grid-cols-[1fr_340px] lg:items-start">
+      <div className="mx-auto grid w-full max-w-[1400px] gap-6 px-4 py-6 sm:px-8 sm:py-10 lg:grid-cols-[1fr_340px] lg:items-start">
         <div className="flex flex-col gap-6">
           <div className="flex items-center justify-between gap-3">
             <Link
@@ -412,12 +413,12 @@ export default async function BattlePage({
             )}
             {!user && battle.status === "OPEN" && (
               <>
-                <Link href={`/login?next=${encodeURIComponent(`/battles/${battle.id}`)}`} className="btn-primary w-full sm:w-fit">
+                <Link href={loginPath(`/battles/${battle.id}`)} className="btn-primary w-full sm:w-fit">
                   Log in to accept →
                 </Link>
                 <p className="text-xs text-muted">
                   Don&apos;t have an account?{" "}
-                  <Link href="/signup" className="font-medium text-accent-blue hover:underline">
+                  <Link href={signupPath(`/battles/${battle.id}`)} className="font-medium text-accent-blue hover:underline">
                     Sign up free
                   </Link>
                 </p>

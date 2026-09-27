@@ -142,10 +142,10 @@ export default async function AdminOverviewPage() {
         <p className="text-sm text-muted">What&apos;s happening on Circuit right now.</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         {metrics.map((m) => (
-          <div key={m.label} className="card flex items-center gap-4">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent-volt-soft text-accent-volt">
+          <div key={m.label} className="card flex flex-col gap-2 !p-4 sm:flex-row sm:items-center sm:gap-4 sm:!p-5">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-volt-soft text-accent-volt sm:h-11 sm:w-11">
               <m.icon size={19} />
             </span>
             <div className="flex flex-col">

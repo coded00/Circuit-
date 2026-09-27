@@ -40,6 +40,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ chan
   const cursor = searchParams.get("cursor") ?? undefined;
   const since = searchParams.get("since"); // ISO timestamp — "only what's new" for the polling path
   const reactionsSince = searchParams.get("reactionsSince");
+  // `thread`: read a thread instead of the main feed; `around`: open on a message.
+  const threadId = searchParams.get("thread") || null;
+  const around = searchParams.get("around") ?? undefined;
 
   try {
     if (since) {
@@ -48,10 +51,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ chan
       if (Number.isNaN(sinceDate.getTime()) || (reactionsDate && Number.isNaN(reactionsDate.getTime()))) {
         return NextResponse.json({ error: "Invalid timestamp." }, { status: 400 });
       }
-      return NextResponse.json(await getChannelUpdates(channelId, user.id, sinceDate, reactionsDate));
+      return NextResponse.json(await getChannelUpdates(channelId, user.id, sinceDate, reactionsDate, threadId));
     }
 
-    const page = await getChannelMessages(channelId, user.id, cursor);
+    const page = await getChannelMessages(channelId, user.id, cursor, 50, { threadId, aroundId: around });
     return NextResponse.json(page);
   } catch (err) {
     if (err instanceof CommunityError) return communityErrorResponse(err);
@@ -66,9 +69,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ cha
   const { channelId } = await params;
 
   let input: SendMessageInput;
+  let threadId: string | null = null;
+  let replyToId: string | null = null;
   if (request.headers.get("content-type")?.startsWith("multipart/form-data")) {
     const form = await request.formData().catch(() => null);
     const image = form?.get("image");
+    threadId = typeof form?.get("threadId") === "string" && form?.get("threadId") ? String(form.get("threadId")) : null;
+    replyToId = typeof form?.get("replyToId") === "string" && form?.get("replyToId") ? String(form.get("replyToId")) : null;
     if (!(image instanceof File) || image.size === 0) {
       return NextResponse.json({ error: "Choose an image to send." }, { status: 400 });
     }
@@ -95,6 +102,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ cha
     };
   } else {
     const body = await request.json().catch(() => null);
+    threadId = typeof body?.threadId === "string" ? body.threadId : null;
+    replyToId = typeof body?.replyToId === "string" ? body.replyToId : null;
     if (typeof body?.stickerId === "string") {
       input = { kind: "STICKER", stickerId: body.stickerId };
     } else if (typeof body?.content === "string") {
@@ -105,7 +114,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ cha
   }
 
   try {
-    const message = await sendMessage(channelId, user.id, input);
+    const message = await sendMessage(channelId, user.id, input, { threadId, replyToId });
     return NextResponse.json(message, { status: 201 });
   } catch (err) {
     if (err instanceof CommunityError) return communityErrorResponse(err);

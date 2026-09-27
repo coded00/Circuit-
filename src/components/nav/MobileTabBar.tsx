@@ -21,7 +21,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
+import { logout } from "@/lib/logout";
+import { loginPath, signupPath } from "@/lib/safeRedirect";
 import {
   Home,
   Trophy,
@@ -74,16 +76,13 @@ function TabLink({
 
 export function MobileTabBar({ user }: { user: NavUser }) {
   const pathname = usePathname();
-  const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const inDashboard = pathname.startsWith("/dashboard");
   const onProfile = user ? pathname.startsWith(`/players/${user.handle}`) : false;
 
-  async function handleLogout() {
-    await fetch("/api/auth/logout", { method: "POST" });
+  function handleLogout() {
     setMenuOpen(false);
-    router.push("/");
-    router.refresh();
+    void logout("/");
   }
 
   return (
@@ -181,7 +180,7 @@ export function MobileTabBar({ user }: { user: NavUser }) {
             {user && (
               <>
                 <Link href="/notifications" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
-                  <Bell size={18} /> Messages
+                  <Bell size={18} /> Notifications
                 </Link>
                 <Link href="/marketplace" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
                   <ShoppingBag size={18} /> Marketplace
@@ -217,10 +216,10 @@ export function MobileTabBar({ user }: { user: NavUser }) {
             )}
             {!user && (
               <>
-                <Link href="/login" onClick={() => setMenuOpen(false)} className="btn-secondary mt-2 w-full">
+                <Link href={loginPath(pathname)} onClick={() => setMenuOpen(false)} className="btn-secondary mt-2 w-full">
                   Log in
                 </Link>
-                <Link href="/signup" onClick={() => setMenuOpen(false)} className="btn-primary w-full">
+                <Link href={signupPath(pathname)} onClick={() => setMenuOpen(false)} className="btn-primary w-full">
                   Sign up
                 </Link>
               </>

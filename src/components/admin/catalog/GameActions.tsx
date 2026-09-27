@@ -29,7 +29,8 @@ export function GameActions({
     const err = await catalogRequest(method, `/api/admin/games/${game.id}`, body);
     setBusy(false);
     if (err) return setError(err);
-    if (method === "DELETE") router.push("/admin/games");
+    // replace: the page they were on no longer exists.
+    if (method === "DELETE") router.replace("/admin/games");
     router.refresh();
   }
 

@@ -50,6 +50,9 @@ export function ChatComposer({
   sending,
   onSubmit,
   onError,
+  replyingTo = null,
+  onCancelReply,
+  placeholder,
 }: {
   /** Scopes @-suggestions to this community's members. */
   communityId: string;
@@ -59,6 +62,11 @@ export function ChatComposer({
    *  only clears the draft/attachment on success. */
   onSubmit: (message: ComposerSubmit) => Promise<boolean>;
   onError: (message: string) => void;
+  /** Shows a "Replying to …" bar above the input. */
+  replyingTo?: { authorName: string; snippet: string } | null;
+  onCancelReply?: () => void;
+  /** Overrides the default "Message #channel". */
+  placeholder?: string;
 }) {
   const [draft, setDraft] = useState("");
   const [image, setImage] = useState<PreparedImage | null>(null);
@@ -254,6 +262,17 @@ export function ChatComposer({
 
   return (
     <div className="relative flex flex-col">
+      {replyingTo && (
+        <div className="flex items-center gap-2 border-b border-border px-4 py-2 text-[13px]">
+          <span className="min-w-0 flex-1 truncate text-muted">
+            Replying to <span className="font-semibold text-foreground">{replyingTo.authorName}</span>
+            {replyingTo.snippet && <> · {replyingTo.snippet}</>}
+          </span>
+          <button type="button" onClick={onCancelReply} aria-label="Cancel reply" className="shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold text-muted hover:text-foreground">
+            Cancel
+          </button>
+        </div>
+      )}
       {showSuggestions && (
         <div
           role="listbox"
@@ -353,7 +372,7 @@ export function ChatComposer({
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
             onFocus={() => setTray(null)}
-            placeholder={image ? "Add a caption…" : `Message #${channelName}`}
+            placeholder={image ? "Add a caption…" : (placeholder ?? `Message #${channelName}`)}
             maxLength={2000}
             rows={1}
             className="scrollbar-hide max-h-32 min-w-0 flex-1 resize-none bg-transparent py-2.5 pl-4 text-[15px] leading-5 outline-none placeholder:text-muted"

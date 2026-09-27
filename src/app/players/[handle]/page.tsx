@@ -49,7 +49,10 @@ export default async function PlayerProfilePage({
 }) {
   const [{ handle }, { tab }] = await Promise.all([params, searchParams]);
 
-  const player = await prisma.user.findUnique({ where: { handle } });
+  const player = await prisma.user.findUnique({
+    where: { handle },
+    include: { featuredCommunity: { select: { tag: true, slug: true, name: true, enabled: true } } },
+  });
   if (!player) notFound();
 
   const viewer = await getCurrentUser();
@@ -260,6 +263,10 @@ export default async function PlayerProfilePage({
       region: player.region,
       favoriteGames: player.favoriteGames,
       createdAt: player.createdAt,
+      communityTag:
+        player.featuredCommunity?.enabled && player.featuredCommunity.tag && player.featuredCommunity.slug
+          ? { tag: player.featuredCommunity.tag, name: player.featuredCommunity.name ?? "", href: `/communities/${player.featuredCommunity.slug}` }
+          : null,
     },
     isOwnProfile,
     viewerSignedIn: Boolean(viewer),

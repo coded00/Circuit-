@@ -12,6 +12,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { loginPath } from "@/lib/safeRedirect";
 import { Heart, Bookmark, Share2, Volume2, VolumeX, Play, Trophy, Gamepad2, Check } from "lucide-react";
 import { GameArtTile } from "@/components/GameArtTile";
 import { gamePath, tournamentPath, videoPath, absoluteUrl } from "@/lib/seo";
@@ -105,7 +106,7 @@ export function VideoCard({
 
   function getLoginRedirect() {
     const path = typeof window !== "undefined" ? window.location.pathname + window.location.search : "/ladder";
-    return `/login?next=${encodeURIComponent(path)}`;
+    return loginPath(path);
   }
 
   async function handleLike() {
@@ -202,10 +203,12 @@ export function VideoCard({
           </div>
         )}
 
+        {/* Near-opaque at the bottom: YouTube draws its own caption and
+            counters in the same corner, and they mustn't show through ours. */}
         <div
           aria-hidden
-          className="absolute inset-x-0 bottom-0 h-1/2"
-          style={{ backgroundImage: "linear-gradient(to top, rgba(0,0,0,0.85), transparent)" }}
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-[55%]"
+          style={{ backgroundImage: "linear-gradient(to top, rgba(0,0,0,0.97) 0%, rgba(0,0,0,0.9) 30%, rgba(0,0,0,0.45) 65%, transparent)" }}
         />
 
         {/* Bottom-left: title/description/tags/attribution/discovery links */}
