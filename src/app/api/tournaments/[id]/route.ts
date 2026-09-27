@@ -2,9 +2,9 @@
  * Circuit — tournament edit (Build Plan P1-3, maps: TRN-4).
  *
  * Editable up until registration closes. entryFee and prizeAmount lock
- * the moment a paid registration exists — everything else stays editable
- * throughout, matching TRN-4's own scope (it's specifically those two
- * money-shaped fields that lock, not the whole tournament).
+ * the moment a paid registration exists, and the game/mode/format lock
+ * the moment anyone has registered (they signed up for that competition)
+ * — everything else stays editable throughout.
  */
 
 import { NextResponse } from "next/server";
@@ -12,7 +12,9 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { parseOptionalUrl, parseOptionalImageUrl } from "@/lib/validation";
 import { logAdminAction } from "@/lib/auditLog";
-import { ALL_TEAM_SIZE_VALUES } from "@/lib/gameFormats";
+import { entriesPerMatch } from "@/lib/gameCatalog";
+import { parseLobbyRounds } from "@/lib/lobbyScoring";
+import { resolveCompetition } from "@/lib/competitionConfig";
 
 const MAX_PARTICIPANT_CAP = 128;
 
@@ -73,31 +75,52 @@ export async function PATCH(
     if (!name) return NextResponse.json({ error: "Name can't be empty." }, { status: 400 });
     data.name = name;
   }
-  if (body.game !== undefined) {
-    const game = typeof body.game === "string" ? body.game.trim() : "";
-    if (!game) return NextResponse.json({ error: "Game can't be empty." }, { status: 400 });
-    data.game = game;
-  }
-  if (body.teamSize !== undefined) {
-    const teamSize = typeof body.teamSize === "string" ? body.teamSize.trim() : "";
-    if (!ALL_TEAM_SIZE_VALUES.includes(teamSize)) {
-      return NextResponse.json(
-        { error: "Game mode isn't a recognized option for this game." },
-        { status: 400 }
-      );
+  let lobbyCapacity: number | null = null;
+  const changesCompetition =
+    body.gameFormatId !== undefined &&
+    (body.gameFormatId !== tournament.gameFormatId || body.structure !== tournament.format || body.gameId !== tournament.gameId);
+  if (changesCompetition) {
+    const registered = await prisma.registration.count({ where: { tournamentId: id, status: { in: ["PENDING_PAYMENT", "CONFIRMED"] } } });
+    if (registered > 0) {
+      return NextResponse.json({ error: "The game and format are locked — players have already registered for this tournament." }, { status: 409 });
     }
-    data.teamSize = teamSize;
+    const competition = await resolveCompetition(body);
+    if (!competition.ok) return NextResponse.json({ error: competition.error }, { status: 400 });
+    Object.assign(data, competition.fields);
+    lobbyCapacity = competition.lobbyCapacity;
+    if (competition.fields.competitionStyle !== "LOBBY") data.lobbyRounds = null;
+  } else if (tournament.competitionStyle === "LOBBY" && tournament.gameFormatId) {
+    const format = await prisma.gameFormat.findUnique({ where: { id: tournament.gameFormatId } });
+    lobbyCapacity = format ? entriesPerMatch(format) : null;
+  }
+  const style = (data.competitionStyle as string | undefined) ?? tournament.competitionStyle;
+  if (style === "LOBBY" && (body.lobbyRounds !== undefined || changesCompetition)) {
+    if (tournament.status === "LIVE" || tournament.status === "COMPLETE") {
+      if (body.lobbyRounds !== undefined && Number(body.lobbyRounds) !== tournament.lobbyRounds) {
+        return NextResponse.json({ error: "The number of rounds is locked once the lobby has started." }, { status: 409 });
+      }
+    } else {
+      const rounds = parseLobbyRounds(body.lobbyRounds ?? tournament.lobbyRounds);
+      if (!rounds.ok) return NextResponse.json({ error: rounds.error }, { status: 400 });
+      data.lobbyRounds = rounds.value;
+    }
   }
   if (body.rulesText !== undefined) {
     const rulesText = typeof body.rulesText === "string" ? body.rulesText.trim() : "";
     if (!rulesText) return NextResponse.json({ error: "Rules can't be empty." }, { status: 400 });
     data.rulesText = rulesText;
   }
-  if (body.participantCap !== undefined) {
-    const participantCap = Number(body.participantCap);
-    if (!Number.isInteger(participantCap) || participantCap < 2 || participantCap > MAX_PARTICIPANT_CAP) {
+  if (body.participantCap !== undefined || (lobbyCapacity !== null && tournament.participantCap > lobbyCapacity)) {
+    const participantCap = Number(body.participantCap ?? tournament.participantCap);
+    const capLimit = style === "LOBBY" && lobbyCapacity !== null ? lobbyCapacity : MAX_PARTICIPANT_CAP;
+    if (!Number.isInteger(participantCap) || participantCap < 2 || participantCap > capLimit) {
       return NextResponse.json(
-        { error: `Participant cap must be a whole number between 2 and ${MAX_PARTICIPANT_CAP}.` },
+        {
+          error:
+            capLimit !== MAX_PARTICIPANT_CAP
+              ? `This format's lobby holds ${capLimit} entries — set a cap between 2 and ${capLimit}.`
+              : `Participant cap must be a whole number between 2 and ${MAX_PARTICIPANT_CAP}.`,
+        },
         { status: 400 }
       );
     }

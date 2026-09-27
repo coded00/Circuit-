@@ -51,6 +51,12 @@ export default async function StaffDisputeQueuePage() {
       },
     },
   });
+  // Lobby tournaments: flags players took past the organizer (src/lib/lobby.ts).
+  const lobbyFlags = await prisma.lobbyFlag.findMany({
+    where: { status: "ESCALATED" },
+    orderBy: { escalatedAt: "asc" },
+    include: { user: { select: { displayName: true } }, round: { select: { number: true, tournament: { select: { id: true, name: true } } } } },
+  });
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-4 py-6 sm:px-8 sm:py-10">
@@ -88,6 +94,34 @@ export default async function StaffDisputeQueuePage() {
               </Link>
             );
           })}
+        </div>
+      )}
+
+      <h2 className="text-eyebrow text-muted">Lobby result flags</h2>
+      {lobbyFlags.length === 0 ? (
+        <p className="card text-center text-muted">No escalated lobby flags right now.</p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {lobbyFlags.map((flag) => (
+            <Link
+              key={flag.id}
+              href={`/tournaments/${flag.round.tournament.id}/bracket?tab=rounds`}
+              className="card-row flex items-center justify-between gap-3 p-4"
+            >
+              <div className="flex min-w-0 flex-col gap-0.5">
+                <span className="truncate text-xs text-muted">
+                  {flag.round.tournament.name} · Round {flag.round.number}
+                </span>
+                <span className="truncate font-medium">
+                  {flag.user.displayName}: {flag.reason}
+                </span>
+              </div>
+              <div className="flex shrink-0 flex-col items-end gap-1">
+                <StatusPill tone="attention">Escalated</StatusPill>
+                <span className="text-metadata">Waiting {timeSince(flag.escalatedAt ?? flag.createdAt)}</span>
+              </div>
+            </Link>
+          ))}
         </div>
       )}
     </div>

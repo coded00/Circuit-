@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { loginPath } from "@/lib/safeRedirect";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
+import { captainTeamOptions, describeRoster, rosterBounds } from "@/lib/teamEntries";
 import RegistrationForm from "./RegistrationForm";
 
 export default async function RegisterPage({
@@ -19,13 +20,21 @@ export default async function RegisterPage({
   if (!tournament) {
     notFound();
   }
+  const isTeam = tournament.entryType === "TEAM";
+  const bounds = rosterBounds(tournament);
+  const teamOptions = isTeam ? await captainTeamOptions(user.id, tournament.id) : [];
 
   return (
     <div className="mx-auto flex w-full max-w-lg flex-col gap-6 px-4 py-6 sm:px-8 sm:py-10">
       <div className="flex flex-col gap-2">
         <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
-          Register for {tournament.name}
+          {isTeam ? "Enter your team in" : "Register for"} {tournament.name}
         </h1>
+        {isTeam && (
+          <p className="text-sm text-muted">
+            {tournament.modeName ?? tournament.teamSize} · teams of {tournament.playersPerTeam} · roster of {describeRoster(bounds)}
+          </p>
+        )}
         <p className="text-sm text-muted">
           {tournament.entryFee === 0
             ? "This tournament is free to enter."
@@ -33,7 +42,12 @@ export default async function RegisterPage({
         </p>
       </div>
       <div className="card">
-        <RegistrationForm tournamentId={tournament.id} entryFee={tournament.entryFee} walletBalance={user.walletBalance} />
+        <RegistrationForm
+          tournamentId={tournament.id}
+          entryFee={tournament.entryFee}
+          walletBalance={user.walletBalance}
+          team={isTeam ? { options: teamOptions, bounds, profileHref: `/players/${user.handle}?tab=teams` } : undefined}
+        />
       </div>
     </div>
   );

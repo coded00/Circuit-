@@ -5,16 +5,28 @@ import { useRouter } from "next/navigation";
 import { Wallet } from "lucide-react";
 import { Spinner } from "@/components/Spinner";
 import { MatchFoundHud } from "@/components/MatchFoundHud";
+import type { CaptainTeamOption, RosterBounds } from "@/lib/teamEntries";
+import { TeamRosterPicker, type RosterPick } from "./TeamRosterPicker";
 
 export default function RegistrationForm({
   tournamentId,
   entryFee,
   walletBalance,
+  team,
 }: {
   tournamentId: string;
   entryFee: number;
   walletBalance: number;
+  /** TEAM tournaments: the teams this user captains and the roster size. */
+  team?: { options: CaptainTeamOption[]; bounds: RosterBounds; profileHref: string };
 }) {
+  const firstTeam = team?.options.find((t) => !t.blocked);
+  const [roster, setRoster] = useState<RosterPick>(() => {
+    const captain = firstTeam?.members.find((m) => m.isCaptain);
+    return { teamId: firstTeam?.id ?? "", members: captain ? { [captain.userId]: "" } : {} };
+  });
+  const rosterSize = Object.keys(roster.members).length;
+  const rosterReady = !team || (!!roster.teamId && rosterSize >= team.bounds.min && rosterSize <= team.bounds.max);
   const router = useRouter();
   const [inGameId, setInGameId] = useState("");
   const canPayFromWallet = entryFee > 0 && walletBalance >= entryFee;
@@ -33,6 +45,7 @@ export default function RegistrationForm({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         inGameId,
+        ...(team ? { teamId: roster.teamId, roster: Object.entries(roster.members).map(([userId, id]) => ({ userId, inGameId: id })) } : {}),
         ...(entryFee > 0 && payFromWallet ? { payFrom: "wallet" } : {}),
       }),
     });
@@ -69,9 +82,11 @@ export default function RegistrationForm({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+      {team && <TeamRosterPicker options={team.options} bounds={team.bounds} value={roster} onChange={setRoster} profileHref={team.profileHref} />}
+      {(!team || team.options.length > 0) && (
       <div className="flex flex-col gap-1.5">
         <label htmlFor="inGameId" className="field-label">
-          In-game ID
+          {team ? "Your in-game ID (captain)" : "In-game ID"}
         </label>
         <input
           id="inGameId"
@@ -81,6 +96,7 @@ export default function RegistrationForm({
           className="field-input"
         />
       </div>
+      )}
 
       {entryFee > 0 && (
         <div className="flex flex-col gap-1.5">
@@ -111,10 +127,12 @@ export default function RegistrationForm({
       )}
 
       {error && <p className="field-error motion-fade-in">{error}</p>}
-      <button type="submit" disabled={submitting} className="btn-primary">
-        {submitting && <Spinner />}
-        {submitting ? "Registering…" : "Register"}
-      </button>
+      {(!team || team.options.length > 0) && (
+        <button type="submit" disabled={submitting || !rosterReady} className="btn-primary">
+          {submitting && <Spinner />}
+          {submitting ? "Registering…" : team ? "Register team" : "Register"}
+        </button>
+      )}
     </form>
   );
 }

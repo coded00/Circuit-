@@ -16,6 +16,7 @@ import { getPaymentProvider } from "@/lib/payments";
 import { maybeGenerateBracketOnCapFill } from "@/lib/matches";
 import { computePlatformFee } from "@/lib/platformFee";
 import { trackEvent } from "@/lib/analytics";
+import { notifyRoster } from "@/lib/teamEntries";
 
 export async function confirmEntryFeePayment(reference: string): Promise<void> {
   const registration = await prisma.registration.findUnique({
@@ -166,6 +167,8 @@ export async function confirmEntryFeePayment(reference: string): Promise<void> {
     amountMinor: registration.tournament.entryFee,
   });
 
+  // Team entry: the rest of the roster hears they're in.
+  await notifyRoster(registration.id).catch(() => undefined);
   await notify(registration.userId, "REGISTRATION_CONFIRMED", {
     tournamentId: registration.tournamentId,
   });

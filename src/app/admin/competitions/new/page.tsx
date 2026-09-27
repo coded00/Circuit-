@@ -6,11 +6,11 @@
  */
 
 import Link from "next/link";
-import { prisma } from "@/lib/db";
+import { loadOrganizerCatalog } from "@/lib/competitionConfig";
 import TournamentForm from "@/app/tournaments/new/TournamentForm";
 
 export default async function AdminNewCompetitionPage() {
-  const games = await prisma.game.findMany({ where: { enabled: true, publishedAt: { not: null } }, orderBy: { name: "asc" } });
+  const catalog = await loadOrganizerCatalog();
 
   return (
     <div className="flex flex-1 flex-col gap-6">
@@ -19,7 +19,7 @@ export default async function AdminNewCompetitionPage() {
       </Link>
       <h1 className="font-display text-2xl font-bold tracking-tight">Create a competition</h1>
       <div className="card max-w-2xl">
-        <TournamentForm redirectBase="/admin/competitions" games={games} />
+        <TournamentForm redirectBase="/admin/competitions" catalog={catalog} />
       </div>
     </div>
   );

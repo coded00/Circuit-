@@ -42,6 +42,21 @@ enum MatchStatus {
   COMPLETE
 }
 
+enum LobbyRoundStatus {
+  PENDING
+  POSTED
+}
+
+/// A player's objection to a posted lobby round: the organizer answers
+/// first (RESOLVED = corrected, DISMISSED = results stand); the player
+/// can escalate to Circuit staff, whose answer is final.
+enum LobbyFlagStatus {
+  OPEN
+  ESCALATED
+  RESOLVED
+  DISMISSED
+}
+
 enum DisputeStatus {
   OPEN
   ORGANIZER_REVIEW
@@ -228,6 +243,8 @@ model User {
   communityReportsAgainst CommunityReport[]        @relation("CommunityReportAgainst")
   appeals                 Appeal[]
   eventRsvps              EventRsvp[]
+  rosterMemberships       RosterMember[]           @relation("RosterMemberships")
+  lobbyFlags              LobbyFlag[]              @relation("LobbyFlagsRaised")
   walletTransactions      WalletTransaction[]
   auditLogEntries         AuditLogEntry[]
   friendshipsSent         Friendship[]             @relation("FriendshipRequester")
@@ -440,6 +457,7 @@ model Game {
 
   modes       GameMode[]
   communities Community[]
+  tournaments Tournament[]
 
   @@index([enabled])
 }
@@ -477,7 +495,8 @@ model GameMode {
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
-  formats GameFormat[]
+  formats     GameFormat[]
+  tournaments Tournament[]
 
   @@unique([gameId, name])
   @@index([gameId, sortOrder])
@@ -509,11 +528,18 @@ model GameFormat {
   /// Starting rules text offered to organizers for this format.
   defaultRules       String?
   /// The single implicit format of a mode with usesFormats = false.
+  /// LOBBY formats: points by finishing place, index 0 = 1st; places past
+  /// the end score 0. Empty = the standard table (src/lib/lobbyScoring.ts).
+  placementPoints    Int[]     @default([])
+  /// LOBBY formats: points per kill.
+  killPoints         Int       @default(1)
   isDefault          Boolean   @default(false)
   enabled            Boolean   @default(true)
   sortOrder          Int       @default(0)
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
+
+  tournaments Tournament[]
 
   @@unique([modeId, name])
   @@index([modeId, sortOrder])
@@ -544,6 +570,32 @@ model Tournament {
   /// outside the platform. Bracket matches themselves are always a real
   /// 1-vs-1 `Match` row regardless of teamSize.
   teamSize            String           @default("1v1")
+  /// Game catalog link (Admin → Games) and a snapshot of the configuration
+  /// chosen at creation — catalog edits later must not change a
+  /// competition that's already running. `game`/`teamSize`/`format` stay
+  /// filled (name, "Mode · Format" label, structure id) for every reader
+  /// that predates the catalog. Null ids = created before the catalog, or
+  /// the catalog entry was since deleted (the snapshot still describes it).
+  gameId              String?
+  gameRef             Game?            @relation(fields: [gameId], references: [id], onDelete: SetNull)
+  gameModeId          String?
+  gameMode            GameMode?        @relation(fields: [gameModeId], references: [id], onDelete: SetNull)
+  gameFormatId        String?
+  gameFormat          GameFormat?      @relation(fields: [gameFormatId], references: [id], onDelete: SetNull)
+  modeName            String?
+  formatName          String?
+  competitionStyle    CompetitionStyle @default(HEAD_TO_HEAD)
+  entryType           EntryType        @default(INDIVIDUAL)
+  playersPerTeam      Int              @default(1)
+  /// TEAM entries: how many players a roster may list (snapshot of the
+  /// format's minRoster/maxRoster; null = exactly playersPerTeam).
+  minRoster           Int?
+  maxRoster           Int?
+  /// LOBBY tournaments: how many rounds (games) every entry plays, and
+  /// the scoring snapshotted from the format at creation.
+  lobbyRounds         Int?
+  placementPoints     Int[]            @default([])
+  killPoints          Int              @default(1)
   /// Minor currency units (kobo), never a float. 0 = free tournament.
   entryFee            Int              @default(0)
   prizeAmount         Int?
@@ -602,6 +654,7 @@ model Tournament {
 
   registrations   Registration[]
   bracket         Bracket?
+  rounds          LobbyRound[]
   matches         Match[]
   escrowTxns      EscrowTransaction[]
   videos          Video[]
@@ -635,13 +688,22 @@ model Registration {
   /// init and echoed back by both PaymentProviderClient implementations —
   /// what a webhook looks up a Registration by.
   paymentRef   String?            @unique
+  /// TEAM tournaments: the team this entry is for. The registration's
+  /// user is its captain — they pay, play the bracket slot, report
+  /// results and receive any prize. `teamName` keeps the name as it was
+  /// at registration (and survives the team being disbanded).
+  teamId       String?
+  team         Team?              @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  teamName     String?
   createdAt    DateTime           @default(now())
   /// V1 audit follow-up — status moves through the whole
   /// PENDING_PAYMENT→CONFIRMED→WITHDRAWN/REFUNDED lifecycle with no
   /// record of when each transition happened.
   updatedAt    DateTime           @updatedAt
 
-  escrowTxns EscrowTransaction[]
+  escrowTxns   EscrowTransaction[]
+  roster       RosterMember[]
+  lobbyResults LobbyResult[]
 
   @@unique([tournamentId, userId])
   @@index([tournamentId, status])
@@ -650,6 +712,74 @@ model Registration {
   // homepage, a player's public profile, admin's user detail page, and
   // the discovery feed's personalization all run exactly that).
   @@index([userId])
+}
+
+/// One player on a team entry's roster (the captain included).
+model RosterMember {
+  id             String       @id @default(cuid())
+  registrationId String
+  registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation("RosterMemberships", fields: [userId], references: [id], onDelete: Cascade)
+  inGameId       String?
+  createdAt      DateTime     @default(now())
+
+  @@unique([registrationId, userId])
+  @@index([userId])
+}
+
+/// LOBBY tournaments: one game everyone plays. The organizer enters each
+/// entry's placement and kills; points follow the tournament's table.
+model LobbyRound {
+  id           String           @id @default(cuid())
+  tournamentId String
+  tournament   Tournament       @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  number       Int
+  status       LobbyRoundStatus @default(PENDING)
+  /// Optional screenshot of the end-of-game results (an /api/images path).
+  proofUrl     String?
+  postedAt     DateTime?
+  postedById   String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  results LobbyResult[]
+  flags   LobbyFlag[]
+
+  @@unique([tournamentId, number])
+}
+
+/// One entry's result in one lobby round. placement null = didn't play.
+model LobbyResult {
+  id             String       @id @default(cuid())
+  roundId        String
+  round          LobbyRound   @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  registrationId String
+  registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  placement      Int?
+  kills          Int          @default(0)
+  points         Int          @default(0)
+
+  @@unique([roundId, registrationId])
+  @@index([registrationId])
+}
+
+model LobbyFlag {
+  id            String          @id @default(cuid())
+  roundId       String
+  round         LobbyRound      @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User            @relation("LobbyFlagsRaised", fields: [userId], references: [id], onDelete: Cascade)
+  reason        String
+  status        LobbyFlagStatus @default(OPEN)
+  /// The latest answer (organizer's, or staff's once escalated).
+  response      String?
+  respondedById String?
+  escalatedAt   DateTime?
+  resolvedAt    DateTime?
+  createdAt     DateTime        @default(now())
+
+  @@index([roundId, status])
 }
 
 /// 1:1 with Tournament. Maps to BRK-1.
@@ -1017,8 +1147,9 @@ model Team {
   captain   User     @relation("TeamCaptain", fields: [captainId], references: [id])
   createdAt DateTime @default(now())
 
-  members     TeamMembership[]
-  communities CommunityTeam[]
+  members       TeamMembership[]
+  communities   CommunityTeam[]
+  registrations Registration[]
 
   // V1 audit follow-up — a player's public profile and the team-role
   // lookup in src/lib/teams.ts both filter by captainId directly, with no

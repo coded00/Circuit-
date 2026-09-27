@@ -29,6 +29,7 @@ import { maybeGenerateBracketOnCapFill } from "@/lib/matches";
 import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
 import { computePlatformFee } from "@/lib/platformFee";
 import { trackEvent } from "@/lib/analytics";
+import { notifyRoster, saveRoster, TeamEntryError, validateTeamEntry, type ValidRoster } from "@/lib/teamEntries";
 
 class InsufficientWalletBalanceError extends Error {}
 
@@ -98,15 +99,33 @@ export async function POST(
     );
   }
 
+  // TEAM tournaments: the registering user is the captain entering a
+  // team, with a roster (see src/lib/teamEntries.ts). The captain's own
+  // registration is the entry, so every path below stays the same.
+  let roster: ValidRoster | null = null;
+  if (tournament.entryType === "TEAM") {
+    try {
+      roster = await validateTeamEntry(tournament, user.id, body ?? {});
+    } catch (err) {
+      if (err instanceof TeamEntryError) return NextResponse.json({ error: err.message }, { status: err.status });
+      throw err;
+    }
+  }
+  const teamData = roster ? { teamId: roster.teamId, teamName: roster.teamName } : {};
+
   if (tournament.entryFee === 0) {
     const registration = existing
       ? await prisma.registration.update({
           where: { id: existing.id },
-          data: { inGameId, status: "CONFIRMED" },
+          data: { inGameId, status: "CONFIRMED", ...teamData },
         })
       : await prisma.registration.create({
-          data: { tournamentId, userId: user.id, inGameId, status: "CONFIRMED" },
+          data: { tournamentId, userId: user.id, inGameId, status: "CONFIRMED", ...teamData },
         });
+    if (roster) {
+      await saveRoster(registration.id, roster.members);
+      await notifyRoster(registration.id);
+    }
     await maybeGenerateBracketOnCapFill(tournamentId); // BRK-1's cap-fill path
     trackEvent("tournament_joined", { userId: user.id, tournamentId, game: tournament.game, amountMinor: 0 });
     return NextResponse.json(
@@ -156,10 +175,10 @@ export async function POST(
         const reg = existing
           ? await tx.registration.update({
               where: { id: existing.id },
-              data: { inGameId, status: "CONFIRMED", paymentRef: reference },
+              data: { inGameId, status: "CONFIRMED", paymentRef: reference, ...teamData },
             })
           : await tx.registration.create({
-              data: { tournamentId, userId: user.id, inGameId, status: "CONFIRMED", paymentRef: reference },
+              data: { tournamentId, userId: user.id, inGameId, status: "CONFIRMED", paymentRef: reference, ...teamData },
             });
 
         await tx.escrowTransaction.create({
@@ -211,6 +230,10 @@ export async function POST(
         return reg;
       });
 
+      if (roster) {
+        await saveRoster(registration.id, roster.members);
+        await notifyRoster(registration.id);
+      }
       await maybeGenerateBracketOnCapFill(tournamentId); // BRK-1's cap-fill path
       trackEvent("tournament_joined", { userId: user.id, tournamentId, game: tournament.game, amountMinor: tournament.entryFee });
       return NextResponse.json({ id: registration.id, status: "CONFIRMED" }, { status: 201 });
@@ -225,11 +248,13 @@ export async function POST(
   const registration = existing
     ? await prisma.registration.update({
         where: { id: existing.id },
-        data: { inGameId, status: "PENDING_PAYMENT" },
+        data: { inGameId, status: "PENDING_PAYMENT", ...teamData },
       })
     : await prisma.registration.create({
-        data: { tournamentId, userId: user.id, inGameId, status: "PENDING_PAYMENT" },
+        data: { tournamentId, userId: user.id, inGameId, status: "PENDING_PAYMENT", ...teamData },
       });
+  // Held while the captain pays; roster players are told once it's confirmed.
+  if (roster) await saveRoster(registration.id, roster.members);
 
   const reference = `reg_${registration.id}_${randomUUID().slice(0, 8)}`;
   const provider = getDefaultPaymentProvider();

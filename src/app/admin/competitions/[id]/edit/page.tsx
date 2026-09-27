@@ -10,6 +10,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { loadOrganizerCatalog } from "@/lib/competitionConfig";
 import EditForm from "@/app/tournaments/[id]/edit/EditForm";
 
 export default async function AdminCompetitionEditPage({ params }: { params: Promise<{ id: string }> }) {
@@ -21,8 +22,9 @@ export default async function AdminCompetitionEditPage({ params }: { params: Pro
   const hasPaidRegistration =
     tournament.entryFee > 0 &&
     (await prisma.registration.count({ where: { tournamentId: id, status: "CONFIRMED" } })) > 0;
-  const [games, community] = await Promise.all([
-    prisma.game.findMany({ where: { enabled: true, publishedAt: { not: null } }, orderBy: { name: "asc" } }),
+  const [catalog, activeRegistrations, community] = await Promise.all([
+    loadOrganizerCatalog(),
+    prisma.registration.count({ where: { tournamentId: id, status: { in: ["PENDING_PAYMENT", "CONFIRMED"] } } }),
     prisma.community.findUnique({ where: { tournamentId: id }, select: { enabled: true } }),
   ]);
 
@@ -37,7 +39,8 @@ export default async function AdminCompetitionEditPage({ params }: { params: Pro
           tournament={tournament}
           moneyFieldsLocked={hasPaidRegistration}
           redirectTo={`/admin/competitions/${id}`}
-          games={games}
+          catalog={catalog}
+          competitionLocked={activeRegistrations > 0}
           communityEnabled={community?.enabled ?? false}
         />
       </div>

@@ -61,9 +61,9 @@ export const COMPETITION_STRUCTURES: readonly CompetitionStructure[] = [
   {
     id: "LOBBY_POINTS",
     label: "Lobby points",
-    description: "Shared lobbies, scored by placement and kills.",
+    description: "One lobby plays several rounds, scored by placement and kills.",
     style: "LOBBY",
-    runnable: false,
+    runnable: true,
   },
 ];
 

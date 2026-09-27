@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 import { loginPath } from "@/lib/safeRedirect";
 import { getCurrentUser } from "@/lib/session";
-import { prisma } from "@/lib/db";
 import { hostableCommunities } from "@/lib/communityDirectory";
+import { loadOrganizerCatalog } from "@/lib/competitionConfig";
 import TournamentForm from "./TournamentForm";
 
 export default async function NewTournamentPage({ searchParams }: { searchParams: Promise<{ community?: string }> }) {
@@ -11,10 +11,7 @@ export default async function NewTournamentPage({ searchParams }: { searchParams
   if (!user) {
     redirect(loginPath("/tournaments/new"));
   }
-  const [games, hostCommunities] = await Promise.all([
-    prisma.game.findMany({ where: { enabled: true, publishedAt: { not: null } }, orderBy: { name: "asc" } }),
-    hostableCommunities(user),
-  ]);
+  const [catalog, hostCommunities] = await Promise.all([loadOrganizerCatalog(), hostableCommunities(user)]);
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-6 sm:px-8 sm:py-10">
@@ -25,7 +22,7 @@ export default async function NewTournamentPage({ searchParams }: { searchParams
         </p>
       </div>
       <div className="card">
-        <TournamentForm games={games} hostCommunities={hostCommunities} defaultHostCommunityId={community} />
+        <TournamentForm catalog={catalog} hostCommunities={hostCommunities} defaultHostCommunityId={community} />
       </div>
     </div>
   );

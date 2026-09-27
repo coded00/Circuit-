@@ -4,8 +4,10 @@
  * a blank required textarea with zero guidance; this gives them a real,
  * researched-against-official-sources template for their game that they
  * can accept as-is or edit, instead of writing a ruleset from scratch.
+ * Used only when the chosen catalog format has no default rules of its
+ * own (GameFormat.defaultRules, set in Admin → Games).
  *
- * Same shape and convention as `gameFormats.ts`: a curated map for games
+ * A curated map for games
  * with a real, verifiable competitive convention, case-insensitive/
  * substring-tolerant lookup, and an honest generic fallback for anything
  * else — never invents an official-sounding ruleset for a game that
@@ -88,9 +90,8 @@ const GENERIC_RULES = `- State the exact match format and win condition for this
 - Winner submits a screenshot of the final score/results screen as proof.
 - No cheats, exploits, or third-party software. Be on time for the scheduled match — no-shows forfeit.`;
 
-/** Case-insensitive, substring-tolerant lookup, longest key first —
- *  matches `gameFormatOptions`'s own lookup so the two never disagree
- *  about which curated game a name resolves to. Always returns *some*
+/** Case-insensitive, substring-tolerant lookup, longest key first (so
+ *  "call of duty mobile" wins over "call of duty"). Always returns *some*
  *  usable starting text, never an empty string. */
 export function defaultRulesFor(game: string): string {
   const normalized = game.trim().toLowerCase();

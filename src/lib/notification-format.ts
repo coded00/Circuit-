@@ -105,6 +105,36 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
       return { message: "You have a new friend request.", href: "/friends" };
     case "FRIEND_ACCEPTED":
       return { message: "Your friend request was accepted.", href: "/friends" };
+    case "LOBBY_STARTED":
+      return {
+        message: `${str(p, "tournamentName") || "Your tournament"} has started — ${str(p, "rounds") || "several"} rounds, one lobby. Good luck.`,
+        href: `/tournaments/${str(p, "tournamentId")}/bracket`,
+      };
+    case "LOBBY_ROUND_POSTED":
+      return {
+        message: `Round ${str(p, "round")} results are up for ${str(p, "tournamentName") || "your tournament"}.`,
+        href: `/tournaments/${str(p, "tournamentId")}/bracket`,
+      };
+    case "LOBBY_FLAG_RAISED":
+      return {
+        message: `A player flagged round ${str(p, "round")} results in ${str(p, "tournamentName") || "your tournament"}.`,
+        href: `/tournaments/${str(p, "tournamentId")}/bracket`,
+      };
+    case "LOBBY_FLAG_ANSWERED":
+      return {
+        message: `${p.byStaff ? "Circuit staff" : "The organizer"} ${str(p, "outcome") === "resolved" ? "corrected" : "reviewed"} round ${str(p, "round")} after your flag.`,
+        href: `/tournaments/${str(p, "tournamentId")}/bracket`,
+      };
+    case "LOBBY_FLAG_ESCALATED":
+      return {
+        message: `A lobby results flag in ${str(p, "tournamentName") || "a tournament"} needs staff review.`,
+        href: `/tournaments/${str(p, "tournamentId")}/bracket`,
+      };
+    case "TEAM_ROSTER_ADDED":
+      return {
+        message: `${str(p, "teamName") || "Your team"} entered you in ${str(p, "tournamentName") || "a tournament"}.`,
+        href: `/tournaments/${str(p, "tournamentId")}`,
+      };
     case "TEAM_INVITE":
       return { message: "You've been invited to a team.", href: `/teams/${str(p, "teamId")}` };
     case "TEAM_JOIN_REQUEST":

@@ -12,7 +12,8 @@ import { NextResponse, after } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { parseOptionalUrl, parseOptionalImageUrl } from "@/lib/validation";
-import { ALL_TEAM_SIZE_VALUES } from "@/lib/gameFormats";
+import { parseLobbyRounds } from "@/lib/lobbyScoring";
+import { resolveCompetition } from "@/lib/competitionConfig";
 import { notifyAllUsers } from "@/lib/notifications";
 import { enableCommunity, postSystemMessage } from "@/lib/community";
 import { hostableCommunities } from "@/lib/communityDirectory";
@@ -69,8 +70,6 @@ export async function POST(request: Request) {
   }
 
   const name = typeof body.name === "string" ? body.name.trim() : "";
-  const game = typeof body.game === "string" ? body.game.trim() : "";
-  const teamSize = typeof body.teamSize === "string" ? body.teamSize.trim() : "1v1";
   const rulesText = typeof body.rulesText === "string" ? body.rulesText.trim() : "";
   const participantCap = Number(body.participantCap);
   const entryFee = Number(body.entryFee);
@@ -87,23 +86,31 @@ export async function POST(request: Request) {
   const posterUrlResult = parseOptionalImageUrl(body.posterUrl);
 
   // TRN-1: all fields required except prize info.
-  if (!name || !game || !rulesText) {
+  if (!name || !rulesText) {
+    return NextResponse.json({ error: "Name and rules are required." }, { status: 400 });
+  }
+  // Game → Mode → Format → Structure, checked against the game catalog.
+  const competition = await resolveCompetition(body);
+  if (!competition.ok) {
+    return NextResponse.json({ error: competition.error }, { status: 400 });
+  }
+  // Lobby tournaments are one lobby, so the lobby's size is the cap.
+  const capLimit = competition.lobbyCapacity ?? MAX_PARTICIPANT_CAP;
+  if (!Number.isInteger(participantCap) || participantCap < 2 || participantCap > capLimit) {
     return NextResponse.json(
-      { error: "Name, game, and rules are required." },
+      {
+        error: competition.lobbyCapacity
+          ? `This format's lobby holds ${competition.lobbyCapacity} entries — set a cap between 2 and ${competition.lobbyCapacity}.`
+          : `Participant cap must be a whole number between 2 and ${MAX_PARTICIPANT_CAP}.`,
+      },
       { status: 400 }
     );
   }
-  if (!ALL_TEAM_SIZE_VALUES.includes(teamSize)) {
-    return NextResponse.json(
-      { error: "Game mode isn't a recognized option for this game." },
-      { status: 400 }
-    );
-  }
-  if (!Number.isInteger(participantCap) || participantCap < 2 || participantCap > MAX_PARTICIPANT_CAP) {
-    return NextResponse.json(
-      { error: `Participant cap must be a whole number between 2 and ${MAX_PARTICIPANT_CAP}.` },
-      { status: 400 }
-    );
+  let lobbyRounds: number | null = null;
+  if (competition.fields.competitionStyle === "LOBBY") {
+    const rounds = parseLobbyRounds(body.lobbyRounds);
+    if (!rounds.ok) return NextResponse.json({ error: rounds.error }, { status: 400 });
+    lobbyRounds = rounds.value;
   }
   if (!Number.isInteger(entryFee) || entryFee < 0) {
     return NextResponse.json(
@@ -179,8 +186,8 @@ export async function POST(request: Request) {
     data: {
       organizerId: organizerProfile.userId,
       name,
-      game,
-      teamSize,
+      ...competition.fields,
+      lobbyRounds,
       rulesText,
       participantCap,
       entryFee,

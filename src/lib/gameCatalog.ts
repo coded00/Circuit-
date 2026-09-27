@@ -13,6 +13,7 @@
 
 import type { CompetitionStyle, EntryType } from "@prisma/client";
 import { COMPETITION_STRUCTURES, getStructure } from "@/lib/competitionStructures";
+import { parseKillPoints, parsePlacementPoints, STANDARD_KILL_POINTS } from "@/lib/lobbyScoring";
 
 export const MAX_PLAYERS_PER_TEAM = 50;
 export const MAX_LOBBY_PLAYERS = 1000;
@@ -31,6 +32,9 @@ export type CatalogFormat = {
   maxPlayersPerMatch: number | null;
   structures: string[];
   defaultRules: string | null;
+  /** LOBBY formats: see src/lib/lobbyScoring.ts. [] = the standard table. */
+  placementPoints: number[];
+  killPoints: number;
   isDefault: boolean;
   enabled: boolean;
   sortOrder: number;
@@ -172,6 +176,17 @@ export function parseFormatInput(body: Record<string, unknown>, style: Competiti
     }
   }
 
+  let placementPoints: number[] = [];
+  let killPoints = STANDARD_KILL_POINTS;
+  if (style === "LOBBY") {
+    const placement = parsePlacementPoints(body.placementPoints);
+    if (!placement.ok) return placement;
+    const kill = parseKillPoints(body.killPoints);
+    if (!kill.ok) return kill;
+    placementPoints = placement.value;
+    killPoints = kill.value;
+  }
+
   const requested = Array.isArray(body.structures) ? body.structures.filter((s): s is string => typeof s === "string") : [];
   const structures = COMPETITION_STRUCTURES.filter((s) => s.style === style && requested.includes(s.id)).map((s) => s.id);
   if (structures.length === 0) return { ok: false, error: "Allow at least one competition structure." };
@@ -189,6 +204,8 @@ export function parseFormatInput(body: Record<string, unknown>, style: Competiti
       maxPlayersPerMatch,
       structures,
       defaultRules: str(body.defaultRules, MAX_TEXT),
+      placementPoints,
+      killPoints,
     },
   };
 }

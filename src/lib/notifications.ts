@@ -53,7 +53,13 @@ export type NotificationType =
   | "COMMUNITY_REPORT"
   | "COMMUNITY_SUSPENDED"
   | "APPEAL_FILED"
-  | "APPEAL_DECIDED";
+  | "APPEAL_DECIDED"
+  | "TEAM_ROSTER_ADDED"
+  | "LOBBY_STARTED"
+  | "LOBBY_ROUND_POSTED"
+  | "LOBBY_FLAG_RAISED"
+  | "LOBBY_FLAG_ANSWERED"
+  | "LOBBY_FLAG_ESCALATED";
 
 export interface NotificationChannel {
   send(userId: string, type: NotificationType, payload: Record<string, unknown>): Promise<void>;

@@ -32,6 +32,7 @@ import { trackEvent } from "@/lib/analytics";
 import { captureException } from "@/lib/observability";
 import { logAdminAction } from "@/lib/auditLog";
 import { sweepQuickMatchChallenges } from "@/lib/quickMatch";
+import { startLobby } from "@/lib/lobby";
 
 export class MatchError extends Error {
   code:
@@ -160,6 +161,10 @@ async function createMatchWithUniqueCode(
  * registrations route) and the deadline-sweep path without double-generating.
  */
 export async function generateBracket(tournamentId: string): Promise<void> {
+  // Lobby tournaments have rounds instead of a bracket (src/lib/lobby.ts).
+  const style = await prisma.tournament.findUnique({ where: { id: tournamentId }, select: { competitionStyle: true } });
+  if (style?.competitionStyle === "LOBBY") return startLobby(tournamentId);
+
   const existing = await prisma.bracket.findUnique({ where: { tournamentId } });
   if (existing) return;
 

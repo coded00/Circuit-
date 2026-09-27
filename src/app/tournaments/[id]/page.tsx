@@ -21,6 +21,9 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { Check, ChevronRight, MessageCircle, ShieldCheck, Timer, Trophy, Tv, Users } from "lucide-react";
 import { prisma } from "@/lib/db";
+import { teamEntryLabels } from "@/lib/teamEntries";
+import { tournamentWinnerId } from "@/lib/lobby";
+import { describePoints, effectiveTable } from "@/lib/lobbyScoring";
 import { getCurrentUser } from "@/lib/session";
 import { StatusPill, tournamentStatusInfo } from "@/components/StatusPill";
 import { GameArtTile } from "@/components/GameArtTile";
@@ -31,6 +34,7 @@ import { CapacityBar } from "@/components/CapacityBar";
 import { CountdownTimer } from "@/components/CountdownTimer";
 import { isStartingSoon } from "@/lib/tournamentTiming";
 import Poller from "@/app/Poller";
+import { getStructure } from "@/lib/competitionStructures";
 import { Panel, PanelBody, PanelEmpty, PanelRows, panelRowClass } from "@/components/ui/Panel";
 import { StatStrip } from "@/components/ui/StatStrip";
 import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
@@ -107,7 +111,11 @@ export default async function TournamentPage({ params }: { params: Promise<{ id:
     notFound();
   }
 
-  const [registrantCount, user, participants] = await Promise.all([
+  const isTeam = tournament.entryType === "TEAM";
+  const isLobby = tournament.competitionStyle === "LOBBY";
+  const bracketWord = isLobby ? "Standings" : "Bracket";
+  const entrantWord = isTeam ? "teams" : "players";
+  const [registrantCount, user, participants, teamLabels] = await Promise.all([
     prisma.registration.count({ where: { tournamentId: tournament.id, status: "CONFIRMED" } }),
     getCurrentUser(),
     prisma.registration.findMany({
@@ -116,6 +124,7 @@ export default async function TournamentPage({ params }: { params: Promise<{ id:
       take: 50,
       include: { user: { select: { displayName: true, handle: true, avatarUrl: true } } },
     }),
+    isTeam ? teamEntryLabels(tournament.id) : Promise.resolve(new Map() as Awaited<ReturnType<typeof teamEntryLabels>>),
   ]);
 
   const myRegistration = user
@@ -140,7 +149,24 @@ export default async function TournamentPage({ params }: { params: Promise<{ id:
     now < tournament.registrationCloseAt &&
     registrantCount < tournament.participantCap;
   const status = tournamentStatusInfo(tournament.status);
-  const formatText = formatLabel(tournament.format);
+  const structure = getStructure(tournament.format);
+  const formatText = structure?.label ?? formatLabel(tournament.format);
+  const competitionRows = [
+    { label: "Game mode", value: tournament.modeName ?? tournament.teamSize },
+    ...(tournament.formatName ? [{ label: "Format", value: tournament.formatName }] : []),
+    {
+      label: "Entry",
+      value: tournament.entryType === "TEAM" ? `Teams of ${tournament.playersPerTeam}` : "Individual — 1 player",
+    },
+    ...(tournament.competitionStyle === "HEAD_TO_HEAD" ? [{ label: "Matches", value: `${tournament.playersPerTeam}v${tournament.playersPerTeam}` }] : []),
+    ...(isLobby
+      ? [
+          { label: "Rounds", value: `${tournament.lobbyRounds ?? 1} in one lobby` },
+          { label: "Scoring", value: describePoints(effectiveTable(tournament)) },
+        ]
+      : []),
+    { label: "How it's run", value: structure ? `${structure.label} — ${structure.description}` : formatText },
+  ];
   const hasBracket = tournament.status === "LIVE" || tournament.status === "COMPLETE";
   // A real countdown only makes sense before the bracket actually starts.
   const startingSoon = !hasBracket && tournament.status !== "CANCELLED" && isStartingSoon(tournament.startAt, now);
@@ -148,17 +174,14 @@ export default async function TournamentPage({ params }: { params: Promise<{ id:
 
   let canClaimPrize = false;
   if (user && tournament.status === "COMPLETE" && tournament.prizeAmount && tournament.prizeAmount > 0) {
-    const [finalMatch, existingPayout] = await Promise.all([
-      prisma.match.findFirst({
-        where: { tournamentId: tournament.id, round: { not: null } },
-        orderBy: { round: "desc" },
-      }),
+    const [winnerId, existingPayout] = await Promise.all([
+      tournamentWinnerId(tournament),
       prisma.escrowTransaction.findFirst({ where: { tournamentId: tournament.id, type: "PRIZE_PAYOUT" } }),
     ]);
-    canClaimPrize = finalMatch?.winnerId === user.id && !existingPayout;
+    canClaimPrize = winnerId === user.id && !existingPayout;
   }
 
-  const aboutText = `${tournament.name} is a ${formatText.toLowerCase()} ${tournament.game} tournament for up to ${tournament.participantCap} players (${tournament.teamSize}). ${
+  const aboutText = `${tournament.name} is a ${formatText.toLowerCase()} ${tournament.game} tournament for up to ${tournament.participantCap} ${entrantWord} (${tournament.teamSize}). ${
     tournament.prizeAmount
       ? `Compete for a ${formatNaira(tournament.prizeAmount)} prize pool.`
       : tournament.entryFee === 0
@@ -248,6 +271,19 @@ export default async function TournamentPage({ params }: { params: Promise<{ id:
             </PanelBody>
           </Panel>
 
+          <Panel title="Format">
+            <PanelBody>
+              <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+                {competitionRows.map((row) => (
+                  <div key={row.label} className="flex flex-col gap-0.5">
+                    <dt className="font-mono text-[10px] font-semibold tracking-[0.14em] text-muted uppercase">{row.label}</dt>
+                    <dd className="text-sm">{row.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </PanelBody>
+          </Panel>
+
           <Panel title="Game & host">
             <PanelRows>
               <Link href={gamePath(tournament.game)} className={panelRowClass}>
@@ -281,10 +317,44 @@ export default async function TournamentPage({ params }: { params: Promise<{ id:
       content: (
         <Panel title="Participants" meta={`${registrantCount}/${tournament.participantCap}`}>
           {participants.length === 0 ? (
-            <PanelEmpty>No one has registered yet. Be the first.</PanelEmpty>
+            <PanelEmpty>{isTeam ? "No teams have entered yet. Be the first." : "No one has registered yet. Be the first."}</PanelEmpty>
           ) : (
             <div className="grid grid-cols-1 border-t border-border sm:grid-cols-2">
-              {participants.map((p, i) => (
+              {participants.map((p, i) => {
+                const team = teamLabels.get(p.userId);
+                if (team) {
+                  return (
+                    <div key={p.userId} className="flex flex-col gap-2 border-b border-border px-5 py-3 sm:odd:border-r">
+                      <div className="flex items-center gap-3">
+                        <span className="w-6 shrink-0 text-right font-mono text-xs text-muted tabular-nums">{i + 1}</span>
+                        <div className="flex min-w-0 flex-col">
+                          <span className="truncate text-sm font-semibold">
+                            {team.teamName}
+                            {team.tag && <span className="ml-1 font-mono text-xs text-muted">[{team.tag}]</span>}
+                          </span>
+                          <span className="text-metadata truncate">
+                            Captain{" "}
+                            <Link href={`/players/${p.user.handle}`} className="hover:text-foreground">
+                              @{p.user.handle}
+                            </Link>
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 pl-9">
+                        {team.roster.map((m) => (
+                          <Link
+                            key={m.handle}
+                            href={`/players/${m.handle}`}
+                            className="rounded-full border border-border px-2 py-0.5 text-xs text-muted transition-colors hover:border-border-hover hover:text-foreground"
+                          >
+                            {m.displayName}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+                return (
                 <Link
                   key={p.userId}
                   href={`/players/${p.user.handle}`}
@@ -297,7 +367,8 @@ export default async function TournamentPage({ params }: { params: Promise<{ id:
                     <span className="text-metadata truncate">@{p.user.handle}</span>
                   </div>
                 </Link>
-              ))}
+                );
+              })}
             </div>
           )}
         </Panel>
@@ -305,17 +376,28 @@ export default async function TournamentPage({ params }: { params: Promise<{ id:
     },
     {
       key: "bracket",
-      label: "Bracket",
+      label: bracketWord,
       content: (
-        <Panel title="Bracket">
+        <Panel title={bracketWord}>
           <PanelBody className="flex flex-col items-start gap-3">
             {hasBracket ? (
               <>
-                <p className="text-sm text-muted">The bracket is live. Follow every round as results come in.</p>
+                <p className="text-sm text-muted">
+                  {isLobby
+                    ? tournament.status === "COMPLETE"
+                      ? "Results are final. See the leaderboard and every round."
+                      : "The lobby is live. The leaderboard updates as each round's results are posted."
+                    : "The bracket is live. Follow every round as results come in."}
+                </p>
                 <Link href={`/tournaments/${tournament.id}/bracket`} className="btn-primary">
-                  Open bracket
+                  {isLobby ? "Open standings" : "Open bracket"}
                 </Link>
               </>
+            ) : isLobby ? (
+              <p className="text-sm text-muted">
+                Everyone plays {tournament.lobbyRounds ?? 1} round{tournament.lobbyRounds === 1 ? "" : "s"} in one lobby once registration closes on{" "}
+                {formatDate(tournament.registrationCloseAt)}. Points add up across rounds into one leaderboard.
+              </p>
             ) : (
               <p className="text-sm text-muted">
                 The bracket is generated when registration closes on {formatDate(tournament.registrationCloseAt)} and players are seeded.
@@ -351,7 +433,7 @@ export default async function TournamentPage({ params }: { params: Promise<{ id:
                 <span className="text-eyebrow text-muted">Prize pool</span>
                 <span className="text-stat text-4xl leading-none text-gold">{formatNaira(tournament.prizeAmount)}</span>
                 {tournament.prizeText && <p className="mt-1 text-sm text-muted">{tournament.prizeText}</p>}
-                <p className="mt-1 text-xs text-muted">Paid to the champion&apos;s payout account once the final is confirmed.</p>
+                <p className="mt-1 text-xs text-muted">Paid to the champion&apos;s payout account once {isLobby ? "the results are finalised" : "the final is confirmed"}.</p>
               </>
             ) : tournament.prizeText ? (
               <p className="text-sm text-foreground/85">{tournament.prizeText}</p>
@@ -445,7 +527,7 @@ export default async function TournamentPage({ params }: { params: Promise<{ id:
             {hasBracket && (
               <Link href={`/tournaments/${tournament.id}/bracket`} className="btn-secondary">
                 <Trophy size={14} />
-                Bracket
+                {bracketWord}
               </Link>
             )}
             {tournament.streamUrl && (
@@ -467,7 +549,7 @@ export default async function TournamentPage({ params }: { params: Promise<{ id:
               valueClassName: tournament.entryFee === 0 ? "text-success" : "",
             },
             {
-              label: "Players",
+              label: isTeam ? "Teams" : "Players",
               value: (
                 <>
                   {registrantCount}
@@ -561,7 +643,9 @@ export default async function TournamentPage({ params }: { params: Promise<{ id:
 
           <p className="flex items-start gap-2 px-1 text-xs text-muted">
             <ShieldCheck size={13} className="mt-px shrink-0" />
-            Both players report every result. Disputes go to the organiser, then Circuit staff.
+            {isLobby
+              ? "The organiser posts placements and kills after each round. Flags go to the organiser, then Circuit staff."
+              : "Both players report every result. Disputes go to the organiser, then Circuit staff."}
           </p>
         </aside>
       </div>

@@ -13,7 +13,9 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { playerRankInGame } from "@/lib/standings";
 import { computeTopFragger } from "@/lib/awards";
+import { asTeam, teamEntryLabels } from "@/lib/teamEntries";
 import { BracketView, type BracketStructure } from "@/app/tournaments/[id]/bracket/BracketView";
+import { renderLobbyStandings } from "@/app/tournaments/[id]/bracket/lobbyPage";
 
 export default async function AdminBracketPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -23,6 +25,10 @@ export default async function AdminBracketPage({ params }: { params: Promise<{ i
     include: { organizer: { select: { verified: true, user: { select: { displayName: true, handle: true } } } } },
   });
   if (!tournament) notFound();
+
+  if (tournament.competitionStyle === "LOBBY") {
+    return <div className="flex flex-1 flex-col gap-6">{await renderLobbyStandings(tournament, { backHref: `/admin/competitions/${id}` })}</div>;
+  }
 
   const bracket = await prisma.bracket.findUnique({ where: { tournamentId: id } });
   if (!bracket) {
@@ -47,12 +53,12 @@ export default async function AdminBracketPage({ params }: { params: Promise<{ i
       if (slot.playerBId) userIds.add(slot.playerBId);
     }
   }
-  const users = await prisma.user.findMany({
+  const rawUsers = await prisma.user.findMany({
     where: { id: { in: [...userIds] } },
     select: { id: true, displayName: true, handle: true, avatarUrl: true },
   });
 
-  const matches = await prisma.match.findMany({
+  const rawMatches = await prisma.match.findMany({
     where: { tournamentId: id },
     orderBy: [{ round: "asc" }, { createdAt: "asc" }],
     include: {
@@ -60,6 +66,15 @@ export default async function AdminBracketPage({ params }: { params: Promise<{ i
       playerB: { select: { displayName: true, handle: true, avatarUrl: true } },
     },
   });
+
+  // Team tournaments: show the team, not the captain who holds the slot.
+  const labels = await teamEntryLabels(id);
+  const users = rawUsers.map((u) => asTeam(u, u.id, labels));
+  const matches = rawMatches.map((m) => ({
+    ...m,
+    playerA: asTeam(m.playerA, m.playerAId, labels),
+    playerB: asTeam(m.playerB, m.playerBId, labels),
+  }));
 
   const champion = structure.rounds[structure.totalRounds - 1]?.slots[0]?.winnerId ?? null;
   const championRank = champion ? await playerRankInGame(tournament.game, champion) : null;

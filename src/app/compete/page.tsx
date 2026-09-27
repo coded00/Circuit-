@@ -3,8 +3,8 @@
  * rework spec section 18). Real, schema-backed filters only: search
  * (name text match), game, status (Open/Live/Completed — reusing
  * `tournamentStatusInfo`), entry type (Free/Paid, via `entryFee`), and
- * game mode (via `Tournament.teamSize` — the organizer-picked real mode
- * for that specific competition, see `gameFormats.ts`). Filter options
+ * game mode (via `Tournament.teamSize` — the "Mode · Format" label saved
+ * from the game catalog when the competition was created). Filter options
  * come from real `distinct` queries against actual tournaments, not
  * hardcoded lists, so they never go stale as organizers add games/modes.
  *

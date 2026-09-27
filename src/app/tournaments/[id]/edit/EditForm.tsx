@@ -4,8 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Tournament } from "@prisma/client";
 import { ImageUploadField, POSTER_BOUNDS } from "@/components/ImageUploadField";
-import { gameFormatOptions } from "@/lib/gameFormats";
 import { defaultRulesFor } from "@/lib/gameRules";
+import type { PickerGame } from "@/lib/competitionRules";
+import { getStructure } from "@/lib/competitionStructures";
+import { CompetitionPicker, DEFAULT_ROUNDS, defaultCompetition, selectedParts, type CompetitionValue } from "@/components/CompetitionPicker";
 
 function toLocalInput(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -20,7 +22,8 @@ export default function EditForm({
   tournament,
   moneyFieldsLocked,
   redirectTo,
-  games,
+  catalog,
+  competitionLocked,
   communityEnabled: initialCommunityEnabled,
 }: {
   tournament: Tournament;
@@ -31,7 +34,10 @@ export default function EditForm({
    *  inside the control center rather than dropping them into the
    *  player-facing app. */
   redirectTo?: string;
-  games: { id: string; name: string }[];
+  /** Published games with their modes/formats (loadOrganizerCatalog). */
+  catalog: PickerGame[];
+  /** Someone has registered: the game/mode/format can no longer change. */
+  competitionLocked: boolean;
   /** "Enable/disable from tournament settings" — this edit form is
    *  Circuit Community Phase 1's only settings surface today. Note this
    *  page itself redirects once registration closes (see its own page.tsx),
@@ -42,8 +48,30 @@ export default function EditForm({
   const router = useRouter();
   const [name, setName] = useState(tournament.name);
   const [communityEnabled, setCommunityEnabled] = useState(initialCommunityEnabled);
-  const [game, setGame] = useState(tournament.game);
-  const [teamSize, setTeamSize] = useState(tournament.teamSize);
+  // The tournament's own config, if it still exists in the catalog. Older
+  // tournaments (pre-catalog) show their saved label until changed.
+  const original: CompetitionValue | null =
+    tournament.gameId && tournament.gameModeId && tournament.gameFormatId
+      ? {
+          gameId: tournament.gameId,
+          gameModeId: tournament.gameModeId,
+          gameFormatId: tournament.gameFormatId,
+          structure: tournament.format,
+          lobbyRounds: String(tournament.lobbyRounds ?? DEFAULT_ROUNDS),
+        }
+      : null;
+  const originalInCatalog = !!original && !!selectedParts(catalog, original).format;
+  const [competition, setCompetition] = useState<CompetitionValue | null>(originalInCatalog ? original : null);
+  const { format: selectedFormat } = competition ? selectedParts(catalog, competition) : { format: undefined };
+  const game = (competition && selectedParts(catalog, competition).game?.name) || tournament.game;
+  const competitionChanged =
+    !!competition &&
+    (!original || competition.gameFormatId !== original.gameFormatId || competition.structure !== original.structure || competition.gameId !== original.gameId);
+  // Lobby rounds stay editable after people register, until the lobby starts.
+  const isLobby = (selectedFormat ? selectedParts(catalog, competition!).mode?.style : tournament.competitionStyle) === "LOBBY";
+  const roundsEditable = tournament.status !== "LIVE" && tournament.status !== "COMPLETE";
+  const [lockedRounds, setLockedRounds] = useState(String(tournament.lobbyRounds ?? DEFAULT_ROUNDS));
+  const competitionInvalid = competitionChanged && (!selectedFormat || !!selectedFormat.unavailable || !competition?.structure);
   const [participantCap, setParticipantCap] = useState(String(tournament.participantCap));
   const [entryFeeNaira, setEntryFeeNaira] = useState(String(tournament.entryFee / 100));
   const [prizeAmountNaira, setPrizeAmountNaira] = useState(
@@ -68,8 +96,10 @@ export default function EditForm({
 
     const body: Record<string, unknown> = {
       name,
-      game,
-      teamSize,
+      ...(competitionChanged ? competition : {}),
+      ...(!competitionChanged && isLobby && roundsEditable
+        ? { lobbyRounds: competition && !competitionLocked ? competition.lobbyRounds : lockedRounds }
+        : {}),
       participantCap: Number(participantCap),
       prizeText: prizeText || null,
       rulesText,
@@ -122,59 +152,47 @@ export default function EditForm({
         />
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="game" className="field-label">
-          Game
-        </label>
-        <select
-          id="game"
-          required
-          value={game}
-          onChange={(e) => {
-            const nextGame = e.target.value;
-            setGame(nextGame);
-            // Only re-pick a mode here (a real, organizer-driven game
-            // change) — never on initial mount, which would otherwise
-            // clobber this tournament's own already-saved, possibly
-            // now-nonstandard mode the instant the page loads.
-            const nextModes = gameFormatOptions(nextGame);
-            if (!nextModes.includes(teamSize)) setTeamSize(nextModes[0]);
-          }}
-          className="field-input"
-        >
-          {/* The tournament's current game might not be an active catalog entry (renamed/disabled since) — keep it selectable so saving doesn't silently change it. */}
-          {!games.some((g) => g.name === game) && game && <option value={game}>{game}</option>}
-          {games.map((g) => (
-            <option key={g.id} value={g.name}>
-              {g.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="teamSize" className="field-label">
-          Game mode
-        </label>
-        <select
-          id="teamSize"
-          value={teamSize}
-          onChange={(e) => setTeamSize(e.target.value)}
-          className="field-input"
-        >
-          {/* This tournament might already be running a mode outside the
-              current game's curated list (an older tournament predating
-              this, or the game catalog entry changed since) — keep it
-              selectable rather than silently swapping it out. */}
-          {!gameFormatOptions(game).includes(teamSize) && teamSize && <option value={teamSize}>{teamSize}</option>}
-          {gameFormatOptions(game).map((mode) => (
-            <option key={mode} value={mode}>
-              {mode}
-            </option>
-          ))}
-        </select>
-        <span className="field-hint">The real modes {game || "this game"} actually runs.</span>
-      </div>
+      {competition && !competitionLocked ? (
+        <CompetitionPicker catalog={catalog} value={competition} onChange={setCompetition} />
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          <span className="field-label">Game &amp; format</span>
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-[10px] border border-border bg-surface-elevated px-3.5 py-3">
+            <span className="text-sm">
+              <span className="font-semibold">{tournament.game}</span> · {tournament.teamSize} · {getStructure(tournament.format)?.label ?? tournament.format}
+            </span>
+            {!competitionLocked && catalog.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setCompetition(defaultCompetition(catalog, catalog.find((g) => g.name.toLowerCase() === tournament.game.toLowerCase())?.id))}
+                className="text-sm font-semibold text-accent-blue hover:underline"
+              >
+                Change
+              </button>
+            )}
+          </div>
+          <span className="field-hint">
+            {competitionLocked
+              ? "Locked — players have already registered for this game and format."
+              : "Saved before the game catalog existed. Change it to pick from the current modes and formats."}
+          </span>
+          {tournament.competitionStyle === "LOBBY" && roundsEditable && (
+            <label className="mt-2 flex w-40 flex-col gap-1.5">
+              <span className="field-label">Rounds</span>
+              <input
+                id="lobbyRounds"
+                type="number"
+                min={1}
+                max={20}
+                required
+                value={lockedRounds}
+                onChange={(e) => setLockedRounds(e.target.value)}
+                className="field-input"
+              />
+            </label>
+          )}
+        </div>
+      )}
 
       <div className="flex flex-col gap-1.5">
         <label htmlFor="participantCap" className="field-label">
@@ -184,12 +202,15 @@ export default function EditForm({
           id="participantCap"
           type="number"
           min={2}
-          max={128}
+          max={selectedFormat?.lobbyCapacity ?? 128}
           required
           value={participantCap}
           onChange={(e) => setParticipantCap(e.target.value)}
           className="field-input"
         />
+        {selectedFormat?.lobbyCapacity && (
+          <span className="field-hint">One lobby holds up to {selectedFormat.lobbyCapacity} entries.</span>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -330,7 +351,7 @@ export default function EditForm({
           {!rulesText && (
             <button
               type="button"
-              onClick={() => setRulesText(defaultRulesFor(game))}
+              onClick={() => setRulesText(selectedFormat?.defaultRules || defaultRulesFor(game))}
               className="text-xs font-medium text-accent-blue hover:underline"
             >
               Use suggested rules for {game || "this game"}
@@ -350,7 +371,7 @@ export default function EditForm({
 
       {error && <p className="field-error">{error}</p>}
 
-      <button type="submit" disabled={submitting || posterBlocked} className="btn-primary">
+      <button type="submit" disabled={submitting || posterBlocked || competitionInvalid} className="btn-primary">
         {submitting ? "Saving…" : "Save changes"}
       </button>
     </form>

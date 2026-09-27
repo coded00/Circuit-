@@ -14,6 +14,7 @@ import { gameStandings } from "@/lib/standings";
 import { matchStatusInfo } from "@/components/StatusPill";
 import { buildMatchTimeline } from "@/lib/matchTimeline";
 import Poller from "@/app/Poller";
+import { teamEntryLabels } from "@/lib/teamEntries";
 import { MatchView, type MatchPlayer, type MatchViewData } from "./MatchView";
 
 type ResultPayload = { winnerId: string; score: string };
@@ -60,9 +61,11 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
     return index === -1 ? null : { rank: index + 1, wins: standings[index].wins, losses: standings[index].losses };
   };
 
+  // Team tournaments: the captain holds the slot, the team's name is shown.
+  const labels = match.tournamentId ? await teamEntryLabels(match.tournamentId) : new Map();
   const toPlayer = (p: typeof match.playerA, which: "A" | "B"): MatchPlayer => ({
     id: p.id,
-    displayName: p.displayName,
+    displayName: labels.get(p.id)?.teamName ?? p.displayName,
     handle: p.handle,
     avatarUrl: p.avatarUrl,
     standing: standingFor(p.id),

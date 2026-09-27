@@ -22,6 +22,7 @@
  */
 
 import { prisma } from "@/lib/db";
+import { tournamentWinnerId } from "@/lib/lobby";
 
 export type WalletRow = {
   id: string;
@@ -101,9 +102,20 @@ export async function getWalletActivity(userId: string): Promise<WalletActivity>
     const current = finalRoundByTournament.get(m.tournamentId!) ?? 0;
     if ((m.round ?? 0) > current) finalRoundByTournament.set(m.tournamentId!, m.round ?? 0);
   }
-  const championTournamentIds = myTournamentIds.filter((tid) =>
-    myMatches.some((m) => m.tournamentId === tid && m.round === finalRoundByTournament.get(tid) && m.winnerId === userId)
+  // Lobby tournaments have no matches — their champion is the top of the leaderboard.
+  const lobbyWins = await prisma.tournament.findMany({
+    where: { competitionStyle: "LOBBY", status: "COMPLETE", registrations: { some: { userId, status: "CONFIRMED" } } },
+    select: { id: true, status: true, competitionStyle: true, placementPoints: true, killPoints: true },
+  });
+  const lobbyChampionIds = (await Promise.all(lobbyWins.map(async (t) => ((await tournamentWinnerId(t)) === userId ? t.id : null)))).filter(
+    (id): id is string => id !== null
   );
+  const championTournamentIds = [
+    ...myTournamentIds.filter((tid) =>
+      myMatches.some((m) => m.tournamentId === tid && m.round === finalRoundByTournament.get(tid) && m.winnerId === userId)
+    ),
+    ...lobbyChampionIds,
+  ];
 
   const prizeTxns = championTournamentIds.length
     ? await prisma.escrowTransaction.findMany({

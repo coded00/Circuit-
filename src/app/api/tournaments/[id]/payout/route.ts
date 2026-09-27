@@ -11,6 +11,7 @@
 import { NextResponse } from "next/server";
 import { Prisma, EscrowStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { tournamentWinnerId } from "@/lib/lobby";
 import { getCurrentUser } from "@/lib/session";
 import { getDefaultPaymentProvider } from "@/lib/payments";
 import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
@@ -57,14 +58,12 @@ export async function POST(
     return NextResponse.json({ error: "This tournament has no cash prize to claim." }, { status: 409 });
   }
 
-  const finalMatch = await prisma.match.findFirst({
-    where: { tournamentId: id, round: { not: null } },
-    orderBy: { round: "desc" },
-  });
-  if (!finalMatch?.winnerId) {
+  // The final bracket match's winner, or the top of a lobby leaderboard.
+  const winnerId = await tournamentWinnerId(tournament);
+  if (!winnerId) {
     return NextResponse.json({ error: "No champion has been decided yet." }, { status: 409 });
   }
-  if (finalMatch.winnerId !== user.id) {
+  if (winnerId !== user.id) {
     return NextResponse.json({ error: "Only the tournament champion can claim this prize." }, { status: 403 });
   }
 

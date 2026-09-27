@@ -10,6 +10,7 @@
 import type { CompetitionStyle, EntryType } from "@prisma/client";
 import { structuresForStyle } from "@/lib/competitionStructures";
 import { describeEntry, describeMatch, entriesPerMatch } from "@/lib/gameCatalog";
+import { describePoints, effectiveTable, parseKillPoints, parsePlacementPoints, STANDARD_PLACEMENT_POINTS } from "@/lib/lobbyScoring";
 
 export type FormatDraft = {
   name: string;
@@ -22,6 +23,9 @@ export type FormatDraft = {
   maxPlayersPerMatch: string;
   structures: string[];
   defaultRules: string;
+  /** LOBBY formats: "10, 6, 5, …" (blank = standard) and points per kill. */
+  placementPoints: string;
+  killPoints: string;
 };
 
 /** Pre-ticks the structures that already run; if none do yet for this
@@ -45,6 +49,8 @@ export function emptyFormatDraft(style: CompetitionStyle): FormatDraft {
     maxPlayersPerMatch: style === "LOBBY" ? "100" : "",
     structures: defaultStructures(style),
     defaultRules: "",
+    placementPoints: "",
+    killPoints: "1",
   };
 }
 
@@ -59,6 +65,8 @@ type FormatLike = {
   maxPlayersPerMatch: number | null;
   structures: string[];
   defaultRules: string | null;
+  placementPoints?: number[];
+  killPoints?: number;
 };
 
 export function draftFromFormat(f: FormatLike): FormatDraft {
@@ -74,6 +82,8 @@ export function draftFromFormat(f: FormatLike): FormatDraft {
     maxPlayersPerMatch: s(f.maxPlayersPerMatch),
     structures: f.structures,
     defaultRules: f.defaultRules ?? "",
+    placementPoints: (f.placementPoints ?? []).join(", "),
+    killPoints: String(f.killPoints ?? 1),
   };
 }
 
@@ -92,6 +102,8 @@ export function formatDraftBody(d: FormatDraft) {
     maxPlayersPerMatch: num(d.maxPlayersPerMatch),
     structures: d.structures,
     defaultRules: d.defaultRules,
+    placementPoints: d.placementPoints,
+    killPoints: d.killPoints,
   };
 }
 
@@ -191,6 +203,8 @@ export function FormatFields({
         </div>
       )}
 
+      {style === "LOBBY" && <PointsFields value={value} set={set} idPrefix={idPrefix} />}
+
       <fieldset className="flex flex-col gap-2">
         <legend className="field-label mb-1.5">Organizers can run it as</legend>
         <div className="flex flex-wrap gap-2">
@@ -228,6 +242,57 @@ export function FormatFields({
         <span className="font-semibold">{p.entry}</span>
         <span className="text-muted">{p.match}</span>
       </div>
+    </div>
+  );
+}
+
+function PointsFields({
+  value,
+  set,
+  idPrefix,
+}: {
+  value: FormatDraft;
+  set: <K extends keyof FormatDraft>(key: K, v: FormatDraft[K]) => void;
+  idPrefix: string;
+}) {
+  const placement = parsePlacementPoints(value.placementPoints);
+  const kill = parseKillPoints(value.killPoints);
+  const summary = placement.ok && kill.ok ? describePoints(effectiveTable({ placementPoints: placement.value, killPoints: kill.value })) : null;
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="grid grid-cols-[1fr_7rem] gap-3">
+        <label className="flex flex-col gap-1.5" htmlFor={`${idPrefix}-placement-points`}>
+          <span className="field-label">Placement points</span>
+          <input
+            id={`${idPrefix}-placement-points`}
+            value={value.placementPoints}
+            onChange={(e) => set("placementPoints", e.target.value)}
+            placeholder={STANDARD_PLACEMENT_POINTS.join(", ")}
+            className="field-input font-mono text-sm"
+          />
+        </label>
+        <label className="flex flex-col gap-1.5" htmlFor={`${idPrefix}-kill-points`}>
+          <span className="field-label">Per kill</span>
+          <input
+            id={`${idPrefix}-kill-points`}
+            type="number"
+            min={0}
+            max={100}
+            value={value.killPoints}
+            onChange={(e) => set("killPoints", e.target.value)}
+            className="field-input"
+          />
+        </label>
+      </div>
+      <p className={`field-hint ${summary ? "" : "text-danger"}`}>
+        {summary
+          ? `Points for 1st, 2nd, 3rd… — places past the list score 0. Blank uses the standard table. Scores: ${summary}.`
+          : !placement.ok
+            ? placement.error
+            : !kill.ok
+              ? kill.error
+              : ""}
+      </p>
     </div>
   );
 }

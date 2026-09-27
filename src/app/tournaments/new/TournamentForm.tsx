@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ImageUploadField, POSTER_BOUNDS } from "@/components/ImageUploadField";
-import { gameFormatOptions } from "@/lib/gameFormats";
 import { defaultRulesFor } from "@/lib/gameRules";
+import type { PickerGame } from "@/lib/competitionRules";
+import { CompetitionPicker, defaultCompetition, selectedParts } from "@/components/CompetitionPicker";
 
 function nairaToKobo(value: string): number {
   const naira = Number(value || 0);
@@ -13,7 +14,7 @@ function nairaToKobo(value: string): number {
 
 export default function TournamentForm({
   redirectBase,
-  games,
+  catalog,
   hostCommunities = [],
   defaultHostCommunityId = "",
 }: {
@@ -21,20 +22,22 @@ export default function TournamentForm({
   // (e.g. the admin page) can't pass functions as props to this Client
   // Component.
   redirectBase?: string;
-  games: { id: string; name: string }[];
+  /** Published games with their modes/formats (loadOrganizerCatalog). */
+  catalog: PickerGame[];
   /** Communities they run — the tournament can be one of their events. */
   hostCommunities?: { id: string; name: string | null }[];
   defaultHostCommunityId?: string;
-} = { games: [] }) {
+} = { catalog: [] }) {
   const [hostCommunityId, setHostCommunityId] = useState(
     hostCommunities.some((c) => c.id === defaultHostCommunityId) ? defaultHostCommunityId : ""
   );
   const router = useRouter();
 
   const [name, setName] = useState("");
-  const [game, setGame] = useState(games[0]?.name ?? "");
-  const modeOptions = gameFormatOptions(game);
-  const [teamSize, setTeamSize] = useState(modeOptions[0]);
+  const [competition, setCompetition] = useState(() => defaultCompetition(catalog));
+  const { game: selectedGame, format: selectedFormat } = selectedParts(catalog, competition);
+  const game = selectedGame?.name ?? "";
+  const canCreate = !!selectedFormat && !selectedFormat.unavailable && !!competition.structure;
   const [participantCap, setParticipantCap] = useState("16");
   const [entryFeeNaira, setEntryFeeNaira] = useState("0");
   const [prizeAmountNaira, setPrizeAmountNaira] = useState("");
@@ -50,6 +53,13 @@ export default function TournamentForm({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // A lobby format caps the tournament at one lobby's worth of entries.
+  function pickCompetition(next: typeof competition) {
+    setCompetition(next);
+    const capacity = selectedParts(catalog, next).format?.lobbyCapacity;
+    if (capacity && Number(participantCap) > capacity) setParticipantCap(String(capacity));
+  }
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     if (posterBlocked) return;
@@ -61,8 +71,7 @@ export default function TournamentForm({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name,
-        game,
-        teamSize,
+        ...competition,
         participantCap: Number(participantCap),
         entryFee: nairaToKobo(entryFeeNaira),
         prizeAmount: prizeAmountNaira ? nairaToKobo(prizeAmountNaira) : null,
@@ -110,63 +119,7 @@ export default function TournamentForm({
         />
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="game" className="field-label">
-          Game
-        </label>
-        <select
-          id="game"
-          required
-          value={game}
-          onChange={(e) => {
-            const nextGame = e.target.value;
-            setGame(nextGame);
-            // Re-pick a valid mode for the newly-selected game's real
-            // options (e.g. Valorant's 5v5-only modes vs. Fortnite's
-            // BR/Zero Build sizes) — never leaves teamSize holding a
-            // value that isn't actually one of the new game's options.
-            const nextModes = gameFormatOptions(nextGame);
-            if (!nextModes.includes(teamSize)) setTeamSize(nextModes[0]);
-          }}
-          className="field-input"
-        >
-          {games.length === 0 && <option value="">No games available — ask an admin to add one</option>}
-          {games.map((g) => (
-            <option key={g.id} value={g.name}>
-              {g.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="flex flex-col gap-1 rounded-[10px] border border-border bg-surface-elevated px-3.5 py-2.5">
-        <span className="text-sm font-medium">Format</span>
-        <span className="field-hint">
-          Single-elimination knockout — the only format Circuit supports in V1.
-        </span>
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="teamSize" className="field-label">
-          Game mode
-        </label>
-        <select
-          id="teamSize"
-          value={teamSize}
-          onChange={(e) => setTeamSize(e.target.value)}
-          className="field-input"
-        >
-          {modeOptions.map((mode) => (
-            <option key={mode} value={mode}>
-              {mode}
-            </option>
-          ))}
-        </select>
-        <span className="field-hint">
-          The real modes {game || "this game"} actually runs. Participants still register
-          individually; coordinate teams outside Circuit.
-        </span>
-      </div>
+      <CompetitionPicker catalog={catalog} value={competition} onChange={pickCompetition} />
 
       <div className="flex flex-col gap-1.5">
         <label htmlFor="participantCap" className="field-label">
@@ -176,12 +129,15 @@ export default function TournamentForm({
           id="participantCap"
           type="number"
           min={2}
-          max={128}
+          max={selectedFormat?.lobbyCapacity ?? 128}
           required
           value={participantCap}
           onChange={(e) => setParticipantCap(e.target.value)}
           className="field-input"
         />
+        {selectedFormat?.lobbyCapacity && (
+          <span className="field-hint">One lobby holds up to {selectedFormat.lobbyCapacity} entries.</span>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -282,7 +238,7 @@ export default function TournamentForm({
           {!rulesText && (
             <button
               type="button"
-              onClick={() => setRulesText(defaultRulesFor(game))}
+              onClick={() => setRulesText(selectedFormat?.defaultRules || defaultRulesFor(game))}
               className="text-xs font-medium text-accent-blue hover:underline"
             >
               Use suggested rules for {game || "this game"}
@@ -359,7 +315,7 @@ export default function TournamentForm({
 
       {error && <p className="field-error">{error}</p>}
 
-      <button type="submit" disabled={submitting || posterBlocked} className="btn-primary">
+      <button type="submit" disabled={submitting || posterBlocked || !canCreate} className="btn-primary">
         {submitting ? "Creating…" : "Create tournament"}
       </button>
     </form>
