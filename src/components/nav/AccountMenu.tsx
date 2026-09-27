@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { ChevronDown, ShoppingBag, Gift, Trophy, Swords, Shield, Wallet, Compass } from "lucide-react";
 
 type NavUser = { handle: string; displayName: string; avatarUrl: string | null; isStaff: boolean };
@@ -74,22 +75,22 @@ export function AccountMenu({
         onClick={() => setOpen((v) => !v)}
         aria-label={`Account menu for ${user.displayName}`}
         aria-expanded={open}
-        className="flex items-center gap-2.5 rounded-[12px] p-1 transition hover:bg-surface-elevated lg:pr-2.5"
+        className="flex h-9 items-center gap-2.5 rounded-[9px] pr-1 pl-0.5 text-white transition hover:bg-white/[0.07] lg:pr-2"
       >
         {user.avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs
-          <img src={user.avatarUrl} alt="" referrerPolicy="no-referrer" className="h-9 w-9 rounded-[10px] object-cover" />
+          <img src={user.avatarUrl} alt="" referrerPolicy="no-referrer" className="h-8 w-8 rounded-[8px] object-cover" />
         ) : (
-          <div className="font-display flex h-9 w-9 items-center justify-center rounded-[10px] bg-[#111318] text-sm font-bold text-accent-volt dark:bg-accent-volt-soft">
+          <div className="font-display flex h-8 w-8 items-center justify-center rounded-[8px] bg-accent-volt text-sm font-bold text-accent-volt-foreground">
             {user.displayName.slice(0, 1).toUpperCase()}
           </div>
         )}
         {/* Real identity only — the old decorative "Level 24" wasn't data. */}
         <span className="hidden flex-col items-start lg:flex">
           <span className="max-w-28 truncate text-sm leading-tight font-semibold">{user.displayName}</span>
-          <span className="max-w-28 truncate font-mono text-[11px] leading-tight text-muted-strong">@{user.handle}</span>
+          <span className="max-w-28 truncate font-mono text-[11px] leading-tight text-white/45">@{user.handle}</span>
         </span>
-        <ChevronDown size={14} className="hidden text-muted lg:block" />
+        <ChevronDown size={14} className="hidden text-white/40 lg:block" />
       </button>
 
       {open && (
@@ -152,6 +153,7 @@ export function AccountMenu({
           )}
 
           <div className="my-1 border-t border-border" />
+          <ThemeToggle variant="menu" />
           <button
             type="button"
             onClick={handleLogout}

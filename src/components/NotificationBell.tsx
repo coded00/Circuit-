@@ -130,7 +130,14 @@ function NotificationInbox({
   );
 }
 
-export function NotificationBell({ initialUnreadCount = 0 }: { initialUnreadCount?: number }) {
+export function NotificationBell({
+  initialUnreadCount = 0,
+  buttonClassName = "btn-icon",
+}: {
+  initialUnreadCount?: number;
+  /** Trigger styling — the header's HUD strip passes its own compact segment style. */
+  buttonClassName?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
   const [unreadCount, setUnreadCount] = useState(initialUnreadCount);
@@ -222,7 +229,7 @@ export function NotificationBell({ initialUnreadCount = 0 }: { initialUnreadCoun
         onClick={() => setOpen((v) => !v)}
         aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
         aria-expanded={open}
-        className={`btn-icon relative ${open ? "bg-surface-elevated text-foreground" : ""}`}
+        className={`${buttonClassName} relative ${open ? "bg-surface-elevated text-foreground" : ""}`}
       >
         <Bell size={18} />
         {unreadCount > 0 && (

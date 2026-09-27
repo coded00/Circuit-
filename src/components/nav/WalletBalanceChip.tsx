@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Wallet } from "lucide-react";
+import { Plus, Wallet } from "lucide-react";
 
 /**
  * Circuit — header wallet balance chip. Shows the real, spendable
@@ -15,12 +15,13 @@ export function WalletBalanceChip({ balance }: { balance: number }) {
     <Link
       href="/wallet"
       aria-label={`Wallet: ₦${naira}`}
-      className="group flex h-9 shrink-0 items-center gap-2 rounded-[10px] border border-border bg-surface py-1 pr-2.5 pl-1 text-foreground transition hover:border-border-hover"
+      className="group flex h-9 shrink-0 items-center gap-2 rounded-[9px] pr-2 pl-1.5 text-white transition hover:bg-white/[0.07]"
     >
-      <span className="flex h-7 w-7 items-center justify-center rounded-[7px] bg-[#111318] text-accent-volt dark:bg-accent-volt-soft">
-        <Wallet size={14} />
-      </span>
+      <Wallet size={16} className="text-accent-volt" />
       <span className="font-display text-[15px] leading-none font-bold tabular-nums">₦{naira}</span>
+      <span aria-hidden className="flex h-5 w-5 items-center justify-center rounded-[5px] bg-accent-volt text-accent-volt-foreground transition group-hover:brightness-95">
+        <Plus size={12} strokeWidth={3} />
+      </span>
     </Link>
   );
 }

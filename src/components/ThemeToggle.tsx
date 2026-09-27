@@ -30,11 +30,23 @@ function toggleTheme() {
   }
 }
 
-export function ThemeToggle({ variant = "icon", onToggle }: { variant?: "icon" | "row"; onToggle?: () => void }) {
+export function ThemeToggle({ variant = "icon", onToggle }: { variant?: "icon" | "row" | "menu"; onToggle?: () => void }) {
   const handleClick = () => {
     toggleTheme();
     onToggle?.();
   };
+
+  // A dropdown-menu item (the header's account menu), matching its rows.
+  if (variant === "menu") {
+    return (
+      <button type="button" onClick={handleClick} className="flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm hover:bg-surface-elevated">
+        <Moon size={15} className="shrink-0 text-muted dark:hidden" />
+        <Sun size={15} className="hidden shrink-0 text-muted dark:block" />
+        <span className="flex-1 dark:hidden">Dark mode</span>
+        <span className="hidden flex-1 dark:inline">Light mode</span>
+      </button>
+    );
+  }
 
   if (variant === "row") {
     return (
