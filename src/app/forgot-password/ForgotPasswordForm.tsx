@@ -52,16 +52,19 @@ export default function ForgotPasswordForm() {
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <AuthField
         id="emailOrPhone"
-        label="Email"
+        label="Email or phone"
         icon={AtSign}
         type="text"
         inputMode="email"
         required
         autoComplete="username"
-        placeholder="you@example.com"
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
+        placeholder="you@example.com or 080…"
         value={emailOrPhone}
         onChange={(e) => setEmailOrPhone(e.target.value)}
-        hint="Recovery by phone isn't available yet — use the email on your account if you have one."
+        hint="We'll send a reset link to the email on your account."
       />
       {error && <p className="field-error" role="alert">{error}</p>}
       <button type="submit" disabled={submitting} className="btn-primary h-12 w-full text-[15px]">

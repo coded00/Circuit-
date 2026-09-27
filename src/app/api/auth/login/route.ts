@@ -8,9 +8,9 @@
  */
 
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { createSessionToken, sessionCookie, verifyPasswordTimingSafe } from "@/lib/auth";
 import { isRateLimited, recordAttempt, clearAttempts } from "@/lib/rateLimit";
+import { findUserByIdentifier } from "@/lib/accountLookup";
 
 const MAX_ATTEMPTS = 5;
 const WINDOW_MS = 15 * 60 * 1000;
@@ -40,7 +40,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const user = await prisma.user.findUnique({ where: { emailOrPhone } });
+  // Email (any capitalisation) or phone (any common format).
+  const user = await findUserByIdentifier(emailOrPhone);
   // Always runs bcrypt.compare, even for an unknown identifier — see
   // verifyPasswordTimingSafe's own comment on why that's load-bearing.
   const valid = await verifyPasswordTimingSafe(password, user?.passwordHash);

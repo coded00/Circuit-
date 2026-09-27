@@ -5,67 +5,75 @@ import { FriendButton } from "@/components/FriendButton";
 import type { DiscoveryPlayer } from "@/lib/discovery";
 
 /**
- * Circuit — Discover Players card (Phase 1). Same `.card-media card-hover`
- * shape /compete's tournament cards use, adapted for a person instead of
- * an event: a short game-art strip for "what they play" (only rendered
- * when a real primaryGame exists — never a fabricated placeholder game),
- * an overlapping avatar, and only the real stats/signals that actually
- * apply to this player (win/loss and mutual-friend lines are omitted, not
- * shown as 0, when genuinely absent).
+ * Circuit — Discover player card, laid out like a roster card: the game
+ * they play as a banner, a rounded-square avatar breaking out of it, then
+ * only the real signals that apply (record, win rate, mutual friends) —
+ * nothing shown as 0 or invented. A player with no matches yet is marked
+ * as new rather than given an empty stat line.
  */
 export function PlayerDiscoveryCard({ player }: { player: DiscoveryPlayer }) {
-  const hasRecord = player.wins + player.losses > 0;
+  const played = player.wins + player.losses;
+  const winRate = played > 0 ? Math.round((player.wins / played) * 100) : null;
 
   return (
-    <div className="card-media card-hover flex h-full flex-col">
-      {player.primaryGame ? (
-        <div className="relative h-16 w-full overflow-hidden">
-          <GameArtTile game={player.primaryGame} className="h-full w-full" />
-        </div>
-      ) : (
-        <div className="h-16 w-full bg-surface-elevated" />
-      )}
+    <div className="group flex h-full flex-col overflow-hidden rounded-[16px] border border-border bg-surface transition duration-[var(--duration-base)] hover:-translate-y-0.5 hover:border-border-hover">
+      <Link href={`/players/${player.handle}`} className="relative block h-24 w-full overflow-hidden" tabIndex={-1} aria-hidden>
+        {player.primaryGame ? (
+          <GameArtTile game={player.primaryGame} className="h-full w-full transition-transform duration-[var(--duration-moderate)] group-hover:scale-[1.04]" hideLabel />
+        ) : (
+          <div className="h-full w-full bg-[#15181d] bg-[radial-gradient(90%_120%_at_15%_0%,color-mix(in_srgb,var(--accent-volt)_28%,transparent),transparent_65%)]" />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
+        {player.primaryGame && (
+          <span className="absolute right-2.5 bottom-2 max-w-[60%] truncate rounded-[6px] bg-black/55 px-1.5 py-0.5 font-mono text-[10px] font-semibold tracking-[0.08em] text-white uppercase backdrop-blur-sm">
+            {player.primaryGame}
+          </span>
+        )}
+      </Link>
 
-      <div className="flex flex-1 flex-col gap-2 p-3 pt-0">
-        <Link href={`/players/${player.handle}`} className="-mt-6 flex flex-col items-start gap-2">
+      <div className="flex flex-1 flex-col gap-3 px-4 pb-4">
+        <Link href={`/players/${player.handle}`} className="relative z-10 -mt-8 flex flex-col items-start gap-2">
           {player.avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs
-            <img
-              src={player.avatarUrl}
-              alt=""
-              className="h-12 w-12 shrink-0 rounded-full border-2 border-surface object-cover"
-            />
+            <img src={player.avatarUrl} alt="" referrerPolicy="no-referrer" className="h-16 w-16 shrink-0 rounded-[14px] border-[3px] border-surface object-cover" />
           ) : (
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-surface bg-surface-elevated text-lg font-semibold text-muted">
+            <span className="font-display flex h-16 w-16 shrink-0 items-center justify-center rounded-[14px] border-[3px] border-surface bg-[#111318] text-2xl font-bold text-accent-volt dark:bg-surface-elevated">
               {player.displayName.slice(0, 1).toUpperCase()}
-            </div>
+            </span>
           )}
-          <span className="flex min-w-0 flex-col">
-            <span className="truncate text-sm font-semibold hover:underline">{player.displayName}</span>
-            <span className="truncate text-xs text-muted">@{player.handle}</span>
+          <span className="flex w-full min-w-0 flex-col">
+            <span className="truncate font-display text-base leading-tight font-bold tracking-tight group-hover:underline">{player.displayName}</span>
+            <span className="truncate font-mono text-xs text-muted">@{player.handle}</span>
           </span>
         </Link>
 
-        {player.bio && <p className="line-clamp-1 text-xs text-muted">{player.bio}</p>}
+        {player.bio ? <p className="line-clamp-2 text-[13px] leading-snug text-muted">{player.bio}</p> : null}
 
-        <div className="mt-auto flex flex-col gap-1.5">
-          {(hasRecord || player.mutualFriends > 0) && (
-            <div className="flex items-center gap-3 text-metadata">
-              {hasRecord && (
-                <span>
+        <dl className="mt-auto flex items-center gap-4 border-t border-border pt-3">
+          {winRate !== null ? (
+            <>
+              <div className="flex flex-col">
+                <dt className="font-mono text-[10px] tracking-[0.12em] text-muted-strong uppercase">Record</dt>
+                <dd className="font-display text-sm font-bold tabular-nums">
                   {player.wins}–{player.losses}
-                </span>
-              )}
-              {player.mutualFriends > 0 && (
-                <span className="flex items-center gap-1">
-                  <Users size={11} />
-                  {player.mutualFriends} mutual
-                </span>
-              )}
-            </div>
+                </dd>
+              </div>
+              <div className="flex flex-col">
+                <dt className="font-mono text-[10px] tracking-[0.12em] text-muted-strong uppercase">Win rate</dt>
+                <dd className="font-display text-sm font-bold tabular-nums">{winRate}%</dd>
+              </div>
+            </>
+          ) : (
+            <span className="rounded-[6px] bg-accent-volt-soft px-2 py-0.5 font-mono text-[10px] font-bold tracking-[0.12em] text-foreground uppercase">New player</span>
           )}
-          <FriendButton targetHandle={player.handle} status={player.friendStatus} />
-        </div>
+          {player.mutualFriends > 0 && (
+            <span className="ml-auto flex items-center gap-1 text-xs text-muted">
+              <Users size={12} />
+              {player.mutualFriends} mutual
+            </span>
+          )}
+        </dl>
+        <FriendButton targetHandle={player.handle} status={player.friendStatus} />
       </div>
     </div>
   );

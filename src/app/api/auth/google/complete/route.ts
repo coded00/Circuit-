@@ -10,6 +10,8 @@ import { NextResponse } from "next/server";
 import { createSessionToken, sessionCookie } from "@/lib/auth";
 import { HANDLE_RULES_MESSAGE, validateHandle } from "@/lib/handles";
 import { createGoogleUser, NewAccountError } from "@/lib/oauth/accounts";
+import { normalizeNigerianPhone } from "@/lib/phone";
+import { parseSignupDateOfBirth } from "@/lib/age";
 import { clearedCookie, PENDING_COOKIE, readPendingCookie } from "@/lib/oauth/flowCookies";
 
 const MAX_DISPLAY_NAME = 40;
@@ -25,6 +27,11 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const handle = validateHandle(typeof body?.handle === "string" ? body.handle : "");
   if (!handle) return NextResponse.json({ error: HANDLE_RULES_MESSAGE }, { status: 400 });
+
+  const phone = normalizeNigerianPhone(typeof body?.phone === "string" ? body.phone : "");
+  if (!phone) return NextResponse.json({ error: "Enter a Nigerian mobile number, e.g. 0803 123 4567.", field: "phone" }, { status: 400 });
+  const dob = parseSignupDateOfBirth(body?.dateOfBirth);
+  if (!dob.ok) return NextResponse.json({ error: dob.error, field: "dateOfBirth" }, { status: 400 });
 
   const displayName = (typeof body?.displayName === "string" ? body.displayName.trim() : "") || handle;
   if (displayName.length > MAX_DISPLAY_NAME) {
@@ -42,13 +49,18 @@ export async function POST(request: Request) {
     user = await createGoogleUser(pending.profile, {
       handle,
       displayName,
+      phone,
+      dateOfBirth: dob.date,
       region: region || null,
       favoriteGames: games,
       useGooglePhoto: body?.useGooglePhoto !== false,
     });
   } catch (err) {
     if (err instanceof NewAccountError) {
-      if (err.code === "handle_taken") return NextResponse.json({ error: "That username is already taken." }, { status: 409 });
+      if (err.code === "handle_taken") return NextResponse.json({ error: "That username is already taken.", field: "handle" }, { status: 409 });
+      if (err.code === "phone_taken") {
+        return NextResponse.json({ error: "That phone number is already on an account. If it's yours, log in with it instead.", field: "phone" }, { status: 409 });
+      }
       // Someone registered this email (or this Google account) meanwhile —
       // start over so the normal existing-account path takes it.
       return NextResponse.json({ error: "An account for this Google login already exists. Please continue with Google again." }, { status: 409 });

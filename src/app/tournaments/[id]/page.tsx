@@ -412,12 +412,9 @@ export default async function TournamentPage({ params }: { params: Promise<{ id:
             <GameArtTile game={tournament.game} posterUrl={tournament.posterUrl} fill hideLabel imgWidth={1400} />
           </ViewTransition>
           <div className="absolute top-4 left-4 z-10 flex flex-wrap items-center gap-2">
-            {/* Dark backing so the soft-tinted pill stays legible on any poster. */}
-            <span className="rounded-full bg-black/70 backdrop-blur-sm">
-              <StatusPill tone={status.tone} pulse={status.pulse}>
-                {status.label}
-              </StatusPill>
-            </span>
+            <StatusPill tone={status.tone} pulse={status.pulse} solid size="md">
+              {status.label}
+            </StatusPill>
             {startingSoon && (
               <span className="badge bg-black/70 text-white backdrop-blur-sm">
                 <Timer size={11} />

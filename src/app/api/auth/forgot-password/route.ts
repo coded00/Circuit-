@@ -6,10 +6,12 @@
  * number — a response that varied by either would let someone enumerate
  * registered accounts.
  *
- * Phone-registered accounts get no actual delivery: SMS is an explicitly
- * undecided channel (docs/circuit-stack.md's Notifications section), not
- * a silently-dropped one — this route just can't reach them yet, same
- * class of gap as the phone-number half of signup itself.
+ * The account is found the same way login finds it (src/lib/accountLookup.ts):
+ * email in any capitalisation — phone keyboards capitalise the first
+ * letter, and the old exact match silently found nobody — or phone in any
+ * common format. The link goes to the account's email; an account with no
+ * email on file can't be reached yet (no SMS provider — see
+ * docs/circuit-stack.md's Notifications section).
  *
  * Rate limited per identifier (3 requests per 15 minutes) — same
  * Postgres-attempts-table design as login (see rateLimit.ts). Every call
@@ -21,16 +23,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { generatePasswordResetToken } from "@/lib/auth";
+import { findUserByIdentifier } from "@/lib/accountLookup";
+import { SITE_URL } from "@/lib/seo";
 import { sendEmail } from "@/lib/email";
 import { isRateLimited, recordAttempt } from "@/lib/rateLimit";
 
 const GENERIC_MESSAGE = "If an account exists for that email, we've sent password reset instructions.";
 const MAX_ATTEMPTS = 3;
 const WINDOW_MS = 15 * 60 * 1000;
-
-function looksLikeEmail(value: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-}
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -53,19 +53,18 @@ export async function POST(request: Request) {
   }
   await recordAttempt(rateLimitKey);
 
-  if (looksLikeEmail(emailOrPhone)) {
-    const user = await prisma.user.findUnique({ where: { emailOrPhone } });
-    if (user) {
-      const { raw, hash, expiresAt } = generatePasswordResetToken();
-      await prisma.passwordResetToken.create({ data: { userId: user.id, tokenHash: hash, expiresAt } });
+  const user = await findUserByIdentifier(emailOrPhone);
+  const deliverTo = user?.email ?? (user?.emailOrPhone.includes("@") ? user.emailOrPhone : null);
+  if (user && deliverTo) {
+    const { raw, hash, expiresAt } = generatePasswordResetToken();
+    await prisma.passwordResetToken.create({ data: { userId: user.id, tokenHash: hash, expiresAt } });
 
-      const resetUrl = `${process.env.NEXT_PUBLIC_APP_URL}/reset-password?token=${raw}`;
-      await sendEmail(
-        emailOrPhone,
-        "Reset your Circuit password",
-        `Someone (hopefully you) asked to reset the password for your Circuit account.\n\nReset it here — this link expires in 1 hour:\n${resetUrl}\n\nIf you didn't request this, you can safely ignore this email.`
-      );
-    }
+    const resetUrl = `${SITE_URL}/reset-password?token=${raw}`;
+    await sendEmail(
+      deliverTo,
+      "Reset your Circuit password",
+      `Someone (hopefully you) asked to reset the password for your Circuit account.\n\nReset it here — this link expires in 1 hour:\n${resetUrl}\n\nIf you didn't request this, you can safely ignore this email.`
+    );
   }
 
   return NextResponse.json({ message: GENERIC_MESSAGE });

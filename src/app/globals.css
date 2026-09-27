@@ -558,8 +558,33 @@ body {
  */
 @layer components {
   .badge {
-    @apply inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium
+    @apply inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold
       whitespace-nowrap;
+  }
+
+  /* Solid status badges for anything laid over artwork (tournament card
+     images, heroes): a soft tint disappears on a busy, bright poster, so
+     these are a full colour fill with white text and a hairline edge. */
+  .badge-solid {
+    @apply border border-white/15 shadow-sm;
+  }
+  .badge-solid.badge-live {
+    @apply bg-live text-white;
+  }
+  .badge-solid.badge-open {
+    @apply bg-status-open text-white;
+  }
+  .badge-solid.badge-neutral {
+    @apply bg-[#2b3038] text-white;
+  }
+  .badge-solid.badge-complete {
+    @apply bg-success-strong text-white;
+  }
+  .badge-solid.badge-cancelled {
+    @apply bg-danger-strong text-white;
+  }
+  .badge-solid.badge-attention {
+    @apply bg-warning text-[#1f1300];
   }
 
   .badge-md {

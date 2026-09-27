@@ -49,6 +49,9 @@ export default function LoginForm() {
         type="text"
         required
         autoComplete="username"
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
         inputMode="email"
         placeholder="you@example.com or 080…"
         value={emailOrPhone}

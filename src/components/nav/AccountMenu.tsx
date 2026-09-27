@@ -74,24 +74,22 @@ export function AccountMenu({
         onClick={() => setOpen((v) => !v)}
         aria-label={`Account menu for ${user.displayName}`}
         aria-expanded={open}
-        className="flex items-center gap-2.5 rounded-full py-1 pr-2 pl-1 transition hover:bg-surface-elevated"
+        className="flex items-center gap-2.5 rounded-[12px] p-1 transition hover:bg-surface-elevated lg:pr-2.5"
       >
         {user.avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs
-          <img src={user.avatarUrl} alt="" className="h-9 w-9 rounded-full border-2 border-accent-blue/40 object-cover" />
+          <img src={user.avatarUrl} alt="" referrerPolicy="no-referrer" className="h-9 w-9 rounded-[10px] object-cover" />
         ) : (
-          <div className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-accent-blue/40 bg-surface text-sm font-semibold text-muted">
+          <div className="font-display flex h-9 w-9 items-center justify-center rounded-[10px] bg-[#111318] text-sm font-bold text-accent-volt dark:bg-accent-volt-soft">
             {user.displayName.slice(0, 1).toUpperCase()}
           </div>
         )}
+        {/* Real identity only — the old decorative "Level 24" wasn't data. */}
         <span className="hidden flex-col items-start lg:flex">
-          <span className="max-w-24 truncate text-sm leading-tight font-medium">{user.displayName}</span>
-          {/* Static illustrative value — Circuit has no Level/XP system;
-              per explicit product decision this spec's "Level 24" ships
-              as decorative UI, not data. */}
-          <span className="text-[10px] leading-tight text-muted-strong">Level 24</span>
+          <span className="max-w-28 truncate text-sm leading-tight font-semibold">{user.displayName}</span>
+          <span className="max-w-28 truncate font-mono text-[11px] leading-tight text-muted-strong">@{user.handle}</span>
         </span>
-        <ChevronDown size={14} className="hidden text-muted sm:block" />
+        <ChevronDown size={14} className="hidden text-muted lg:block" />
       </button>
 
       {open && (

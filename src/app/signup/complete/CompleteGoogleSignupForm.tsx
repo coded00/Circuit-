@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { AtSign, Check, Globe2, UserRound } from "lucide-react";
+import { AtSign, CalendarDays, Check, Globe2, Phone, UserRound } from "lucide-react";
+import { formatNigerianPhone, normalizeNigerianPhone } from "@/lib/phone";
 import { AuthField } from "@/components/auth/AuthField";
 import { HANDLE_PATTERN } from "@/lib/handles";
 import { GoogleMark } from "@/components/auth/GoogleButton";
@@ -27,6 +28,8 @@ export default function CompleteGoogleSignupForm({
   const [handle, setHandle] = useState(suggestedHandle);
   const [displayName, setDisplayName] = useState(googleName ?? "");
   const [region, setRegion] = useState("");
+  const [phone, setPhone] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
   const [games, setGames] = useState<string[]>([]);
   const [useGooglePhoto, setUseGooglePhoto] = useState(!!googlePicture);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +48,7 @@ export default function CompleteGoogleSignupForm({
       res = await fetch("/api/auth/google/complete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ handle, displayName, region, favoriteGames: games, useGooglePhoto }),
+        body: JSON.stringify({ handle, displayName, phone, dateOfBirth, region, favoriteGames: games, useGooglePhoto }),
       });
     } catch {
       setError("We couldn't reach Circuit. Check your connection and try again.");
@@ -106,6 +109,31 @@ export default function CompleteGoogleSignupForm({
         hintTone={HANDLE_PATTERN.test(handle) ? "ok" : handle ? "error" : "muted"}
       />
       <AuthField id="displayName" label="Display name" icon={UserRound} maxLength={40} value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder={handle} />
+      <AuthField
+        id="phone"
+        label="Phone number"
+        icon={Phone}
+        type="tel"
+        inputMode="tel"
+        autoComplete="tel-national"
+        required
+        placeholder="0803 123 4567"
+        value={phone}
+        onChange={(e) => setPhone(e.target.value)}
+        hint={normalizeNigerianPhone(phone) ? `Saved as ${formatNigerianPhone(normalizeNigerianPhone(phone)!)}` : "Nigerian mobile number."}
+        hintTone={normalizeNigerianPhone(phone) ? "ok" : "muted"}
+      />
+      <AuthField
+        id="dateOfBirth"
+        label="Date of birth"
+        icon={CalendarDays}
+        type="date"
+        required
+        autoComplete="bday"
+        value={dateOfBirth}
+        onChange={(e) => setDateOfBirth(e.target.value)}
+        hint="You need to be 13 or older. Paid tournaments and payouts are 18+."
+      />
       <AuthField
         id="region"
         label="Country (optional)"

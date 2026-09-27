@@ -43,10 +43,9 @@ import { ThemeToggle } from "@/components/ThemeToggle";
  * is gone, `.btn-golive`'s two remaining disabled usages elsewhere are
  * being retired in the same pass).
  *
- * Create is desktop/tablet-only (`hidden sm:block`) — logo + search-toggle
- * + notifications + create + account genuinely don't fit next to each
- * other at 320–375px (measured: they overflow the header by ~70px even
- * with every icon at its minimum size). "New tournament"/"Open a Battle"
+ * Create is desktop/tablet-only (`hidden sm:block`) — at 320–375px the
+ * phone header holds logo, search toggle, wallet, notifications and
+ * account, and Create doesn't fit beside them. "New tournament"/"Open a Battle"
  * move into MobileTabBar's own sheet below `sm` instead, the same place
  * Marketplace/Rewards/Organize already live for the same reason.
  */
@@ -66,15 +65,15 @@ export async function TopBar({ user, disputeCount = 0 }: { user: User | null; di
           otherwise force a second implicit row (and unwanted extra
           height) once `grid-cols-1` collapses to one column on mobile. */}
       <div className="mx-auto grid h-full w-full max-w-[1920px] grid-cols-1 sm:grid-cols-[var(--sidebar-width-sm)_1fr] lg:grid-cols-[var(--sidebar-width-lg)_1fr]">
-        <div className="col-start-1 flex h-full items-center gap-4 border-b border-border bg-background/85 px-5 backdrop-blur-md sm:col-start-2 sm:px-8">
-          <Link href="/" className="flex shrink-0 items-center sm:hidden">
+        <div className="col-start-1 flex h-full items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur-xl sm:col-start-2 sm:gap-4 sm:px-8">
+          <Link href="/" className="flex shrink-0 items-center sm:hidden" aria-label="Circuit home">
             {/* eslint-disable-next-line @next/next/no-img-element -- local /public asset, no next/image usage elsewhere in this codebase */}
-            <img src="/circuit-logo.png" alt="Circuit" width={700} height={347} className="h-12 w-auto max-w-none" />
+            <img src="/circuit-logo.png" alt="Circuit" width={700} height={347} className="h-9 w-auto max-w-none" />
           </Link>
 
           <SearchInput className="hidden min-w-0 flex-1 sm:block sm:max-w-[430px]" />
 
-          <div className="ml-auto flex shrink-0 items-center gap-3">
+          <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2.5">
             <MobileSearchToggle />
             {/* sm+ only, same reason as Create below — the phone header is
                 already full; phones get it in MobileTabBar's sheet. */}
@@ -101,10 +100,10 @@ export async function TopBar({ user, disputeCount = 0 }: { user: User | null; di
               </>
             ) : (
               <>
-                <Link href="/login" className="text-sm font-medium text-muted transition hover:text-foreground">
+                <Link href="/login" className="px-2 text-sm font-semibold text-muted transition hover:text-foreground">
                   Log in
                 </Link>
-                <Link href="/signup" className="btn-primary px-4 py-1.5">
+                <Link href="/signup" className="btn-primary h-9 px-4 py-0 text-sm">
                   Sign up
                 </Link>
               </>

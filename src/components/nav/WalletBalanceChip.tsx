@@ -5,6 +5,8 @@ import { Wallet } from "lucide-react";
  * Circuit — header wallet balance chip. Shows the real, spendable
  * `User.walletBalance` (kobo) — funded via Fund Wallet, spent on entry
  * fees, cashed out via Withdraw (src/lib/wallet.ts, src/app/api/wallet/).
+ * Shown on every screen size — on phones it's the way into the wallet
+ * (the bottom tab bar's slot went to Community).
  */
 export function WalletBalanceChip({ balance }: { balance: number }) {
   const naira = Math.round(balance / 100).toLocaleString("en-NG");
@@ -12,10 +14,13 @@ export function WalletBalanceChip({ balance }: { balance: number }) {
   return (
     <Link
       href="/wallet"
-      className="hidden shrink-0 items-center gap-1.5 rounded-full border border-border-strong bg-surface-elevated px-3 py-1.5 text-sm font-semibold text-foreground transition hover:border-border-hover sm:flex"
+      aria-label={`Wallet: ₦${naira}`}
+      className="group flex h-9 shrink-0 items-center gap-2 rounded-[10px] border border-border bg-surface py-1 pr-2.5 pl-1 text-foreground transition hover:border-border-hover"
     >
-      <Wallet size={14} className="text-accent-volt" />
-      <span className="font-mono tabular-nums">₦{naira}</span>
+      <span className="flex h-7 w-7 items-center justify-center rounded-[7px] bg-[#111318] text-accent-volt dark:bg-accent-volt-soft">
+        <Wallet size={14} />
+      </span>
+      <span className="font-display text-[15px] leading-none font-bold tabular-nums">₦{naira}</span>
     </Link>
   );
 }

@@ -151,6 +151,9 @@ model User {
   /// nobody is required to add one, they just don't get the email side of
   /// notifyNewContent below until they do.
   email             String?    @unique
+  /// Nigerian mobile in +234… form (src/lib/phone.ts). Required at signup
+  /// since the multi-step form; not SMS-verified. Can be used to log in.
+  phone             String?    @unique
   /// Single opt-out switch for "new tournament/challenge" broadcast
   /// announcements (email + push only — in-app notifications are always-on
   /// regardless, per InAppChannel's own comment in notifications.ts).

@@ -1,9 +1,10 @@
 "use client";
 
 /**
- * Circuit — mobile primary nav. 5 fixed slots matching the MVP rework
- * spec's mobile set exactly: Home / Compete / Challenges / Wallet /
- * Profile (spec section 44) — Watch/Live are removed-from-MVP and no
+ * Circuit — mobile primary nav. 5 fixed slots: Home / Compete /
+ * Challenges / Community / Profile. Wallet moved from this bar to the
+ * mobile header (TopBar's WalletBalanceChip), where the balance itself is
+ * visible at a glance; Community took its slot — Watch/Live are removed-from-MVP and no
  * longer appear here at all (hidden, not deleted — see /watch's own
  * route, still on disk).
  *
@@ -26,6 +27,7 @@ import {
   Trophy,
   Swords,
   Wallet,
+  MessagesSquare,
   Gamepad2,
   Calendar,
   X,
@@ -112,7 +114,12 @@ export function MobileTabBar({ user }: { user: NavUser }) {
         <TabLink href="/" icon={Home} label="Home" active={pathname === "/"} />
         <TabLink href="/compete" icon={Trophy} label="Compete" active={pathname.startsWith("/compete")} />
         <TabLink href="/battles" icon={Swords} label="Challenges" active={pathname.startsWith("/battles")} />
-        <TabLink href="/wallet" icon={Wallet} label="Wallet" active={pathname.startsWith("/wallet")} />
+        <TabLink
+          href="/communities"
+          icon={MessagesSquare}
+          label="Community"
+          active={pathname.startsWith("/communities") || /^\/tournaments\/[^/]+\/community$/.test(pathname)}
+        />
         <button
           type="button"
           onClick={() => setMenuOpen(true)}

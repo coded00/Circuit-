@@ -101,13 +101,16 @@ export async function suggestHandle(profile: GoogleProfile): Promise<string> {
 export type NewGoogleUserInput = {
   handle: string;
   displayName: string;
+  /** +234… (src/lib/phone.ts). */
+  phone: string;
+  dateOfBirth: Date;
   region: string | null;
   favoriteGames: string[];
   useGooglePhoto: boolean;
 };
 
 export class NewAccountError extends Error {
-  constructor(public code: "handle_taken" | "email_taken" | "identity_taken") {
+  constructor(public code: "handle_taken" | "email_taken" | "identity_taken" | "phone_taken") {
     super(code);
     this.name = "NewAccountError";
   }
@@ -118,6 +121,9 @@ export async function createGoogleUser(profile: GoogleProfile, input: NewGoogleU
   // Re-checked here, not just when the flow started: an email account
   // could have been registered in the meantime.
   if (await findUserByEmail(profile.email)) throw new NewAccountError("email_taken");
+  if (await prisma.user.findFirst({ where: { OR: [{ phone: input.phone }, { emailOrPhone: input.phone }] }, select: { id: true } })) {
+    throw new NewAccountError("phone_taken");
+  }
 
   try {
     const user = await prisma.$transaction(async (tx) => {
@@ -128,6 +134,8 @@ export async function createGoogleUser(profile: GoogleProfile, input: NewGoogleU
           emailOrPhone: profile.email,
           email: profile.email,
           passwordHash: null,
+          phone: input.phone,
+          dateOfBirth: input.dateOfBirth,
           avatarUrl: input.useGooglePhoto ? profile.picture : null,
           region: input.region,
           favoriteGames: input.favoriteGames,
@@ -145,6 +153,7 @@ export async function createGoogleUser(profile: GoogleProfile, input: NewGoogleU
       const target = (err.meta?.target as string[] | undefined) ?? [];
       if (target.includes("handle")) throw new NewAccountError("handle_taken");
       if (target.includes("providerAccountId")) throw new NewAccountError("identity_taken");
+      if (target.includes("phone")) throw new NewAccountError("phone_taken");
       throw new NewAccountError("email_taken");
     }
     throw err;

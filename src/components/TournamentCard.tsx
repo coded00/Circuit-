@@ -61,7 +61,7 @@ export function TournamentCard({
       href={tournamentPath(t)}
       className="group flex h-full w-full flex-col overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface transition duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:-translate-y-0.5 hover:border-border-hover active:translate-y-0 active:scale-[0.99] active:duration-[var(--duration-instant)]"
     >
-      <div className="relative aspect-[16/10] w-full shrink-0 overflow-hidden bg-surface-elevated">
+      <div className="relative aspect-video w-full shrink-0 overflow-hidden bg-surface-elevated sm:aspect-[16/10]">
         <div className="h-full w-full transition-transform duration-[var(--duration-moderate)] ease-[var(--ease-standard)] group-hover:scale-[1.03]">
           {morph ? (
             <ViewTransition name={tournamentArtName(t.id)} share="tournament-morph" default="none">
@@ -71,22 +71,20 @@ export function TournamentCard({
             <GameArtTile game={t.game} posterUrl={t.posterUrl} className="h-full w-full" hideLabel imgWidth={560} />
           )}
         </div>
-        <div className="absolute top-3 left-3 flex gap-1.5">
-          <span className="rounded-full bg-black/70 backdrop-blur-sm">
-            <StatusPill tone={status.tone} pulse={status.pulse}>
-              {status.label}
-            </StatusPill>
-          </span>
+        <div className="absolute top-2.5 left-2.5 flex gap-1.5">
+          <StatusPill tone={status.tone} pulse={status.pulse} solid>
+            {status.label}
+          </StatusPill>
           {featured && <span className="badge bg-accent-volt text-accent-volt-foreground">Featured</span>}
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col gap-4 p-4">
+      <div className="flex flex-1 flex-col gap-3 p-3.5 sm:gap-4 sm:p-4">
         <div className="flex min-w-0 flex-col gap-1">
           <span className="truncate text-xs text-muted">
             {t.game} · {t.teamSize}
           </span>
-          <span className="line-clamp-2 font-display text-lg leading-tight font-bold tracking-tight">{t.name}</span>
+          <span className="line-clamp-2 font-display text-base leading-tight font-bold tracking-tight sm:text-lg">{t.name}</span>
         </div>
 
         <dl className="mt-auto grid grid-cols-3 gap-2 border-t border-border pt-3">
