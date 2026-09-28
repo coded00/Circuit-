@@ -10,6 +10,9 @@ describe("parsePrizeSplit", () => {
   it("stores winner-takes-all as empty", () => {
     expect(parsePrizeSplit([100], 3)).toEqual({ ok: true, value: [] });
     expect(parsePrizeSplit(undefined, 3)).toEqual({ ok: true, value: [] });
+    // The create/edit forms send [] when there's no cash prize.
+    expect(parsePrizeSplit([], 3)).toEqual({ ok: true, value: [] });
+    expect(parsePrizeSplit("  ", 3)).toEqual({ ok: true, value: [] });
   });
   it("rejects bad splits", () => {
     expect(parsePrizeSplit([50, 30], 3)).toMatchObject({ ok: false, error: "The shares add up to 80% — they need to make 100%." });

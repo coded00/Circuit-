@@ -47,9 +47,11 @@ type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 
 /** Organizer input — an array or "50, 30, 20" — checked against the structure's places. */
 export function parsePrizeSplit(input: unknown, maxPlaces: number): Result<number[]> {
-  if (input === null || input === undefined || input === "") return { ok: true, value: [] };
+  // Nothing chosen (including the empty list the forms send with no cash prize) = winner takes all.
+  if (input === null || input === undefined || input === "" || (Array.isArray(input) && input.length === 0)) return { ok: true, value: [] };
   const raw = Array.isArray(input) ? input : typeof input === "string" ? input.split(/[\s,/]+/).filter(Boolean) : null;
   if (!raw) return { ok: false, error: "The prize split must be a list of percentages." };
+  if (raw.length === 0) return { ok: true, value: [] };
   const values = raw.map(Number);
   if (values.some((n) => !Number.isInteger(n) || n < 1 || n > 100)) return { ok: false, error: "Each place's share must be a whole percentage from 1 to 100." };
   if (values.length > maxPlaces) {

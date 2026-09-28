@@ -37,6 +37,7 @@ import { buildRoundRobinTable, roundRobinOutcome, roundRobinSchedule } from "@/l
 import {
   buildDoubleElim,
   isDoubleElimStructure,
+  nodeByMatch,
   nodeMatchRound,
   recordDoubleElimResult,
   resolveDoubleElim,
@@ -1179,6 +1180,7 @@ export async function createBattleMatch(
 
 export async function runScheduledSweep(): Promise<{
   bracketsGenerated: number;
+  advancementRepaired: number;
   autoAccepted: number;
   escalated: number;
   organizerRevenueSettled: number;
@@ -1276,8 +1278,12 @@ export async function runScheduledSweep(): Promise<{
   const quickMatchSweep = await sweepQuickMatchChallenges();
   if (quickMatchSweep.errors.length > 0) errors.push(...quickMatchSweep.errors);
 
+  const repair = await repairStalledAdvancement();
+  if (repair.errors.length > 0) errors.push(...repair.errors);
+
   return {
     bracketsGenerated,
+    advancementRepaired: repair.repaired,
     autoAccepted,
     escalated,
     organizerRevenueSettled: settlement.settled,
@@ -1285,6 +1291,62 @@ export async function runScheduledSweep(): Promise<{
     quickMatchRecoveredStuck: quickMatchSweep.recoveredStuck,
     ...(errors.length > 0 ? { errors } : {}),
   };
+}
+
+/**
+ * Safety net for completeMatch: the match is marked COMPLETE first and the
+ * tournament advanced afterwards, so a failure in between (a transaction
+ * timeout on a slow connection, a dropped connection) leaves a finished
+ * match whose result never reached the bracket — and nothing else would
+ * retry it. Every sweep, for live head-to-head tournaments, this replays
+ * the advancement for any completed match its structure hasn't recorded.
+ * Each engine's advancement is safe to re-run.
+ */
+async function repairStalledAdvancement(): Promise<{ repaired: number; errors: string[] }> {
+  const errors: string[] = [];
+  let repaired = 0;
+  const live = await prisma.tournament.findMany({ where: { status: "LIVE", competitionStyle: "HEAD_TO_HEAD" }, select: { id: true, format: true } });
+  for (const t of live) {
+    try {
+      const bracket = await prisma.bracket.findUnique({ where: { tournamentId: t.id } });
+      if (!bracket) continue;
+      const matches = await prisma.match.findMany({ where: { tournamentId: t.id }, select: { id: true, status: true, winnerId: true } });
+      const done = matches.filter((m) => m.status === "COMPLETE" && m.winnerId);
+      if (isRoundRobinStructure(bracket.structure) || isSwissStructure(bracket.structure)) {
+        // Stalled only when nothing is left to play: the next step (a new
+        // Swiss round, a decider, or completing) never ran.
+        if (matches.length > 0 && matches.every((m) => m.status === "COMPLETE")) {
+          if (isSwissStructure(bracket.structure)) await advanceSwiss(t.id);
+          else await advanceRoundRobin(t.id);
+          repaired++;
+        }
+        continue;
+      }
+      if (isDoubleElimStructure(bracket.structure)) {
+        for (const m of done) {
+          const n = nodeByMatch(bracket.structure, m.id);
+          if (n && !n.resolved) {
+            await advanceDoubleElim(t.id, m.id, m.winnerId!);
+            repaired++;
+          }
+        }
+        continue;
+      }
+      const structure = bracket.structure as unknown as BracketStructure;
+      for (const m of done) {
+        const loc = findSlotByMatchId(structure, m.id);
+        const slot = loc ? structure.rounds.find((r) => r.round === loc.round)?.slots[loc.position] : null;
+        if (slot && slot.winnerId !== m.winnerId) {
+          await applyWinnerAdvancement(t.id, m.id, m.winnerId!);
+          repaired++;
+        }
+      }
+    } catch (err) {
+      captureException(err, { source: "sweep:repairAdvancement", tournamentId: t.id });
+      errors.push(`advance:${t.id}`);
+    }
+  }
+  return { repaired, errors };
 }
 
 /** Called inline from the registrations route once a confirmation pushes
