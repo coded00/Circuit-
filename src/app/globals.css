@@ -1432,3 +1432,168 @@ html:not([data-nav-morph])::view-transition-new(.tournament-morph) {
     }
   }
 }
+
+/*
+ * ============================================================================
+ * Admin control center — a calmer operator surface (Linear/Stripe-style).
+ * Scoped to `[data-admin]` (set on /admin's layout) so the player app is
+ * untouched. Same dark palette and fonts; what changes is emphasis:
+ * flat panels with hairline borders instead of floating cards, smaller
+ * controls, a quiet table, volt only on the one primary action per view
+ * and live states, muted eyebrows. Structure (page headers, sections,
+ * stat strips) comes from src/components/admin/ui.tsx.
+ * ============================================================================
+ */
+[data-admin] {
+  --background: #0d1014;
+  --surface: #13171c;
+  --surface-elevated: #1a1f26;
+  --border: rgba(255, 255, 255, 0.07);
+  --border-hover: rgba(255, 255, 255, 0.14);
+  --border-strong: rgba(255, 255, 255, 0.13);
+  --radius-control: 8px;
+  font-size: 14px;
+}
+
+@layer components {
+  /* Panels: flat, hairline, tight radius — no lift, no hover jump. */
+  [data-admin] .card,
+  [data-admin] .widget {
+    border-radius: 10px;
+    background: var(--surface);
+    box-shadow: none;
+  }
+  [data-admin] .card-hover:hover {
+    transform: none;
+  }
+
+  /* Controls: 36px tall, 13px text. */
+  [data-admin] .btn-primary,
+  [data-admin] .btn-secondary,
+  [data-admin] .btn-ghost,
+  [data-admin] .btn-danger,
+  [data-admin] .btn-danger-solid {
+    min-height: 2.25rem;
+    padding: 0.4rem 0.9rem;
+    font-size: 13px;
+    border-radius: 8px;
+    box-shadow: none;
+  }
+  [data-admin] .btn-primary:active,
+  [data-admin] .btn-secondary:active,
+  [data-admin] .btn-ghost:active,
+  [data-admin] .btn-danger:active {
+    transform: scale(0.98);
+  }
+  [data-admin] .btn-secondary {
+    border-color: var(--border-strong);
+    background: var(--surface-elevated);
+  }
+  [data-admin] .btn-secondary:hover {
+    background: #212730;
+  }
+  [data-admin] .btn-ghost {
+    background: transparent;
+  }
+  [data-admin] .btn-ghost:hover {
+    background: var(--surface-elevated);
+  }
+  [data-admin] .field-input,
+  [data-admin] .field-select,
+  [data-admin] .field-textarea {
+    background-color: var(--background);
+    border-color: var(--border-strong);
+    font-size: 13px;
+    padding-top: 0.45rem;
+    padding-bottom: 0.45rem;
+    border-radius: 8px;
+  }
+  [data-admin] .field-input,
+  [data-admin] .field-select {
+    min-height: 2.25rem;
+  }
+  [data-admin] .field-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+  }
+
+  /* Eyebrows are labels here, not accents. */
+  [data-admin] .text-eyebrow {
+    color: var(--muted-strong);
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+  }
+
+  /* Tables: no header band, sentence-case headers, 44px rows. */
+  [data-admin] .table-wrap {
+    border-radius: 10px;
+    background: var(--surface);
+  }
+  [data-admin] .table th {
+    background: transparent;
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted-strong);
+    padding: 0.6rem 1rem;
+    white-space: nowrap;
+  }
+  [data-admin] .table td {
+    padding: 0.65rem 1rem;
+    font-variant-numeric: tabular-nums;
+  }
+  [data-admin] .table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.025);
+  }
+  [data-admin] .table tbody tr[data-href] {
+    cursor: pointer;
+  }
+
+  /* Badges: small, rectangular-ish status chips. */
+  [data-admin] .badge {
+    border-radius: 6px;
+    font-size: 11px;
+    padding: 0.1rem 0.45rem;
+    font-weight: 500;
+  }
+
+  /* Admin kit pieces (src/components/admin/ui.tsx). */
+  .admin-page {
+    @apply mx-auto flex w-full max-w-[1180px] flex-col gap-8;
+  }
+  .admin-title {
+    @apply text-[22px] leading-7 font-semibold tracking-[-0.01em] text-foreground;
+  }
+  .admin-section-title {
+    @apply text-[13px] font-semibold text-foreground;
+  }
+  .admin-stat-strip {
+    @apply grid overflow-hidden rounded-[10px] border border-border bg-surface;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  }
+  .admin-stat {
+    @apply flex flex-col gap-1 px-4 py-3.5;
+    box-shadow: -1px 0 0 0 var(--border), 0 -1px 0 0 var(--border);
+  }
+  .admin-stat-value {
+    @apply text-[20px] leading-7 font-semibold tracking-[-0.01em] tabular-nums text-foreground;
+  }
+  .admin-kv {
+    @apply grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2 lg:grid-cols-3;
+  }
+}
+
+/* Admin numbers: the body face with tabular digits (no slashed zeros, a
+   normal-weight ₦). Unlayered on purpose — it has to win over the
+   `font-mono` utility wherever a component still uses it. Real codes
+   (match codes, ids) opt back into mono with .font-code. */
+[data-admin] .font-mono,
+[data-admin] .text-stat {
+  font-family: var(--font-body);
+  font-variant-numeric: tabular-nums;
+}
+[data-admin] .font-code {
+  font-family: var(--font-geist-mono);
+}

@@ -65,7 +65,7 @@ export function OrganizerRevenueSettlementControl({
         </div>
         {error && <p className="field-error">{error}</p>}
         <div className="flex gap-2">
-          <button type="button" disabled={submitting} onClick={save} className="btn-primary text-sm">
+          <button type="button" disabled={submitting} onClick={save} className="btn-primary">
             {submitting ? "Saving…" : "Save"}
           </button>
           <button
@@ -75,7 +75,7 @@ export function OrganizerRevenueSettlementControl({
               setValue(hours.toString());
               setError(null);
             }}
-            className="btn-ghost text-sm"
+            className="btn-ghost"
           >
             Cancel
           </button>
@@ -87,14 +87,14 @@ export function OrganizerRevenueSettlementControl({
   return (
     <div className="flex items-center justify-between gap-4">
       <div className="flex flex-col gap-0.5">
-        <span className="text-sm font-semibold">Organizer revenue settlement window</span>
-        <span className="text-xs text-muted">
+        <span className="text-[13px] font-medium text-foreground">Organizer revenue settlement window</span>
+        <span className="text-[12px] text-muted">
           {hours} hour{hours === 1 ? "" : "s"} after a tournament completes before its organizer revenue credits to
           their wallet — held longer if a dispute is open or funds are frozen.
         </span>
       </div>
       {canEdit && (
-        <button type="button" onClick={() => setEditing(true)} className="btn-secondary text-sm">
+        <button type="button" onClick={() => setEditing(true)} className="btn-secondary">
           Edit
         </button>
       )}

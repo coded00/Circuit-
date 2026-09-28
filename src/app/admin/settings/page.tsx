@@ -24,6 +24,8 @@ import { AdminUsersManager } from "@/components/admin/AdminUsersManager";
 import { MaintenanceModeToggle } from "@/components/admin/MaintenanceModeToggle";
 import { PlatformFeeControl } from "@/components/admin/PlatformFeeControl";
 import { OrganizerRevenueSettlementControl } from "@/components/admin/OrganizerRevenueSettlementControl";
+import { ArrowUpRight } from "lucide-react";
+import { EmptyState, PageHeader, Panel, PanelRow, Section } from "@/components/admin/ui";
 
 function timeAgo(date: Date): string {
   const ms = Date.now() - date.getTime();
@@ -35,8 +37,58 @@ function timeAgo(date: Date): string {
   return `${Math.floor(hr / 24)}d ago`;
 }
 
+const ACTION_LABELS: Record<string, string> = {
+  "announcement.create": "posted an announcement",
+  "announcement.delete": "deleted an announcement",
+  "banner.create": "added a homepage slide",
+  "banner.update": "edited a homepage slide",
+  "banner.delete": "deleted a homepage slide",
+  "calendarEvent.create": "added a calendar event",
+  "calendarEvent.delete": "deleted a calendar event",
+  "challenge.cancel": "cancelled a challenge",
+  "community.create_official": "created an official community",
+  "dispute.rule": "ruled on a dispute",
+  "dispute.void": "voided a disputed match",
+  "game.create": "created a game",
+  "game.update": "edited a game",
+  "game.delete": "deleted a game",
+  "gameMode.create": "added a game mode",
+  "gameMode.update": "edited a game mode",
+  "gameMode.delete": "deleted a game mode",
+  "gameFormat.create": "added a format",
+  "gameFormat.update": "edited a format",
+  "gameFormat.delete": "deleted a format",
+  "quickMatch.cancel": "cancelled a Quick Match",
+  "report.statusChange": "updated a report",
+  "settings.platformFeeChange": "changed the platform fee",
+  "settings.organizerRevenueSettlementHoursChange": "changed the revenue settlement window",
+  "settings.maintenanceModeChange": "changed maintenance mode",
+  "staff.grant": "granted admin access",
+  "staff.revoke": "revoked admin access",
+  "staff.roleChange": "changed an admin's role",
+  "tournament.cancel": "cancelled a tournament",
+  "tournament.edit": "edited a tournament",
+  "tournament.freezeFunds": "froze a tournament's funds",
+  "tournament.unfreezeFunds": "unfroze a tournament's funds",
+  "user.suspend": "suspended a user",
+  "user.unsuspend": "restored a user",
+  "videos.import": "imported feed videos",
+  "videos.publish_all": "published all video drafts",
+};
+
 function actionLabel(action: string): string {
-  return action.replace(/\./g, " · ").replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
+  return ACTION_LABELS[action] ?? action.replace(/[._]/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
+}
+
+/** Where an audit entry's target lives in the admin, if it has a page. */
+function targetHref(type: string | null, id: string | null): string | null {
+  if (!type || !id) return null;
+  if (type === "Tournament") return `/admin/competitions/${id}`;
+  if (type === "User") return `/admin/users/${id}`;
+  if (type === "Battle") return `/admin/challenges/${id}`;
+  if (type === "Game") return `/admin/games/${id}`;
+  if (type === "QuickMatchChallenge") return `/admin/quick-matches/${id}`;
+  return null;
 }
 
 export default async function AdminSettingsPage() {
@@ -57,110 +109,126 @@ export default async function AdminSettingsPage() {
     }),
   ]);
 
+  const sections = [
+    { id: "platform", label: "Platform" },
+    { id: "access", label: "Admin access" },
+    { id: "audit", label: "Audit log" },
+    { id: "profile", label: "Your profile" },
+  ];
+
   return (
-    <div className="flex flex-1 flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="font-display text-2xl font-bold tracking-tight">Settings</h1>
-        <p className="text-sm text-muted">Your profile, admin access, platform-wide controls, and the audit trail.</p>
-      </div>
+    <>
+      <PageHeader title="Settings" description="Platform-wide controls, who has admin access, and everything staff have changed." />
 
-      <div className="card flex items-center justify-between gap-4">
-        <div className="flex flex-col gap-0.5">
-          <h2 className="text-card-title">Admin Profile</h2>
-          <p className="text-xs text-muted">Display name, handle, bio, password — same settings every Circuit account has.</p>
-        </div>
-        <Link href="/account" target="_blank" className="btn-secondary text-sm">
-          Edit profile ↗
-        </Link>
-      </div>
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[160px_minmax(0,1fr)]">
+        <nav className="hidden flex-col gap-0.5 self-start lg:sticky lg:top-20 lg:flex" aria-label="Settings sections">
+          {sections.map((s) => (
+            <a key={s.id} href={`#${s.id}`} className="rounded-[6px] px-2.5 py-1.5 text-[13px] text-muted transition-colors hover:bg-surface hover:text-foreground">
+              {s.label}
+            </a>
+          ))}
+        </nav>
 
-      <div className="card flex flex-col gap-3">
-        <h2 className="text-card-title">Admin Users</h2>
-        {isSuperAdmin ? (
-          <AdminUsersManager
-            staff={staff.map((s) => ({ ...s }))}
-            currentUserId={admin!.id}
-          />
-        ) : (
-          <>
-            <p className="text-xs text-muted">Only a Super Admin can grant, change, or revoke admin access.</p>
-            <div className="table-wrap">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Admin</th>
-                    <th>Role</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {staff.map((s) => (
-                    <tr key={s.id}>
-                      <td>
-                        {s.displayName} <span className="text-muted">(@{s.handle})</span>
-                      </td>
-                      <td className="text-muted">{s.adminRole ?? "MODERATOR"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        <div className="flex min-w-0 flex-col gap-10">
+          <Section
+            id="platform"
+            title="Platform"
+            description={isSuperAdmin ? "Changes apply to everyone immediately and are recorded in the audit log." : "Only a super admin can change these."}
+          >
+            <Panel padded={false}>
+              <PanelRow>
+                <div className="w-full">
+                  <MaintenanceModeToggle enabled={platformSetting?.maintenanceMode ?? false} canEdit={isSuperAdmin} />
+                </div>
+              </PanelRow>
+              <PanelRow>
+                <div className="w-full">
+                  <PlatformFeeControl platformFeeBps={platformSetting?.platformFeeBps ?? 500} canEdit={isSuperAdmin} />
+                </div>
+              </PanelRow>
+              <PanelRow>
+                <div className="w-full">
+                  <OrganizerRevenueSettlementControl hours={platformSetting?.organizerRevenueSettlementHours ?? 24} canEdit={isSuperAdmin} />
+                </div>
+              </PanelRow>
+            </Panel>
+          </Section>
+
+          <Section id="access" title="Admin access" description="Moderators run day-to-day operations; super admins also manage admins and platform settings.">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Panel>
+                <p className="text-[13px] font-medium text-foreground">Moderator</p>
+                <p className="mt-1 text-[12px] leading-5 text-muted">
+                  Suspend and restore users, manage competitions and challenges, rule on escalated disputes, and edit homepage and calendar content.
+                </p>
+              </Panel>
+              <Panel>
+                <p className="text-[13px] font-medium text-foreground">Super admin</p>
+                <p className="mt-1 text-[12px] leading-5 text-muted">Everything a moderator can do, plus granting, changing and revoking admin access, and platform settings.</p>
+              </Panel>
             </div>
-          </>
-        )}
-      </div>
-
-      <div className="card flex flex-col gap-3">
-        <h2 className="text-card-title">Roles &amp; Permissions</h2>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="widget flex flex-col gap-1.5">
-            <span className="badge badge-brand w-fit">Super Admin</span>
-            <p className="text-xs text-muted">
-              Everything a Moderator can do, plus: grant/revoke admin access, change admin roles, and toggle Platform Settings.
-            </p>
-          </div>
-          <div className="widget flex flex-col gap-1.5">
-            <span className="badge badge-neutral w-fit">Moderator</span>
-            <p className="text-xs text-muted">
-              Suspend/unsuspend users, manage competitions and challenges, and edit homepage/calendar content. Can&apos;t manage
-              other admins or platform-wide settings.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="card flex flex-col gap-4">
-        <h2 className="text-card-title">Platform Settings</h2>
-        <MaintenanceModeToggle enabled={platformSetting?.maintenanceMode ?? false} canEdit={isSuperAdmin} />
-        <div className="border-t border-border pt-4">
-          <PlatformFeeControl platformFeeBps={platformSetting?.platformFeeBps ?? 500} canEdit={isSuperAdmin} />
-        </div>
-        <div className="border-t border-border pt-4">
-          <OrganizerRevenueSettlementControl
-            hours={platformSetting?.organizerRevenueSettlementHours ?? 24}
-            canEdit={isSuperAdmin}
-          />
-        </div>
-        {!isSuperAdmin && <p className="text-xs text-muted">Only a Super Admin can change these.</p>}
-      </div>
-
-      <div className="card flex flex-col gap-3">
-        <h2 className="text-card-title">Audit Log</h2>
-        {auditLog.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted">No admin actions logged yet.</p>
-        ) : (
-          <div className="flex flex-col">
-            {auditLog.map((entry, i) => (
-              <div key={entry.id} className={`flex items-center justify-between gap-3 py-2.5 text-sm ${i > 0 ? "border-t border-border" : ""}`}>
-                <span className="min-w-0 flex-1 truncate">
-                  <span className="font-medium">{entry.actor.displayName}</span>{" "}
-                  <span className="text-muted">{actionLabel(entry.action)}</span>
-                  {entry.targetId && <span className="text-muted-strong"> · {entry.targetType}</span>}
-                </span>
-                <span className="shrink-0 text-xs text-muted-strong">{timeAgo(entry.createdAt)}</span>
+            {isSuperAdmin ? (
+              <AdminUsersManager staff={staff.map((s) => ({ ...s }))} currentUserId={admin!.id} />
+            ) : (
+              <div className="table-wrap">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Admin</th>
+                      <th>Role</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {staff.map((s) => (
+                      <tr key={s.id}>
+                        <td>
+                          <span className="font-medium text-foreground">{s.displayName}</span> <span className="text-muted">@{s.handle}</span>
+                        </td>
+                        <td className="text-muted">{s.adminRole === "SUPER_ADMIN" ? "Super admin" : "Moderator"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            ))}
-          </div>
-        )}
+            )}
+          </Section>
+
+          <Section id="audit" title="Audit log" description="The last 30 staff actions.">
+            {auditLog.length === 0 ? (
+              <EmptyState title="No admin actions logged yet" />
+            ) : (
+              <Panel padded={false}>
+                {auditLog.map((entry) => (
+                  <div key={entry.id} className="flex items-center gap-3 border-b border-border px-4 py-2.5 text-[13px] last:border-b-0 sm:px-5">
+                    <span className="min-w-0 flex-1 truncate text-muted">
+                      <span className="font-medium text-foreground">{entry.actor.displayName}</span> {actionLabel(entry.action)}
+                      {targetHref(entry.targetType, entry.targetId) && (
+                        <>
+                          {" "}
+                          <Link href={targetHref(entry.targetType, entry.targetId)!} className="text-foreground hover:underline">
+                            View
+                          </Link>
+                        </>
+                      )}
+                    </span>
+                    <span className="shrink-0 text-[12px] text-muted-strong" title={entry.createdAt.toLocaleString("en-NG")}>
+                      {timeAgo(entry.createdAt)}
+                    </span>
+                  </div>
+                ))}
+              </Panel>
+            )}
+          </Section>
+
+          <Section id="profile" title="Your profile" description="Display name, handle, bio and password — the same settings every Circuit account has.">
+            <div>
+              <Link href="/account" target="_blank" className="btn-secondary">
+                Edit profile <ArrowUpRight size={14} />
+              </Link>
+            </div>
+          </Section>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

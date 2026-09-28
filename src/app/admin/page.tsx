@@ -1,61 +1,59 @@
 /**
- * Circuit — Admin Overview. The first thing an admin sees: four real
- * top-line numbers, a real recent-activity feed, and a lightweight
- * 7-day activity snapshot. Every number here is a live query — nothing
- * on this page is mocked or illustrative.
+ * Circuit — Admin Overview: what needs staff today, then the numbers.
  *
- * "Revenue" here is gross completed entry-fee volume (every completed
- * `EscrowTransaction` of type `ENTRY_FEE`) — total real money that has
- * moved through paid tournament entries, not Circuit's own cut of it.
- * That cut is real too now (`EscrowType.PLATFORM_FEE`, configurable rate
- * at Admin > Settings) but belongs on the dedicated Finance page
- * (Admin > Finance) alongside the rest of the money-movement detail,
- * not folded into this page's deliberately small curated set.
+ * 1. Needs attention — every queue that's waiting on staff, with counts:
+ *    escalated match disputes and lobby flags, open abuse and community
+ *    reports, open appeals, prize payouts and withdrawals still
+ *    processing, tournaments with frozen funds. Empty queues collapse
+ *    into a single "All clear".
+ * 2. Key numbers — users, live/open competitions, open challenges and
+ *    entry-fee volume, each with its last-7-days change.
+ * 3. The last 7 days by day (a plain table — honest at any volume, unlike
+ *    a bar chart of single-digit counts) and recent activity.
  *
-
- * "Competition completed" (an activity-feed line the spec's example
- * copy showed) is deliberately not one of the feed types below —
- * `Tournament` has no `completedAt`/`updatedAt` field, only `createdAt`,
- * so there's no real timestamp for "when this was marked complete" to
- * sort or label by. The feed below only uses event types with a real,
- * meaningful timestamp: registrations, challenges, and wallet activity.
+ * "Entry-fee volume" is gross completed ENTRY_FEE money — Circuit's own
+ * cut (PLATFORM_FEE) is on Finance with the rest of the money detail.
+ * Every number is a live query.
  */
 
+import Link from "next/link";
+import { ArrowUpRight, CheckCircle2 } from "lucide-react";
 import { prisma } from "@/lib/db";
-import { Users, Trophy, Swords, Banknote, UserPlus, Wallet, ArrowDownToLine } from "lucide-react";
-
-function formatNaira(kobo: number): string {
-  return `₦${(kobo / 100).toLocaleString("en-NG")}`;
-}
+import { EmptyState, naira, PageHeader, Panel, Section, StatStrip, StatusBadge } from "@/components/admin/ui";
 
 function timeAgo(date: Date): string {
-  const ms = Date.now() - date.getTime();
-  const min = Math.floor(ms / 60_000);
+  const min = Math.floor((Date.now() - date.getTime()) / 60_000);
   if (min < 1) return "just now";
   if (min < 60) return `${min}m ago`;
   const hr = Math.floor(min / 60);
   if (hr < 24) return `${hr}h ago`;
-  const days = Math.floor(hr / 24);
-  return `${days}d ago`;
+  return `${Math.floor(hr / 24)}d ago`;
 }
 
-function dayKey(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
-
-type ActivityItem = { id: string; message: string; date: Date };
+// Local calendar day (the same clock the row labels use), not the UTC date.
+const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 
 export default async function AdminOverviewPage() {
   const now = new Date();
-  const sevenDaysAgo = new Date(now);
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
-  sevenDaysAgo.setHours(0, 0, 0, 0);
+  const weekStart = new Date(now);
+  weekStart.setDate(weekStart.getDate() - 6);
+  weekStart.setHours(0, 0, 0, 0);
 
   const [
     userCount,
     activeCompetitions,
+    liveCompetitions,
     openChallenges,
-    entryFeeRevenue,
+    entryFees,
+    weekEntryFees,
+    escalatedDisputes,
+    escalatedFlags,
+    openReports,
+    openCommunityReports,
+    openAppeals,
+    pendingPayouts,
+    pendingWithdrawals,
+    frozenTournaments,
     recentRegistrations,
     recentBattles,
     recentWalletTx,
@@ -65,147 +63,220 @@ export default async function AdminOverviewPage() {
   ] = await Promise.all([
     prisma.user.count(),
     prisma.tournament.count({ where: { status: { in: ["OPEN", "LIVE"] } } }),
+    prisma.tournament.count({ where: { status: "LIVE" } }),
     prisma.battle.count({ where: { status: "OPEN" } }),
-    prisma.escrowTransaction.aggregate({
-      where: { type: "ENTRY_FEE", status: "COMPLETE" },
-      _sum: { amount: true },
-    }),
+    prisma.escrowTransaction.aggregate({ where: { type: "ENTRY_FEE", status: "COMPLETE" }, _sum: { amount: true } }),
+    prisma.escrowTransaction.aggregate({ where: { type: "ENTRY_FEE", status: "COMPLETE", createdAt: { gte: weekStart } }, _sum: { amount: true } }),
+    prisma.dispute.count({ where: { status: "ESCALATED" } }),
+    prisma.lobbyFlag.count({ where: { status: "ESCALATED" } }),
+    prisma.report.count({ where: { status: "OPEN" } }),
+    prisma.communityReport.count({ where: { status: { in: ["OPEN", "ESCALATED"] } } }),
+    prisma.appeal.count({ where: { status: "OPEN" } }),
+    prisma.escrowTransaction.aggregate({ where: { type: "PRIZE_PAYOUT", status: "PENDING" }, _count: true, _sum: { amount: true } }),
+    prisma.walletTransaction.aggregate({ where: { type: "WITHDRAWAL", status: "PENDING" }, _count: true, _sum: { amount: true } }),
+    prisma.tournament.count({ where: { fundsFrozen: true, status: { not: "CANCELLED" } } }),
     prisma.registration.findMany({
       orderBy: { createdAt: "desc" },
-      take: 6,
-      include: { user: { select: { displayName: true } }, tournament: { select: { name: true } } },
+      take: 8,
+      include: { user: { select: { displayName: true } }, tournament: { select: { id: true, name: true } } },
     }),
-    prisma.battle.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 6,
-      include: { creator: { select: { displayName: true } } },
-    }),
+    prisma.battle.findMany({ orderBy: { createdAt: "desc" }, take: 8, include: { creator: { select: { displayName: true } } } }),
     prisma.walletTransaction.findMany({
       where: { status: "COMPLETE", type: { in: ["FUND", "WITHDRAWAL"] } },
       orderBy: { createdAt: "desc" },
-      take: 6,
+      take: 8,
       include: { user: { select: { displayName: true } } },
     }),
-    prisma.user.findMany({ where: { createdAt: { gte: sevenDaysAgo } }, select: { createdAt: true } }),
-    prisma.registration.findMany({ where: { createdAt: { gte: sevenDaysAgo } }, select: { createdAt: true } }),
-    prisma.battle.findMany({ where: { createdAt: { gte: sevenDaysAgo } }, select: { createdAt: true } }),
+    prisma.user.findMany({ where: { createdAt: { gte: weekStart } }, select: { createdAt: true } }),
+    prisma.registration.findMany({ where: { createdAt: { gte: weekStart } }, select: { createdAt: true } }),
+    prisma.battle.findMany({ where: { createdAt: { gte: weekStart } }, select: { createdAt: true } }),
   ]);
 
-  const metrics = [
-    { label: "Users", value: userCount.toLocaleString("en-NG"), icon: Users },
-    { label: "Active Competitions", value: activeCompetitions.toLocaleString("en-NG"), icon: Trophy },
-    { label: "Open Challenges", value: openChallenges.toLocaleString("en-NG"), icon: Swords },
-    { label: "Revenue", value: formatNaira(entryFeeRevenue._sum.amount ?? 0), icon: Banknote },
+  const queues = [
+    { label: "Escalated match disputes", count: escalatedDisputes, href: "/admin/disputes", tone: "danger" as const },
+    { label: "Escalated lobby result flags", count: escalatedFlags, href: "/admin/disputes?tab=flags", tone: "danger" as const },
+    { label: "Open abuse reports", count: openReports, href: "/admin/reports", tone: "attention" as const },
+    { label: "Open community reports", count: openCommunityReports, href: "/admin/reports?tab=communities", tone: "attention" as const },
+    { label: "Open appeals", count: openAppeals, href: "/admin/reports?tab=appeals", tone: "attention" as const },
+    {
+      label: "Prize payouts processing",
+      count: pendingPayouts._count,
+      detail: pendingPayouts._count ? naira(pendingPayouts._sum.amount ?? 0) : undefined,
+      href: "/admin/finance?tab=escrow&etype=PRIZE_PAYOUT&estatus=PENDING",
+      tone: "attention" as const,
+    },
+    {
+      label: "Withdrawals processing",
+      count: pendingWithdrawals._count,
+      detail: pendingWithdrawals._count ? naira(pendingWithdrawals._sum.amount ?? 0) : undefined,
+      href: "/admin/finance?type=WITHDRAWAL&status=PENDING",
+      tone: "attention" as const,
+    },
+    { label: "Tournaments with frozen funds", count: frozenTournaments, href: "/admin/competitions?frozen=1", tone: "neutral" as const },
   ];
+  const waiting = queues.filter((q) => q.count > 0);
 
-  const activity: ActivityItem[] = [
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(weekStart);
+    d.setDate(d.getDate() + i);
+    return d;
+  });
+  const tally = (rows: { createdAt: Date }[]) => {
+    const m = new Map(days.map((d) => [dayKey(d), 0]));
+    for (const r of rows) m.set(dayKey(r.createdAt), (m.get(dayKey(r.createdAt)) ?? 0) + 1);
+    return m;
+  };
+  const usersByDay = tally(weekUsers);
+  const regsByDay = tally(weekRegistrations);
+  const battlesByDay = tally(weekBattles);
+
+  const activity = [
     ...recentRegistrations.map((r) => ({
       id: `reg-${r.id}`,
-      message: `${r.user.displayName} joined ${r.tournament.name}`,
+      kind: "Registration",
+      text: (
+        <>
+          <span className="text-foreground">{r.user.displayName}</span> joined{" "}
+          <Link href={`/admin/competitions/${r.tournament.id}`} className="text-foreground hover:underline">
+            {r.tournament.name}
+          </Link>
+        </>
+      ),
       date: r.createdAt,
     })),
     ...recentBattles.map((b) => ({
       id: `battle-${b.id}`,
-      message: `${b.creator.displayName} created a new ${b.game} challenge`,
+      kind: "Challenge",
+      text: (
+        <>
+          <span className="text-foreground">{b.creator.displayName}</span> opened a{" "}
+          <Link href={`/admin/challenges/${b.id}`} className="text-foreground hover:underline">
+            {b.game} challenge
+          </Link>
+        </>
+      ),
       date: b.createdAt,
     })),
     ...recentWalletTx.map((t) => ({
       id: `wtx-${t.id}`,
-      message:
-        t.type === "FUND"
-          ? `${formatNaira(t.amount)} deposited by ${t.user.displayName}`
-          : `${formatNaira(t.amount)} withdrawn by ${t.user.displayName}`,
+      kind: t.type === "FUND" ? "Deposit" : "Withdrawal",
+      text: (
+        <>
+          <span className="text-foreground">{t.user.displayName}</span> {t.type === "FUND" ? "deposited" : "withdrew"}{" "}
+          <span className="font-mono text-foreground">{naira(t.amount)}</span>
+        </>
+      ),
       date: t.createdAt,
     })),
   ]
     .sort((a, b) => b.date.getTime() - a.date.getTime())
-    .slice(0, 8);
-
-  const days = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(sevenDaysAgo);
-    d.setDate(d.getDate() + i);
-    return d;
-  });
-  const buckets = new Map<string, number>();
-  for (const d of days) buckets.set(dayKey(d), 0);
-  for (const row of [...weekUsers, ...weekRegistrations, ...weekBattles]) {
-    const key = dayKey(row.createdAt);
-    buckets.set(key, (buckets.get(key) ?? 0) + 1);
-  }
-  const snapshot = days.map((d) => ({ date: d, count: buckets.get(dayKey(d)) ?? 0 }));
-  const maxCount = Math.max(1, ...snapshot.map((s) => s.count));
+    .slice(0, 10);
 
   return (
-    <div className="flex flex-1 flex-col gap-8">
-      <div className="flex flex-col gap-1">
-        <h1 className="font-display text-2xl font-bold tracking-tight">Overview</h1>
-        <p className="text-sm text-muted">What&apos;s happening on Circuit right now.</p>
-      </div>
+    <>
+      <PageHeader
+        title="Overview"
+        description={now.toLocaleDateString("en-NG", { weekday: "long", day: "numeric", month: "long" })}
+      />
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        {metrics.map((m) => (
-          <div key={m.label} className="card flex flex-col gap-2 !p-4 sm:flex-row sm:items-center sm:gap-4 sm:!p-5">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-volt-soft text-accent-volt sm:h-11 sm:w-11">
-              <m.icon size={19} />
-            </span>
-            <div className="flex flex-col">
-              <span className="text-xs font-medium text-muted">{m.label}</span>
-              <span className="font-display text-2xl font-bold tracking-tight">{m.value}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.1fr_1fr]">
-        <div className="card flex flex-col gap-4">
-          <h2 className="text-card-title">Recent Activity</h2>
-          {activity.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted">Nothing yet.</p>
-          ) : (
-            <div className="flex flex-col">
-              {activity.map((item, i) => {
-                const Icon = item.message.includes("deposited")
-                  ? Wallet
-                  : item.message.includes("withdrawn")
-                    ? ArrowDownToLine
-                    : item.message.includes("challenge")
-                      ? Swords
-                      : UserPlus;
-                return (
-                  <div
-                    key={item.id}
-                    className={`flex items-center gap-3 py-3 ${i > 0 ? "border-t border-border" : ""}`}
-                  >
-                    <Icon size={15} className="shrink-0 text-muted" />
-                    <span className="min-w-0 flex-1 truncate text-sm">{item.message}</span>
-                    <span className="shrink-0 text-xs text-muted-strong">{timeAgo(item.date)}</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        <div className="card flex flex-col gap-4">
-          <h2 className="text-card-title">Platform Snapshot</h2>
-          <p className="text-xs text-muted">New users, registrations, and challenges — last 7 days.</p>
-          <div className="flex flex-1 items-end justify-between gap-2 pt-2">
-            {snapshot.map((s) => (
-              <div key={dayKey(s.date)} className="flex flex-1 flex-col items-center gap-2">
-                <div className="flex h-24 w-full items-end">
-                  <div
-                    className="w-full rounded-t-[4px] bg-accent-volt"
-                    style={{ height: `${Math.max(6, (s.count / maxCount) * 100)}%` }}
-                  />
-                </div>
-                <span className="text-[10px] text-muted-strong">
-                  {s.date.toLocaleDateString("en-NG", { weekday: "narrow" })}
+      <Section title="Needs attention">
+        {waiting.length === 0 ? (
+          <Panel className="flex items-center gap-2.5 !py-3.5">
+            <CheckCircle2 size={16} className="text-success" />
+            <span className="text-[13px] text-muted">All clear — no disputes, reports, appeals or payouts waiting on staff.</span>
+          </Panel>
+        ) : (
+          <Panel padded={false}>
+            {waiting.map((q) => (
+              <Link
+                key={q.label}
+                href={q.href}
+                className="group flex items-center justify-between gap-3 border-b border-border px-4 py-3 transition-colors last:border-b-0 hover:bg-surface-elevated sm:px-5"
+              >
+                <span className="flex items-center gap-3 text-[13px] text-foreground">
+                  <StatusBadge tone={q.tone}>{q.count}</StatusBadge>
+                  {q.label}
+                  {q.detail && <span className="font-mono text-[12px] text-muted">{q.detail}</span>}
                 </span>
-              </div>
+                <ArrowUpRight size={15} className="text-muted-strong transition-colors group-hover:text-foreground" />
+              </Link>
             ))}
+          </Panel>
+        )}
+      </Section>
+
+      <StatStrip
+        stats={[
+          { label: "Users", value: userCount.toLocaleString("en-NG"), hint: `+${weekUsers.length} this week`, href: "/admin/users" },
+          {
+            label: "Open & live competitions",
+            value: activeCompetitions.toLocaleString("en-NG"),
+            hint: `${liveCompetitions} live now`,
+            href: "/admin/competitions",
+          },
+          { label: "Open challenges", value: openChallenges.toLocaleString("en-NG"), hint: `+${weekBattles.length} this week`, href: "/admin/challenges" },
+          {
+            label: "Entry-fee volume",
+            value: naira(entryFees._sum.amount ?? 0),
+            hint: `+${naira(weekEntryFees._sum.amount ?? 0)} this week`,
+            href: "/admin/finance",
+          },
+        ]}
+      />
+
+      <div className="grid grid-cols-1 gap-8 xl:grid-cols-[1fr_1.15fr]">
+        <Section title="Last 7 days">
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Day</th>
+                  <th className="text-right">Users</th>
+                  <th className="text-right">Registrations</th>
+                  <th className="text-right">Challenges</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...days].reverse().map((d) => {
+                  const k = dayKey(d);
+                  const today = k === dayKey(now);
+                  return (
+                    <tr key={k}>
+                      <td className="text-muted">
+                        {today ? <span className="text-foreground">Today</span> : `${d.toLocaleDateString("en-NG", { weekday: "short" })} ${d.getDate()}`}
+                      </td>
+                      {[usersByDay, regsByDay, battlesByDay].map((m, i) => {
+                        const n = m.get(k) ?? 0;
+                        return (
+                          <td key={i} className={`text-right font-mono ${n ? "text-foreground" : "text-muted-strong"}`}>
+                            {n}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        </div>
+        </Section>
+
+        <Section title="Recent activity">
+          {activity.length === 0 ? (
+            <EmptyState title="No activity yet" description="Registrations, challenges, deposits and withdrawals show up here as they happen." />
+          ) : (
+            <Panel padded={false}>
+              {activity.map((item) => (
+                <div key={item.id} className="flex items-center gap-3 border-b border-border px-4 py-2.5 last:border-b-0 sm:px-5">
+                  <span className="w-[76px] shrink-0 text-[11px] font-medium text-muted-strong">{item.kind}</span>
+                  <span className="min-w-0 flex-1 truncate text-[13px] text-muted">{item.text}</span>
+                  <span className="shrink-0 text-[12px] text-muted-strong tabular-nums">{timeAgo(item.date)}</span>
+                </div>
+              ))}
+            </Panel>
+          )}
+        </Section>
       </div>
-    </div>
+    </>
   );
 }

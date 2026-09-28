@@ -8,9 +8,9 @@ import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { communityHref } from "@/lib/community";
-import { CommunityAvatar } from "@/components/community/CommunityAvatar";
 import { CommunityEnabledToggle } from "@/components/admin/CommunityEnabledToggle";
 import { NewOfficialCommunity } from "@/components/admin/NewOfficialCommunity";
+import { Avatar, EmptyState, Field, FilterBar, PageHeader, StatusBadge } from "@/components/admin/ui";
 
 type SearchParams = { q?: string; kind?: string; status?: string };
 
@@ -32,92 +32,97 @@ export default async function AdminCommunitiesPage({ searchParams }: { searchPar
     include: { owner: { select: { handle: true } }, _count: { select: { members: true } } },
   });
 
+  const hasFilters = !!(q || kind || status);
+  const kindLabel = (c: (typeof communities)[number]) =>
+    c.kind === "GAME_HUB" ? "Game hub" : c.kind === "OFFICIAL" ? `Official · ${c.category === "LOCATION" ? "city" : "interest"}` : c.kind === "GLOBAL" ? "Circuit" : `Player · ${c.joinPolicy.toLowerCase()}`;
+
   return (
-    <div className="flex flex-1 flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="font-display text-2xl font-bold tracking-tight">Communities</h1>
-        <p className="text-sm text-muted">Game hubs are created automatically for every published game. Suspend anything that breaks the rules — owners can appeal from Reports & appeals.</p>
-      </div>
+    <>
+      <PageHeader
+        title="Communities"
+        description="Game hubs are created for every published game. Suspend anything that breaks the rules — owners see the reason and can appeal from Reports & appeals."
+        actions={<NewOfficialCommunity />}
+      />
 
-      <NewOfficialCommunity />
-
-      <form className="card filter-bar">
-        <div className="flex min-w-[200px] flex-1 flex-col gap-1.5">
-          <label className="field-label" htmlFor="q">
-            Search
-          </label>
+      <FilterBar
+        extra={
+          hasFilters && (
+            <Link href="/admin/communities" className="text-[12px] font-medium text-muted hover:text-foreground">
+              Clear
+            </Link>
+          )
+        }
+      >
+        <Field label="Search" grow htmlFor="q">
           <input id="q" name="q" defaultValue={q ?? ""} placeholder="Name or link" className="field-input" />
-        </div>
-        <div className="flex min-w-[140px] flex-col gap-1.5">
-          <label className="field-label" htmlFor="kind">
-            Type
-          </label>
+        </Field>
+        <Field label="Type" htmlFor="kind">
           <select id="kind" name="kind" defaultValue={kind ?? ""} className="field-select">
-            <option value="">All</option>
+            <option value="">All types</option>
             <option value="GAME_HUB">Game hubs</option>
             <option value="OFFICIAL">Cities &amp; interests</option>
             <option value="PLAYER">Player communities</option>
           </select>
-        </div>
-        <div className="flex min-w-[140px] flex-col gap-1.5">
-          <label className="field-label" htmlFor="status">
-            Status
-          </label>
+        </Field>
+        <Field label="Status" htmlFor="status">
           <select id="status" name="status" defaultValue={status ?? ""} className="field-select">
-            <option value="">All</option>
+            <option value="">Any status</option>
             <option value="active">Active</option>
             <option value="disabled">Suspended / closed</option>
           </select>
-        </div>
-        <button type="submit" className="btn-primary h-11 px-5">
-          Filter
-        </button>
-      </form>
+        </Field>
+      </FilterBar>
 
-      <div className="card overflow-x-auto p-0">
-        <table className="w-full min-w-[720px] text-sm">
-          <thead>
-            <tr className="border-b border-border text-left text-xs text-muted">
-              <th className="px-4 py-3 font-medium">Community</th>
-              <th className="px-4 py-3 font-medium">Type</th>
-              <th className="px-4 py-3 font-medium">Owner</th>
-              <th className="px-4 py-3 font-medium">Members</th>
-              <th className="px-4 py-3 font-medium">Last active</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {communities.map((c) => (
-              <tr key={c.id} className="border-b border-border last:border-0">
-                <td className="px-4 py-3">
-                  <Link href={communityHref(c)} className="flex items-center gap-3 hover:underline">
-                    <CommunityAvatar name={c.name ?? "?"} iconUrl={c.iconUrl} tag={c.tag} size="sm" />
-                    <span className="flex flex-col">
-                      <span className="font-medium">{c.name}</span>
-                      <span className="text-xs text-muted">/{c.slug}</span>
-                    </span>
-                  </Link>
-                </td>
-                <td className="px-4 py-3 text-muted">{c.kind === "GAME_HUB" ? "Game hub" : c.kind === "OFFICIAL" ? `Official · ${c.category === "LOCATION" ? "location" : "interest"}` : c.kind === "GLOBAL" ? "Circuit" : `Player · ${c.joinPolicy.toLowerCase()}`}</td>
-                <td className="px-4 py-3 text-muted">{c.owner ? `@${c.owner.handle}` : "Staff"}</td>
-                <td className="px-4 py-3 tabular-nums">{c._count.members.toLocaleString("en-NG")}</td>
-                <td className="px-4 py-3 text-muted">{formatDate(c.lastActivityAt)}</td>
-                <td className="px-4 py-3">{c.kind === "GLOBAL" ? <span className="text-muted">Always on</span> : <span className="flex items-center gap-2">
-                      {!c.enabled && <span className="badge badge-cancelled">{c.suspendedAt ? "Suspended" : "Closed"}</span>}
-                      <CommunityEnabledToggle communityId={c.id} enabled={c.enabled} name={c.name ?? "this community"} />
-                    </span>}</td>
-              </tr>
-            ))}
-            {communities.length === 0 && (
+      {communities.length === 0 ? (
+        <EmptyState title={hasFilters ? "No communities match these filters" : "No communities yet"} />
+      ) : (
+        <div className="table-wrap">
+          <table className="table min-w-[760px]">
+            <thead>
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-muted">
-                  No communities match.
-                </td>
+                <th>Community</th>
+                <th>Type</th>
+                <th>Owner</th>
+                <th className="text-right">Members</th>
+                <th className="text-right">Last active</th>
+                <th>Status</th>
+                <th className="w-[1%]" aria-label="Actions" />
               </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+            </thead>
+            <tbody>
+              {communities.map((c) => (
+                <tr key={c.id}>
+                  <td>
+                    <Link href={communityHref(c)} target="_blank" className="flex items-center gap-3">
+                      <Avatar name={c.name ?? "?"} src={c.iconUrl} size={30} square />
+                      <span className="flex min-w-0 flex-col leading-tight">
+                        <span className="truncate font-medium text-foreground">{c.name}</span>
+                        <span className="truncate text-[12px] text-muted">/{c.slug}</span>
+                      </span>
+                    </Link>
+                  </td>
+                  <td className="text-muted">{kindLabel(c)}</td>
+                  <td className="text-muted">{c.owner ? `@${c.owner.handle}` : "Staff"}</td>
+                  <td className="text-right">{c._count.members.toLocaleString("en-NG")}</td>
+                  <td className="text-right text-muted">{formatDate(c.lastActivityAt)}</td>
+                  <td>
+                    {c.kind === "GLOBAL" ? (
+                      <StatusBadge tone="neutral">Always on</StatusBadge>
+                    ) : c.enabled ? (
+                      <StatusBadge tone="success" dot>
+                        Active
+                      </StatusBadge>
+                    ) : (
+                      <StatusBadge tone="danger">{c.suspendedAt ? "Suspended" : "Closed"}</StatusBadge>
+                    )}
+                  </td>
+                  <td className="text-right">{c.kind !== "GLOBAL" && <CommunityEnabledToggle communityId={c.id} enabled={c.enabled} name={c.name ?? "this community"} />}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
   );
 }

@@ -68,9 +68,9 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
         href: `/dashboard/tournaments/${str(p, "tournamentId")}`,
       };
     case "DISPUTE_ESCALATED":
-      return { message: "A dispute was escalated to staff.", href: "/staff/disputes" };
+      return { message: "A dispute was escalated to staff.", href: "/admin/disputes" };
     case "REPORT_FILED":
-      return { message: "A new abuse report was filed.", href: "/staff/reports" };
+      return { message: "A new abuse report was filed.", href: "/admin/reports" };
     case "COMMUNITY_MENTION":
       return {
         message: `${str(p, "authorName") || "Someone"} mentioned you in #${str(p, "channelName") || "chat"}${
@@ -93,7 +93,7 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
         href: str(p, "href") || "/communities",
       };
     case "APPEAL_FILED":
-      return { message: "A new appeal is waiting for review.", href: "/staff/reports?tab=appeals" };
+      return { message: "A new appeal is waiting for review.", href: "/admin/reports?tab=appeals" };
     case "APPEAL_DECIDED":
       return {
         message: p.overturned

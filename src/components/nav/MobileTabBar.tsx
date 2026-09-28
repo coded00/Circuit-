@@ -197,10 +197,10 @@ export function MobileTabBar({ user }: { user: NavUser }) {
                 {user.isStaff && (
                   <>
                     <span className="text-eyebrow mt-2 px-3">Staff</span>
-                    <Link href="/staff/disputes" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
+                    <Link href="/admin/disputes" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
                       <Shield size={18} /> Disputes queue
                     </Link>
-                    <Link href="/staff/reports" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
+                    <Link href="/admin/reports" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
                       <Shield size={18} /> Reports
                     </Link>
                   </>

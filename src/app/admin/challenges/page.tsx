@@ -10,13 +10,13 @@
 import Link from "next/link";
 import type { Prisma, BattleStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { StatusPill, battleStatusInfo } from "@/components/StatusPill";
+import { battleStatusInfo } from "@/components/StatusPill";
+import { EmptyState, Field, FilterBar, naira, PageHeader, Pagination, StatusBadge, SubNav, toneFor } from "@/components/admin/ui";
+import { RowLink } from "@/components/admin/ui-client";
 
-type SearchParams = { q?: string; status?: string };
+type SearchParams = { q?: string; status?: string; page?: string };
 
-function formatNaira(kobo: number): string {
-  return `₦${(kobo / 100).toLocaleString("en-NG")}`;
-}
+const PAGE_SIZE = 30;
 
 function formatDate(date: Date): string {
   return date.toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" });
@@ -31,17 +31,22 @@ const STATUS_OPTIONS: { value: BattleStatus | ""; label: string }[] = [
 ];
 
 export default async function AdminChallengesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const { q, status } = await searchParams;
+  const { q, status, page: pageParam } = await searchParams;
+  const page = Math.max(1, Number(pageParam) || 1);
 
   const and: Prisma.BattleWhereInput[] = [];
   if (q?.trim()) and.push({ game: { contains: q.trim(), mode: "insensitive" } });
   if (status) and.push({ status: status as BattleStatus });
   const where: Prisma.BattleWhereInput = and.length ? { AND: and } : {};
 
-  const battles = await prisma.battle.findMany({
+  const [total, quickMatchCount, battles] = await Promise.all([
+    prisma.battle.count({ where }),
+    prisma.quickMatchChallenge.count(),
+    prisma.battle.findMany({
     where,
     orderBy: { createdAt: "desc" },
-    take: 50,
+    skip: (page - 1) * PAGE_SIZE,
+    take: PAGE_SIZE,
     include: {
       creator: { select: { displayName: true } },
       matches: {
@@ -52,33 +57,43 @@ export default async function AdminChallengesPage({ searchParams }: { searchPara
         },
       },
     },
-  });
+  }),
+  ]);
 
   const hasFilters = !!(q || status);
+  const pageHref = (n: number) => {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (status) params.set("status", status);
+    if (n > 1) params.set("page", String(n));
+    const qs = params.toString();
+    return qs ? `/admin/challenges?${qs}` : "/admin/challenges";
+  };
 
   return (
-    <div className="flex flex-1 flex-col gap-6">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <div className="flex flex-col gap-1">
-          <h1 className="font-display text-2xl font-bold tracking-tight">Challenges</h1>
-          <p className="text-sm text-muted">{battles.length.toLocaleString("en-NG")} challenges.</p>
-        </div>
-        <Link href="/admin/quick-matches" className="text-sm font-medium text-accent-volt hover:underline">
-          View Quick Matches →
-        </Link>
-      </div>
+    <>
+      <PageHeader title="Challenges" description="Player-vs-player matches outside tournaments — open challenges and Quick Matches." />
+      <SubNav
+        active="challenges"
+        items={[
+          { key: "challenges", label: "Challenges", href: "/admin/challenges", count: total },
+          { key: "quick", label: "Quick Matches", href: "/admin/quick-matches", count: quickMatchCount },
+        ]}
+      />
 
-      <form className="card filter-bar">
-        <div className="flex min-w-[200px] flex-1 flex-col gap-1.5">
-          <label className="field-label" htmlFor="q">
-            Game
-          </label>
+      <FilterBar
+        extra={
+          hasFilters && (
+            <Link href="/admin/challenges" className="text-[12px] font-medium text-muted hover:text-foreground">
+              Clear
+            </Link>
+          )
+        }
+      >
+        <Field label="Game" grow htmlFor="q">
           <input id="q" name="q" defaultValue={q ?? ""} placeholder="e.g. Valorant" className="field-input" />
-        </div>
-        <div className="flex min-w-[160px] flex-col gap-1.5">
-          <label className="field-label" htmlFor="status">
-            Status
-          </label>
+        </Field>
+        <Field label="Status" htmlFor="status">
           <select id="status" name="status" defaultValue={status ?? ""} className="field-select">
             {STATUS_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
@@ -86,66 +101,55 @@ export default async function AdminChallengesPage({ searchParams }: { searchPara
               </option>
             ))}
           </select>
-        </div>
-        <button type="submit" className="btn-primary">
-          Apply
-        </button>
-        {hasFilters && (
-          <Link href="/admin/challenges" className="text-xs font-medium text-accent-volt hover:underline">
-            Clear filters
-          </Link>
-        )}
-      </form>
+        </Field>
+      </FilterBar>
 
       {battles.length === 0 ? (
-        <div className="card flex flex-col items-center gap-1 py-16 text-center">
-          <p className="text-sm text-muted">No challenges match those filters.</p>
-        </div>
+        <EmptyState title={hasFilters ? "No challenges match these filters" : "No challenges yet"} description={hasFilters ? "Try a broader search or clear the filters." : undefined} />
       ) : (
-        <div className="table-wrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Game</th>
-                <th>Host</th>
-                <th>Challenger</th>
-                <th>Entry</th>
-                <th>Status</th>
-                <th>Created</th>
-              </tr>
-            </thead>
-            <tbody>
-              {battles.map((b) => {
-                const statusInfo = battleStatusInfo(b.status);
-                const match = b.matches[0];
-                const challenger = match
-                  ? match.playerAId === b.creatorId
-                    ? match.playerB.displayName
-                    : match.playerA.displayName
-                  : null;
-                return (
-                  <tr key={b.id}>
-                    <td>
-                      <Link href={`/admin/challenges/${b.id}`} className="font-medium hover:text-accent-volt">
-                        {b.game}
-                      </Link>
-                    </td>
-                    <td className="text-muted">{b.creator.displayName}</td>
-                    <td className="text-muted">{challenger ?? "—"}</td>
-                    <td className="font-mono tabular-nums">{b.stakeAmount === 0 ? "Free" : formatNaira(b.stakeAmount)}</td>
-                    <td>
-                      <StatusPill tone={statusInfo.tone} pulse={statusInfo.pulse}>
-                        {statusInfo.label}
-                      </StatusPill>
-                    </td>
-                    <td className="text-muted">{formatDate(b.createdAt)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="flex flex-col gap-3">
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Game</th>
+                  <th>Host</th>
+                  <th>Challenger</th>
+                  <th className="text-right">Stake</th>
+                  <th>Status</th>
+                  <th className="text-right">Created</th>
+                </tr>
+              </thead>
+              <tbody>
+                {battles.map((b) => {
+                  const statusInfo = battleStatusInfo(b.status);
+                  const match = b.matches[0];
+                  const challenger = match ? (match.playerAId === b.creatorId ? match.playerB.displayName : match.playerA.displayName) : null;
+                  return (
+                    <RowLink key={b.id} href={`/admin/challenges/${b.id}`}>
+                      <td>
+                        <Link href={`/admin/challenges/${b.id}`} className="font-medium text-foreground">
+                          {b.game}
+                        </Link>
+                      </td>
+                      <td className="text-muted">{b.creator.displayName}</td>
+                      <td className="text-muted">{challenger ?? "—"}</td>
+                      <td className="text-right">{b.stakeAmount === 0 ? <span className="text-muted">Free</span> : naira(b.stakeAmount)}</td>
+                      <td>
+                        <StatusBadge tone={toneFor(statusInfo.tone)} dot={statusInfo.pulse}>
+                          {statusInfo.label}
+                        </StatusBadge>
+                      </td>
+                      <td className="text-right text-muted">{formatDate(b.createdAt)}</td>
+                    </RowLink>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <Pagination page={page} pageSize={PAGE_SIZE} total={total} href={pageHref} />
         </div>
       )}
-    </div>
+    </>
   );
 }

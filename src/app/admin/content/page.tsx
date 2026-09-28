@@ -18,16 +18,19 @@ import { prisma } from "@/lib/db";
 import { BannerList } from "@/components/admin/BannerList";
 import { AnnouncementList } from "@/components/admin/AnnouncementList";
 import { VideoQueue } from "@/components/admin/VideoQueue";
+import { EmptyState, PageHeader, Panel, Section, SubNav } from "@/components/admin/ui";
 
-export default async function AdminContentPage() {
+export default async function AdminContentPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+  const { tab: tabParam } = await searchParams;
+  const tab = tabParam === "videos" || tabParam === "news" ? tabParam : "homepage";
   const [banners, announcements, newsItems, videos, videoCounts] = await Promise.all([
     prisma.homepageBanner.findMany({ orderBy: { order: "asc" } }),
     prisma.announcement.findMany({ orderBy: { createdAt: "desc" } }),
-    fetchGamerNews().catch(() => []),
+    tab === "news" ? fetchGamerNews().catch(() => []) : Promise.resolve([] as Awaited<ReturnType<typeof fetchGamerNews>>),
     prisma.video.findMany({
       where: { status: { in: ["DRAFT", "PUBLISHED"] } },
       orderBy: [{ publishedAt: { sort: "desc", nulls: "last" } }],
-      take: 120,
+      take: 500,
       select: { id: true, title: true, thumbnailUrl: true, sourceAuthor: true, sourceUrl: true, game: true, status: true },
     }),
     prisma.video.groupBy({ by: ["status"], _count: { _all: true } }),
@@ -35,75 +38,66 @@ export default async function AdminContentPage() {
   const countOf = (s: "DRAFT" | "PUBLISHED") => videoCounts.find((c) => c.status === s)?._count._all ?? 0;
 
   return (
-    <div className="flex flex-1 flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="font-display text-2xl font-bold tracking-tight">Content</h1>
-        <p className="text-sm text-muted">What shows up on the player-facing platform.</p>
-      </div>
+    <>
+      <PageHeader title="Content" description="What players see on the homepage and in the feed." />
+      <SubNav
+        active={tab}
+        items={[
+          { key: "homepage", label: "Homepage", href: "/admin/content" },
+          { key: "videos", label: "Feed videos", href: "/admin/content?tab=videos", count: countOf("DRAFT") || undefined },
+          { key: "news", label: "Gamer news", href: "/admin/content?tab=news" },
+        ]}
+      />
 
-      <div className="card flex flex-col gap-1">
-        <h2 className="text-card-title">Homepage Carousel</h2>
-        <p className="text-xs text-muted">
-          Real slides on the player homepage hero — reorder with the arrows, disable without deleting, or schedule a future
-          publish date. No banners published falls back to Circuit&apos;s default pitch.
-        </p>
-        <BannerList
-          banners={banners.map((b) => ({
-            ...b,
-            publishAt: b.publishAt?.toISOString() ?? null,
-          }))}
-        />
-      </div>
+      {tab === "homepage" && (
+        <>
+          <Section
+            title="Homepage carousel"
+            description="Slides on the player homepage hero. Reorder with the arrows, disable without deleting, or schedule a publish date. With none live, the homepage shows Circuit's default pitch."
+          >
+            <Panel>
+              <BannerList banners={banners.map((b) => ({ ...b, publishAt: b.publishAt?.toISOString() ?? null }))} />
+            </Panel>
+          </Section>
+          <Section title="Announcements" description="The most recent enabled announcement shows in a strip at the top of the homepage.">
+            <Panel>
+              <AnnouncementList announcements={announcements.map((a) => ({ ...a, createdAt: a.createdAt.toISOString() }))} />
+            </Panel>
+          </Section>
+        </>
+      )}
 
-      <div className="card flex flex-col gap-2">
-        <h2 className="text-card-title">Feed videos</h2>
-        <p className="text-xs text-muted">
-          Clips in the player Feed. Imports pull the latest shorts from the approved YouTube channels as drafts — nothing appears in the
-          Feed until it&apos;s published here.
-        </p>
-        <VideoQueue
-          videos={videos}
-          counts={{ DRAFT: countOf("DRAFT"), PUBLISHED: countOf("PUBLISHED") }}
-          youtubeConfigured={!!process.env.YOUTUBE_API_KEY}
-        />
-      </div>
+      {tab === "videos" && (
+        <Section description="Clips in the player feed. Imports pull the latest shorts from the approved YouTube channels as drafts — nothing appears in the feed until it's published here.">
+          <VideoQueue videos={videos} counts={{ DRAFT: countOf("DRAFT"), PUBLISHED: countOf("PUBLISHED") }} youtubeConfigured={!!process.env.YOUTUBE_API_KEY} />
+        </Section>
+      )}
 
-      <div className="card flex flex-col gap-1">
-        <h2 className="text-card-title">Gamer News</h2>
-        <p className="text-xs text-muted">
-          Live RSS from real gaming outlets
-          {newsItems.length > 0 && ` (${[...new Set(newsItems.map((n) => n.source))].join(", ")})`} — not admin-editable, shown
-          here for reference only.
-        </p>
-        {newsItems.length === 0 ? (
-          <p className="py-4 text-center text-sm text-muted">Feed unavailable right now.</p>
-        ) : (
-          <div className="flex flex-col">
-            {newsItems.slice(0, 5).map((item, i) => (
-              <a
-                key={item.link}
-                href={item.link}
-                target="_blank"
-                rel="noreferrer"
-                className={`flex items-center justify-between gap-3 py-2.5 text-sm hover:text-accent-volt ${i > 0 ? "border-t border-border" : ""}`}
-              >
-                <span className="min-w-0 flex-1 truncate">
-                  <span className="text-muted-strong">{item.source}</span> · {item.title}
-                </span>
-                <span className="shrink-0 text-xs text-muted-strong">{item.publishedAt.toLocaleDateString("en-NG")}</span>
-              </a>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="card flex flex-col gap-1">
-        <h2 className="text-card-title">Announcements</h2>
-        <p className="text-xs text-muted">The most recently-published enabled announcement shows in a strip at the top of the homepage.</p>
-        <AnnouncementList
-          announcements={announcements.map((a) => ({ ...a, createdAt: a.createdAt.toISOString() }))}
-        />
-      </div>
-    </div>
+      {tab === "news" && (
+        <Section
+          description={`Live RSS from gaming outlets${newsItems.length > 0 ? ` (${[...new Set(newsItems.map((n) => n.source))].join(", ")})` : ""}. Not editable — shown here for reference.`}
+        >
+          {newsItems.length === 0 ? (
+            <EmptyState title="News feed unavailable right now" description="The outlets' RSS feeds didn't respond. It retries on the next load." />
+          ) : (
+            <Panel padded={false}>
+              {newsItems.slice(0, 15).map((item) => (
+                <a
+                  key={item.link}
+                  href={item.link}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-3 border-b border-border px-4 py-2.5 text-[13px] transition-colors last:border-b-0 hover:bg-surface-elevated sm:px-5"
+                >
+                  <span className="w-[110px] shrink-0 truncate text-[12px] text-muted-strong">{item.source}</span>
+                  <span className="min-w-0 flex-1 truncate text-foreground">{item.title}</span>
+                  <span className="shrink-0 text-[12px] text-muted">{item.publishedAt.toLocaleDateString("en-NG", { day: "numeric", month: "short" })}</span>
+                </a>
+              ))}
+            </Panel>
+          )}
+        </Section>
+      )}
+    </>
   );
 }

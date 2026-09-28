@@ -154,7 +154,7 @@ function ModeCard({
         <ReorderButtons label={mode.name} onUp={() => onReorder(-1)} onDown={() => onReorder(1)} disableUp={index === 0 || busy} disableDown={index === count - 1 || busy} />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="flex flex-wrap items-center gap-2">
-            <span className="font-display text-base font-bold tracking-tight">{mode.name}</span>
+            <span className="text-[14px] font-semibold">{mode.name}</span>
             <span className="badge badge-neutral">{mode.style === "LOBBY" ? "Lobby" : "Head-to-head"}</span>
             {!mode.enabled && <StatusBadge enabled={false} />}
           </span>

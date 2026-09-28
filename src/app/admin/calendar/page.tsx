@@ -10,20 +10,17 @@
 
 import { prisma } from "@/lib/db";
 import { CalendarEventList } from "@/components/admin/CalendarEventList";
+import { PageHeader, Panel } from "@/components/admin/ui";
 
 export default async function AdminCalendarPage() {
   const events = await prisma.calendarEvent.findMany({ orderBy: { date: "desc" }, take: 100 });
 
   return (
-    <div className="flex flex-1 flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="font-display text-2xl font-bold tracking-tight">Calendar</h1>
-        <p className="text-sm text-muted">Community and Game Release events on the player calendar.</p>
-      </div>
-
-      <div className="card flex flex-col gap-1">
+    <>
+      <PageHeader title="Calendar" description="Community events and game releases on the player calendar. Tournaments and challenges appear there automatically." />
+      <Panel>
         <CalendarEventList events={events.map((e) => ({ ...e, date: e.date.toISOString() }))} />
-      </div>
-    </div>
+      </Panel>
+    </>
   );
 }

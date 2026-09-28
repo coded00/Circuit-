@@ -5,22 +5,19 @@
  * on success instead of out to the public tournament page.
  */
 
-import Link from "next/link";
 import { loadOrganizerCatalog } from "@/lib/competitionConfig";
 import TournamentForm from "@/app/tournaments/new/TournamentForm";
+import { PageHeader, Panel } from "@/components/admin/ui";
 
 export default async function AdminNewCompetitionPage() {
   const catalog = await loadOrganizerCatalog();
 
   return (
-    <div className="flex flex-1 flex-col gap-6">
-      <Link href="/admin/competitions" className="w-fit text-sm font-medium text-muted transition hover:text-foreground">
-        ← All competitions
-      </Link>
-      <h1 className="font-display text-2xl font-bold tracking-tight">Create a competition</h1>
-      <div className="card max-w-2xl">
+    <>
+      <PageHeader back={{ href: "/admin/competitions", label: "Competitions" }} title="New competition" description="Created under your account as organizer. Pick the game, format and dates; players can register as soon as registration opens." />
+      <Panel className="max-w-2xl">
         <TournamentForm redirectBase="/admin/competitions" catalog={catalog} />
-      </div>
-    </div>
+      </Panel>
+    </>
   );
 }

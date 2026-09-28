@@ -140,10 +140,10 @@ export function AccountMenu({
             <>
               <div className="my-1 border-t border-border" />
               <span className="text-eyebrow block px-4 py-1">Staff</span>
-              <MenuLink href="/staff/disputes" icon={Shield} onClick={() => setOpen(false)}>
+              <MenuLink href="/admin/disputes" icon={Shield} onClick={() => setOpen(false)}>
                 Disputes queue
               </MenuLink>
-              <MenuLink href="/staff/reports" icon={Shield} onClick={() => setOpen(false)}>
+              <MenuLink href="/admin/reports" icon={Shield} onClick={() => setOpen(false)}>
                 Reports
               </MenuLink>
             </>

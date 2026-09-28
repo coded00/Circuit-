@@ -1,24 +1,21 @@
 /**
- * Circuit — Admin Competitions (Phase 2). Every real Tournament, with
- * admin-capable actions on top of the same real routes the organizer
- * dashboard already uses (Edit, Manage Players, Cancel) — their auth
- * gates now also accept staff, not just each tournament's own organizer,
- * rather than duplicating that logic here. Bracket is admin-native
- * (`/admin/competitions/[id]/bracket`, same `BracketView` the
- * player-facing page renders).
+ * Circuit — Admin Competitions: every tournament, paginated and
+ * filterable (status, game, frozen funds). A row opens its detail page,
+ * where the actions live (edit, bracket, freeze, cancel) — the list
+ * itself carries no destructive buttons.
  */
 
 import Link from "next/link";
 import type { Prisma, TournamentStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { StatusPill, tournamentStatusInfo } from "@/components/StatusPill";
-import { CancelTournamentButton } from "@/components/CancelTournamentButton";
+import { Plus } from "lucide-react";
+import { getStructure } from "@/lib/competitionStructures";
+import { EmptyState, Field, FilterBar, naira, PageHeader, Pagination, plural, StatusBadge, TournamentStatusBadge } from "@/components/admin/ui";
+import { RowLink } from "@/components/admin/ui-client";
 
-type SearchParams = { q?: string; status?: string; game?: string };
+type SearchParams = { q?: string; status?: string; game?: string; frozen?: string; page?: string };
 
-function formatNaira(kobo: number): string {
-  return `₦${(kobo / 100).toLocaleString("en-NG")}`;
-}
+const PAGE_SIZE = 30;
 
 function formatDate(date: Date): string {
   return date.toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" });
@@ -27,67 +24,87 @@ function formatDate(date: Date): string {
 const STATUS_OPTIONS: { value: TournamentStatus | ""; label: string }[] = [
   { value: "", label: "Any status" },
   { value: "DRAFT", label: "Draft" },
-  { value: "OPEN", label: "Open" },
-  { value: "CLOSED", label: "Closed" },
+  { value: "OPEN", label: "Registration open" },
+  { value: "CLOSED", label: "Registration closed" },
   { value: "LIVE", label: "Live" },
   { value: "COMPLETE", label: "Complete" },
   { value: "CANCELLED", label: "Cancelled" },
 ];
 
 export default async function AdminCompetitionsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const { q, status, game } = await searchParams;
+  const { q, status, game, frozen, page: pageParam } = await searchParams;
+  const page = Math.max(1, Number(pageParam) || 1);
 
   const and: Prisma.TournamentWhereInput[] = [];
   if (q?.trim()) and.push({ name: { contains: q.trim(), mode: "insensitive" } });
   if (status) and.push({ status: status as TournamentStatus });
   if (game?.trim()) and.push({ game: { contains: game.trim(), mode: "insensitive" } });
+  if (frozen === "1") and.push({ fundsFrozen: true });
   const where: Prisma.TournamentWhereInput = and.length ? { AND: and } : {};
 
-  const tournaments = await prisma.tournament.findMany({
-    where,
-    orderBy: { createdAt: "desc" },
-    take: 50,
-    select: {
-      id: true,
-      name: true,
-      game: true,
-      status: true,
-      entryFee: true,
-      prizeAmount: true,
-      prizeText: true,
-      participantCap: true,
-      startAt: true,
-      registrationCloseAt: true,
-      fundsFrozen: true,
-      _count: { select: { registrations: { where: { status: "CONFIRMED" } } } },
-    },
-  });
+  const [total, tournaments] = await Promise.all([
+    prisma.tournament.count({ where }),
+    prisma.tournament.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+      select: {
+        id: true,
+        name: true,
+        game: true,
+        teamSize: true,
+        format: true,
+        status: true,
+        entryFee: true,
+        prizeAmount: true,
+        prizeText: true,
+        participantCap: true,
+        startAt: true,
+        fundsFrozen: true,
+        organizer: { select: { user: { select: { displayName: true } } } },
+        _count: { select: { registrations: { where: { status: "CONFIRMED" } } } },
+      },
+    }),
+  ]);
 
-  const hasFilters = !!(q || status || game);
+  const hasFilters = !!(q || status || game || frozen);
+  const pageHref = (n: number) => {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (status) params.set("status", status);
+    if (game) params.set("game", game);
+    if (frozen) params.set("frozen", frozen);
+    if (n > 1) params.set("page", String(n));
+    const qs = params.toString();
+    return qs ? `/admin/competitions?${qs}` : "/admin/competitions";
+  };
 
   return (
-    <div className="flex flex-1 flex-col gap-6">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex flex-col gap-1">
-          <h1 className="font-display text-2xl font-bold tracking-tight">Competitions</h1>
-          <p className="text-sm text-muted">{tournaments.length.toLocaleString("en-NG")} tournaments.</p>
-        </div>
-        <Link href="/admin/competitions/new" className="btn-primary">
-          + Create
-        </Link>
-      </div>
+    <>
+      <PageHeader
+        title="Competitions"
+        description={`${plural(total, "tournament")}${hasFilters ? " match these filters" : ""}.`}
+        actions={
+          <Link href="/admin/competitions/new" className="btn-primary">
+            <Plus size={15} /> New competition
+          </Link>
+        }
+      />
 
-      <form className="card filter-bar">
-        <div className="flex min-w-[200px] flex-1 flex-col gap-1.5">
-          <label className="field-label" htmlFor="q">
-            Search
-          </label>
+      <FilterBar
+        extra={
+          hasFilters && (
+            <Link href="/admin/competitions" className="text-[12px] font-medium text-muted hover:text-foreground">
+              Clear
+            </Link>
+          )
+        }
+      >
+        <Field label="Search" grow htmlFor="q">
           <input id="q" name="q" defaultValue={q ?? ""} placeholder="Tournament name" className="field-input" />
-        </div>
-        <div className="flex min-w-[140px] flex-col gap-1.5">
-          <label className="field-label" htmlFor="status">
-            Status
-          </label>
+        </Field>
+        <Field label="Status" htmlFor="status">
           <select id="status" name="status" defaultValue={status ?? ""} className="field-select">
             {STATUS_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
@@ -95,89 +112,83 @@ export default async function AdminCompetitionsPage({ searchParams }: { searchPa
               </option>
             ))}
           </select>
-        </div>
-        <div className="flex min-w-[140px] flex-col gap-1.5">
-          <label className="field-label" htmlFor="game">
-            Game
-          </label>
+        </Field>
+        <Field label="Game" htmlFor="game">
           <input id="game" name="game" defaultValue={game ?? ""} placeholder="e.g. Valorant" className="field-input" />
-        </div>
-        <button type="submit" className="btn-primary">
-          Apply
-        </button>
-        {hasFilters && (
-          <Link href="/admin/competitions" className="text-xs font-medium text-accent-volt hover:underline">
-            Clear filters
-          </Link>
-        )}
-      </form>
+        </Field>
+        <Field label="Funds" htmlFor="frozen">
+          <select id="frozen" name="frozen" defaultValue={frozen ?? ""} className="field-select">
+            <option value="">Any</option>
+            <option value="1">Frozen only</option>
+          </select>
+        </Field>
+      </FilterBar>
 
       {tournaments.length === 0 ? (
-        <div className="card flex flex-col items-center gap-1 py-16 text-center">
-          <p className="text-sm text-muted">No competitions match those filters.</p>
-        </div>
+        <EmptyState
+          title={hasFilters ? "No competitions match these filters" : "No competitions yet"}
+          description={hasFilters ? "Try a broader search or clear the filters." : "Tournaments organizers create show up here."}
+          action={
+            !hasFilters && (
+              <Link href="/admin/competitions/new" className="btn-secondary">
+                New competition
+              </Link>
+            )
+          }
+        />
       ) : (
-        <div className="table-wrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Competition</th>
-                <th>Game</th>
-                <th>Players</th>
-                <th>Prize</th>
-                <th>Status</th>
-                <th>Date</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tournaments.map((t) => {
-                const statusInfo = tournamentStatusInfo(t.status);
-                // Matches tournaments/[id]/cancel/route.ts's own guard —
-                // see admin/competitions/[id]/page.tsx's own comment on
-                // why this doesn't also check startAt.
-                const cancellable = t.status !== "CANCELLED" && t.status !== "COMPLETE" && !t.fundsFrozen;
-                return (
-                  <tr key={t.id}>
-                    <td>
-                      <Link href={`/admin/competitions/${t.id}`} className="font-medium hover:text-accent-volt">
-                        {t.name}
+        <div className="flex flex-col gap-3">
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Competition</th>
+                  <th>Format</th>
+                  <th className="text-right">Entries</th>
+                  <th className="text-right">Entry</th>
+                  <th className="text-right">Prize</th>
+                  <th>Status</th>
+                  <th className="text-right">Starts</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tournaments.map((t) => (
+                  <RowLink key={t.id} href={`/admin/competitions/${t.id}`}>
+                    <td className="max-w-[320px]">
+                      <Link href={`/admin/competitions/${t.id}`} className="flex min-w-0 flex-col leading-tight">
+                        <span className="truncate font-medium text-foreground">{t.name}</span>
+                        <span className="truncate text-[12px] text-muted">
+                          {t.game} · by {t.organizer.user.displayName}
+                        </span>
                       </Link>
                     </td>
-                    <td className="text-muted">{t.game}</td>
-                    <td className="font-mono tabular-nums">
-                      {t._count.registrations} / {t.participantCap}
+                    <td className="text-muted">
+                      <span className="flex flex-col leading-tight">
+                        <span className="text-foreground">{getStructure(t.format)?.label ?? t.format}</span>
+                        <span className="text-[12px]">{t.teamSize}</span>
+                      </span>
                     </td>
-                    <td className="font-mono tabular-nums text-gold">
-                      {t.prizeAmount ? formatNaira(t.prizeAmount) : t.prizeText || "—"}
+                    <td className="text-right">
+                      {t._count.registrations}
+                      <span className="text-muted-strong">/{t.participantCap}</span>
                     </td>
+                    <td className="text-right">{t.entryFee ? naira(t.entryFee) : <span className="text-muted">Free</span>}</td>
+                    <td className="text-right">{t.prizeAmount ? naira(t.prizeAmount) : <span className="text-muted">{t.prizeText ? "Non-cash" : "—"}</span>}</td>
                     <td>
-                      <StatusPill tone={statusInfo.tone} pulse={statusInfo.pulse}>
-                        {statusInfo.label}
-                      </StatusPill>
+                      <span className="flex flex-wrap items-center gap-1.5">
+                        <TournamentStatusBadge status={t.status} />
+                        {t.fundsFrozen && <StatusBadge tone="attention">Funds frozen</StatusBadge>}
+                      </span>
                     </td>
-                    <td className="text-muted">{formatDate(t.startAt)}</td>
-                    <td>
-                      <div className="flex items-center gap-3">
-                        <Link href={`/admin/competitions/${t.id}/edit`} className="text-xs font-medium text-accent-blue hover:underline">
-                          Edit
-                        </Link>
-                        <Link href={`/admin/competitions/${t.id}`} className="text-xs font-medium text-accent-blue hover:underline">
-                          Manage
-                        </Link>
-                        <Link href={`/admin/competitions/${t.id}/bracket`} className="text-xs font-medium text-accent-blue hover:underline">
-                          Bracket
-                        </Link>
-                        {cancellable && <CancelTournamentButton tournamentId={t.id} />}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                    <td className="text-right text-muted">{formatDate(t.startAt)}</td>
+                  </RowLink>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Pagination page={page} pageSize={PAGE_SIZE} total={total} href={pageHref} />
         </div>
       )}
-    </div>
+    </>
   );
 }

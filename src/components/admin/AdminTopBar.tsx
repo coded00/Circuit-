@@ -16,8 +16,10 @@
 
 import { logout } from "@/lib/logout";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { LogOut, ExternalLink } from "lucide-react";
 import { AdminMobileNav } from "./AdminMobileNav";
+import { adminSectionFor } from "./AdminSidebar";
 
 export function AdminTopBar({
   admin,
@@ -25,22 +27,32 @@ export function AdminTopBar({
   admin: { displayName: string; avatarUrl: string | null };
 }) {
 
+  const section = adminSectionFor(usePathname());
+
   function handleLogout() {
     void logout("/login");
   }
 
   return (
-    <header className="flex h-[64px] shrink-0 items-center justify-between border-b border-border px-4 sm:px-8">
-      <div className="flex items-center gap-3">
+    <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center justify-between border-b border-border bg-background/90 px-4 backdrop-blur sm:px-8">
+      <div className="flex min-w-0 items-center gap-2 text-[13px]">
         <AdminMobileNav />
-        <span className="text-eyebrow text-muted-strong">Circuit Admin</span>
+        <span className="hidden text-muted-strong sm:inline">Admin</span>
+        {section && (
+          <>
+            <span className="hidden text-muted-strong sm:inline" aria-hidden>
+              /
+            </span>
+            <span className="truncate font-medium text-foreground">{section.label}</span>
+          </>
+        )}
       </div>
 
       <div className="flex items-center gap-4">
         <Link
           href="/"
           target="_blank"
-          className="hidden items-center gap-1.5 text-sm font-medium text-muted transition hover:text-foreground sm:flex"
+          className="hidden items-center gap-1.5 text-[13px] font-medium text-muted transition hover:text-foreground sm:flex"
         >
           View Site
           <ExternalLink size={13} />
@@ -51,13 +63,13 @@ export function AdminTopBar({
         <div className="flex items-center gap-2.5">
           {admin.avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs
-            <img src={admin.avatarUrl} alt="" className="h-8 w-8 rounded-full border border-border object-cover" />
+            <img src={admin.avatarUrl} alt="" className="h-7 w-7 rounded-full border border-border object-cover" />
           ) : (
-            <div className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface-elevated text-xs font-semibold text-muted">
+            <div className="flex h-7 w-7 items-center justify-center rounded-full border border-border bg-surface-elevated text-[11px] font-semibold text-muted">
               {admin.displayName.slice(0, 1).toUpperCase()}
             </div>
           )}
-          <span className="hidden text-sm font-medium sm:inline">{admin.displayName}</span>
+          <span className="hidden text-[13px] font-medium sm:inline">{admin.displayName}</span>
         </div>
 
         <button

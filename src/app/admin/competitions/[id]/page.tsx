@@ -13,16 +13,14 @@
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AlertTriangle, Snowflake } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, Download, Snowflake } from "lucide-react";
 import { prisma } from "@/lib/db";
-import { prizePayoutSummary } from "@/lib/prizes";
-import { StatusPill, registrationStatusInfo, tournamentStatusInfo } from "@/components/StatusPill";
-import { CancelTournamentButton } from "@/components/CancelTournamentButton";
+import { describeSplit, prizePayoutSummary } from "@/lib/prizes";
+import { getStructure } from "@/lib/competitionStructures";
+import { EmptyState, naira, PageHeader, Panel, RegistrationBadge, Section, StatStrip, StatusBadge, TournamentStatusBadge } from "@/components/admin/ui";
+import { RowLink } from "@/components/admin/ui-client";
+import { AdminCancelTournament } from "@/components/admin/AdminCancelTournament";
 import { FreezeFundsControl } from "@/components/admin/FreezeFundsControl";
-
-function formatNaira(kobo: number): string {
-  return `₦${(kobo / 100).toLocaleString("en-NG")}`;
-}
 
 function formatDateTime(date: Date): string {
   return date.toLocaleString("en-NG", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
@@ -31,8 +29,9 @@ function formatDateTime(date: Date): string {
 export default async function AdminCompetitionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  const tournament = await prisma.tournament.findUnique({ where: { id } });
+  const tournament = await prisma.tournament.findUnique({ where: { id }, include: { organizer: { select: { user: { select: { displayName: true } } } } } });
   if (!tournament) notFound();
+  const organizerName = tournament.organizer.user.displayName;
 
   const [registrations, escrowTxns, openDisputes, bracket, latestFreezeAction] = await Promise.all([
     prisma.registration.findMany({
@@ -63,7 +62,6 @@ export default async function AdminCompetitionDetailPage({ params }: { params: P
   const organizerRevenuePending = escrowTxns.filter((t) => t.type === "ORGANIZER_REVENUE" && t.status === "PENDING").reduce((s, t) => s + t.amount, 0);
   const refunded = escrowTxns.filter((t) => t.type === "REFUND").reduce((s, t) => s + t.amount, 0);
   const payoutSummary = prizePayoutSummary(escrowTxns, tournament.prizeSplit);
-  const status = tournamentStatusInfo(tournament.status);
   // Matches tournaments/[id]/cancel/route.ts's own guard exactly — that
   // route stopped blocking cancellation once startAt passes (a live
   // tournament can still be voided/refunded), but this button's own
@@ -76,159 +74,172 @@ export default async function AdminCompetitionDetailPage({ params }: { params: P
       ? ((latestFreezeAction.metadata as { reason?: string } | null)?.reason ?? null)
       : null;
 
-  return (
-    <div className="flex flex-1 flex-col gap-6">
-      <Link href="/admin/competitions" className="w-fit text-sm font-medium text-muted transition hover:text-foreground">
-        ← All competitions
-      </Link>
+  const structure = getStructure(tournament.format);
+  const standingsLabel = tournament.competitionStyle === "LOBBY" || ["ROUND_ROBIN", "SWISS"].includes(tournament.format) ? "Standings" : "Bracket";
+  const started = tournament.status === "LIVE" || tournament.status === "COMPLETE";
+  const confirmed = registrations.filter((r) => r.status === "CONFIRMED").length;
 
-      <div className="card flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-col gap-2">
-          <StatusPill tone={status.tone} pulse={status.pulse}>
-            {status.label}
-          </StatusPill>
-          <h1 className="font-display text-2xl font-bold tracking-tight">{tournament.name}</h1>
-          <span className="text-sm text-muted">{tournament.game}</span>
-        </div>
-        <div className="flex flex-col items-end gap-2">
-          <div className="flex items-center gap-4">
-            <Link href={`/tournaments/${id}`} target="_blank" className="text-sm font-medium text-accent-blue hover:underline">
-              View public page ↗
+  return (
+    <>
+      <PageHeader
+        back={{ href: "/admin/competitions", label: "Competitions" }}
+        title={tournament.name}
+        meta={
+          <>
+            <TournamentStatusBadge status={tournament.status} />
+            {tournament.fundsFrozen && <StatusBadge tone="attention">Funds frozen</StatusBadge>}
+            <span>
+              {tournament.game} · {structure?.label ?? tournament.format} · {tournament.teamSize}
+            </span>
+          </>
+        }
+        actions={
+          <>
+            <Link href={`/tournaments/${id}`} target="_blank" className="btn-ghost">
+              Public page <ArrowUpRight size={14} />
             </Link>
-            <Link href={`/admin/competitions/${id}/edit`} className="btn-secondary text-sm">
+            {(bracket || started) && (
+              <Link href={`/admin/competitions/${id}/bracket`} className="btn-secondary">
+                {standingsLabel}
+              </Link>
+            )}
+            <Link href={`/admin/competitions/${id}/edit`} className="btn-secondary">
               Edit
             </Link>
-            {cancellable && <CancelTournamentButton tournamentId={id} />}
-          </div>
-          {tournament.cancellationLockAt && cancellable && (
-            <span className="text-xs text-muted">
-              {new Date() < tournament.cancellationLockAt
-                ? `Organizer can cancel until ${formatDateTime(tournament.cancellationLockAt)}`
-                : `Past the cancellation lock (${formatDateTime(tournament.cancellationLockAt)}) — staff-only now`}
-            </span>
-          )}
-        </div>
-      </div>
+            {cancellable && <AdminCancelTournament tournamentId={id} paidEntries={registrations.filter((r) => r.status === "CONFIRMED" && tournament.entryFee > 0).length} />}
+          </>
+        }
+      />
 
       {tournament.fundsFrozen && (
-        <section className="alert alert-danger flex-col items-stretch gap-3">
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-danger">
-            <Snowflake size={16} />
-            Funds frozen — payouts and cancellation are blocked
-          </h2>
-          {freezeReason && <p className="text-sm">{freezeReason}</p>}
-        </section>
+        <div className="flex items-start gap-3 rounded-[10px] border border-gold/30 bg-gold/[0.06] px-4 py-3">
+          <Snowflake size={16} className="mt-0.5 shrink-0 text-gold" />
+          <div className="flex flex-col gap-0.5 text-[13px]">
+            <span className="font-medium text-foreground">Funds frozen — prize claims and cancel-with-refund are blocked.</span>
+            {freezeReason && <span className="text-muted">Reason: {freezeReason}</span>}
+          </div>
+        </div>
       )}
-
-      <div className="card flex flex-col items-start gap-2">
-        <h2 className="text-card-title">Fund controls</h2>
-        <p className="text-sm text-muted">
-          Freezing blocks the prize-payout claim and cancel-with-refund actions for this tournament until unfrozen —
-          use this while investigating a dispute or a suspected issue, not as a routine action.
-        </p>
-        <FreezeFundsControl tournamentId={id} fundsFrozen={tournament.fundsFrozen} freezeReason={freezeReason} />
-      </div>
 
       {openDisputes.length > 0 && (
-        <section className="alert alert-warning flex-col items-stretch gap-3">
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-warning">
-            <AlertTriangle size={16} />
-            Disputes need a ruling
-          </h2>
-          {openDisputes.map((dispute) => (
-            <Link key={dispute.id} href={`/admin/matches/${dispute.matchId}`} className="card-row flex items-center justify-between gap-3 p-3">
-              <span className="truncate font-medium">
-                {dispute.match.playerA.displayName} vs {dispute.match.playerB.displayName}
-              </span>
-              <span className="shrink-0 text-sm font-medium text-accent-blue">Rule now →</span>
-            </Link>
-          ))}
-        </section>
+        <Section title="Disputes waiting on the organizer" description="Staff can rule once a dispute escalates, or open the match to review it.">
+          <Panel padded={false}>
+            {openDisputes.map((dispute) => (
+              <Link
+                key={dispute.id}
+                href={`/admin/matches/${dispute.matchId}`}
+                className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 text-[13px] transition-colors last:border-b-0 hover:bg-surface-elevated sm:px-5"
+              >
+                <span className="flex items-center gap-2.5 truncate">
+                  <AlertTriangle size={14} className="shrink-0 text-gold" />
+                  {dispute.match.playerA.displayName} vs {dispute.match.playerB.displayName}
+                </span>
+                <span className="shrink-0 text-muted">Review →</span>
+              </Link>
+            ))}
+          </Panel>
+        </Section>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <div className="widget flex flex-col gap-1">
-          <span className="text-eyebrow">Entry fees collected</span>
-          <span className="text-stat text-xl">{formatNaira(collected)}</span>
-        </div>
-        <div className="widget flex flex-col gap-1">
-          <span className="text-eyebrow">Platform fee</span>
-          <span className="text-stat text-xl">{formatNaira(platformFee)}</span>
-        </div>
-        <div className="widget flex flex-col gap-1">
-          <span className="text-eyebrow">Organizer revenue</span>
-          <span className="text-stat text-xl">{formatNaira(organizerRevenueSettled)}</span>
-          {organizerRevenuePending > 0 && (
-            <span className="text-xs text-muted">{formatNaira(organizerRevenuePending)} pending settlement</span>
-          )}
-        </div>
-        <div className="widget flex flex-col gap-1">
-          <span className="text-eyebrow">Refunded</span>
-          <span className="text-stat text-xl">{formatNaira(refunded)}</span>
-        </div>
-        <div className="widget flex flex-col gap-1">
-          <span className="text-eyebrow">Prize payout</span>
-          <span className="text-stat text-xl">{payoutSummary}</span>
-        </div>
-      </div>
+      <StatStrip
+        stats={[
+          { label: "Entry fees collected", value: naira(collected), hint: `${confirmed} confirmed of ${tournament.participantCap}` },
+          { label: "Platform fee", value: naira(platformFee) },
+          {
+            label: "Organizer revenue",
+            value: naira(organizerRevenueSettled),
+            hint: organizerRevenuePending > 0 ? `${naira(organizerRevenuePending)} pending settlement` : undefined,
+            tone: "attention",
+          },
+          { label: "Refunded", value: naira(refunded) },
+          {
+            label: "Prize payout",
+            value: <span className="text-[15px]">{tournament.status === "COMPLETE" ? payoutSummary : tournament.prizeAmount ? "After it finishes" : "No cash prize"}</span>,
+          },
+        ]}
+      />
 
-      <div className="card flex flex-col gap-2">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-card-title">Bracket</h2>
-          {bracket && (
-            <Link href={`/admin/competitions/${id}/bracket`} className="text-sm font-medium text-accent-blue hover:underline">
-              View bracket →
-            </Link>
-          )}
-        </div>
-        <p className="text-sm text-muted">{bracket ? "Generated — see the bracket view for live match status." : "Not generated yet."}</p>
-      </div>
-
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-card-title">
-            Registrants (<span className="font-mono tabular-nums">{registrations.length}</span>)
-          </h2>
-          {registrations.length > 0 && (
-            <a href={`/api/tournaments/${id}/registrants.csv`} className="text-sm font-medium text-accent-blue hover:underline">
-              Export CSV
-            </a>
-          )}
-        </div>
-        {registrations.length === 0 ? (
-          <p className="card py-8 text-center text-sm text-muted">No registrants yet.</p>
-        ) : (
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Player</th>
-                  <th>In-game ID</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {registrations.map((reg) => {
-                  const regStatus = registrationStatusInfo(reg.status);
-                  return (
-                    <tr key={reg.id}>
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <Section
+          title={`Entries · ${registrations.length}`}
+          actions={
+            registrations.length > 0 && (
+              <a href={`/api/tournaments/${id}/registrants.csv`} className="btn-ghost !min-h-8 !px-2.5 !text-[12px]">
+                <Download size={13} /> Export CSV
+              </a>
+            )
+          }
+        >
+          {registrations.length === 0 ? (
+            <EmptyState title="No entries yet" description="Players who register appear here with their payment status." />
+          ) : (
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>{tournament.entryType === "TEAM" ? "Team / captain" : "Player"}</th>
+                    <th>In-game ID</th>
+                    <th>Status</th>
+                    <th className="text-right">Registered</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {registrations.map((reg) => (
+                    <RowLink key={reg.id} href={`/admin/users/${reg.user.id}`}>
                       <td>
-                        <Link href={`/admin/users/${reg.user.id}`} className="hover:text-accent-volt">
-                          {reg.user.displayName} <span className="text-muted">(@{reg.user.handle})</span>
+                        <Link href={`/admin/users/${reg.user.id}`} className="flex min-w-0 flex-col leading-tight">
+                          <span className="truncate font-medium text-foreground">{reg.teamName ?? reg.user.displayName}</span>
+                          <span className="truncate text-[12px] text-muted">
+                            {reg.teamName ? `Captain ${reg.user.displayName} · ` : ""}@{reg.user.handle}
+                          </span>
                         </Link>
                       </td>
-                      <td className="font-mono">{reg.inGameId}</td>
+                      <td className="font-code text-[12px] text-muted">{reg.inGameId}</td>
                       <td>
-                        <StatusPill tone={regStatus.tone}>{regStatus.label}</StatusPill>
+                        <RegistrationBadge status={reg.status} />
                       </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+                      <td className="text-right text-muted">{formatDateTime(reg.createdAt)}</td>
+                    </RowLink>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Section>
+
+        <div className="flex flex-col gap-8">
+          <Section title="Details">
+            <Panel>
+              <dl className="flex flex-col gap-3 text-[13px]">
+                {[
+                  ["Organizer", tournament.organizerId ? <Link key="o" href={`/admin/users/${tournament.organizerId}`} className="hover:underline">{organizerName}</Link> : "—"],
+                  ["Entry fee", tournament.entryFee ? naira(tournament.entryFee) : "Free"],
+                  ["Prize", tournament.prizeAmount ? `${naira(tournament.prizeAmount)} · ${describeSplit(tournament.prizeSplit)}` : (tournament.prizeText ?? "None")],
+                  ["Registration", `${formatDateTime(tournament.registrationOpenAt)} → ${formatDateTime(tournament.registrationCloseAt)}`],
+                  ["Starts", formatDateTime(tournament.startAt)],
+                  [
+                    "Cancellation lock",
+                    tournament.cancellationLockAt
+                      ? `${formatDateTime(tournament.cancellationLockAt)}${new Date() >= tournament.cancellationLockAt ? " · passed (staff only)" : ""}`
+                      : "None",
+                  ],
+                ].map(([label, value]) => (
+                  <div key={label as string} className="flex flex-col gap-0.5">
+                    <dt className="text-[12px] text-muted">{label}</dt>
+                    <dd className="text-foreground">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </Panel>
+          </Section>
+
+          <Section title="Fund controls" description="Freezing blocks prize claims and cancel-with-refund until unfrozen. Use it while investigating, not routinely.">
+            <Panel>
+              <FreezeFundsControl tournamentId={id} fundsFrozen={tournament.fundsFrozen} freezeReason={freezeReason} />
+            </Panel>
+          </Section>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

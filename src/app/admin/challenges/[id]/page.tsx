@@ -9,12 +9,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { StatusPill, battleStatusInfo, matchStatusInfo, disputeStatusInfo } from "@/components/StatusPill";
+import { ChevronRight } from "lucide-react";
+import { battleStatusInfo, matchStatusInfo, disputeStatusInfo } from "@/components/StatusPill";
+import { EmptyState, KeyValue, naira, PageHeader, Panel, Section, StatusBadge, toneFor } from "@/components/admin/ui";
 import { CancelChallengeButton } from "@/components/admin/CancelChallengeButton";
-
-function formatNaira(kobo: number): string {
-  return `₦${(kobo / 100).toLocaleString("en-NG")}`;
-}
 
 function formatDate(date: Date): string {
   return date.toLocaleString("en-NG", { dateStyle: "medium", timeStyle: "short" });
@@ -48,90 +46,83 @@ export default async function AdminChallengeDetailPage({ params }: { params: Pro
   const match = battle.matches[0] ?? null;
 
   return (
-    <div className="flex flex-1 flex-col gap-6">
-      <Link href="/admin/challenges" className="w-fit text-sm font-medium text-muted transition hover:text-foreground">
-        ← All challenges
-      </Link>
+    <>
+      <PageHeader
+        back={{ href: "/admin/challenges", label: "Challenges" }}
+        title={`${battle.game} challenge`}
+        meta={
+          <>
+            <StatusBadge tone={toneFor(status.tone)} dot={status.pulse}>
+              {status.label}
+            </StatusBadge>
+            <span>
+              {formatBattleFormat(battle.format)} · {battle.visibility === "TARGETED" ? "Targeted" : "Open to anyone"}
+            </span>
+          </>
+        }
+        actions={battle.status === "OPEN" && <CancelChallengeButton battleId={battle.id} />}
+      />
 
-      <div className="card flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-col gap-2">
-          <StatusPill tone={status.tone} pulse={status.pulse}>
-            {status.label}
-          </StatusPill>
-          <h1 className="font-display text-2xl font-bold tracking-tight">{battle.game}</h1>
-          <span className="text-sm text-muted">{formatBattleFormat(battle.format)}</span>
-        </div>
-        {battle.status === "OPEN" && <CancelChallengeButton battleId={battle.id} />}
-      </div>
+      <Panel>
+        <KeyValue
+          items={[
+            {
+              label: "Host",
+              value: (
+                <Link href={`/admin/users/${battle.creator.id}`} className="hover:underline">
+                  {battle.creator.displayName} <span className="text-muted">@{battle.creator.handle}</span>
+                </Link>
+              ),
+            },
+            { label: "Stake", value: battle.stakeAmount === 0 ? "Free" : `${naira(battle.stakeAmount)} each · ${naira(battle.stakeAmount * 2)} pot` },
+            { label: "Created", value: formatDate(battle.createdAt) },
+            ...(battle.visibility === "TARGETED" && battle.targetUser
+              ? [
+                  {
+                    label: "Sent to",
+                    value: (
+                      <Link href={`/admin/users/${battle.targetUser.id}`} className="hover:underline">
+                        {battle.targetUser.displayName} <span className="text-muted">@{battle.targetUser.handle}</span>
+                      </Link>
+                    ),
+                  },
+                ]
+              : []),
+          ]}
+        />
+      </Panel>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="widget flex flex-col gap-1">
-          <span className="text-eyebrow">Host</span>
-          <Link href={`/admin/users/${battle.creator.id}`} className="text-sm font-semibold hover:text-accent-volt">
-            {battle.creator.displayName}
-          </Link>
-        </div>
-        <div className="widget flex flex-col gap-1">
-          <span className="text-eyebrow">Entry</span>
-          <span className="text-stat text-lg">{battle.stakeAmount === 0 ? "Free" : formatNaira(battle.stakeAmount)}</span>
-        </div>
-        <div className="widget flex flex-col gap-1">
-          <span className="text-eyebrow">Created</span>
-          <span className="text-stat text-lg">{formatDate(battle.createdAt)}</span>
-        </div>
-      </div>
-
-      {battle.visibility === "TARGETED" && battle.targetUser && (
-        <div className="card flex items-center justify-between gap-3">
-          <span className="text-sm text-muted">Targeted at</span>
-          <Link href={`/admin/users/${battle.targetUser.id}`} className="text-sm font-semibold hover:text-accent-volt">
-            {battle.targetUser.displayName}
-          </Link>
-        </div>
-      )}
-
-      <div className="card flex flex-col gap-3">
-        <h2 className="text-card-title">Match</h2>
+      <Section title="Match">
         {!match ? (
-          <p className="py-6 text-center text-sm text-muted">No one has accepted this challenge yet.</p>
+          <EmptyState title="Not accepted yet" description="The match appears here once someone accepts the challenge." />
         ) : (
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-sm">
-                <Link href={`/admin/users/${match.playerA.id}`} className="font-semibold hover:text-accent-volt">
-                  {match.playerA.displayName}
-                </Link>
-                <span className="text-muted">vs</span>
-                <Link href={`/admin/users/${match.playerB.id}`} className="font-semibold hover:text-accent-volt">
-                  {match.playerB.displayName}
-                </Link>
-              </div>
-              <StatusPill tone={matchStatusInfo(match.status).tone} pulse={matchStatusInfo(match.status).pulse}>
-                {matchStatusInfo(match.status).label}
-              </StatusPill>
-            </div>
-            <span className="font-mono text-xs text-muted-strong">Match code: {match.matchCode}</span>
-            {match.winner && (
-              <span className="text-sm text-muted">
-                Winner: <span className="font-semibold text-foreground">{match.winner.displayName}</span>
+          <Panel padded={false}>
+            <Link
+              href={`/admin/matches/${match.id}`}
+              className="flex flex-wrap items-center justify-between gap-3 px-4 py-3.5 transition-colors hover:bg-surface-elevated sm:px-5"
+            >
+              <span className="flex flex-col gap-0.5">
+                <span className="text-[13px] font-medium text-foreground">
+                  {match.playerA.displayName} <span className="text-muted">vs</span> {match.playerB.displayName}
+                </span>
+                <span className="text-[12px] text-muted">
+                  Code <span className="font-code">{match.matchCode}</span>
+                  {match.winner && <> · Winner {match.winner.displayName}</>}
+                </span>
               </span>
-            )}
-            {match.dispute && (
-              <div className="flex items-center justify-between gap-3 rounded-[10px] border border-warning/30 bg-warning/10 px-3 py-2.5">
-                <div className="flex items-center gap-2">
-                  <StatusPill tone={disputeStatusInfo(match.dispute.status).tone}>
-                    {disputeStatusInfo(match.dispute.status).label}
-                  </StatusPill>
-                  <span className="text-sm text-warning">Dispute raised</span>
-                </div>
-                <Link href={`/admin/matches/${match.id}`} className="text-sm font-medium text-accent-blue hover:underline">
-                  View match →
-                </Link>
-              </div>
-            )}
-          </div>
+              <span className="flex items-center gap-2">
+                {match.dispute && (
+                  <StatusBadge tone={toneFor(disputeStatusInfo(match.dispute.status).tone)}>Dispute · {disputeStatusInfo(match.dispute.status).label}</StatusBadge>
+                )}
+                <StatusBadge tone={toneFor(matchStatusInfo(match.status).tone)} dot={matchStatusInfo(match.status).pulse}>
+                  {matchStatusInfo(match.status).label}
+                </StatusBadge>
+                <ChevronRight size={15} className="text-muted-strong" />
+              </span>
+            </Link>
+          </Panel>
         )}
-      </div>
-    </div>
+      </Section>
+    </>
   );
 }

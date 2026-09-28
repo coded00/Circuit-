@@ -20,6 +20,9 @@ const nextConfig: NextConfig = {
       // linked the Circuit chat as /communities?channel=…&message=…
       // (the query is carried over to the destination).
       { source: "/communities", has: [{ type: "query", key: "channel" }], destination: "/communities/circuit", permanent: false },
+      // The staff queues moved into the admin control center.
+      { source: "/staff/disputes", destination: "/admin/disputes", permanent: false },
+      { source: "/staff/reports", destination: "/admin/reports", permanent: false },
     ];
   },
   async headers() {

@@ -8,8 +8,8 @@
  */
 
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { PageHeader, Panel } from "@/components/admin/ui";
 import { loadOrganizerCatalog } from "@/lib/competitionConfig";
 import EditForm from "@/app/tournaments/[id]/edit/EditForm";
 
@@ -29,12 +29,17 @@ export default async function AdminCompetitionEditPage({ params }: { params: Pro
   ]);
 
   return (
-    <div className="flex flex-1 flex-col gap-6">
-      <Link href={`/admin/competitions/${id}`} className="w-fit text-sm font-medium text-muted transition hover:text-foreground">
-        ← Back
-      </Link>
-      <h1 className="font-display text-2xl font-bold tracking-tight">Edit {tournament.name}</h1>
-      <div className="card max-w-2xl">
+    <>
+      <PageHeader
+        back={{ href: `/admin/competitions/${id}`, label: tournament.name }}
+        title="Edit competition"
+        description={
+          hasPaidRegistration
+            ? "Players have paid — entry fee and prize are locked. Everything else can still change until registration closes."
+            : "Changes apply immediately. The game and format lock once anyone registers."
+        }
+      />
+      <Panel className="max-w-2xl">
         <EditForm
           tournament={tournament}
           moneyFieldsLocked={hasPaidRegistration}
@@ -43,7 +48,7 @@ export default async function AdminCompetitionEditPage({ params }: { params: Pro
           competitionLocked={activeRegistrations > 0}
           communityEnabled={community?.enabled ?? false}
         />
-      </div>
-    </div>
+      </Panel>
+    </>
   );
 }

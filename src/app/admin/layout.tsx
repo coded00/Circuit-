@@ -32,11 +32,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <div data-surface="dark" className="flex min-h-screen w-full bg-background text-foreground">
+    <div data-surface="dark" data-admin className="flex min-h-screen w-full bg-background text-foreground">
       <AdminSidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <AdminTopBar admin={{ displayName: user.displayName, avatarUrl: user.avatarUrl }} />
-        <main className="flex flex-1 flex-col gap-6 p-4 sm:p-8">{children}</main>
+        <main className="flex flex-1 flex-col px-4 py-6 sm:px-8 sm:py-8">
+          <div className="admin-page">{children}</div>
+        </main>
       </div>
     </div>
   );

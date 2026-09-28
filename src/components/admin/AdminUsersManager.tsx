@@ -41,21 +41,25 @@ export function AdminUsersManager({ staff, currentUserId }: { staff: StaffUser[]
   }
 
   async function changeRole(id: string, newRole: string) {
-    await fetch(`/api/admin/staff/${id}`, {
+    setError(null);
+    const res = await fetch(`/api/admin/staff/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ role: newRole }),
-    });
+    }).catch(() => null);
+    if (!res?.ok) setError(((await res?.json().catch(() => null))?.error as string) ?? "Couldn't change that role.");
     router.refresh();
   }
 
   async function revoke(id: string, name: string) {
     if (!(await confirmDialog({ title: `Revoke admin access for ${name}?`, confirmLabel: "Revoke access" }))) return;
-    await fetch(`/api/admin/staff/${id}`, {
+    setError(null);
+    const res = await fetch(`/api/admin/staff/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ revoke: true }),
-    });
+    }).catch(() => null);
+    if (!res?.ok) setError(((await res?.json().catch(() => null))?.error as string) ?? "Couldn't revoke access.");
     router.refresh();
   }
 
@@ -67,32 +71,37 @@ export function AdminUsersManager({ staff, currentUserId }: { staff: StaffUser[]
             <tr>
               <th>Admin</th>
               <th>Role</th>
-              <th></th>
+              <th className="w-[1%]" aria-label="Actions" />
             </tr>
           </thead>
           <tbody>
             {staff.map((s) => (
               <tr key={s.id}>
                 <td>
-                  <span className="font-medium">{s.displayName}</span> <span className="text-muted">(@{s.handle})</span>
+                  <span className="flex flex-col leading-tight">
+                    <span className="font-medium text-foreground">{s.displayName}</span>
+                    <span className="text-[12px] text-muted">@{s.handle}</span>
+                  </span>
                 </td>
                 <td>
                   {s.id === currentUserId ? (
-                    <span className="badge badge-brand">{s.adminRole ?? "MODERATOR"} (you)</span>
+                    <span className="text-[13px] text-foreground">
+                      {s.adminRole === "SUPER_ADMIN" ? "Super admin" : "Moderator"} <span className="text-muted">· you</span>
+                    </span>
                   ) : (
                     <select
                       defaultValue={s.adminRole ?? "MODERATOR"}
                       onChange={(e) => changeRole(s.id, e.target.value)}
-                      className="field-select w-auto py-1 text-xs"
+                      className="field-select !w-auto !min-h-8 !py-1 !text-[12px]"
                     >
                       <option value="SUPER_ADMIN">Super Admin</option>
                       <option value="MODERATOR">Moderator</option>
                     </select>
                   )}
                 </td>
-                <td>
+                <td className="text-right">
                   {s.id !== currentUserId && (
-                    <button type="button" onClick={() => revoke(s.id, s.displayName)} className="text-xs font-medium text-danger hover:underline">
+                    <button type="button" onClick={() => revoke(s.id, s.displayName)} className="btn-ghost !min-h-8 !px-2.5 !text-[12px] hover:!text-danger">
                       Revoke
                     </button>
                   )}
@@ -103,9 +112,9 @@ export function AdminUsersManager({ staff, currentUserId }: { staff: StaffUser[]
         </table>
       </div>
 
-      <form onSubmit={grant} className="flex flex-wrap items-end gap-3 border-t border-border pt-4">
+      <form onSubmit={grant} className="flex flex-wrap items-end gap-3">
         <div className="flex min-w-[200px] flex-1 flex-col gap-1.5">
-          <label htmlFor="grant-identifier" className="field-label">Grant access to (handle or email)</label>
+          <label htmlFor="grant-identifier" className="field-label">Grant access (handle or email)</label>
           <input id="grant-identifier" required value={identifier} onChange={(e) => setIdentifier(e.target.value)} className="field-input" />
         </div>
         <div className="flex flex-col gap-1.5">
@@ -115,7 +124,7 @@ export function AdminUsersManager({ staff, currentUserId }: { staff: StaffUser[]
             <option value="SUPER_ADMIN">Super Admin</option>
           </select>
         </div>
-        <button type="submit" disabled={submitting} className="btn-primary text-sm">
+        <button type="submit" disabled={submitting} className="btn-secondary">
           {submitting ? "Granting…" : "Grant access"}
         </button>
       </form>
