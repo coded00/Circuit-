@@ -107,3 +107,36 @@ describe("buildLeaderboard", () => {
     expect(leaderboardWinner(board)).toBeNull();
   });
 });
+
+describe("groups → final", () => {
+  it("parses settings and checks the final fits", async () => {
+    const { parseLobbyGroups } = await import("./lobbyScoring");
+    expect(parseLobbyGroups({ groups: "" }, 100, 100)).toEqual({ ok: true, value: null });
+    expect(parseLobbyGroups({ groups: 4, qualifiers: 5, finalRounds: 3 }, 25, 100)).toEqual({ ok: true, value: { groups: 4, qualifiers: 5, finalRounds: 3 } });
+    expect(parseLobbyGroups({ groups: 4, qualifiers: 10 }, 25, 100).ok).toBe(false); // 40 finalists > 25
+    expect(parseLobbyGroups({ groups: 4, qualifiers: 5 }, 25, 101).ok).toBe(false); // 4 lobbies hold 100
+    expect(parseLobbyGroups({ groups: 4, qualifiers: 5 }, 25, 20).ok).toBe(false); // 5 per group, 5 qualify
+    expect(parseLobbyGroups({ groups: 1, qualifiers: 5 }, 25, 20).ok).toBe(false);
+  });
+  it("runs fewer groups when too few registered", async () => {
+    const { effectiveGroups } = await import("./lobbyScoring");
+    const config = { groups: 4, qualifiers: 5, finalRounds: 3 };
+    expect(effectiveGroups(100, config)).toBe(4);
+    expect(effectiveGroups(20, config)).toBe(3); // 4 groups of 5 knock nobody out; 3 of 6 do
+    expect(effectiveGroups(11, config)).toBe(1);
+  });
+  it("deals evenly and picks qualifiers, refusing a dead tie on the line", async () => {
+    const { dealGroups, qualifiersFrom, groupLetter } = await import("./lobbyScoring");
+    const dealt = dealGroups(["a", "b", "c", "d", "e"], 2);
+    expect([...dealt.values()]).toEqual([1, 2, 1, 2, 1]);
+    expect(groupLetter(2)).toBe("B");
+    const board = buildLeaderboard(["a", "b", "c", "d"], [
+      { roundNumber: 1, registrationId: "a", placement: 1, kills: 0 },
+      { roundNumber: 1, registrationId: "b", placement: 2, kills: 0 },
+      { roundNumber: 1, registrationId: "c", placement: 3, kills: 0 },
+    ], table);
+    expect(qualifiersFrom(board, 2)).toEqual(["a", "b"]);
+    const level = buildLeaderboard(["a", "b", "c"], [{ roundNumber: 1, registrationId: "a", placement: 1, kills: 0 }], table);
+    expect(qualifiersFrom(level, 2)).toBeNull(); // b and c both didn't play: level on the line
+  });
+});

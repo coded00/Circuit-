@@ -107,23 +107,47 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
       return { message: "Your friend request was accepted.", href: "/friends" };
     case "LOBBY_STARTED":
       return {
-        message: `${str(p, "tournamentName") || "Your tournament"} has started — ${str(p, "rounds") || "several"} rounds, one lobby. Good luck.`,
+        message: str(p, "group")
+          ? `${str(p, "tournamentName") || "Your tournament"} has started — you're in Group ${str(p, "group")} for ${str(p, "rounds") || "several"} rounds. Good luck.`
+          : `${str(p, "tournamentName") || "Your tournament"} has started — ${str(p, "rounds") || "several"} rounds, one lobby. Good luck.`,
         href: `/tournaments/${str(p, "tournamentId")}/bracket`,
       };
     case "LOBBY_ROUND_POSTED":
       return {
-        message: `Round ${str(p, "round")} results are up for ${str(p, "tournamentName") || "your tournament"}.`,
+        message: `${/^\d+$/.test(str(p, "round")) ? `Round ${str(p, "round")}` : str(p, "round") || "Round"} results are up for ${str(p, "tournamentName") || "your tournament"}.`,
         href: `/tournaments/${str(p, "tournamentId")}/bracket`,
       };
     case "LOBBY_FLAG_RAISED":
       return {
-        message: `A player flagged round ${str(p, "round")} results in ${str(p, "tournamentName") || "your tournament"}.`,
+        message: `A player flagged ${/^\d+$/.test(str(p, "round")) ? `round ${str(p, "round")}` : str(p, "round")} results in ${str(p, "tournamentName") || "your tournament"}.`,
         href: `/tournaments/${str(p, "tournamentId")}/bracket`,
       };
     case "LOBBY_FLAG_ANSWERED":
       return {
-        message: `${p.byStaff ? "Circuit staff" : "The organizer"} ${str(p, "outcome") === "resolved" ? "corrected" : "reviewed"} round ${str(p, "round")} after your flag.`,
+        message: `${p.byStaff ? "Circuit staff" : "The organizer"} ${str(p, "outcome") === "resolved" ? "corrected" : "reviewed"} ${/^\d+$/.test(str(p, "round")) ? `round ${str(p, "round")}` : str(p, "round")} after your flag.`,
         href: `/tournaments/${str(p, "tournamentId")}/bracket`,
+      };
+    case "LOBBY_FINAL_SET":
+      return {
+        message: p.qualified
+          ? `You're through to the final of ${str(p, "tournamentName") || "your tournament"} — ${str(p, "rounds") || "several"} rounds, points start fresh.`
+          : `The group stage of ${str(p, "tournamentName") || "your tournament"} is over — you didn't make the final this time.`,
+        href: `/tournaments/${str(p, "tournamentId")}/bracket`,
+      };
+    case "SWISS_BYE":
+      return {
+        message: `You have a bye in round ${str(p, "round")} of ${str(p, "rounds")} of ${str(p, "tournamentName") || "your tournament"} — it counts as a win.`,
+        href: `/tournaments/${str(p, "tournamentId")}/bracket`,
+      };
+    case "ROUND_ROBIN_STARTED":
+      return {
+        message: `${str(p, "tournamentName") || "Your tournament"} has started — you have ${str(p, "matches") || "several"} matches to play, in any order.`,
+        href: `/tournaments/${str(p, "tournamentId")}/bracket`,
+      };
+    case "LOBBY_ROOM_POSTED":
+      return {
+        message: `Room details for ${str(p, "rounds") || "the next round"} of ${str(p, "tournamentName") || "your tournament"} are up.`,
+        href: `/tournaments/${str(p, "tournamentId")}/bracket?tab=rounds`,
       };
     case "LOBBY_FLAG_ESCALATED":
       return {

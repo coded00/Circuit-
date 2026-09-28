@@ -18,7 +18,7 @@ const CONFETTI_PIECES = [
   { left: "92%", delay: "60ms", color: "var(--accent-blue)" },
 ];
 
-export default function ClaimPrizeButton({ tournamentId }: { tournamentId: string }) {
+export default function ClaimPrizeButton({ tournamentId, label }: { tournamentId: string; label?: string }) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,7 +69,7 @@ export default function ClaimPrizeButton({ tournamentId }: { tournamentId: strin
     <div className="flex flex-col gap-2">
       <button onClick={handleClick} disabled={submitting} className="btn-primary">
         {submitting ? <Spinner /> : <Trophy size={14} aria-hidden />}
-        {submitting ? "Claiming…" : "Claim prize"}
+        {submitting ? "Claiming…" : (label ?? "Claim prize")}
       </button>
       {error && <p className="field-error motion-fade-in">{error}</p>}
     </div>

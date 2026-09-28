@@ -13,7 +13,9 @@ import { getCurrentUser } from "@/lib/session";
 import { parseOptionalUrl, parseOptionalImageUrl } from "@/lib/validation";
 import { logAdminAction } from "@/lib/auditLog";
 import { entriesPerMatch } from "@/lib/gameCatalog";
-import { parseLobbyRounds } from "@/lib/lobbyScoring";
+import { parseLobbyGroups, parseLobbyRounds } from "@/lib/lobbyScoring";
+import { getStructure } from "@/lib/competitionStructures";
+import { maxPrizePlaces, parsePrizeSplit } from "@/lib/prizes";
 import { resolveCompetition } from "@/lib/competitionConfig";
 
 const MAX_PARTICIPANT_CAP = 128;
@@ -105,20 +107,58 @@ export async function PATCH(
       data.lobbyRounds = rounds.value;
     }
   }
+  // Groups, then a final: fixed once the lobby has started.
+  let groupCount = style === "LOBBY" ? Math.max(1, tournament.lobbyGroups ?? 1) : 1;
+  let finalists = style === "LOBBY" && tournament.lobbyGroups && tournament.lobbyQualifiers ? tournament.lobbyGroups * tournament.lobbyQualifiers : null;
+  if (style !== "LOBBY" && changesCompetition) Object.assign(data, { lobbyGroups: null, lobbyQualifiers: null, lobbyFinalRounds: null });
+  if (style === "LOBBY" && (body.lobbyGroups !== undefined || changesCompetition || body.participantCap !== undefined)) {
+    const started = tournament.status === "LIVE" || tournament.status === "COMPLETE";
+    if (started) {
+      if (body.lobbyGroups !== undefined && (Number(body.lobbyGroups) || null) !== tournament.lobbyGroups) {
+        return NextResponse.json({ error: "Groups are locked once the lobby has started." }, { status: 409 });
+      }
+    } else {
+      const parsed = parseLobbyGroups(
+        {
+          groups: body.lobbyGroups !== undefined ? body.lobbyGroups : tournament.lobbyGroups,
+          qualifiers: body.lobbyQualifiers !== undefined ? body.lobbyQualifiers : tournament.lobbyQualifiers,
+          finalRounds: body.lobbyFinalRounds !== undefined ? body.lobbyFinalRounds : tournament.lobbyFinalRounds,
+        },
+        lobbyCapacity,
+        Number(body.participantCap ?? tournament.participantCap)
+      );
+      if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
+      data.lobbyGroups = parsed.value?.groups ?? null;
+      data.lobbyQualifiers = parsed.value?.qualifiers ?? null;
+      data.lobbyFinalRounds = parsed.value?.finalRounds ?? null;
+      groupCount = parsed.value?.groups ?? 1;
+      finalists = parsed.value ? parsed.value.groups * parsed.value.qualifiers : null;
+    }
+  }
   if (body.rulesText !== undefined) {
     const rulesText = typeof body.rulesText === "string" ? body.rulesText.trim() : "";
     if (!rulesText) return NextResponse.json({ error: "Rules can't be empty." }, { status: 400 });
     data.rulesText = rulesText;
   }
-  if (body.participantCap !== undefined || (lobbyCapacity !== null && tournament.participantCap > lobbyCapacity)) {
+  const newStructureMax = getStructure((data.format as string | undefined) ?? tournament.format)?.maxEntries ?? null;
+  if (
+    body.participantCap !== undefined ||
+    (lobbyCapacity !== null && tournament.participantCap > lobbyCapacity * groupCount) ||
+    (newStructureMax !== null && tournament.participantCap > newStructureMax)
+  ) {
     const participantCap = Number(body.participantCap ?? tournament.participantCap);
-    const capLimit = style === "LOBBY" && lobbyCapacity !== null ? lobbyCapacity : MAX_PARTICIPANT_CAP;
+    const structureMax = getStructure((data.format as string | undefined) ?? tournament.format)?.maxEntries ?? null;
+    const capLimit = style === "LOBBY" && lobbyCapacity !== null ? lobbyCapacity * groupCount : (structureMax ?? MAX_PARTICIPANT_CAP);
     if (!Number.isInteger(participantCap) || participantCap < 2 || participantCap > capLimit) {
       return NextResponse.json(
         {
           error:
             capLimit !== MAX_PARTICIPANT_CAP
-              ? `This format's lobby holds ${capLimit} entries — set a cap between 2 and ${capLimit}.`
+              ? structureMax && style !== "LOBBY"
+                ? `This structure can have at most ${capLimit} entries.`
+                : groupCount > 1
+                  ? `${groupCount} group lobbies hold ${capLimit} entries — set a cap between 2 and ${capLimit}.`
+                  : `This format's lobby holds ${capLimit} entries — set a cap between 2 and ${capLimit}, or split into groups.`
               : `Participant cap must be a whole number between 2 and ${MAX_PARTICIPANT_CAP}.`,
         },
         { status: 400 }
@@ -159,6 +199,23 @@ export async function PATCH(
       return NextResponse.json({ error: "Poster link must be a valid http(s) URL." }, { status: 400 });
     }
     data.posterUrl = posterUrlResult.url;
+  }
+
+  // The prize split is part of what players signed up for: fixed once anyone has entered.
+  const nextFormat = (data.format as string | undefined) ?? tournament.format;
+  const nextCap = (data.participantCap as number | undefined) ?? tournament.participantCap;
+  const nextPrize = data.prizeAmount !== undefined ? (data.prizeAmount as number | null) : tournament.prizeAmount;
+  if (body.prizeSplit !== undefined || data.format !== undefined || data.participantCap !== undefined || data.prizeAmount !== undefined) {
+    const split = parsePrizeSplit(body.prizeSplit ?? tournament.prizeSplit, maxPrizePlaces(nextFormat, nextCap, finalists));
+    if (!split.ok) return NextResponse.json({ error: split.error }, { status: 400 });
+    const value = nextPrize ? split.value : [];
+    if (value.join() !== tournament.prizeSplit.join()) {
+      const entered = await prisma.registration.count({ where: { tournamentId: id, status: { in: ["PENDING_PAYMENT", "CONFIRMED"] } } });
+      if (entered > 0) {
+        return NextResponse.json({ error: "The prize split is locked — players have already registered for this tournament." }, { status: 409 });
+      }
+      data.prizeSplit = value;
+    }
   }
 
   const registrationOpenAt = parseDate(body.registrationOpenAt);

@@ -196,3 +196,74 @@ export function leaderboardWinner(board: readonly LeaderboardRow[]): string | nu
   if (second && second.rank === first.rank) return null;
   return first.registrationId;
 }
+
+// ----------------------------------------------------------- Groups → final
+
+export const MAX_LOBBY_GROUPS = 16;
+
+export type LobbyGroupsConfig = { groups: number; qualifiers: number; finalRounds: number };
+
+/** "A", "B", … for group 1, 2, … */
+export function groupLetter(group: number): string {
+  return String.fromCharCode(64 + group);
+}
+
+/**
+ * Organizer settings for groups-then-a-final. Blank groups = one lobby
+ * (null). The final must fit one lobby (groups × qualifiers ≤ lobby
+ * size) and, at a full cap, each group has to hold more entries than
+ * qualify from it.
+ */
+export function parseLobbyGroups(
+  input: { groups?: unknown; qualifiers?: unknown; finalRounds?: unknown },
+  lobbyCapacity: number | null,
+  participantCap: number
+): ParseResult<LobbyGroupsConfig | null> {
+  if (input.groups === undefined || input.groups === null || input.groups === "" || Number(input.groups) === 0) return { ok: true, value: null };
+  const groups = Number(input.groups);
+  const qualifiers = Number(input.qualifiers);
+  const finalRounds = input.finalRounds === undefined || input.finalRounds === "" ? DEFAULT_LOBBY_ROUNDS : Number(input.finalRounds);
+  if (!Number.isInteger(groups) || groups < 2 || groups > MAX_LOBBY_GROUPS) return { ok: false, error: `Groups must be between 2 and ${MAX_LOBBY_GROUPS}.` };
+  if (!Number.isInteger(qualifiers) || qualifiers < 1) return { ok: false, error: "Set how many from each group go to the final." };
+  if (!Number.isInteger(finalRounds) || finalRounds < 1 || finalRounds > MAX_LOBBY_ROUNDS) return { ok: false, error: `Final rounds must be between 1 and ${MAX_LOBBY_ROUNDS}.` };
+  if (lobbyCapacity !== null && groups * qualifiers > lobbyCapacity) {
+    return { ok: false, error: `${groups} groups × ${qualifiers} qualifiers is ${groups * qualifiers} finalists — one lobby holds ${lobbyCapacity}.` };
+  }
+  if (groups * qualifiers < 2) return { ok: false, error: "The final needs at least 2 entries." };
+  if (Math.floor(participantCap / groups) <= qualifiers) {
+    return { ok: false, error: `With a cap of ${participantCap}, each of ${groups} groups would have ${Math.floor(participantCap / groups)} entries — fewer than ${qualifiers + 1}, so nobody would be knocked out.` };
+  }
+  if (lobbyCapacity !== null && participantCap > groups * lobbyCapacity) {
+    return { ok: false, error: `${groups} lobbies hold ${groups * lobbyCapacity} entries — lower the cap or add groups.` };
+  }
+  return { ok: true, value: { groups, qualifiers, finalRounds } };
+}
+
+/**
+ * How many groups to actually run with this many confirmed entries: as
+ * configured, unless too few registered for every group to knock someone
+ * out — then fewer groups, or 1 (play as a single lobby).
+ */
+export function effectiveGroups(entries: number, config: LobbyGroupsConfig): number {
+  let g = config.groups;
+  while (g >= 2 && Math.floor(entries / g) <= config.qualifiers) g--;
+  return g >= 2 ? g : 1;
+}
+
+/** Deals (already shuffled) entries into `groups` groups as evenly as possible: 1-based group per id. */
+export function dealGroups(ids: readonly string[], groups: number): Map<string, number> {
+  return new Map(ids.map((id, i) => [id, (i % groups) + 1]));
+}
+
+/**
+ * The top `count` of a group's leaderboard. Null if the qualification
+ * line falls inside a tie that no tiebreak separates (the organizer must
+ * check those results before the final can start).
+ */
+export function qualifiersFrom(board: readonly LeaderboardRow[], count: number): string[] | null {
+  if (board.length <= count) return board.map((r) => r.registrationId);
+  const lastIn = board[count - 1];
+  const firstOut = board[count];
+  if (lastIn.rank === firstOut.rank) return null;
+  return board.slice(0, count).map((r) => r.registrationId);
+}

@@ -7,6 +7,8 @@ import { ImageUploadField, POSTER_BOUNDS } from "@/components/ImageUploadField";
 import { defaultRulesFor } from "@/lib/gameRules";
 import type { PickerGame } from "@/lib/competitionRules";
 import { getStructure } from "@/lib/competitionStructures";
+import { PrizeSplitField } from "@/components/PrizeSplitField";
+import { maxPrizePlaces } from "@/lib/prizes";
 import { CompetitionPicker, DEFAULT_ROUNDS, defaultCompetition, selectedParts, type CompetitionValue } from "@/components/CompetitionPicker";
 
 function toLocalInput(date: Date): string {
@@ -58,11 +60,17 @@ export default function EditForm({
           gameFormatId: tournament.gameFormatId,
           structure: tournament.format,
           lobbyRounds: String(tournament.lobbyRounds ?? DEFAULT_ROUNDS),
+          lobbyGroups: tournament.lobbyGroups ? String(tournament.lobbyGroups) : "",
+          lobbyQualifiers: tournament.lobbyQualifiers ? String(tournament.lobbyQualifiers) : "",
+          lobbyFinalRounds: tournament.lobbyFinalRounds ? String(tournament.lobbyFinalRounds) : "",
         }
       : null;
   const originalInCatalog = !!original && !!selectedParts(catalog, original).format;
   const [competition, setCompetition] = useState<CompetitionValue | null>(originalInCatalog ? original : null);
   const { format: selectedFormat } = competition ? selectedParts(catalog, competition) : { format: undefined };
+  const structureMax = selectedFormat?.structures.find((x) => x.id === (competition?.structure ?? tournament.format))?.maxEntries ?? null;
+  const groupCount = Number(competition?.lobbyGroups) >= 2 ? Number(competition?.lobbyGroups) : 1;
+  const capLimit = selectedFormat?.lobbyCapacity ? selectedFormat.lobbyCapacity * groupCount : (structureMax ?? 128);
   const game = (competition && selectedParts(catalog, competition).game?.name) || tournament.game;
   const competitionChanged =
     !!competition &&
@@ -78,6 +86,14 @@ export default function EditForm({
     tournament.prizeAmount ? String(tournament.prizeAmount / 100) : ""
   );
   const [prizeText, setPrizeText] = useState(tournament.prizeText ?? "");
+  const [prizeSplit, setPrizeSplit] = useState<number[]>(tournament.prizeSplit);
+  const [splitBlocked, setSplitBlocked] = useState(false);
+  const prizeKobo = prizeAmountNaira ? nairaToKobo(prizeAmountNaira) : 0;
+  const splitStructure = competition?.structure ?? tournament.format;
+  const groupsForSplit = Number(competition?.lobbyGroups ?? tournament.lobbyGroups) || 0;
+  const qualifiersForSplit = Number(competition?.lobbyQualifiers ?? tournament.lobbyQualifiers) || 0;
+  const splitMaxPlaces = maxPrizePlaces(splitStructure, Number(participantCap) || 2, groupsForSplit >= 2 ? groupsForSplit * qualifiersForSplit : null);
+  const splitTooLong = prizeKobo > 0 && prizeSplit.length > splitMaxPlaces;
   const [rulesText, setRulesText] = useState(tournament.rulesText ?? "");
   const [streamUrl, setStreamUrl] = useState(tournament.streamUrl ?? "");
   const [posterUrl, setPosterUrl] = useState(tournament.posterUrl ?? "");
@@ -98,7 +114,12 @@ export default function EditForm({
       name,
       ...(competitionChanged ? competition : {}),
       ...(!competitionChanged && isLobby && roundsEditable
-        ? { lobbyRounds: competition && !competitionLocked ? competition.lobbyRounds : lockedRounds }
+        ? {
+            lobbyRounds: competition && !competitionLocked ? competition.lobbyRounds : lockedRounds,
+            ...(competition && !competitionLocked
+              ? { lobbyGroups: competition.lobbyGroups, lobbyQualifiers: competition.lobbyQualifiers, lobbyFinalRounds: competition.lobbyFinalRounds }
+              : {}),
+          }
         : {}),
       participantCap: Number(participantCap),
       prizeText: prizeText || null,
@@ -109,6 +130,7 @@ export default function EditForm({
       registrationCloseAt: new Date(registrationCloseAt).toISOString(),
       startAt: new Date(startAt).toISOString(),
     };
+    if (!competitionLocked && prizeSplit.join() !== tournament.prizeSplit.join()) body.prizeSplit = prizeSplit;
     if (!moneyFieldsLocked) {
       body.entryFee = nairaToKobo(entryFeeNaira);
       body.prizeAmount = prizeAmountNaira ? nairaToKobo(prizeAmountNaira) : null;
@@ -202,15 +224,23 @@ export default function EditForm({
           id="participantCap"
           type="number"
           min={2}
-          max={selectedFormat?.lobbyCapacity ?? 128}
+          max={capLimit}
           required
           value={participantCap}
           onChange={(e) => setParticipantCap(e.target.value)}
           className="field-input"
         />
-        {selectedFormat?.lobbyCapacity && (
-          <span className="field-hint">One lobby holds up to {selectedFormat.lobbyCapacity} entries.</span>
-        )}
+        {selectedFormat?.lobbyCapacity ? (
+          <span className="field-hint">
+            {groupCount > 1 ? `${groupCount} group lobbies hold up to ${capLimit} entries.` : `One lobby holds up to ${selectedFormat.lobbyCapacity} entries.`}
+          </span>
+        ) : structureMax ? (
+          <span className="field-hint">
+            {(competition?.structure ?? tournament.format) === "ROUND_ROBIN"
+              ? `Up to ${structureMax} entries — every pairing is a match (${(structureMax * (structureMax - 1)) / 2} matches at ${structureMax}).`
+              : `Up to ${structureMax} entries.`}
+          </span>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -306,6 +336,18 @@ export default function EditForm({
         </div>
       </div>
 
+      {prizeKobo > 0 && (
+        <PrizeSplitField
+          value={prizeSplit}
+          onChange={setPrizeSplit}
+          maxPlaces={splitMaxPlaces}
+          prizeAmount={prizeKobo}
+          knockout={splitStructure === "KNOCKOUT"}
+          locked={competitionLocked}
+          onValidityChange={setSplitBlocked}
+        />
+      )}
+
       <div className="flex flex-col gap-1.5">
         <label htmlFor="streamUrl" className="field-label">
           Stream link (optional)
@@ -371,7 +413,7 @@ export default function EditForm({
 
       {error && <p className="field-error">{error}</p>}
 
-      <button type="submit" disabled={submitting || posterBlocked || competitionInvalid} className="btn-primary">
+      <button type="submit" disabled={submitting || posterBlocked || competitionInvalid || splitBlocked || (!competitionLocked && splitTooLong)} className="btn-primary">
         {submitting ? "Saving…" : "Save changes"}
       </button>
     </form>

@@ -398,7 +398,7 @@ export default async function AdminFinancePage({ searchParams }: { searchParams:
                             </span>
                           ) : (
                             <span className="text-muted">
-                              {t.type === "PRIZE_PAYOUT" ? "Champion" : "—"}
+                              {t.type === "PRIZE_PAYOUT" ? (t.place && t.place > 1 ? `Place ${t.place}` : "Champion") : "—"}
                             </span>
                           )}
                         </td>

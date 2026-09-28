@@ -83,47 +83,27 @@ export async function getWalletActivity(userId: string): Promise<WalletActivity>
     : [];
 
   // A prize payout has no direct recipient field — derive "is this mine"
-  // the same way the payout route itself decides who's allowed to claim:
-  // whoever won the tournament's real final round (highest `round`
-  // number for that tournament), not just any match they happened to win.
-  const myMatches = await prisma.match.findMany({
-    where: { tournamentId: { not: null }, OR: [{ playerAId: userId }, { playerBId: userId }] },
-    select: { tournamentId: true, round: true, winnerId: true },
+  // the same way the payout route decides who may claim: the tournament's
+  // winner (bracket final, round robin standings or lobby leaderboard —
+  // tournamentWinnerId) for every finished tournament this user entered.
+  const finished = await prisma.tournament.findMany({
+    where: { status: "COMPLETE", registrations: { some: { userId, status: "CONFIRMED" } } },
+    select: { id: true, status: true, competitionStyle: true, format: true, placementPoints: true, killPoints: true, lobbyGroups: true, lobbyQualifiers: true, lobbyFinalRounds: true },
   });
-  const myTournamentIds = [...new Set(myMatches.map((m) => m.tournamentId!))];
-  const allMatchesInThoseTournaments = myTournamentIds.length
-    ? await prisma.match.findMany({
-        where: { tournamentId: { in: myTournamentIds } },
-        select: { tournamentId: true, round: true },
-      })
-    : [];
-  const finalRoundByTournament = new Map<string, number>();
-  for (const m of allMatchesInThoseTournaments) {
-    const current = finalRoundByTournament.get(m.tournamentId!) ?? 0;
-    if ((m.round ?? 0) > current) finalRoundByTournament.set(m.tournamentId!, m.round ?? 0);
-  }
-  // Lobby tournaments have no matches — their champion is the top of the leaderboard.
-  const lobbyWins = await prisma.tournament.findMany({
-    where: { competitionStyle: "LOBBY", status: "COMPLETE", registrations: { some: { userId, status: "CONFIRMED" } } },
-    select: { id: true, status: true, competitionStyle: true, placementPoints: true, killPoints: true },
-  });
-  const lobbyChampionIds = (await Promise.all(lobbyWins.map(async (t) => ((await tournamentWinnerId(t)) === userId ? t.id : null)))).filter(
+  const championTournamentIds = (await Promise.all(finished.map(async (t) => ((await tournamentWinnerId(t)) === userId ? t.id : null)))).filter(
     (id): id is string => id !== null
   );
-  const championTournamentIds = [
-    ...myTournamentIds.filter((tid) =>
-      myMatches.some((m) => m.tournamentId === tid && m.round === finalRoundByTournament.get(tid) && m.winnerId === userId)
-    ),
-    ...lobbyChampionIds,
-  ];
 
-  const prizeTxns = championTournamentIds.length
-    ? await prisma.escrowTransaction.findMany({
-        where: { tournamentId: { in: championTournamentIds }, type: "PRIZE_PAYOUT" },
-        include: { tournament: { select: { name: true, game: true } } },
-        orderBy: { createdAt: "desc" },
-      })
-    : [];
+  // Split-prize payouts carry the recipient's userId; older ones don't
+  // and were always the champion's.
+  const prizeTxns = await prisma.escrowTransaction.findMany({
+    where: {
+      type: "PRIZE_PAYOUT",
+      OR: [{ userId }, ...(championTournamentIds.length ? [{ userId: null, tournamentId: { in: championTournamentIds } }] : [])],
+    },
+    include: { tournament: { select: { name: true, game: true } } },
+    orderBy: { createdAt: "desc" },
+  });
 
   // Battle-stake side: unlike the tournament rows above, these already
   // carry `userId` directly (no Registration indirection needed — see

@@ -15,6 +15,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AlertTriangle, Snowflake } from "lucide-react";
 import { prisma } from "@/lib/db";
+import { prizePayoutSummary } from "@/lib/prizes";
 import { StatusPill, registrationStatusInfo, tournamentStatusInfo } from "@/components/StatusPill";
 import { CancelTournamentButton } from "@/components/CancelTournamentButton";
 import { FreezeFundsControl } from "@/components/admin/FreezeFundsControl";
@@ -61,7 +62,7 @@ export default async function AdminCompetitionDetailPage({ params }: { params: P
   const organizerRevenueSettled = escrowTxns.filter((t) => t.type === "ORGANIZER_REVENUE" && t.status === "COMPLETE").reduce((s, t) => s + t.amount, 0);
   const organizerRevenuePending = escrowTxns.filter((t) => t.type === "ORGANIZER_REVENUE" && t.status === "PENDING").reduce((s, t) => s + t.amount, 0);
   const refunded = escrowTxns.filter((t) => t.type === "REFUND").reduce((s, t) => s + t.amount, 0);
-  const payout = escrowTxns.find((t) => t.type === "PRIZE_PAYOUT");
+  const payoutSummary = prizePayoutSummary(escrowTxns, tournament.prizeSplit);
   const status = tournamentStatusInfo(tournament.status);
   // Matches tournaments/[id]/cancel/route.ts's own guard exactly — that
   // route stopped blocking cancellation once startAt passes (a live
@@ -167,7 +168,7 @@ export default async function AdminCompetitionDetailPage({ params }: { params: P
         </div>
         <div className="widget flex flex-col gap-1">
           <span className="text-eyebrow">Prize payout</span>
-          <span className="text-stat text-xl">{payout ? (payout.status === "COMPLETE" ? "Sent" : "Processing") : "Not yet claimed"}</span>
+          <span className="text-stat text-xl">{payoutSummary}</span>
         </div>
       </div>
 

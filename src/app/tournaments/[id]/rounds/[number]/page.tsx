@@ -34,21 +34,23 @@ export default async function RoundResultsPage({ params }: { params: Promise<{ i
         <Link href={back} className="inline-flex w-fit items-center gap-1.5 text-sm font-medium text-muted transition hover:text-foreground">
           <ArrowLeft size={15} /> {tournament.name}
         </Link>
-        <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
-          Round {round.number} of {view.rounds.length} results
-        </h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">{round.label} results</h1>
         <p className="text-sm text-muted">Scoring: {describePoints(view.table)}.</p>
       </div>
-      {tournament.status !== "LIVE" ? (
+      {tournament.status !== "LIVE" || (round.stage === "GROUP" && view.stage === "FINAL") ? (
         <p className="card text-sm text-muted">
-          {tournament.status === "COMPLETE" ? "Results are final — this tournament is complete." : "The lobby hasn't started yet."}
+          {tournament.status === "COMPLETE"
+            ? "Results are final — this tournament is complete."
+            : tournament.status === "LIVE"
+              ? "The final has started — group results are locked."
+              : "The lobby hasn't started yet."}
         </p>
       ) : (
         <RoundResultsForm
           tournamentId={id}
           roundNumber={round.number}
           table={view.table}
-          entries={view.entries.map((e) => ({ registrationId: e.registrationId, name: e.name, tag: e.tag, sub: e.roster.length ? e.roster.map((m) => m.displayName).join(", ") : `@${e.handle}`, inGameId: e.inGameId }))}
+          entries={view.entries.filter((e) => round.entryIds.includes(e.registrationId)).map((e) => ({ registrationId: e.registrationId, name: e.name, tag: e.tag, sub: e.roster.length ? e.roster.map((m) => m.displayName).join(", ") : `@${e.handle}`, inGameId: e.inGameId }))}
           initial={round.results.map((r) => ({ registrationId: r.registrationId, placement: r.placement, kills: r.kills }))}
           initialProofUrl={round.proofUrl}
           backHref={back}

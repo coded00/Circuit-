@@ -7,11 +7,22 @@
  * "coming soon" — see src/lib/competitionRules.ts for the rules.
  */
 
-import { DEFAULT_LOBBY_ROUNDS, MAX_LOBBY_ROUNDS } from "@/lib/lobbyScoring";
+import { DEFAULT_LOBBY_ROUNDS, MAX_LOBBY_GROUPS, MAX_LOBBY_ROUNDS } from "@/lib/lobbyScoring";
 import { UNAVAILABLE_LABEL, type PickerFormat, type PickerGame, type PickerMode } from "@/lib/competitionRules";
 
-/** lobbyRounds only matters for lobby modes (a number as typed). */
-export type CompetitionValue = { gameId: string; gameModeId: string; gameFormatId: string; structure: string; lobbyRounds: string };
+/** Lobby settings only matter for lobby modes (numbers as typed; lobbyGroups "" = one lobby). */
+export type CompetitionValue = {
+  gameId: string;
+  gameModeId: string;
+  gameFormatId: string;
+  structure: string;
+  lobbyRounds: string;
+  lobbyGroups: string;
+  lobbyQualifiers: string;
+  lobbyFinalRounds: string;
+};
+
+const NO_GROUPS = { lobbyGroups: "", lobbyQualifiers: "", lobbyFinalRounds: "" };
 
 export const DEFAULT_ROUNDS = String(DEFAULT_LOBBY_ROUNDS);
 
@@ -29,9 +40,9 @@ export function defaultCompetition(catalog: PickerGame[], gameId?: string): Comp
   for (const game of [...games.filter((g) => g.available), ...games]) {
     const mode = game.modes.find((m) => !m.unavailable) ?? game.modes[0];
     const format = mode ? (firstAvailableFormat(mode) ?? mode.formats[0]) : undefined;
-    return { gameId: game.id, gameModeId: mode?.id ?? "", gameFormatId: format?.id ?? "", structure: firstRunnable(format), lobbyRounds: DEFAULT_ROUNDS };
+    return { gameId: game.id, gameModeId: mode?.id ?? "", gameFormatId: format?.id ?? "", structure: firstRunnable(format), lobbyRounds: DEFAULT_ROUNDS, ...NO_GROUPS };
   }
-  return { gameId: "", gameModeId: "", gameFormatId: "", structure: "", lobbyRounds: DEFAULT_ROUNDS };
+  return { gameId: "", gameModeId: "", gameFormatId: "", structure: "", lobbyRounds: DEFAULT_ROUNDS, ...NO_GROUPS };
 }
 
 /** Looks up the objects behind a value. */
@@ -66,6 +77,14 @@ export function CompetitionPicker({
   lockedReason?: string;
 }) {
   const { game, mode, format } = selectedParts(catalog, value);
+  const groupsHint = (() => {
+    const g = Number(value.lobbyGroups);
+    const q = Number(value.lobbyQualifiers);
+    const cap = format?.lobbyCapacity ?? null;
+    if (!g) return { text: "", error: false };
+    if (cap && g * q > cap) return { text: `${g} × ${q} = ${g * q} finalists — one lobby holds ${cap}.`, error: true };
+    return { text: `${g * q} finalists${cap ? ` of ${cap} lobby places` : ""}. Up to ${cap ? g * cap : "—"} entries across the groups.`, error: false };
+  })();
 
   function pickGame(gameId: string) {
     onChange({ ...defaultCompetition(catalog, gameId), lobbyRounds: value.lobbyRounds });
@@ -194,7 +213,7 @@ export function CompetitionPicker({
         <div className="grid grid-cols-1 gap-3 rounded-[12px] border border-border bg-surface-elevated/40 p-3.5 sm:grid-cols-[8rem_1fr]">
           <div className="flex flex-col gap-1.5">
             <label htmlFor="lobbyRounds" className="field-label">
-              Rounds
+              {value.lobbyGroups ? "Group rounds" : "Rounds"}
             </label>
             <input
               id="lobbyRounds"
@@ -211,9 +230,71 @@ export function CompetitionPicker({
             <span className="field-label">Scoring</span>
             <span className="text-muted">{format.points}</span>
             <span className="text-xs text-muted">
-              Everyone plays every round in one lobby{format.lobbyCapacity ? ` (up to ${format.lobbyCapacity} entries)` : ""}. You enter placements and kills after each round; the points table is set for this format.
+              {value.lobbyGroups
+                ? `Entries are split into ${value.lobbyGroups} group lobbies that each play the group rounds; the top ${value.lobbyQualifiers || "N"} of each group play the final, where points start fresh.`
+                : `Everyone plays every round in one lobby${format.lobbyCapacity ? ` (up to ${format.lobbyCapacity} entries)` : ""}.`}{" "}
+              You enter placements and kills after each round; the points table is set for this format.
             </span>
           </div>
+          <label className="flex items-center gap-2 text-sm sm:col-span-2">
+            <input
+              type="checkbox"
+              checked={!!value.lobbyGroups}
+              onChange={(e) =>
+                onChange(
+                  e.target.checked
+                    ? { ...value, lobbyGroups: "2", lobbyQualifiers: String(Math.max(1, Math.floor((format.lobbyCapacity ?? 20) / 2))), lobbyFinalRounds: DEFAULT_ROUNDS }
+                    : { ...value, ...NO_GROUPS }
+                )
+              }
+              className="accent-[var(--accent-volt)]"
+            />
+            <span className="font-medium">Groups, then a final</span>
+            <span className="text-xs text-muted">— for more entries than one lobby holds</span>
+          </label>
+          {value.lobbyGroups && (
+            <div className="grid grid-cols-3 gap-3 sm:col-span-2">
+              <label className="flex flex-col gap-1.5">
+                <span className="field-label">Groups</span>
+                <input
+                  id="lobbyGroups"
+                  type="number"
+                  min={2}
+                  max={MAX_LOBBY_GROUPS}
+                  required
+                  value={value.lobbyGroups}
+                  onChange={(e) => onChange({ ...value, lobbyGroups: e.target.value })}
+                  className="field-input"
+                />
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className="field-label">Qualify per group</span>
+                <input
+                  id="lobbyQualifiers"
+                  type="number"
+                  min={1}
+                  required
+                  value={value.lobbyQualifiers}
+                  onChange={(e) => onChange({ ...value, lobbyQualifiers: e.target.value })}
+                  className="field-input"
+                />
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className="field-label">Final rounds</span>
+                <input
+                  id="lobbyFinalRounds"
+                  type="number"
+                  min={1}
+                  max={MAX_LOBBY_ROUNDS}
+                  required
+                  value={value.lobbyFinalRounds}
+                  onChange={(e) => onChange({ ...value, lobbyFinalRounds: e.target.value })}
+                  className="field-input"
+                />
+              </label>
+              <span className={`field-hint col-span-3 ${groupsHint.error ? "text-danger" : ""}`}>{groupsHint.text}</span>
+            </div>
+          )}
         </div>
       )}
     </fieldset>

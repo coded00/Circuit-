@@ -22,8 +22,9 @@ import type { Metadata } from "next";
 import { Check, ChevronRight, MessageCircle, ShieldCheck, Timer, Trophy, Tv, Users } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { teamEntryLabels } from "@/lib/teamEntries";
-import { tournamentWinnerId } from "@/lib/lobby";
 import { describePoints, effectiveTable } from "@/lib/lobbyScoring";
+import { tournamentPrizeShares } from "@/lib/prizePlaces";
+import { placeLabel, plannedShares, type PrizeShare } from "@/lib/prizes";
 import { getCurrentUser } from "@/lib/session";
 import { StatusPill, tournamentStatusInfo } from "@/components/StatusPill";
 import { GameArtTile } from "@/components/GameArtTile";
@@ -113,7 +114,8 @@ export default async function TournamentPage({ params }: { params: Promise<{ id:
 
   const isTeam = tournament.entryType === "TEAM";
   const isLobby = tournament.competitionStyle === "LOBBY";
-  const bracketWord = isLobby ? "Standings" : "Bracket";
+  const isRoundRobin = tournament.format === "ROUND_ROBIN" || tournament.format === "SWISS";
+  const bracketWord = isLobby || isRoundRobin ? "Standings" : "Bracket";
   const entrantWord = isTeam ? "teams" : "players";
   const [registrantCount, user, participants, teamLabels] = await Promise.all([
     prisma.registration.count({ where: { tournamentId: tournament.id, status: "CONFIRMED" } }),
@@ -161,7 +163,13 @@ export default async function TournamentPage({ params }: { params: Promise<{ id:
     ...(tournament.competitionStyle === "HEAD_TO_HEAD" ? [{ label: "Matches", value: `${tournament.playersPerTeam}v${tournament.playersPerTeam}` }] : []),
     ...(isLobby
       ? [
-          { label: "Rounds", value: `${tournament.lobbyRounds ?? 1} in one lobby` },
+          {
+            label: "Rounds",
+            value:
+              tournament.lobbyGroups && tournament.lobbyQualifiers
+                ? `${tournament.lobbyGroups} groups × ${tournament.lobbyRounds ?? 1} rounds, then the top ${tournament.lobbyQualifiers} of each play a ${tournament.lobbyFinalRounds ?? 1}-round final`
+                : `${tournament.lobbyRounds ?? 1} in one lobby`,
+          },
           { label: "Scoring", value: describePoints(effectiveTable(tournament)) },
         ]
       : []),
@@ -172,14 +180,23 @@ export default async function TournamentPage({ params }: { params: Promise<{ id:
   const startingSoon = !hasBracket && tournament.status !== "CANCELLED" && isStartingSoon(tournament.startAt, now);
   const communityVisible = Boolean(tournament.community?.enabled || isOrganizer);
 
-  let canClaimPrize = false;
-  if (user && tournament.status === "COMPLETE" && tournament.prizeAmount && tournament.prizeAmount > 0) {
-    const [winnerId, existingPayout] = await Promise.all([
-      tournamentWinnerId(tournament),
-      prisma.escrowTransaction.findFirst({ where: { tournamentId: tournament.id, type: "PRIZE_PAYOUT" } }),
+  // Split prizes (src/lib/prizes.ts): every paid place claims its own share.
+  let myShare: PrizeShare | null = null;
+  let prizeResults: { share: PrizeShare; name: string; claimed: boolean }[] = [];
+  if (tournament.status === "COMPLETE" && tournament.prizeAmount && tournament.prizeAmount > 0) {
+    const [shares, payouts] = await Promise.all([
+      tournamentPrizeShares(tournament),
+      prisma.escrowTransaction.findMany({ where: { tournamentId: tournament.id, type: "PRIZE_PAYOUT", status: { in: ["PENDING", "COMPLETE"] } } }),
     ]);
-    canClaimPrize = winnerId === user.id && !existingPayout;
+    const people = await prisma.user.findMany({ where: { id: { in: shares.map((x) => x.userId) } }, select: { id: true, displayName: true } });
+    const nameOf = new Map(people.map((x) => [x.id, teamLabels.get(x.id)?.teamName ?? x.displayName]));
+    // Payouts from before split prizes carry no userId — they were the champion's.
+    const claimed = (share: PrizeShare) => payouts.some((x) => x.userId === share.userId || (x.userId === null && share.place === 1));
+    prizeResults = shares.map((share) => ({ share, name: nameOf.get(share.userId) ?? "Unknown", claimed: claimed(share) }));
+    const mine = prizeResults.find((x) => x.share.userId === user?.id);
+    myShare = mine && !mine.claimed ? mine.share : null;
   }
+  const canClaimPrize = !!myShare;
 
   const aboutText = `${tournament.name} is a ${formatText.toLowerCase()} ${tournament.game} tournament for up to ${tournament.participantCap} ${entrantWord} (${tournament.teamSize}). ${
     tournament.prizeAmount
@@ -387,16 +404,27 @@ export default async function TournamentPage({ params }: { params: Promise<{ id:
                     ? tournament.status === "COMPLETE"
                       ? "Results are final. See the leaderboard and every round."
                       : "The lobby is live. The leaderboard updates as each round's results are posted."
-                    : "The bracket is live. Follow every round as results come in."}
+                    : isRoundRobin
+                      ? tournament.format === "SWISS"
+                        ? "Swiss rounds are live — each round is drawn when the last one finishes."
+                        : "Everyone plays everyone — follow the standings as matches finish."
+                      : "The bracket is live. Follow every round as results come in."}
                 </p>
                 <Link href={`/tournaments/${tournament.id}/bracket`} className="btn-primary">
-                  {isLobby ? "Open standings" : "Open bracket"}
+                  {isLobby || isRoundRobin ? "Open standings" : "Open bracket"}
                 </Link>
               </>
+            ) : isRoundRobin ? (
+              <p className="text-sm text-muted">
+                {tournament.format === "SWISS"
+                  ? `When registration closes on ${formatDate(tournament.registrationCloseAt)}, round 1 is drawn. Each round pairs players on the same record — never the same opponent twice — and the most wins after the last round takes it.`
+                  : `When registration closes on ${formatDate(tournament.registrationCloseAt)}, every pairing is drawn at once — everyone plays everyone, in any order. Most wins takes it.`}
+              </p>
             ) : isLobby ? (
               <p className="text-sm text-muted">
-                Everyone plays {tournament.lobbyRounds ?? 1} round{tournament.lobbyRounds === 1 ? "" : "s"} in one lobby once registration closes on{" "}
-                {formatDate(tournament.registrationCloseAt)}. Points add up across rounds into one leaderboard.
+                {tournament.lobbyGroups && tournament.lobbyQualifiers
+                  ? `When registration closes on ${formatDate(tournament.registrationCloseAt)}, entries are split into ${tournament.lobbyGroups} group lobbies. The top ${tournament.lobbyQualifiers} of each group play the final, where points start fresh.`
+                  : `Everyone plays ${tournament.lobbyRounds ?? 1} round${tournament.lobbyRounds === 1 ? "" : "s"} in one lobby once registration closes on ${formatDate(tournament.registrationCloseAt)}. Points add up across rounds into one leaderboard.`}
               </p>
             ) : (
               <p className="text-sm text-muted">
@@ -433,7 +461,44 @@ export default async function TournamentPage({ params }: { params: Promise<{ id:
                 <span className="text-eyebrow text-muted">Prize pool</span>
                 <span className="text-stat text-4xl leading-none text-gold">{formatNaira(tournament.prizeAmount)}</span>
                 {tournament.prizeText && <p className="mt-1 text-sm text-muted">{tournament.prizeText}</p>}
-                <p className="mt-1 text-xs text-muted">Paid to the champion&apos;s payout account once {isLobby ? "the results are finalised" : "the final is confirmed"}.</p>
+                {tournament.prizeSplit.length > 0 && (
+                  <ul className="mt-2 flex flex-col divide-y divide-border rounded-[10px] border border-border">
+                    {(prizeResults.length
+                      ? prizeResults.map((x) => ({
+                          key: x.share.userId,
+                          place: `${placeLabel(x.share.place)}${x.share.sharedWith > 1 ? " (shared)" : ""}`,
+                          who: x.name,
+                          amount: x.share.amount,
+                          claimed: x.claimed,
+                        }))
+                      : plannedShares(tournament.prizeAmount, tournament.prizeSplit).map((x) => ({
+                          key: String(x.place),
+                          place: `${placeLabel(x.place)} · ${x.percent}%`,
+                          who: null as string | null,
+                          amount: x.amount,
+                          claimed: false,
+                        }))
+                    ).map((row) => (
+                      <li key={row.key} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                        <span className="flex min-w-0 flex-col">
+                          <span className="font-semibold">{row.place}</span>
+                          {row.who && <span className="truncate text-xs text-muted">{row.who}</span>}
+                        </span>
+                        <span className="flex shrink-0 items-center gap-2">
+                          {row.who && <span className={`text-xs ${row.claimed ? "text-success" : "text-muted"}`}>{row.claimed ? "Claimed" : "Unclaimed"}</span>}
+                          <span className="font-mono text-sm font-bold text-gold">{formatNaira(row.amount)}</span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="mt-1 text-xs text-muted">
+                  {tournament.prizeSplit.length > 0
+                    ? `Each place claims its own share once ${isLobby ? "the results are finalised" : isRoundRobin ? "every match is played" : "the final is confirmed"}.${
+                        tournament.format === "KNOCKOUT" && tournament.prizeSplit.length >= 3 ? " The two semi-final losers share 3rd." : ""
+                      } Ties split the places they cover.`
+                    : `Paid to the champion's payout account once ${isLobby ? "the results are finalised" : isRoundRobin ? "every match is played" : "the final is confirmed"}.`}
+                </p>
               </>
             ) : tournament.prizeText ? (
               <p className="text-sm text-foreground/85">{tournament.prizeText}</p>
@@ -639,7 +704,12 @@ export default async function TournamentPage({ params }: { params: Promise<{ id:
             </PanelBody>
           </Panel>
 
-          {canClaimPrize && <ClaimPrizeButton tournamentId={tournament.id} />}
+          {canClaimPrize && myShare && (
+            <ClaimPrizeButton
+              tournamentId={tournament.id}
+              label={prizeResults.length > 1 ? `Claim ${formatNaira(myShare.amount)} — ${placeLabel(myShare.place)} place` : undefined}
+            />
+          )}
 
           <p className="flex items-start gap-2 px-1 text-xs text-muted">
             <ShieldCheck size={13} className="mt-px shrink-0" />

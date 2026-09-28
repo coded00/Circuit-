@@ -11,7 +11,7 @@
 import { NextResponse } from "next/server";
 import { Prisma, EscrowStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { tournamentWinnerId } from "@/lib/lobby";
+import { tournamentPrizeShares } from "@/lib/prizePlaces";
 import { getCurrentUser } from "@/lib/session";
 import { getDefaultPaymentProvider } from "@/lib/payments";
 import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
@@ -58,23 +58,30 @@ export async function POST(
     return NextResponse.json({ error: "This tournament has no cash prize to claim." }, { status: 409 });
   }
 
-  // The final bracket match's winner, or the top of a lobby leaderboard.
-  const winnerId = await tournamentWinnerId(tournament);
-  if (!winnerId) {
+  // Each paid place claims its own share (src/lib/prizes.ts): the whole
+  // prize for the champion when it's winner-takes-all.
+  const shares = await tournamentPrizeShares(tournament);
+  if (shares.length === 0) {
     return NextResponse.json({ error: "No champion has been decided yet." }, { status: 409 });
   }
-  if (winnerId !== user.id) {
-    return NextResponse.json({ error: "Only the tournament champion can claim this prize." }, { status: 403 });
+  const share = shares.find((s) => s.userId === user.id);
+  if (!share) {
+    return NextResponse.json(
+      { error: shares.length === 1 ? "Only the tournament champion can claim this prize." : "Only players who finished in a prize place can claim." },
+      { status: 403 }
+    );
   }
+  // Payouts from before split prizes have no userId — they were always the champion's.
+  const mineOrLegacy = { OR: [{ userId: user.id }, { userId: null }] };
 
   // Fast-path check only — not the actual guard against a concurrent
   // double-claim (that's the transaction below). This just avoids running
   // the age-gate/payout-method checks below for the common case.
   const existingPayout = await prisma.escrowTransaction.findFirst({
-    where: { tournamentId: id, type: "PRIZE_PAYOUT", status: { in: CLAIMED_STATUSES } },
+    where: { tournamentId: id, type: "PRIZE_PAYOUT", status: { in: CLAIMED_STATUSES }, ...mineOrLegacy },
   });
   if (existingPayout) {
-    return NextResponse.json({ error: "This prize has already been claimed." }, { status: 409 });
+    return NextResponse.json({ error: "You've already claimed your prize." }, { status: 409 });
   }
 
   // ACC-3: payout claim is a cash-touching action.
@@ -103,8 +110,8 @@ export async function POST(
   }
 
   const provider = getDefaultPaymentProvider();
-  const reference = `payout_${tournament.id}`;
-  const prizeAmount = tournament.prizeAmount;
+  const reference = `payout_${tournament.id}_${share.place}_${user.id}`;
+  const prizeAmount = share.amount;
 
   // Reserve the claim — a PENDING row created inside a Serializable
   // transaction that re-checks for an existing claim first. Two concurrent
@@ -130,12 +137,12 @@ export async function POST(
           if (freshTournament.fundsFrozen) throw new FundsFrozenError();
 
           const existing = await tx.escrowTransaction.findFirst({
-            where: { tournamentId: id, type: "PRIZE_PAYOUT", status: { in: CLAIMED_STATUSES } },
+            where: { tournamentId: id, type: "PRIZE_PAYOUT", status: { in: CLAIMED_STATUSES }, ...mineOrLegacy },
           });
           if (existing) throw new AlreadyClaimedError();
 
           const row = await tx.escrowTransaction.create({
-            data: { tournamentId: tournament.id, type: "PRIZE_PAYOUT", amount: prizeAmount, provider: provider.name, status: "PENDING" },
+            data: { tournamentId: tournament.id, type: "PRIZE_PAYOUT", amount: prizeAmount, userId: user.id, place: share.place, provider: provider.name, status: "PENDING" },
           });
           return row.id;
         },
@@ -144,7 +151,7 @@ export async function POST(
       break;
     } catch (err) {
       if (err instanceof AlreadyClaimedError) {
-        return NextResponse.json({ error: "This prize has already been claimed." }, { status: 409 });
+        return NextResponse.json({ error: "You've already claimed your prize." }, { status: 409 });
       }
       if (err instanceof FundsFrozenError) {
         return NextResponse.json({ error: "Funds for this tournament are frozen pending review." }, { status: 409 });

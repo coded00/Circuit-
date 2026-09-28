@@ -9,6 +9,7 @@ import { notFound, redirect } from "next/navigation";
 import { loginPath } from "@/lib/safeRedirect";
 import { AlertTriangle } from "lucide-react";
 import { prisma } from "@/lib/db";
+import { prizePayoutSummary } from "@/lib/prizes";
 import { getCurrentUser } from "@/lib/session";
 import { StatusPill, registrationStatusInfo, tournamentStatusInfo } from "@/components/StatusPill";
 import { CancelTournamentButton } from "@/components/CancelTournamentButton";
@@ -69,7 +70,7 @@ export default async function DashboardTournamentDetailPage({
   const organizerRevenuePending = escrowTxns
     .filter((t) => t.type === "ORGANIZER_REVENUE" && t.status === "PENDING")
     .reduce((sum, t) => sum + t.amount, 0);
-  const payout = escrowTxns.find((t) => t.type === "PRIZE_PAYOUT");
+  const payoutSummary = prizePayoutSummary(escrowTxns, tournament.prizeSplit);
   const status = tournamentStatusInfo(tournament.status);
   // Same guard as tournaments/[id]/cancel/route.ts itself — see that
   // route's own comments for why fundsFrozen and cancellationLockAt are
@@ -145,7 +146,7 @@ export default async function DashboardTournamentDetailPage({
         <div className="widget flex flex-col gap-1">
           <span className="text-eyebrow">Prize payout</span>
           <span className="text-stat text-xl">
-            {payout ? (payout.status === "COMPLETE" ? "Sent" : "Processing") : "Not yet claimed"}
+            {payoutSummary}
           </span>
         </div>
       </section>

@@ -15,6 +15,8 @@ import { matchStatusInfo } from "@/components/StatusPill";
 import { buildMatchTimeline } from "@/lib/matchTimeline";
 import Poller from "@/app/Poller";
 import { teamEntryLabels } from "@/lib/teamEntries";
+import { isRoundRobinStructure, isSwissStructure } from "@/lib/roundRobinStandings";
+import { isDoubleElimStructure, nodeByMatch, nodeLabel } from "@/lib/doubleElim";
 import { MatchView, type MatchPlayer, type MatchViewData } from "./MatchView";
 
 type ResultPayload = { winnerId: string; score: string };
@@ -32,7 +34,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
       playerA: true,
       playerB: true,
       winner: true,
-      tournament: { select: { id: true, name: true, game: true, organizerId: true } },
+      tournament: { select: { id: true, name: true, game: true, organizerId: true, format: true } },
       battle: { select: { id: true, game: true, format: true, stakeAmount: true } },
       dispute: true,
     },
@@ -60,6 +62,18 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
     const index = standings.findIndex((s) => s.userId === userId);
     return index === -1 ? null : { rank: index + 1, wins: standings[index].wins, losses: standings[index].losses };
   };
+
+  // Round robin: the extra match after the last round is the tie-for-first decider;
+  // double elimination: which bracket and round this is.
+  let roundLabel = `Round ${match.round}`;
+  if (["ROUND_ROBIN", "SWISS", "DOUBLE_ELIMINATION"].includes(match.tournament?.format ?? "") && match.tournamentId) {
+    const bracket = await prisma.bracket.findUnique({ where: { tournamentId: match.tournamentId } });
+    if ((isRoundRobinStructure(bracket?.structure) || isSwissStructure(bracket?.structure)) && (match.round ?? 0) > bracket.structure.totalRounds) roundLabel = "Decider";
+    if (isDoubleElimStructure(bracket?.structure)) {
+      const n = nodeByMatch(bracket.structure, match.id);
+      if (n) roundLabel = nodeLabel(bracket.structure, n);
+    }
+  }
 
   // Team tournaments: the captain holds the slot, the team's name is shown.
   const labels = match.tournamentId ? await teamEntryLabels(match.tournamentId) : new Map();
@@ -90,7 +104,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
     statusPill: matchStatusInfo(match.status),
     kind: match.battleId ? "battle" : "tournament",
     game,
-    formatLabel: match.battle ? formatBattleFormat(match.battle.format) : `Round ${match.round}`,
+    formatLabel: match.battle ? formatBattleFormat(match.battle.format) : roundLabel,
     tournament: match.tournament ? { id: match.tournament.id, name: match.tournament.name } : null,
     battleId: match.battleId,
     stakeAmount: match.battle?.stakeAmount ?? 0,

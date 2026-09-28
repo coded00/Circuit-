@@ -42,6 +42,13 @@ enum MatchStatus {
   COMPLETE
 }
 
+/// MAIN = the one lobby of an ungrouped tournament.
+enum LobbyStage {
+  MAIN
+  GROUP
+  FINAL
+}
+
 enum LobbyRoundStatus {
   PENDING
   POSTED
@@ -594,12 +601,21 @@ model Tournament {
   /// LOBBY tournaments: how many rounds (games) every entry plays, and
   /// the scoring snapshotted from the format at creation.
   lobbyRounds         Int?
+  /// LOBBY tournaments run as groups, then a final (null = one lobby):
+  /// how many group lobbies, how many of each qualify, and the final's
+  /// rounds. lobbyRounds is then the group stage's rounds.
+  lobbyGroups         Int?
+  lobbyQualifiers     Int?
+  lobbyFinalRounds    Int?
   placementPoints     Int[]            @default([])
   killPoints          Int              @default(1)
   /// Minor currency units (kobo), never a float. 0 = free tournament.
   entryFee            Int              @default(0)
   prizeAmount         Int?
   prizeText           String?
+  /// How prizeAmount is shared: percent per finishing place, index 0 =
+  /// 1st (sums to 100). Empty = winner takes all. See src/lib/prizes.ts.
+  prizeSplit          Int[]            @default([])
   rulesText           String?
   /// Just a link (Twitch/YouTube/anything) — no embed, no live-status
   /// check. Full streaming integration is a documented V2 item (PRD's
@@ -701,9 +717,13 @@ model Registration {
   /// record of when each transition happened.
   updatedAt    DateTime           @updatedAt
 
-  escrowTxns   EscrowTransaction[]
-  roster       RosterMember[]
-  lobbyResults LobbyResult[]
+  escrowTxns    EscrowTransaction[]
+  roster        RosterMember[]
+  lobbyResults  LobbyResult[]
+  /// Grouped lobby tournaments: the entry's group (1 = A), and whether it
+  /// qualified for the final.
+  lobbyGroup    Int?
+  lobbyFinalist Boolean             @default(false)
 
   @@unique([tournamentId, userId])
   @@index([tournamentId, status])
@@ -734,11 +754,23 @@ model LobbyRound {
   id           String           @id @default(cuid())
   tournamentId String
   tournament   Tournament       @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  /// Unique across the tournament (used in URLs); stage/group/stageRound
+  /// say which lobby it is and which of that lobby's rounds.
   number       Int
+  stage        LobbyStage       @default(MAIN)
+  /// GROUP rounds: 1 = Group A. 0 otherwise.
+  group        Int              @default(0)
+  /// The round's number within its stage and group (1, 2, …).
+  stageRound   Int              @default(0)
   status       LobbyRoundStatus @default(PENDING)
   /// Optional screenshot of the end-of-game results (an /api/images path).
   proofUrl     String?
   postedAt     DateTime?
+  /// The in-game custom room for this round. Only confirmed entrants
+  /// (and roster players), the organizer and staff can see these.
+  roomCode     String?
+  roomPassword String?
+  roomPostedAt DateTime?
   postedById   String?
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
@@ -1043,6 +1075,9 @@ model EscrowTransaction {
   /// orphans that history, even though nothing deletes a User today.
   user                  User?                @relation(fields: [userId], references: [id], onDelete: Restrict)
   type                  EscrowType
+  /// PRIZE_PAYOUT: the finishing place this share is for (1 = champion).
+  /// Null on payouts from before split prizes (always the champion's).
+  place                 Int?
   /// Minor currency units (kobo).
   amount                Int
   /// Null for a Battle-stake row — wallet-balance-only, no external

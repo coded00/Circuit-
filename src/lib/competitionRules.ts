@@ -30,6 +30,7 @@ export function structureOptions(format: { structures: string[] }) {
     label: s.label,
     description: s.description,
     runnable: s.runnable,
+    maxEntries: s.maxEntries ?? null,
   }));
 }
 

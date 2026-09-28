@@ -20,6 +20,8 @@ export type CompetitionStructure = {
   style: CompetitionStyle;
   /** False = admins can offer it, organizers see it as "coming soon". */
   runnable: boolean;
+  /** Most entries it can run with (round robin: every pairing is a match). */
+  maxEntries?: number;
 };
 
 export const COMPETITION_STRUCTURES: readonly CompetitionStructure[] = [
@@ -33,23 +35,26 @@ export const COMPETITION_STRUCTURES: readonly CompetitionStructure[] = [
   {
     id: "DOUBLE_ELIMINATION",
     label: "Double elimination",
-    description: "A second life through a losers' bracket.",
+    description: "Lose twice and you're out — a losers' bracket, then a grand final.",
     style: "HEAD_TO_HEAD",
-    runnable: false,
+    runnable: true,
+    maxEntries: 32,
   },
   {
     id: "ROUND_ROBIN",
     label: "Round robin",
-    description: "Every entry plays every other entry.",
+    description: "Every entry plays every other entry once; most wins takes it.",
     style: "HEAD_TO_HEAD",
-    runnable: false,
+    runnable: true,
+    maxEntries: 16,
   },
   {
     id: "SWISS",
     label: "Swiss",
-    description: "Fixed rounds, paired against similar records.",
+    description: "A few rounds, each against someone on the same record; never the same opponent twice.",
     style: "HEAD_TO_HEAD",
-    runnable: false,
+    runnable: true,
+    maxEntries: 64,
   },
   {
     id: "LEAGUE",

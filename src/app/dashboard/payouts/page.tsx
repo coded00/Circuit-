@@ -6,6 +6,7 @@
 
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { prizePayoutSummary } from "@/lib/prizes";
 import { getCurrentUser } from "@/lib/session";
 
 function formatNaira(kobo: number): string {
@@ -28,8 +29,7 @@ export default async function DashboardPayoutsPage() {
         .filter((e) => e.type === "ENTRY_FEE" && e.status === "COMPLETE")
         .reduce((sum, e) => sum + e.amount, 0);
       const refunded = t.escrowTxns.filter((e) => e.type === "REFUND").reduce((sum, e) => sum + e.amount, 0);
-      const payout = t.escrowTxns.find((e) => e.type === "PRIZE_PAYOUT");
-      return { tournament: t, collected, refunded, payout };
+      return { tournament: t, collected, refunded, payout: prizePayoutSummary(t.escrowTxns, t.prizeSplit) };
     })
     .filter((row) => row.collected > 0 || row.refunded > 0 || row.tournament.prizeAmount);
 
@@ -74,7 +74,7 @@ export default async function DashboardPayoutsPage() {
                   </td>
                   <td className="font-mono tabular-nums">{formatNaira(row.collected)}</td>
                   <td className="font-mono tabular-nums">{formatNaira(row.refunded)}</td>
-                  <td>{row.payout ? (row.payout.status === "COMPLETE" ? "Sent" : "Processing") : "Not yet claimed"}</td>
+                  <td>{row.payout}</td>
                 </tr>
               ))}
             </tbody>

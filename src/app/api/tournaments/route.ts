@@ -12,7 +12,9 @@ import { NextResponse, after } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { parseOptionalUrl, parseOptionalImageUrl } from "@/lib/validation";
-import { parseLobbyRounds } from "@/lib/lobbyScoring";
+import { parseLobbyGroups, parseLobbyRounds, type LobbyGroupsConfig } from "@/lib/lobbyScoring";
+import { getStructure } from "@/lib/competitionStructures";
+import { maxPrizePlaces, parsePrizeSplit } from "@/lib/prizes";
 import { resolveCompetition } from "@/lib/competitionConfig";
 import { notifyAllUsers } from "@/lib/notifications";
 import { enableCommunity, postSystemMessage } from "@/lib/community";
@@ -95,23 +97,44 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: competition.error }, { status: 400 });
   }
   // Lobby tournaments are one lobby, so the lobby's size is the cap.
-  const capLimit = competition.lobbyCapacity ?? MAX_PARTICIPANT_CAP;
+  // Round robins are capped by the structure (every pairing is a match).
+  const structureMax = getStructure(competition.fields.format)?.maxEntries ?? null;
+  // Groups, then a final: each group is a lobby, so the cap can be groups × lobby size.
+  const groupCount = competition.fields.competitionStyle === "LOBBY" && Number(body.lobbyGroups) >= 2 ? Number(body.lobbyGroups) : 1;
+  const capLimit = competition.lobbyCapacity ? competition.lobbyCapacity * groupCount : (structureMax ?? MAX_PARTICIPANT_CAP);
   if (!Number.isInteger(participantCap) || participantCap < 2 || participantCap > capLimit) {
     return NextResponse.json(
       {
         error: competition.lobbyCapacity
-          ? `This format's lobby holds ${competition.lobbyCapacity} entries — set a cap between 2 and ${competition.lobbyCapacity}.`
-          : `Participant cap must be a whole number between 2 and ${MAX_PARTICIPANT_CAP}.`,
+          ? groupCount > 1
+            ? `${groupCount} group lobbies hold ${capLimit} entries — set a cap between 2 and ${capLimit}.`
+            : `This format's lobby holds ${competition.lobbyCapacity} entries — set a cap between 2 and ${competition.lobbyCapacity}, or split into groups.`
+          : structureMax
+            ? `A ${getStructure(competition.fields.format)!.label.toLowerCase()} can have at most ${structureMax} entries.`
+            : `Participant cap must be a whole number between 2 and ${MAX_PARTICIPANT_CAP}.`,
       },
       { status: 400 }
     );
   }
   let lobbyRounds: number | null = null;
+  let groups: LobbyGroupsConfig | null = null;
   if (competition.fields.competitionStyle === "LOBBY") {
     const rounds = parseLobbyRounds(body.lobbyRounds);
     if (!rounds.ok) return NextResponse.json({ error: rounds.error }, { status: 400 });
     lobbyRounds = rounds.value;
+    const parsedGroups = parseLobbyGroups(
+      { groups: body.lobbyGroups, qualifiers: body.lobbyQualifiers, finalRounds: body.lobbyFinalRounds },
+      competition.lobbyCapacity,
+      participantCap
+    );
+    if (!parsedGroups.ok) return NextResponse.json({ error: parsedGroups.error }, { status: 400 });
+    groups = parsedGroups.value;
   }
+
+  // How the prize pool is shared (src/lib/prizes.ts); only with a cash prize.
+  const finalists = groups ? groups.groups * groups.qualifiers : null;
+  const split = parsePrizeSplit(body.prizeSplit, maxPrizePlaces(competition.fields.format, participantCap, finalists));
+  if (!split.ok) return NextResponse.json({ error: split.error }, { status: 400 });
   if (!Number.isInteger(entryFee) || entryFee < 0) {
     return NextResponse.json(
       { error: "Entry fee must be a whole number of kobo, 0 or more." },
@@ -188,6 +211,10 @@ export async function POST(request: Request) {
       name,
       ...competition.fields,
       lobbyRounds,
+      lobbyGroups: groups?.groups ?? null,
+      lobbyQualifiers: groups?.qualifiers ?? null,
+      lobbyFinalRounds: groups?.finalRounds ?? null,
+      prizeSplit: prizeAmount ? split.value : [],
       rulesText,
       participantCap,
       entryFee,

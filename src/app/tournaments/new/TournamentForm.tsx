@@ -6,6 +6,8 @@ import { ImageUploadField, POSTER_BOUNDS } from "@/components/ImageUploadField";
 import { defaultRulesFor } from "@/lib/gameRules";
 import type { PickerGame } from "@/lib/competitionRules";
 import { CompetitionPicker, defaultCompetition, selectedParts } from "@/components/CompetitionPicker";
+import { PrizeSplitField } from "@/components/PrizeSplitField";
+import { maxPrizePlaces } from "@/lib/prizes";
 
 function nairaToKobo(value: string): number {
   const naira = Number(value || 0);
@@ -36,12 +38,20 @@ export default function TournamentForm({
   const [name, setName] = useState("");
   const [competition, setCompetition] = useState(() => defaultCompetition(catalog));
   const { game: selectedGame, format: selectedFormat } = selectedParts(catalog, competition);
+  const structureMax = selectedFormat?.structures.find((x) => x.id === competition.structure)?.maxEntries ?? null;
+  const groupCount = Number(competition.lobbyGroups) >= 2 ? Number(competition.lobbyGroups) : 1;
+  const capLimit = selectedFormat?.lobbyCapacity ? selectedFormat.lobbyCapacity * groupCount : (structureMax ?? 128);
   const game = selectedGame?.name ?? "";
   const canCreate = !!selectedFormat && !selectedFormat.unavailable && !!competition.structure;
   const [participantCap, setParticipantCap] = useState("16");
   const [entryFeeNaira, setEntryFeeNaira] = useState("0");
   const [prizeAmountNaira, setPrizeAmountNaira] = useState("");
   const [prizeText, setPrizeText] = useState("");
+  const [prizeSplit, setPrizeSplit] = useState<number[]>([]);
+  const [splitBlocked, setSplitBlocked] = useState(false);
+  const prizeKobo = prizeAmountNaira ? nairaToKobo(prizeAmountNaira) : 0;
+  const finalistCount = Number(competition.lobbyGroups) >= 2 ? Number(competition.lobbyGroups) * (Number(competition.lobbyQualifiers) || 0) : null;
+  const splitTooLong = prizeKobo > 0 && prizeSplit.length > maxPrizePlaces(competition.structure, Number(participantCap) || 2, finalistCount);
   const [rulesText, setRulesText] = useState("");
   const [streamUrl, setStreamUrl] = useState("");
   const [enableCommunity, setEnableCommunity] = useState(true);
@@ -56,7 +66,9 @@ export default function TournamentForm({
   // A lobby format caps the tournament at one lobby's worth of entries.
   function pickCompetition(next: typeof competition) {
     setCompetition(next);
-    const capacity = selectedParts(catalog, next).format?.lobbyCapacity;
+    const format = selectedParts(catalog, next).format;
+    const groupsNext = Number(next.lobbyGroups) >= 2 ? Number(next.lobbyGroups) : 1;
+    const capacity = format?.lobbyCapacity ? format.lobbyCapacity * groupsNext : format?.structures.find((x) => x.id === next.structure)?.maxEntries;
     if (capacity && Number(participantCap) > capacity) setParticipantCap(String(capacity));
   }
 
@@ -76,6 +88,7 @@ export default function TournamentForm({
         entryFee: nairaToKobo(entryFeeNaira),
         prizeAmount: prizeAmountNaira ? nairaToKobo(prizeAmountNaira) : null,
         prizeText: prizeText || null,
+        prizeSplit: prizeKobo > 0 ? prizeSplit : [],
         rulesText,
         streamUrl: streamUrl || null,
         enableCommunity,
@@ -129,15 +142,23 @@ export default function TournamentForm({
           id="participantCap"
           type="number"
           min={2}
-          max={selectedFormat?.lobbyCapacity ?? 128}
+          max={capLimit}
           required
           value={participantCap}
           onChange={(e) => setParticipantCap(e.target.value)}
           className="field-input"
         />
-        {selectedFormat?.lobbyCapacity && (
-          <span className="field-hint">One lobby holds up to {selectedFormat.lobbyCapacity} entries.</span>
-        )}
+        {selectedFormat?.lobbyCapacity ? (
+          <span className="field-hint">
+            {groupCount > 1 ? `${groupCount} group lobbies hold up to ${capLimit} entries.` : `One lobby holds up to ${selectedFormat.lobbyCapacity} entries.`}
+          </span>
+        ) : structureMax ? (
+          <span className="field-hint">
+            {competition.structure === "ROUND_ROBIN"
+              ? `Up to ${structureMax} entries — every pairing is a match (${(structureMax * (structureMax - 1)) / 2} matches at ${structureMax}).`
+              : `Up to ${structureMax} entries.`}
+          </span>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -227,6 +248,17 @@ export default function TournamentForm({
         </div>
       </div>
 
+      {prizeKobo > 0 && (
+        <PrizeSplitField
+          value={prizeSplit}
+          onChange={setPrizeSplit}
+          maxPlaces={maxPrizePlaces(competition.structure, Number(participantCap) || 2, finalistCount)}
+          prizeAmount={prizeKobo}
+          knockout={competition.structure === "KNOCKOUT"}
+          onValidityChange={setSplitBlocked}
+        />
+      )}
+
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between">
           <label htmlFor="rulesText" className="field-label">
@@ -315,7 +347,7 @@ export default function TournamentForm({
 
       {error && <p className="field-error">{error}</p>}
 
-      <button type="submit" disabled={submitting || posterBlocked || !canCreate} className="btn-primary">
+      <button type="submit" disabled={submitting || posterBlocked || !canCreate || splitBlocked || splitTooLong} className="btn-primary">
         {submitting ? "Creating…" : "Create tournament"}
       </button>
     </form>

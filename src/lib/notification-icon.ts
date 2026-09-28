@@ -73,6 +73,10 @@ const CATEGORY_BY_TYPE: Record<NotificationType, NotificationCategory> = {
   LOBBY_FLAG_RAISED: TOURNAMENT,
   LOBBY_FLAG_ANSWERED: TOURNAMENT,
   LOBBY_FLAG_ESCALATED: TOURNAMENT,
+  LOBBY_ROOM_POSTED: TOURNAMENT,
+  ROUND_ROBIN_STARTED: TOURNAMENT,
+  LOBBY_FINAL_SET: TOURNAMENT,
+  SWISS_BYE: TOURNAMENT,
 };
 
 export function getNotificationCategory(type: string): NotificationCategory {

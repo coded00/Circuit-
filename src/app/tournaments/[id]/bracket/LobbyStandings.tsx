@@ -9,14 +9,14 @@
  */
 
 import Link from "next/link";
-import { ArrowLeft, Crosshair, Crown, ImageIcon, Pencil } from "lucide-react";
+import { ArrowLeft, Crosshair, Crown, ImageIcon, Pencil, Share2 } from "lucide-react";
 import { GameArtTile } from "@/components/GameArtTile";
 import { ShareButton } from "@/components/ShareButton";
 import { StatusPill, type StatusTone } from "@/components/StatusPill";
 import { describePoints } from "@/lib/lobbyScoring";
-import { FLAG_ANSWER_HOURS, finaliseBlocker, type LobbyEntry, type LobbyFlagView, type LobbyView } from "@/lib/lobby";
+import { FLAG_ANSWER_HOURS, finalBlocker, finaliseBlocker, type LobbyEntry, type LobbyFlagView, type LobbyView, type RoomDetails } from "@/lib/lobby";
 import TournamentTabs, { type TournamentTab } from "../TournamentTabs";
-import { FinaliseButton, FlagAnswer, FlagRoundForm } from "./LobbyActions";
+import { FinaliseButton, FlagAnswer, FlagRoundForm, RoomDetailsCard, RoomDetailsForm, StartFinalButton } from "./LobbyActions";
 
 type ViewTournament = {
   id: string;
@@ -69,6 +69,8 @@ export function LobbyStandings({
   backHref,
   resultsHrefBase,
   shareUrl,
+  rooms,
+  viewerEntryId = null,
   now = new Date(),
 }: {
   tournament: ViewTournament;
@@ -82,6 +84,10 @@ export function LobbyStandings({
   /** `${resultsHrefBase}/${roundNumber}` is the results entry page. */
   resultsHrefBase: string;
   shareUrl?: string;
+  /** Room details — only passed when the viewer may see them (entrant, organizer, staff). */
+  rooms: RoomDetails[] | null;
+  /** The entry (registration) the viewer plays in, if any — decides which lobby's rounds they can flag. */
+  viewerEntryId?: string | null;
   now?: Date;
 }) {
   const entryById = new Map(view.entries.map((e) => [e.registrationId, e]));
@@ -95,69 +101,107 @@ export function LobbyStandings({
   const champion = view.winner;
   const topKills = [...view.board].sort((a, b) => b.kills - a.kills)[0];
   const topFragger = topKills && topKills.kills > 0 ? entryById.get(topKills.registrationId) : undefined;
-  const nextRound = view.rounds.find((r) => r.status === "PENDING");
+  const grouped = view.stage !== "MAIN";
+  // The rounds being played now: the group stage's, or the final's / the one lobby's.
+  const activeRounds = view.rounds.filter((r) => (view.stage === "GROUPS" ? r.stage === "GROUP" : r.stage !== "GROUP"));
+  const nextRound = activeRounds.find((r) => r.status === "PENDING");
+  const myNextRound = viewerEntryId ? view.rounds.find((r) => r.status === "PENDING" && r.entryIds.includes(viewerEntryId)) : undefined;
+  const qualify = view.config?.qualifiers ?? 0;
   const waitingFlags = view.rounds.flatMap((r) => r.flags).filter((f) => f.status === "OPEN" || f.status === "ESCALATED");
   const unit = tournament.entryType === "TEAM" ? "teams" : "players";
+  const roomFor = (n: number) => rooms?.find((r) => r.number === n);
 
-  const leaderboard = (
-    <section className="card overflow-hidden p-0">
-      {posted.length === 0 && (
-        <p className="border-b border-border px-5 py-3 text-sm text-muted">
-          {live ? "No results yet — standings fill in as each round is posted." : "Standings appear once the lobby starts."}
-        </p>
-      )}
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[520px] text-sm">
-          <thead>
-            <tr className="border-b border-border text-left">
-              <th className="text-eyebrow w-12 px-4 py-2.5 text-muted">#</th>
-              <th className="text-eyebrow px-2 py-2.5 text-muted">{tournament.entryType === "TEAM" ? "Team" : "Player"}</th>
-              {view.rounds.map((r) => (
-                <th key={r.number} className="text-eyebrow hidden w-12 px-1 py-2.5 text-center text-muted md:table-cell" title={`Round ${r.number}`}>
-                  R{r.number}
+  const renderBoard = (board: LobbyView["board"], boardRounds: LobbyView["rounds"], opts: { qualify?: number; finalStarted?: boolean; showChampion?: boolean } = {}) => {
+    const anyPosted = boardRounds.some((r) => r.status === "POSTED");
+    return (
+      <section className="card overflow-hidden p-0">
+        {!anyPosted && (
+          <p className="border-b border-border px-5 py-3 text-sm text-muted">
+            {live ? "No results yet — standings fill in as each round is posted." : "Standings appear once the lobby starts."}
+          </p>
+        )}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm md:min-w-[520px]">
+            <thead>
+              <tr className="border-b border-border text-left">
+                <th className="text-eyebrow w-12 px-4 py-2.5 text-muted">#</th>
+                <th className="text-eyebrow px-2 py-2.5 text-muted">{tournament.entryType === "TEAM" ? "Team" : "Player"}</th>
+                {boardRounds.map((r) => (
+                  <th key={r.number} className="text-eyebrow hidden w-12 px-1 py-2.5 text-center text-muted md:table-cell" title={r.label}>
+                    R{r.stageRound}
+                  </th>
+                ))}
+                <th className="text-eyebrow w-12 px-1 py-2.5 text-center text-muted" title="Rounds won">
+                  W
                 </th>
-              ))}
-              <th className="text-eyebrow w-12 px-1 py-2.5 text-center text-muted" title="Rounds won">
-                W
-              </th>
-              <th className="text-eyebrow w-14 px-1 py-2.5 text-center text-muted">Kills</th>
-              <th className="text-eyebrow w-16 px-4 py-2.5 text-right text-muted">Pts</th>
-            </tr>
-          </thead>
-          <tbody>
-            {view.board.map((row) => {
-              const entry = entryById.get(row.registrationId);
-              if (!entry) return null;
-              const isWinner = champion?.registrationId === row.registrationId;
-              return (
-                <tr key={row.registrationId} className={`border-b border-border last:border-b-0 ${mine.has(row.registrationId) ? "bg-accent-volt/5" : ""}`}>
-                  <td className="px-4 py-2.5 font-mono text-xs text-muted tabular-nums">
-                    {isWinner ? <Crown size={15} className="text-gold" aria-label="Champion" /> : posted.length ? row.rank : "–"}
-                  </td>
-                  <td className="max-w-0 px-2 py-2.5">
-                    <EntryName entry={entry} you={mine.has(row.registrationId)} />
-                  </td>
-                  {view.rounds.map((r) => {
-                    const cell = row.rounds[r.number];
-                    return (
-                      <td key={r.number} className="hidden px-1 py-2.5 text-center font-mono text-xs tabular-nums md:table-cell" title={cell?.placement ? `${ordinal(cell.placement)} · ${cell.kills} kills` : undefined}>
-                        {r.status !== "POSTED" ? <span className="text-muted-strong">·</span> : cell?.placement ? cell.points : <span className="text-muted">—</span>}
-                      </td>
-                    );
-                  })}
-                  <td className="px-1 py-2.5 text-center font-mono text-xs tabular-nums">{row.wins || ""}</td>
-                  <td className="px-1 py-2.5 text-center font-mono text-xs tabular-nums">{row.kills}</td>
-                  <td className="px-4 py-2.5 text-right font-mono text-sm font-bold tabular-nums">{row.total}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      <p className="border-t border-border px-5 py-2.5 text-xs text-muted">
-        Ties break on rounds won, then placement points, then kills, then the better place in the latest round.
-      </p>
-    </section>
+                <th className="text-eyebrow w-14 px-1 py-2.5 text-center text-muted">Kills</th>
+                <th className="text-eyebrow w-16 px-4 py-2.5 text-right text-muted">Pts</th>
+              </tr>
+            </thead>
+            <tbody>
+              {board.map((row, index) => {
+                const entry = entryById.get(row.registrationId);
+                if (!entry) return null;
+                const isWinner = opts.showChampion && champion?.registrationId === row.registrationId;
+                const lineAfter = !!opts.qualify && index === opts.qualify - 1 && index < board.length - 1;
+                const out = opts.finalStarted && !entry.finalist;
+                return (
+                  <tr
+                    key={row.registrationId}
+                    className={`border-b last:border-b-0 ${lineAfter ? "border-b-2 border-b-accent-volt/60" : "border-border"} ${mine.has(row.registrationId) ? "bg-accent-volt/5" : ""} ${out ? "opacity-55" : ""}`}
+                  >
+                    <td className="px-4 py-2.5 font-mono text-xs text-muted tabular-nums">
+                      {isWinner ? <Crown size={15} className="text-gold" aria-label="Champion" /> : anyPosted ? row.rank : "–"}
+                    </td>
+                    <td className="max-w-0 px-2 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className="min-w-0 flex-1">
+                          <EntryName entry={entry} you={mine.has(row.registrationId)} />
+                        </div>
+                        {opts.finalStarted && entry.finalist && <span className="badge badge-open shrink-0">Final</span>}
+                      </div>
+                    </td>
+                    {boardRounds.map((r) => {
+                      const cell = row.rounds[r.stageRound];
+                      return (
+                        <td key={r.number} className="hidden px-1 py-2.5 text-center font-mono text-xs tabular-nums md:table-cell" title={cell?.placement ? `${ordinal(cell.placement)} · ${cell.kills} kills` : undefined}>
+                          {r.status !== "POSTED" ? <span className="text-muted-strong">·</span> : cell?.placement ? cell.points : <span className="text-muted">—</span>}
+                        </td>
+                      );
+                    })}
+                    <td className="px-1 py-2.5 text-center font-mono text-xs tabular-nums">{row.wins || ""}</td>
+                    <td className="px-1 py-2.5 text-center font-mono text-xs tabular-nums">{row.kills}</td>
+                    <td className="px-4 py-2.5 text-right font-mono text-sm font-bold tabular-nums">{row.total}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <p className="border-t border-border px-5 py-2.5 text-xs text-muted">
+          {opts.qualify ? `Top ${opts.qualify} (above the line) go to the final. ` : ""}Ties break on rounds won, then placement points, then kills, then the better place in the latest round.
+        </p>
+      </section>
+    );
+  };
+
+  const decidingRounds = view.rounds.filter((r) => r.stage !== "GROUP");
+  const leaderboard = renderBoard(view.board, decidingRounds, { showChampion: true });
+  const groupsTab = (
+    <div className="flex flex-col gap-5">
+      {view.groupBoards.map((g) => (
+        <div key={g.group} className="flex flex-col gap-2">
+          <h3 className="text-eyebrow text-muted">
+            Group {g.letter} · {g.entryIds.length} {unit}
+          </h3>
+          {renderBoard(
+            g.board,
+            view.rounds.filter((r) => r.stage === "GROUP" && r.group === g.group),
+            { qualify, finalStarted: view.stage === "FINAL" }
+          )}
+        </div>
+      ))}
+    </div>
   );
 
   const rounds = (
@@ -171,7 +215,7 @@ export function LobbyStandings({
           <section key={round.number} className="card flex flex-col gap-3 p-4 sm:p-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2.5">
-                <h3 className="font-display text-lg font-bold tracking-tight uppercase">Round {round.number}</h3>
+                <h3 className="font-display text-lg font-bold tracking-tight uppercase">{round.label}</h3>
                 <StatusPill tone={round.status === "POSTED" ? "complete" : live ? "live" : "neutral"}>
                   {round.status === "POSTED" ? "Results posted" : live ? "Waiting for results" : "Not started"}
                 </StatusPill>
@@ -190,6 +234,21 @@ export function LobbyStandings({
                 )}
               </div>
             </div>
+
+            {live && round.status === "PENDING" && rooms && (
+              isManager ? (
+                <RoomDetailsForm
+                  tournamentId={tournament.id}
+                  roundNumber={round.number}
+                  roundLabel={round.label}
+                  roomCode={roomFor(round.number)?.roomCode ?? null}
+                  roomPassword={roomFor(round.number)?.roomPassword ?? null}
+                  hasLaterRounds={view.rounds.some((r) => r.number > round.number && r.status === "PENDING" && r.stage === round.stage && r.group === round.group)}
+                />
+              ) : !grouped || (viewerEntryId && round.entryIds.includes(viewerEntryId)) ? (
+                <RoomDetailsCard roundLabel={round.label} roomCode={roomFor(round.number)?.roomCode ?? null} roomPassword={roomFor(round.number)?.roomPassword ?? null} />
+              ) : null
+            )}
 
             {round.status === "POSTED" && (
               <ol className="flex flex-col divide-y divide-border rounded-[10px] border border-border">
@@ -241,7 +300,9 @@ export function LobbyStandings({
               );
             })}
 
-            {live && round.status === "POSTED" && viewerInTournament && <FlagRoundForm tournamentId={tournament.id} roundNumber={round.number} />}
+            {live && round.status === "POSTED" && viewerInTournament && (!grouped || (viewerEntryId && round.entryIds.includes(viewerEntryId))) && (
+              <FlagRoundForm tournamentId={tournament.id} roundNumber={round.number} roundLabel={round.label} />
+            )}
           </section>
         );
       })}
@@ -278,12 +339,14 @@ export function LobbyStandings({
     </div>
   );
 
+  const finalTab = view.stage === "FINAL" ? [{ key: "standings", label: "Final", content: leaderboard }] : [];
   const tabs: TournamentTab[] = [
-    { key: "standings", label: "Standings", content: leaderboard },
+    ...(grouped ? [...finalTab, { key: "groups", label: "Groups", content: groupsTab }] : [{ key: "standings", label: "Standings", content: leaderboard }]),
     { key: "rounds", label: `Rounds${view.rounds.length ? ` · ${posted.length}/${view.rounds.length}` : ""}`, content: rounds },
     { key: "scoring", label: "Scoring", content: scoring },
   ];
-  const headline = champion ?? leader;
+  const headline = champion ?? (view.stage === "GROUPS" ? undefined : leader);
+  const finalCheck = view.stage === "GROUPS" ? finalBlocker(view, now) : null;
 
   return (
     <div className="flex w-full flex-1 flex-col gap-6">
@@ -297,7 +360,10 @@ export function LobbyStandings({
             </Link>
             <h1 className="font-display text-3xl leading-none font-bold tracking-tight uppercase sm:text-4xl">Standings</h1>
             <span className="text-xs text-muted">
-              {tournament.game} · {tournament.teamSize} · {view.entries.length} {unit} · {view.rounds.length || tournament.lobbyRounds || 0} rounds
+              {tournament.game} · {tournament.teamSize} · {view.entries.length} {unit} ·{" "}
+              {grouped && view.config
+                ? `${view.groupBoards.length} groups × ${tournament.lobbyRounds ?? 1} rounds, then a ${view.config.finalRounds}-round final`
+                : `${view.rounds.length || tournament.lobbyRounds || 0} rounds`}
             </span>
           </div>
         </div>
@@ -308,8 +374,10 @@ export function LobbyStandings({
 
         <aside className="flex h-fit flex-col gap-4 lg:sticky lg:top-[76px]">
           <section className={`card flex flex-col items-center gap-2 p-6 text-center ${champion ? "border-gold/40" : ""}`}>
-            <span className="text-eyebrow text-gold">{champion ? "Champion" : "Leader"}</span>
-            <span className="font-display text-2xl font-bold tracking-tight uppercase">{headline?.name ?? "TBD"}</span>
+            <span className="text-eyebrow text-gold">{champion ? "Champion" : view.stage === "GROUPS" ? "Group stage" : view.stage === "FINAL" ? "Leading the final" : "Leader"}</span>
+            <span className="font-display text-2xl font-bold tracking-tight uppercase">
+              {headline?.name ?? (view.stage === "GROUPS" ? `${view.groupBoards.length} groups` : "TBD")}
+            </span>
             {headline && <span className="text-xs text-muted">@{headline.handle}</span>}
             {headline && (
               <span className="text-stat text-sm text-gold">{view.board.find((r) => r.registrationId === headline.registrationId)?.total ?? 0} pts</span>
@@ -319,9 +387,26 @@ export function LobbyStandings({
                 ? "Top of the leaderboard when results were finalised."
                 : complete
                   ? "Results are final."
-                  : `Decided after ${view.rounds.length || tournament.lobbyRounds || "all"} rounds, once the organizer finalises.`}
+                  : view.stage === "GROUPS"
+                    ? `The top ${qualify} of each group go to a ${view.config?.finalRounds ?? ""}-round final, where points start fresh.`
+                    : view.stage === "FINAL"
+                      ? "Decided by the final, once the organizer finalises."
+                      : `Decided after ${view.rounds.length || tournament.lobbyRounds || "all"} rounds, once the organizer finalises.`}
             </p>
+            {champion && (
+              <Link href={`/share/champion/${tournament.id}`} className="btn-secondary w-full text-sm">
+                <Share2 size={13} />
+                Share champion card
+              </Link>
+            )}
           </section>
+
+          {live && myNextRound && rooms && !isManager && (
+            <section className="card flex flex-col gap-2 p-4">
+              <span className="text-eyebrow text-muted">Up next · {myNextRound.label}</span>
+              <RoomDetailsCard roundLabel={myNextRound.label} roomCode={roomFor(myNextRound.number)?.roomCode ?? null} roomPassword={roomFor(myNextRound.number)?.roomPassword ?? null} />
+            </section>
+          )}
 
           {topFragger && (
             <section className="card flex items-center gap-3 p-4">
@@ -339,17 +424,21 @@ export function LobbyStandings({
               <span className="text-eyebrow text-muted">Organizer</span>
               {nextRound ? (
                 <Link href={`${resultsHrefBase}/${nextRound.number}`} className="btn-secondary h-10 text-sm">
-                  <Pencil size={14} /> Enter round {nextRound.number} results
+                  <Pencil size={14} /> Enter {nextRound.label} results
                 </Link>
               ) : (
-                <p className="text-sm text-muted">All {view.rounds.length} rounds are posted.</p>
+                <p className="text-sm text-muted">{view.stage === "GROUPS" ? "Every group round is posted." : `All ${activeRounds.length} rounds are posted.`}</p>
               )}
               {waitingFlags.length > 0 && (
                 <p className="text-sm text-danger">
                   {waitingFlags.length} flag{waitingFlags.length === 1 ? "" : "s"} waiting — see the Rounds tab.
                 </p>
               )}
-              <FinaliseButton tournamentId={tournament.id} blocker={finaliseBlocker(view, now)} />
+              {view.stage === "GROUPS" && finalCheck ? (
+                <StartFinalButton tournamentId={tournament.id} blocker={finalCheck.blocker} finalists={finalCheck.finalists.length} />
+              ) : (
+                <FinaliseButton tournamentId={tournament.id} blocker={finaliseBlocker(view, now)} />
+              )}
             </section>
           )}
         </aside>
