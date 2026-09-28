@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
+    "sweep": "node --env-file=.env scripts/cron-sweep.mjs",
     "lint": "eslint",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",

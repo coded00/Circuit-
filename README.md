@@ -59,7 +59,7 @@ IDs:
 | P3-1..P3-3 | Match/Bracket entities, bracket generation, match codes | `src/lib/matches.ts` (`generateBracket`) |
 | P3-4 | Result submission & proof upload | `src/app/api/matches/[id]/results/route.ts`, `src/app/matches/[id]/` |
 | P3-5 | Auto-complete on matching reports | `src/lib/matches.ts` (`resolveAfterSubmission`, `completeMatch`) |
-| P3-6 | Silent-side auto-accept + dispute-escalation timeout | `src/lib/matches.ts` (`runScheduledSweep`), `src/app/api/cron/sweep/route.ts` — not wired to an actual scheduler yet |
+| P3-6 | Silent-side auto-accept + dispute-escalation timeout | `src/lib/matches.ts` (`runScheduledSweep`), `src/app/api/cron/sweep/route.ts` — Vercel Cron (`vercel.json`), or `scripts/cron-sweep.mjs` on a self-hosted server (docs/self-hosting.md) |
 | P3-7 | Dispute creation on conflict | `src/lib/matches.ts` (`openDispute`) |
 | P3-8 | Organizer ruling & staff escalation | `src/app/api/disputes/[id]/rule/route.ts`, `src/lib/matches.ts` (`ruleDispute`) |
 | P3-9 | Live bracket view (polling) | `src/app/tournaments/[id]/bracket/` |
@@ -136,8 +136,13 @@ file's own comment for each):
 - Bracket generation has a narrow, unlikely-in-practice race if two
   triggers (cap-fill and the deadline sweep) fire for the same tournament
   at the same instant — see `generateBracket`'s own comment.
-- The sweep endpoint (`/api/cron/sweep`) is scheduled every 2 minutes in
-  `vercel.json`; it only runs once deployed to Vercel with `CRON_SECRET` set.
+- The sweep endpoint (`/api/cron/sweep`) has to be called every 2 minutes:
+  Vercel does it from `vercel.json`; a self-hosted server needs
+  `scripts/cron-sweep.mjs` on a cron or as a process (docs/self-hosting.md).
+  Either way it needs `CRON_SECRET` set.
+- Migrations need `DIRECT_URL` (a non-pooled connection; see `.env.example`)
+  — through Neon's pooler, `prisma migrate deploy` leaves its advisory lock
+  stuck.
 
 ## Setup
 
@@ -150,7 +155,7 @@ cp .env.example .env
 # until Phase 2 work starts.
 
 npx prisma generate
-npx prisma migrate dev --name init   # needs DATABASE_URL pointing at a real Postgres
+npx prisma migrate deploy   # needs DATABASE_URL and DIRECT_URL pointing at a real Postgres
 
 npm run dev
 ```
