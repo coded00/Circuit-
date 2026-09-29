@@ -7,10 +7,15 @@
  *
  * Each feed is fetched independently with `Promise.allSettled`: one dead
  * or slow feed degrades the result (fewer items) rather than taking the
- * whole widget — or the homepage render — down with it. Next's fetch
- * cache (`next.revalidate`) keeps this from re-hitting every outlet on
- * every request; 15 minutes is fresh enough for "gaming news" without
- * hammering someone else's server on every homepage view.
+ * whole widget — or the homepage render — down with it.
+ *
+ * Caching: each feed's parsed, trimmed items (a few KB) are kept in
+ * memory for 15 minutes. Next's fetch cache can't do this — PC Gamer's
+ * feed is ~6MB, over its 2MB per-entry limit, so it was re-downloaded on
+ * every page view. After 15 minutes the old items are still served while
+ * a single background refresh runs, so a page view never waits on an
+ * outlet except the very first one after the server starts. A failed
+ * refresh keeps the last good items.
  */
 
 import { XMLParser } from "fast-xml-parser";
@@ -51,10 +56,42 @@ function toArray<T>(value: T | T[] | undefined): T[] {
   return Array.isArray(value) ? value : [value];
 }
 
+const FRESH_MS = 15 * 60_000;
+const ITEMS_PER_FEED = 20;
+
+type FeedCacheEntry = { items: NewsItem[]; fetchedAt: number; refreshing?: Promise<NewsItem[]> };
+// On globalThis so dev-server reloads of this module keep the cache.
+const feedCache: Map<string, FeedCacheEntry> = ((globalThis as { __gamerNewsCache?: Map<string, FeedCacheEntry> }).__gamerNewsCache ??= new Map());
+
+/** A feed's items from the memory cache, refreshing in the background once stale. */
+async function cachedFeed(source: string, url: string): Promise<NewsItem[]> {
+  const entry = feedCache.get(url);
+  const refresh = () => {
+    const pending = fetchFeed(source, url)
+      .then((items) => {
+        feedCache.set(url, { items, fetchedAt: Date.now() });
+        return items;
+      })
+      .catch((err) => {
+        // Keep serving the last good copy; try again after another 15 minutes.
+        const last = feedCache.get(url);
+        if (last) feedCache.set(url, { items: last.items, fetchedAt: Date.now() });
+        throw err;
+      });
+    feedCache.set(url, { items: entry?.items ?? [], fetchedAt: entry?.fetchedAt ?? 0, refreshing: pending });
+    return pending;
+  };
+
+  if (!entry) return refresh(); // first view after start: nothing to serve yet
+  if (entry.refreshing) return entry.fetchedAt ? entry.items : entry.refreshing;
+  if (Date.now() - entry.fetchedAt > FRESH_MS) refresh().catch((err) => console.error("[gamerNews] feed refresh failed:", err));
+  return entry.items;
+}
+
 async function fetchFeed(source: string, url: string): Promise<NewsItem[]> {
   const res = await fetch(url, {
     headers: { "User-Agent": "CircuitApp/1.0 (+https://circuit.app)" },
-    next: { revalidate: 900 },
+    cache: "no-store", // cached above, trimmed — see the header comment
     signal: AbortSignal.timeout(8000),
   });
   if (!res.ok) throw new Error(`${source} feed returned ${res.status}`);
@@ -83,13 +120,15 @@ async function fetchFeed(source: string, url: string): Promise<NewsItem[]> {
         snippet: stripHtml(description).slice(0, 140),
       };
     })
-    .filter((item): item is NewsItem => item !== null);
+    .filter((item): item is NewsItem => item !== null)
+    .sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime())
+    .slice(0, ITEMS_PER_FEED);
 }
 
 /** Merged, newest-first gaming news across every source. Never throws —
  *  a source that fails to fetch or parse just contributes zero items. */
 export async function fetchGamerNews(limit = 5): Promise<NewsItem[]> {
-  const results = await Promise.allSettled(FEEDS.map((feed) => fetchFeed(feed.source, feed.url)));
+  const results = await Promise.allSettled(FEEDS.map((feed) => cachedFeed(feed.source, feed.url)));
 
   const items = results.flatMap((result) => {
     if (result.status === "fulfilled") return result.value;

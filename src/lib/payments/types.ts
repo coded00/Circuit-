@@ -60,6 +60,10 @@ export type InitiateTransferResult = {
   providerReference: string;
 };
 
+/** A transfer's current state at the provider. REVERSED = it had gone out
+ *  and came back (the money is in our balance again). */
+export type TransferStatus = "SUCCESS" | "PENDING" | "FAILED" | "REVERSED";
+
 /**
  * Implemented by src/lib/payments/paystack.ts and flutterwave.ts.
  * Phase 2 code (P2-2 paid registration, P2-6 prize payout) depends on this
@@ -74,4 +78,7 @@ export interface PaymentProviderClient {
    *  from initiateTransfer, which pays out to a bank account (P2-6's prize
    *  payout) rather than reversing a charge on the original payment method. */
   refundCharge(providerReference: string, amount: MinorAmount): Promise<RefundChargeResult>;
+  /** Looks up a transfer we initiated, by our own reference — the backstop
+   *  for a transfer webhook that never arrives (src/lib/payments/transfers.ts). */
+  verifyTransfer(reference: string): Promise<TransferStatus>;
 }

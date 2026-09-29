@@ -60,7 +60,10 @@ describe("createSessionToken / verifySessionToken", () => {
     // Flip a character in the signature portion — still well-formed JWT
     // shape (three dot-separated segments), just an invalid signature.
     const parts = token.split(".");
-    const tamperedSignature = parts[2].slice(0, -1) + (parts[2].endsWith("A") ? "B" : "A");
+    // The first character, not the last: a 32-byte signature's last
+    // base64url character carries 2 padding bits, so A↔B there can decode
+    // to the same bytes and the "tampered" token still verifies.
+    const tamperedSignature = (parts[2].startsWith("A") ? "B" : "A") + parts[2].slice(1);
     const tamperedToken = `${parts[0]}.${parts[1]}.${tamperedSignature}`;
     await expect(verifySessionToken(tamperedToken)).resolves.toBeNull();
   });

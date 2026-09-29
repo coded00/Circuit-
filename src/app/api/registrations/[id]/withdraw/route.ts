@@ -5,7 +5,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
-import { getPaymentProvider } from "@/lib/payments";
+import { issueEntryFeeRefund } from "@/lib/payments/transfers";
 
 export async function POST(
   request: Request,
@@ -46,13 +46,11 @@ export async function POST(
     );
   }
 
-  // Known gap, accepted for V1: withdrawing a still-PENDING_PAYMENT
-  // registration just marks it WITHDRAWN with no refund attempt, since
-  // there's nothing charged yet to refund. If the provider's charge
-  // actually completes moments later — a race with this request —
-  // confirmEntryFeePayment's idempotency check sees a non-PENDING_PAYMENT
-  // registration and no-ops, so money is taken with no compensating
-  // refund. Closing this needs a reconciliation job V1 doesn't have yet.
+  // Withdrawing a still-PENDING_PAYMENT registration just marks it
+  // WITHDRAWN — nothing's been charged yet to refund. If the charge
+  // completes afterwards, confirmEntryFeePayment sees a WITHDRAWN
+  // registration with a paid fee and refunds it (from the webhook, or the
+  // sweep's reconcilePendingMoney() if the webhook never comes).
   const paidEntryFeeTxn = registration.escrowTxns.find(
     (txn) => txn.type === "ENTRY_FEE" && txn.status === "COMPLETE"
   );
@@ -73,19 +71,13 @@ export async function POST(
       return NextResponse.json({ error: "Already withdrawn." }, { status: 409 });
     }
 
-    const provider = getPaymentProvider(paidEntryFeeTxn.provider!); // always set for an ENTRY_FEE row
     try {
-      const refund = await provider.refundCharge(paidEntryFeeTxn.providerRef!, paidEntryFeeTxn.amount);
-      await prisma.escrowTransaction.create({
-        data: {
-          tournamentId: registration.tournamentId,
-          registrationId: registration.id,
-          type: "REFUND",
-          amount: paidEntryFeeTxn.amount,
-          provider: paidEntryFeeTxn.provider,
-          providerRef: refund.providerReference,
-          status: refund.status === "SUCCESS" ? "COMPLETE" : "PENDING",
-        },
+      await issueEntryFeeRefund({
+        tournamentId: registration.tournamentId,
+        registrationId: registration.id,
+        provider: paidEntryFeeTxn.provider!, // always set for an ENTRY_FEE row
+        chargeRef: paidEntryFeeTxn.providerRef!,
+        amount: paidEntryFeeTxn.amount,
       });
     } catch (err) {
       // The refund call itself threw (network/provider error) — nothing

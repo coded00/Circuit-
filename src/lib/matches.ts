@@ -1186,6 +1186,8 @@ export async function runScheduledSweep(): Promise<{
   organizerRevenueSettled: number;
   quickMatchExpired: number;
   quickMatchRecoveredStuck: number;
+  transfersSettled: number;
+  latePaymentsChecked: number;
   errors?: string[];
 }> {
   const now = new Date();
@@ -1281,6 +1283,16 @@ export async function runScheduledSweep(): Promise<{
   const repair = await repairStalledAdvancement();
   if (repair.errors.length > 0) errors.push(...repair.errors);
 
+  // Money backstop for webhooks that never arrive — see src/lib/payments/transfers.ts.
+  let money = { transfersSettled: 0, latePaymentsChecked: 0 };
+  try {
+    const { reconcilePendingMoney } = await import("@/lib/payments/transfers");
+    money = await reconcilePendingMoney();
+  } catch (err) {
+    captureException(err, { source: "sweep:reconcilePendingMoney" });
+    errors.push("reconcilePendingMoney");
+  }
+
   return {
     bracketsGenerated,
     advancementRepaired: repair.repaired,
@@ -1289,6 +1301,7 @@ export async function runScheduledSweep(): Promise<{
     organizerRevenueSettled: settlement.settled,
     quickMatchExpired: quickMatchSweep.expired,
     quickMatchRecoveredStuck: quickMatchSweep.recoveredStuck,
+    ...money,
     ...(errors.length > 0 ? { errors } : {}),
   };
 }

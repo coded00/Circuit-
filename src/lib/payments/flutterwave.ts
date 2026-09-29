@@ -13,6 +13,7 @@ import type {
   MinorAmount,
   PaymentProviderClient,
   RefundChargeResult,
+  TransferStatus,
   VerifyChargeResult,
 } from "./types";
 
@@ -98,6 +99,14 @@ export const flutterwaveClient: PaymentProviderClient = {
       status: data.status === "completed" ? "SUCCESS" : "PENDING",
       providerReference,
     };
+  },
+
+  async verifyTransfer(reference: string): Promise<TransferStatus> {
+    const data = await flutterwaveFetch<{ status: string }[]>(`/transfers?reference=${encodeURIComponent(reference)}`);
+    const status = Array.isArray(data) ? data[0]?.status : undefined;
+    if (status === "SUCCESSFUL") return "SUCCESS";
+    if (status === "FAILED") return "FAILED";
+    return "PENDING";
   },
 
   async initiateTransfer(input: InitiateTransferInput): Promise<InitiateTransferResult> {

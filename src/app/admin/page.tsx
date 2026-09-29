@@ -4,7 +4,8 @@
  * 1. Needs attention — every queue that's waiting on staff, with counts:
  *    escalated match disputes and lobby flags, open abuse and community
  *    reports, open appeals, prize payouts and withdrawals still
- *    processing, tournaments with frozen funds. Empty queues collapse
+ *    processing, refunds that failed or are stuck, tournaments with
+ *    frozen funds. Empty queues collapse
  *    into a single "All clear".
  * 2. Key numbers — users, live/open competitions, open challenges and
  *    entry-fee volume, each with its last-7-days change.
@@ -53,6 +54,8 @@ export default async function AdminOverviewPage() {
     openAppeals,
     pendingPayouts,
     pendingWithdrawals,
+    failedRefunds,
+    stuckRefunds,
     frozenTournaments,
     recentRegistrations,
     recentBattles,
@@ -74,6 +77,8 @@ export default async function AdminOverviewPage() {
     prisma.appeal.count({ where: { status: "OPEN" } }),
     prisma.escrowTransaction.aggregate({ where: { type: "PRIZE_PAYOUT", status: "PENDING" }, _count: true, _sum: { amount: true } }),
     prisma.walletTransaction.aggregate({ where: { type: "WITHDRAWAL", status: "PENDING" }, _count: true, _sum: { amount: true } }),
+    prisma.escrowTransaction.aggregate({ where: { type: "REFUND", status: "FAILED" }, _count: true, _sum: { amount: true } }),
+    prisma.escrowTransaction.count({ where: { type: "REFUND", status: "PENDING", createdAt: { lt: new Date(now.getTime() - 24 * 60 * 60_000) } } }),
     prisma.tournament.count({ where: { fundsFrozen: true, status: { not: "CANCELLED" } } }),
     prisma.registration.findMany({
       orderBy: { createdAt: "desc" },
@@ -110,6 +115,20 @@ export default async function AdminOverviewPage() {
       count: pendingWithdrawals._count,
       detail: pendingWithdrawals._count ? naira(pendingWithdrawals._sum.amount ?? 0) : undefined,
       href: "/admin/finance?type=WITHDRAWAL&status=PENDING",
+      tone: "attention" as const,
+    },
+    {
+      // Paystack refused the refund: no automatic retry, a person has to sort it out.
+      label: "Refunds that failed",
+      count: failedRefunds._count,
+      detail: failedRefunds._count ? naira(failedRefunds._sum.amount ?? 0) : undefined,
+      href: "/admin/finance?tab=escrow&etype=REFUND&estatus=FAILED",
+      tone: "danger" as const,
+    },
+    {
+      label: "Refunds processing over a day",
+      count: stuckRefunds,
+      href: "/admin/finance?tab=escrow&etype=REFUND&estatus=PENDING",
       tone: "attention" as const,
     },
     { label: "Tournaments with frozen funds", count: frozenTournaments, href: "/admin/competitions?frozen=1", tone: "neutral" as const },

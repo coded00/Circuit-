@@ -63,7 +63,10 @@ export type NotificationType =
   | "LOBBY_ROOM_POSTED"
   | "ROUND_ROBIN_STARTED"
   | "LOBBY_FINAL_SET"
-  | "SWISS_BYE";
+  | "SWISS_BYE"
+  | "WITHDRAWAL_RETURNED"
+  | "PRIZE_PAYOUT_FAILED"
+  | "PAYMENT_REFUNDED";
 
 export interface NotificationChannel {
   send(userId: string, type: NotificationType, payload: Record<string, unknown>): Promise<void>;

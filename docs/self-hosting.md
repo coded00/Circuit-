@@ -31,7 +31,9 @@ Every couple of minutes something must call `/api/cron/sweep`. It:
   fills);
 - auto-accepts a result the other player never answered;
 - escalates disputes the organizer didn't rule on in time;
-- settles organizer revenue after the settlement window.
+- settles organizer revenue after the settlement window;
+- checks with Paystack on withdrawals and prize payouts still processing
+  after 30 minutes, and refunds entry fees paid after the player left.
 
 `scripts/cron-sweep.mjs` does the call (it reads `CRON_SECRET` and talks to
 `http://localhost:$PORT`, so it never leaves the machine). Pick **one** of:

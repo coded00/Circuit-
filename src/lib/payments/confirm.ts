@@ -8,6 +8,14 @@
  * reference, and is idempotent: calling this twice for the same reference
  * is safe because it only acts while the registration is still
  * PENDING_PAYMENT.
+ *
+ * A charge can also complete after it stopped being the registration's
+ * current checkout: the player withdrew while it was processing, or
+ * started a fresh checkout (the registration row is reused and its
+ * paymentRef overwritten), or already got in with another payment. That
+ * money is refunded once (refundOrphanedCharge below). Lookups go by the
+ * ENTRY_FEE row's own providerRef, not the registration's paymentRef, so
+ * a superseded reference is still found.
  */
 
 import { prisma } from "@/lib/db";
@@ -17,22 +25,24 @@ import { maybeGenerateBracketOnCapFill } from "@/lib/matches";
 import { computePlatformFee } from "@/lib/platformFee";
 import { trackEvent } from "@/lib/analytics";
 import { notifyRoster } from "@/lib/teamEntries";
+import { captureException } from "@/lib/observability";
+import { issueEntryFeeRefund } from "@/lib/payments/transfers";
+import { lockTournament } from "@/lib/registrationCapacity";
 
 export async function confirmEntryFeePayment(reference: string): Promise<void> {
-  const registration = await prisma.registration.findUnique({
-    where: { paymentRef: reference },
-    include: { tournament: true, escrowTxns: true },
+  const escrowTxn = await prisma.escrowTransaction.findUnique({
+    where: { providerRef: reference },
+    include: { registration: { include: { tournament: true } } },
   });
-  if (!registration || registration.status !== "PENDING_PAYMENT") {
-    // Unknown reference, or already processed by an earlier call — a
-    // webhook retry/replay lands here too, and both are a safe no-op.
+  // Unknown reference, or already processed by an earlier call — a
+  // webhook retry/replay lands here too, and both are a safe no-op.
+  if (!escrowTxn || escrowTxn.type !== "ENTRY_FEE" || escrowTxn.status !== "PENDING" || !escrowTxn.registration) return;
+  const registration = escrowTxn.registration;
+
+  if (registration.status !== "PENDING_PAYMENT" || registration.paymentRef !== reference) {
+    await refundOrphanedCharge(escrowTxn.id, reference);
     return;
   }
-
-  const escrowTxn = registration.escrowTxns.find(
-    (txn) => txn.type === "ENTRY_FEE" && txn.providerRef === reference
-  );
-  if (!escrowTxn) return;
 
   const provider = getPaymentProvider(escrowTxn.provider!); // always set for an ENTRY_FEE row
   const result = await provider.verifyCharge(reference);
@@ -73,6 +83,10 @@ export async function confirmEntryFeePayment(reference: string): Promise<void> {
     // (both funnel into this function, per this file's header comment)
     // could both pass the fast-path read and both create those rows —
     // double-crediting the organizer for one entry fee.
+    //
+    // The tournament lock makes two payments for the last slot take turns,
+    // so the count below sees the other one (src/lib/registrationCapacity.ts).
+    await lockTournament(tx, registration.tournamentId);
     const claimed = await tx.registration.updateMany({
       where: { id: registration.id, status: "PENDING_PAYMENT" },
       data: { status: "CONFIRMED" },
@@ -150,9 +164,15 @@ export async function confirmEntryFeePayment(reference: string): Promise<void> {
   if (confirmed === "OVER_CAPACITY") {
     // Automatically issue the gateway refund so the player's funds are returned
     try {
-      await provider.refundCharge(reference, registration.tournament.entryFee);
+      await issueEntryFeeRefund({
+        tournamentId: registration.tournamentId,
+        registrationId: registration.id,
+        provider: escrowTxn.provider!,
+        chargeRef: reference,
+        amount: result.amount,
+      });
     } catch (refundErr) {
-      console.error(`[payment] Failed to auto-refund over-capacity payment for reference ${reference}:`, refundErr);
+      captureException(refundErr, { source: "confirmEntryFeePayment", reason: "over-capacity refund", reference });
     }
     await notify(registration.userId, "REGISTRATION_CLOSED", {
       tournamentId: registration.tournamentId,
@@ -174,6 +194,52 @@ export async function confirmEntryFeePayment(reference: string): Promise<void> {
   });
 
   await maybeGenerateBracketOnCapFill(registration.tournamentId); // BRK-1's cap-fill path
+}
+
+/**
+ * A paid entry fee that no longer belongs to an active checkout (see the
+ * header comment): mark it received, refund it, tell the player. The
+ * escrow row's PENDING → COMPLETE flip is the claim, so a webhook and the
+ * sweep can't both refund. If the refund call throws, the claim is undone
+ * and the sweep (reconcilePendingMoney) tries again later.
+ */
+async function refundOrphanedCharge(escrowTxnId: string, reference: string): Promise<void> {
+  const escrowTxn = await prisma.escrowTransaction.findUniqueOrThrow({
+    where: { id: escrowTxnId },
+    include: { registration: { include: { tournament: { select: { id: true, name: true } } } } },
+  });
+  const provider = getPaymentProvider(escrowTxn.provider!);
+  const result = await provider.verifyCharge(reference);
+  if (result.status === "FAILED") {
+    await prisma.escrowTransaction.updateMany({ where: { id: escrowTxn.id, status: "PENDING" }, data: { status: "FAILED" } });
+    return;
+  }
+  if (result.status !== "SUCCESS") return;
+
+  const claimed = await prisma.escrowTransaction.updateMany({ where: { id: escrowTxn.id, status: "PENDING" }, data: { status: "COMPLETE" } });
+  if (claimed.count === 0) return;
+
+  try {
+    await issueEntryFeeRefund({
+      tournamentId: escrowTxn.tournamentId!,
+      registrationId: escrowTxn.registrationId!,
+      provider: escrowTxn.provider!,
+      chargeRef: reference,
+      amount: result.amount,
+    });
+  } catch (err) {
+    await prisma.escrowTransaction.update({ where: { id: escrowTxn.id }, data: { status: "PENDING" } });
+    throw err;
+  }
+  // A withdrawn player's registration now reads as refunded. One that's
+  // CONFIRMED (paid twice) or mid-checkout again is left alone.
+  await prisma.registration.updateMany({ where: { id: escrowTxn.registrationId!, status: "WITHDRAWN" }, data: { status: "REFUNDED" } });
+  const tournament = escrowTxn.registration?.tournament;
+  await notify(escrowTxn.registration!.userId, "PAYMENT_REFUNDED", {
+    tournamentId: tournament?.id,
+    tournamentName: tournament?.name,
+    amount: result.amount,
+  }).catch(() => undefined);
 }
 
 /**

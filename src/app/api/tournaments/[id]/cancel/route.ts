@@ -12,7 +12,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
-import { getPaymentProvider } from "@/lib/payments";
+import { issueEntryFeeRefund } from "@/lib/payments/transfers";
 import { notify } from "@/lib/notifications";
 import { logAdminAction } from "@/lib/auditLog";
 import { captureException } from "@/lib/observability";
@@ -129,27 +129,19 @@ export async function POST(
     const organizerRevenueTxn = registration.escrowTxns.find((txn) => txn.type === "ORGANIZER_REVENUE" && txn.status === "PENDING");
 
     try {
-      const provider = getPaymentProvider(paidEntryFeeTxn.provider!); // always set for an ENTRY_FEE row
-      const refund = await provider.refundCharge(
-        paidEntryFeeTxn.providerRef!,
-        paidEntryFeeTxn.amount
-      );
+      // Records the REFUND row too (src/lib/payments/transfers.ts).
+      await issueEntryFeeRefund({
+        tournamentId: id,
+        registrationId: registration.id,
+        provider: paidEntryFeeTxn.provider!, // always set for an ENTRY_FEE row
+        chargeRef: paidEntryFeeTxn.providerRef!,
+        amount: paidEntryFeeTxn.amount,
+      });
 
       await prisma.$transaction([
         prisma.registration.update({
           where: { id: registration.id },
           data: { status: "REFUNDED" },
-        }),
-        prisma.escrowTransaction.create({
-          data: {
-            tournamentId: id,
-            registrationId: registration.id,
-            type: "REFUND",
-            amount: paidEntryFeeTxn.amount,
-            provider: paidEntryFeeTxn.provider,
-            providerRef: refund.providerReference,
-            status: refund.status === "SUCCESS" ? "COMPLETE" : "PENDING",
-          },
         }),
         ...(platformFeeTxn ? [prisma.escrowTransaction.update({ where: { id: platformFeeTxn.id }, data: { status: "FAILED" as const } })] : []),
         ...(organizerRevenueTxn ? [prisma.escrowTransaction.update({ where: { id: organizerRevenueTxn.id }, data: { status: "FAILED" as const } })] : []),

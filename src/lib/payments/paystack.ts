@@ -14,6 +14,7 @@ import type {
   MinorAmount,
   PaymentProviderClient,
   RefundChargeResult,
+  TransferStatus,
   VerifyChargeResult,
 } from "./types";
 
@@ -41,6 +42,14 @@ async function paystackFetch<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(`Paystack request failed: ${body.message ?? res.statusText}`);
   }
   return body.data as T;
+}
+
+/** Paystack transfer states → ours. "otp"/"pending"/"processing"/"queued" all mean still in flight. */
+export function mapPaystackTransferStatus(status: string): TransferStatus {
+  if (status === "success") return "SUCCESS";
+  if (status === "reversed") return "REVERSED";
+  if (["failed", "abandoned", "blocked", "rejected"].includes(status)) return "FAILED";
+  return "PENDING";
 }
 
 export type BankItem = {
@@ -152,6 +161,11 @@ export const paystackClient: PaymentProviderClient = {
       status: data.status === "processed" ? "SUCCESS" : "PENDING",
       providerReference: data.transaction?.reference ?? providerReference,
     };
+  },
+
+  async verifyTransfer(reference: string): Promise<TransferStatus> {
+    const data = await paystackFetch<{ status: string }>(`/transfer/verify/${encodeURIComponent(reference)}`);
+    return mapPaystackTransferStatus(data.status);
   },
 
   async initiateTransfer(input: InitiateTransferInput): Promise<InitiateTransferResult> {

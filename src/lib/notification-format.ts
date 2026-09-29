@@ -13,6 +13,12 @@ function asRecord(payload: unknown): Record<string, unknown> {
   return payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
 }
 
+/** A kobo amount in the payload, as naira — "₦2,500". Empty if missing. */
+function money(payload: Record<string, unknown>, key: string): string {
+  const v = payload[key];
+  return typeof v === "number" ? `₦${(v / 100).toLocaleString("en-NG")}` : "";
+}
+
 function str(payload: Record<string, unknown>, key: string): string {
   const value = payload[key];
   return typeof value === "string" ? value : "";
@@ -167,6 +173,18 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
       return { message: `New tournament: ${str(p, "name")}`, href: `/tournaments/${str(p, "tournamentId")}` };
     case "NEW_CHALLENGE":
       return { message: `New open Challenge: ${str(p, "game")}`, href: `/battles/${str(p, "battleId")}` };
+    case "WITHDRAWAL_RETURNED":
+      return { message: `Your withdrawal of ${money(p, "amount")} didn't go through — the money is back in your wallet.`, href: "/wallet" };
+    case "PRIZE_PAYOUT_FAILED":
+      return {
+        message: `Your ${money(p, "amount")} prize from ${str(p, "tournamentName") || "your tournament"} couldn't be sent. Check your payout details and claim it again.`,
+        href: `/tournaments/${str(p, "tournamentId")}`,
+      };
+    case "PAYMENT_REFUNDED":
+      return {
+        message: `Your ${money(p, "amount")} entry-fee payment for ${str(p, "tournamentName") || "a tournament"} came through after you'd left, so it's been refunded.`,
+        href: "/wallet",
+      };
     case "ORGANIZER_REVENUE_SETTLED":
       return { message: "Your tournament revenue was credited to your wallet.", href: "/wallet" };
     case "QUICK_MATCH_CHALLENGE":

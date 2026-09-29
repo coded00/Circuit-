@@ -9,6 +9,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { randomUUID } from "crypto";
 import { Prisma, EscrowStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { tournamentPrizeShares } from "@/lib/prizePlaces";
@@ -16,6 +17,7 @@ import { getCurrentUser } from "@/lib/session";
 import { getDefaultPaymentProvider } from "@/lib/payments";
 import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
 import { trackEvent } from "@/lib/analytics";
+import { applyTransferOutcome } from "@/lib/payments/transfers";
 import { captureException, captureMessage } from "@/lib/observability";
 
 // A row still PENDING or already COMPLETE means this prize is spoken for;
@@ -110,7 +112,10 @@ export async function POST(
   }
 
   const provider = getDefaultPaymentProvider();
-  const reference = `payout_${tournament.id}_${share.place}_${user.id}`;
+  // Unique per attempt: a retry after a failed transfer needs a fresh
+  // reference (Paystack rejects a reused one, and providerRef is unique).
+  // Stored on the row up front so the transfer webhook can always find it.
+  const reference = `payout_${randomUUID()}`;
   const prizeAmount = share.amount;
 
   // Reserve the claim — a PENDING row created inside a Serializable
@@ -142,7 +147,7 @@ export async function POST(
           if (existing) throw new AlreadyClaimedError();
 
           const row = await tx.escrowTransaction.create({
-            data: { tournamentId: tournament.id, type: "PRIZE_PAYOUT", amount: prizeAmount, userId: user.id, place: share.place, provider: provider.name, status: "PENDING" },
+            data: { tournamentId: tournament.id, type: "PRIZE_PAYOUT", amount: prizeAmount, userId: user.id, place: share.place, provider: provider.name, providerRef: reference, status: "PENDING" },
           });
           return row.id;
         },
@@ -182,13 +187,8 @@ export async function POST(
       reason: `Prize payout — ${tournament.name}`,
     });
 
-    await prisma.escrowTransaction.update({
-      where: { id: txnId },
-      data: {
-        providerRef: transfer.providerReference,
-        status: transfer.status === "SUCCESS" ? "COMPLETE" : transfer.status === "FAILED" ? "FAILED" : "PENDING",
-      },
-    });
+    // PENDING waits for the transfer webhook (src/lib/payments/transfers.ts).
+    if (transfer.status !== "PENDING") await applyTransferOutcome(reference, transfer.status);
 
     if (transfer.status === "SUCCESS") {
       trackEvent("escrow_payout_released", {
@@ -217,7 +217,7 @@ export async function POST(
     // throw below (a generic framework 500 log, no monitoring context) —
     // a real Paystack/Flutterwave outage mid-payout was invisible.
     captureException(err, { route: "tournaments/[id]/payout", userId: user.id, tournamentId: tournament.id, escrowTransactionId: txnId, amount: prizeAmount, provider: provider.name });
-    await prisma.escrowTransaction.update({ where: { id: txnId }, data: { status: "FAILED" } });
+    await prisma.escrowTransaction.updateMany({ where: { id: txnId, status: "PENDING" }, data: { status: "FAILED" } });
     throw err;
   }
 }

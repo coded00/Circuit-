@@ -29,6 +29,7 @@ import { maybeGenerateBracketOnCapFill } from "@/lib/matches";
 import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
 import { computePlatformFee } from "@/lib/platformFee";
 import { trackEvent } from "@/lib/analytics";
+import { claimSlot, RegistrationFullError } from "@/lib/registrationCapacity";
 import { notifyRoster, saveRoster, TeamEntryError, validateTeamEntry, type ValidRoster } from "@/lib/teamEntries";
 
 class InsufficientWalletBalanceError extends Error {}
@@ -74,11 +75,10 @@ export async function POST(
     return NextResponse.json({ error: "Registration is closed." }, { status: 409 });
   }
 
-  // Known gap, accepted for V1: this count-then-write isn't inside a
-  // serializable transaction, so two concurrent requests landing on the
-  // last open slot could both pass this check. Not worth a row lock at
-  // V1's expected concurrency (docs/circuit-stack.md's minimal-infra
-  // stance) — revisit if a real tournament ever actually oversells its cap.
+  // Fast-path check only. The real one is claimSlot() inside each write
+  // below (src/lib/registrationCapacity.ts), which locks the tournament so
+  // two requests for the last slot can't both get it. A paid checkout is
+  // checked again when its payment confirms (confirmEntryFeePayment).
   const confirmedCount = await prisma.registration.count({
     where: { tournamentId, status: "CONFIRMED" },
   });
@@ -114,14 +114,23 @@ export async function POST(
   const teamData = roster ? { teamId: roster.teamId, teamName: roster.teamName } : {};
 
   if (tournament.entryFee === 0) {
-    const registration = existing
-      ? await prisma.registration.update({
-          where: { id: existing.id },
-          data: { inGameId, status: "CONFIRMED", ...teamData },
-        })
-      : await prisma.registration.create({
-          data: { tournamentId, userId: user.id, inGameId, status: "CONFIRMED", ...teamData },
-        });
+    let registration;
+    try {
+      registration = await prisma.$transaction(async (tx) => {
+        await claimSlot(tx, tournamentId, tournament.participantCap);
+        return existing
+          ? tx.registration.update({
+              where: { id: existing.id },
+              data: { inGameId, status: "CONFIRMED", ...teamData },
+            })
+          : tx.registration.create({
+              data: { tournamentId, userId: user.id, inGameId, status: "CONFIRMED", ...teamData },
+            });
+      });
+    } catch (err) {
+      if (err instanceof RegistrationFullError) return NextResponse.json({ error: "Registration is full." }, { status: 409 });
+      throw err;
+    }
     if (roster) {
       await saveRoster(registration.id, roster.members);
       await notifyRoster(registration.id);
@@ -163,6 +172,7 @@ export async function POST(
 
     try {
       const registration = await prisma.$transaction(async (tx) => {
+        await claimSlot(tx, tournamentId, tournament.participantCap);
         // Atomic guard: a single conditional UPDATE, not a read-then-write —
         // two concurrent registration attempts can't both pass this check
         // and overdraw the balance.
@@ -241,6 +251,7 @@ export async function POST(
       if (err instanceof InsufficientWalletBalanceError) {
         return NextResponse.json({ error: "Insufficient wallet balance." }, { status: 402 });
       }
+      if (err instanceof RegistrationFullError) return NextResponse.json({ error: "Registration is full." }, { status: 409 });
       throw err;
     }
   }
