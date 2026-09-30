@@ -51,7 +51,7 @@ export default async function RegisterPage({
           walletBalance={user.walletBalance}
           username={user.handle}
           savedName={savedName}
-          team={isTeam ? { options: teamOptions, bounds, profileHref: `/players/${user.handle}?tab=teams` } : undefined}
+          team={isTeam ? { options: teamOptions, bounds, profileHref: `/players/${user.handle}?tab=teams`, hasPrize: (tournament.prizeAmount ?? 0) > 0 } : undefined}
         />
       </div>
     </div>

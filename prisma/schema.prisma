@@ -749,6 +749,10 @@ model RosterMember {
   userId         String
   user           User         @relation("RosterMemberships", fields: [userId], references: [id], onDelete: Cascade)
   inGameId       String?
+  /// This player's share of the team's prize, in basis points (10,000 = 100%).
+  /// Set by the captain when entering; null on entries made before prizes were
+  /// shared, which pay the captain (src/lib/prizePlaces.ts).
+  prizeBp        Int?
   createdAt      DateTime     @default(now())
 
   @@unique([registrationId, userId])

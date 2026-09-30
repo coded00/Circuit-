@@ -17,6 +17,7 @@ import { loadLobby } from "@/lib/lobby";
 import { loadLeagueStandings } from "@/lib/roundRobinStandings";
 import { doubleElimPlacements, isDoubleElimStructure } from "@/lib/doubleElim";
 import { prizeShares, type FinishGroup, type PrizeShare } from "@/lib/prizes";
+import { splitByBasisPoints } from "@/lib/teamPrize";
 
 type TournamentShape = Pick<
   Tournament,
@@ -80,5 +81,39 @@ export async function finishingGroups(tournament: TournamentShape): Promise<Fini
 export async function tournamentPrizeShares(tournament: TournamentShape & Pick<Tournament, "prizeAmount" | "prizeSplit">): Promise<PrizeShare[]> {
   if (!tournament.prizeAmount || tournament.prizeAmount <= 0) return [];
   const groups = await finishingGroups(tournament);
-  return groups ? prizeShares(tournament.prizeAmount, tournament.prizeSplit, groups) : [];
+  if (!groups) return [];
+  return expandTeamShares(tournament.id, prizeShares(tournament.prizeAmount, tournament.prizeSplit, groups));
+}
+
+/**
+ * A team entry's place share (keyed to its captain, see the top of this file)
+ * becomes one share per roster player, by the percentages the captain set when
+ * entering. Entries made before prizes were shared have no percentages and keep
+ * paying the captain.
+ */
+export async function expandTeamShares(tournamentId: string, shares: PrizeShare[]): Promise<PrizeShare[]> {
+  if (shares.length === 0) return shares;
+  const rosters = await prisma.rosterMember.findMany({
+    where: {
+      registration: { tournamentId, userId: { in: shares.map((s) => s.userId) }, status: "CONFIRMED", teamId: { not: null } },
+      prizeBp: { not: null },
+    },
+    select: { userId: true, prizeBp: true, registration: { select: { userId: true } } },
+    orderBy: { createdAt: "asc" },
+  });
+  const byCaptain = new Map<string, { userId: string; bp: number }[]>();
+  for (const m of rosters) {
+    const list = byCaptain.get(m.registration.userId) ?? [];
+    // The captain first: any odd kobo go to them.
+    if (m.userId === m.registration.userId) list.unshift({ userId: m.userId, bp: m.prizeBp! });
+    else list.push({ userId: m.userId, bp: m.prizeBp! });
+    byCaptain.set(m.registration.userId, list);
+  }
+  return shares.flatMap((share) => {
+    const team = byCaptain.get(share.userId);
+    if (!team) return [share];
+    return splitByBasisPoints(share.amount, team)
+      .filter((part) => part.amount > 0)
+      .map((part) => ({ ...share, userId: part.userId, amount: part.amount }));
+  });
 }

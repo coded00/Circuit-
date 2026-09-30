@@ -9,9 +9,27 @@
 
 import Link from "next/link";
 import { Check, Crown, Users } from "lucide-react";
+import { InfoTip } from "@/components/InfoTip";
+import { basisPointsToPercent, equalBasisPoints } from "@/lib/teamPrize";
 import type { CaptainTeamOption, RosterBounds } from "@/lib/teamEntries";
 
-export type RosterPick = { teamId: string; members: Record<string, string> };
+/** `shares` is each player's prize percent as typed; undefined means an equal split. */
+export type RosterPick = { teamId: string; members: Record<string, string>; shares?: Record<string, string> };
+
+/** What each selected player's percent box shows — the typed value, or the equal split. */
+export function displayedShares(value: RosterPick, captainId: string | undefined): Record<string, string> {
+  const ids = Object.keys(value.members);
+  const ordered = captainId && ids.includes(captainId) ? [captainId, ...ids.filter((id) => id !== captainId)] : ids;
+  const equal = equalBasisPoints(ordered.length);
+  return Object.fromEntries(ordered.map((id, i) => [id, value.shares?.[id] ?? basisPointsToPercent(equal[i])]));
+}
+
+/** Null when the shares add up to 100% (or are equal); otherwise the total the captain has typed. */
+export function shareTotalProblem(value: RosterPick, captainId: string | undefined): number | null {
+  if (!value.shares) return null;
+  const total = Object.values(displayedShares(value, captainId)).reduce((a, v) => a + (Number(v) || 0), 0);
+  return Math.abs(total - 100) > 0.05 ? total : null;
+}
 
 export function TeamRosterPicker({
   options,
@@ -19,6 +37,7 @@ export function TeamRosterPicker({
   value,
   onChange,
   profileHref,
+  hasPrize = false,
 }: {
   options: CaptainTeamOption[];
   bounds: RosterBounds;
@@ -26,10 +45,15 @@ export function TeamRosterPicker({
   onChange: (next: RosterPick) => void;
   /** Where to create or manage teams. */
   profileHref: string;
+  /** The tournament pays cash, so each player's share is shown. */
+  hasPrize?: boolean;
 }) {
   const team = options.find((t) => t.id === value.teamId);
   const count = Object.keys(value.members).length;
   const available = team ? team.members.filter((m) => !m.busyWith).length : 0;
+  const captainId = team?.members.find((m) => m.isCaptain)?.userId;
+  const shown = displayedShares(value, captainId);
+  const problem = shareTotalProblem(value, captainId);
   const sizeText = bounds.min === bounds.max ? `${bounds.min}` : `${bounds.min}–${bounds.max}`;
 
   if (options.length === 0) {
@@ -52,14 +76,14 @@ export function TeamRosterPicker({
   function pickTeam(id: string) {
     const next = options.find((t) => t.id === id);
     const captain = next?.members.find((m) => m.isCaptain);
-    onChange({ teamId: id, members: captain ? { [captain.userId]: "" } : {} });
+    onChange({ teamId: id, members: captain ? { [captain.userId]: "" } : {}, shares: undefined });
   }
 
   function toggle(userId: string) {
     const members = { ...value.members };
     if (userId in members) delete members[userId];
     else members[userId] = "";
-    onChange({ ...value, members });
+    onChange({ ...value, members, shares: undefined });
   }
 
   return (
@@ -141,21 +165,62 @@ export function TeamRosterPicker({
                     </span>
                     {on && <Check size={15} className="text-success" />}
                   </label>
-                  {on && !m.isCaptain && (
-                    <input
-                      value={value.members[m.userId]}
-                      onChange={(e) => onChange({ ...value, members: { ...value.members, [m.userId]: e.target.value } })}
-                      placeholder={`${m.displayName}'s in-game ID (optional)`}
-                      maxLength={60}
-                      className="field-input h-9 text-sm"
-                    />
+                  {on && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      {!m.isCaptain && (
+                        <input
+                          value={value.members[m.userId]}
+                          onChange={(e) => onChange({ ...value, members: { ...value.members, [m.userId]: e.target.value } })}
+                          placeholder={`${m.displayName}'s in-game ID (optional)`}
+                          maxLength={60}
+                          className="field-input h-9 min-w-0 flex-1 text-sm"
+                        />
+                      )}
+                      {hasPrize && (
+                        <label className="ml-auto flex items-center gap-1.5 text-xs text-muted">
+                          Prize share
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            min={0.01}
+                            max={100}
+                            step={0.01}
+                            value={shown[m.userId] ?? ""}
+                            onChange={(e) => onChange({ ...value, shares: { ...shown, [m.userId]: e.target.value } })}
+                            aria-label={`${m.displayName}'s prize share in percent`}
+                            className="field-input h-9 w-20 text-right text-sm"
+                          />
+                          %
+                        </label>
+                      )}
+                    </div>
                   )}
                 </li>
               );
             })}
           </ul>
+          {hasPrize && (
+            <div className="flex flex-col gap-1 rounded-[10px] bg-surface-elevated/60 px-3 py-2 text-xs">
+              <div className="flex items-center justify-between gap-2">
+                <span className="flex items-center gap-1.5 font-semibold">
+                  How the prize is shared
+                  <InfoTip text="If your team wins prize money, each player is paid their own share straight to their own account. It starts equal; change the percentages if your team agrees on a different split. Everyone is told their share, and it can't be changed after you enter." />
+                </span>
+                {value.shares && (
+                  <button type="button" onClick={() => onChange({ ...value, shares: undefined })} className="font-semibold underline">
+                    Split equally
+                  </button>
+                )}
+              </div>
+              {problem !== null ? (
+                <span className="text-danger">The shares add up to {Number(problem.toFixed(2))}% — they need to make 100%.</span>
+              ) : (
+                <span className="text-muted">{value.shares ? "Custom split — adds up to 100%." : "Shared equally between everyone on the roster."}</span>
+              )}
+            </div>
+          )}
           <span className="field-hint">
-            You pay the entry fee, report results and receive any prize for the team. Roster players are notified when the entry is confirmed.
+            You pay the entry fee and report results. Roster players are notified when the entry is confirmed{hasPrize ? ", along with their share of any prize" : ""}.
           </span>
         </div>
       )}

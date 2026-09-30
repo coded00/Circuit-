@@ -162,7 +162,9 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
       };
     case "TEAM_ROSTER_ADDED":
       return {
-        message: `${str(p, "teamName") || "Your team"} entered you in ${str(p, "tournamentName") || "a tournament"}.`,
+        message: `${str(p, "teamName") || "Your team"} entered you in ${str(p, "tournamentName") || "a tournament"}.${
+          str(p, "sharePercent") ? ` If the team wins prize money, you get ${str(p, "sharePercent")}% of it, paid to your own account.` : ""
+        }`,
         href: `/tournaments/${str(p, "tournamentId")}`,
       };
     case "TEAM_INVITE":

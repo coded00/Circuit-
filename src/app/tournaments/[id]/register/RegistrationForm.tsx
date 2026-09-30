@@ -7,7 +7,7 @@ import { InfoTip } from "@/components/InfoTip";
 import { Spinner } from "@/components/Spinner";
 import { MatchFoundHud } from "@/components/MatchFoundHud";
 import type { CaptainTeamOption, RosterBounds } from "@/lib/teamEntries";
-import { TeamRosterPicker, type RosterPick } from "./TeamRosterPicker";
+import { displayedShares, shareTotalProblem, TeamRosterPicker, type RosterPick } from "./TeamRosterPicker";
 
 export default function RegistrationForm({
   tournamentId,
@@ -25,7 +25,7 @@ export default function RegistrationForm({
   /** The in-game name they typed last time for this game. */
   savedName: string | null;
   /** TEAM tournaments: the teams this user captains and the roster size. */
-  team?: { options: CaptainTeamOption[]; bounds: RosterBounds; profileHref: string };
+  team?: { options: CaptainTeamOption[]; bounds: RosterBounds; profileHref: string; hasPrize: boolean };
 }) {
   const firstTeam = team?.options.find((t) => !t.blocked);
   const [roster, setRoster] = useState<RosterPick>(() => {
@@ -33,7 +33,8 @@ export default function RegistrationForm({
     return { teamId: firstTeam?.id ?? "", members: captain ? { [captain.userId]: "" } : {} };
   });
   const rosterSize = Object.keys(roster.members).length;
-  const rosterReady = !team || (!!roster.teamId && rosterSize >= team.bounds.min && rosterSize <= team.bounds.max);
+  const captainId = team?.options.find((t) => t.id === roster.teamId)?.members.find((m) => m.isCaptain)?.userId;
+  const rosterReady = !team || (!!roster.teamId && rosterSize >= team.bounds.min && rosterSize <= team.bounds.max && shareTotalProblem(roster, captainId) === null);
   const router = useRouter();
   const [nameChoice, setNameChoice] = useState<"username" | "custom">(savedName ? "custom" : "username");
   const [customName, setCustomName] = useState(savedName ?? "");
@@ -75,7 +76,7 @@ export default function RegistrationForm({
       body: JSON.stringify({
         inGameId,
         ...(nameChoice === "custom" ? { saveInGameName: true } : {}),
-        ...(team ? { teamId: roster.teamId, roster: Object.entries(roster.members).map(([userId, id]) => ({ userId, inGameId: id })) } : {}),
+        ...(team ? { teamId: roster.teamId, roster: Object.entries(roster.members).map(([userId, id]) => ({ userId, inGameId: id, ...(roster.shares ? { prizePercent: Number(displayedShares(roster, captainId)[userId]) } : {}) })) } : {}),
         ...(entryFee > 0 && payFromWallet ? { payFrom: "wallet" } : {}),
       }),
     });
@@ -112,7 +113,7 @@ export default function RegistrationForm({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-      {team && <TeamRosterPicker options={team.options} bounds={team.bounds} value={roster} onChange={setRoster} profileHref={team.profileHref} />}
+      {team && <TeamRosterPicker options={team.options} bounds={team.bounds} value={roster} onChange={setRoster} profileHref={team.profileHref} hasPrize={team.hasPrize} />}
       {(!team || team.options.length > 0) && (
       <div className="flex flex-col gap-2">
         <span className="field-label flex items-center gap-1.5">

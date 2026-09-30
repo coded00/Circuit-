@@ -123,13 +123,24 @@ export function prizeShares(prizeAmount: number, split: readonly number[], group
   return shares;
 }
 
-/** "Not yet claimed" / "Sent" / "Processing" / "2 of 3 places paid · 1 processing" — for organizer and admin views. */
-export function prizePayoutSummary(txns: readonly { type: string; status: string }[], split: readonly number[]): string {
+/**
+ * "Not yet claimed" / "Sent" / "Processing" / "2 of 3 places paid · 1 processing" — for organizer and admin views.
+ * A team's place is claimed by each of its players, so a place counts as paid once everyone who
+ * has claimed it is paid; with a single place and several claimants it reads "2 players paid".
+ */
+export function prizePayoutSummary(txns: readonly { type: string; status: string; place?: number | null }[], split: readonly number[]): string {
   const payouts = txns.filter((t) => t.type === "PRIZE_PAYOUT" && t.status !== "FAILED");
   if (payouts.length === 0) return "Not yet claimed";
-  const sent = payouts.filter((t) => t.status === "COMPLETE").length;
-  const processing = payouts.length - sent;
   const places = effectiveSplit(split).length;
-  if (places === 1) return sent ? "Sent" : "Processing";
-  return `${sent} of ${places} places paid${processing ? ` · ${processing} processing` : ""}`;
+  if (places === 1) {
+    const sent = payouts.filter((t) => t.status === "COMPLETE").length;
+    const processing = payouts.length - sent;
+    if (payouts.length === 1) return sent ? "Sent" : "Processing";
+    return `${sent} player${sent === 1 ? "" : "s"} paid${processing ? ` · ${processing} processing` : ""}`;
+  }
+  const byPlace = new Map<number, { type: string; status: string }[]>();
+  for (const t of payouts) byPlace.set(t.place ?? 1, [...(byPlace.get(t.place ?? 1) ?? []), t]);
+  const sentPlaces = [...byPlace.values()].filter((rows) => rows.every((r) => r.status === "COMPLETE")).length;
+  const processingPlaces = byPlace.size - sentPlaces;
+  return `${sentPlaces} of ${places} places paid${processingPlaces ? ` · ${processingPlaces} processing` : ""}`;
 }

@@ -10,6 +10,7 @@
  * team's name wherever an entry is displayed.
  */
 
+import { basisPointsToPercent, parseTeamShares } from "@/lib/teamPrize";
 import { prisma } from "@/lib/db";
 import { notify } from "@/lib/notifications";
 
@@ -39,7 +40,7 @@ export class TeamEntryError extends Error {
 
 type TournamentShape = { id: string; playersPerTeam: number; minRoster: number | null; maxRoster: number | null };
 
-export type ValidRoster = { teamId: string; teamName: string; members: { userId: string; inGameId: string | null }[] };
+export type ValidRoster = { teamId: string; teamName: string; members: { userId: string; inGameId: string | null; prizeBp: number }[] };
 
 /**
  * Checks a captain's entry: they captain the team, every roster player is
@@ -58,11 +59,13 @@ export async function validateTeamEntry(tournament: TournamentShape, captainId: 
 
   const raw = Array.isArray(body.roster) ? body.roster : [];
   const picked = new Map<string, string | null>();
+  const percents: Record<string, unknown> = {};
   for (const item of raw) {
     const userId = typeof item === "string" ? item : typeof item?.userId === "string" ? item.userId : null;
     if (!userId) continue;
     const inGameId = typeof item?.inGameId === "string" && item.inGameId.trim() ? item.inGameId.trim().slice(0, 60) : null;
     picked.set(userId, inGameId);
+    if (item && typeof item === "object" && "prizePercent" in item) percents[userId] = item.prizePercent;
   }
   if (!picked.has(captainId)) picked.set(captainId, null); // the captain always plays
 
@@ -96,14 +99,22 @@ export async function validateTeamEntry(tournament: TournamentShape, captainId: 
     const c = clashes[0];
     throw new TeamEntryError(`${c.user.displayName} is already playing for ${c.registration.teamName ?? "another team"} in this tournament.`, 409);
   }
-  return { teamId: team.id, teamName: team.name, members: [...picked].map(([userId, inGameId]) => ({ userId, inGameId })) };
+  // Each player's cut of the team's prize: equal unless the captain set it.
+  const shares = parseTeamShares([...picked.keys()], captainId, Object.keys(percents).length > 0 ? percents : undefined);
+  if (!shares.ok) throw new TeamEntryError(shares.error);
+  const ordered = [captainId, ...[...picked.keys()].filter((id) => id !== captainId)];
+  return {
+    teamId: team.id,
+    teamName: team.name,
+    members: ordered.map((userId) => ({ userId, inGameId: picked.get(userId) ?? null, prizeBp: shares.value[userId] })),
+  };
 }
 
 /** Replaces an entry's roster (re-registering after a withdrawal can change it). */
 export async function saveRoster(registrationId: string, members: ValidRoster["members"]) {
   await prisma.$transaction([
     prisma.rosterMember.deleteMany({ where: { registrationId } }),
-    prisma.rosterMember.createMany({ data: members.map((m) => ({ registrationId, userId: m.userId, inGameId: m.inGameId })) }),
+    prisma.rosterMember.createMany({ data: members.map((m) => ({ registrationId, userId: m.userId, inGameId: m.inGameId, prizeBp: m.prizeBp })) }),
   ]);
 }
 
@@ -111,13 +122,22 @@ export async function saveRoster(registrationId: string, members: ValidRoster["m
 export async function notifyRoster(registrationId: string) {
   const reg = await prisma.registration.findUnique({
     where: { id: registrationId },
-    include: { roster: { select: { userId: true } }, tournament: { select: { id: true, name: true } } },
+    include: { roster: { select: { userId: true, prizeBp: true } }, tournament: { select: { id: true, name: true, prizeAmount: true } } },
   });
   if (!reg?.teamName) return;
+  const hasPrize = (reg.tournament.prizeAmount ?? 0) > 0;
   await Promise.all(
     reg.roster
       .filter((m) => m.userId !== reg.userId)
-      .map((m) => notify(m.userId, "TEAM_ROSTER_ADDED", { tournamentId: reg.tournament.id, tournamentName: reg.tournament.name, teamName: reg.teamName }))
+      .map((m) =>
+        notify(m.userId, "TEAM_ROSTER_ADDED", {
+          tournamentId: reg.tournament.id,
+          tournamentName: reg.tournament.name,
+          teamName: reg.teamName,
+          // Their cut of any prize, so nobody finds out after winning.
+          ...(hasPrize && m.prizeBp ? { sharePercent: basisPointsToPercent(m.prizeBp) } : {}),
+        })
+      )
   );
 }
 
