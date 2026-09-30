@@ -218,6 +218,9 @@ export async function POST(
     // a real Paystack/Flutterwave outage mid-payout was invisible.
     captureException(err, { route: "tournaments/[id]/payout", userId: user.id, tournamentId: tournament.id, escrowTransactionId: txnId, amount: prizeAmount, provider: provider.name });
     await prisma.escrowTransaction.updateMany({ where: { id: txnId, status: "PENDING" }, data: { status: "FAILED" } });
-    throw err;
+    return NextResponse.json(
+      { error: "We couldn't send your prize right now. Nothing has been taken — your prize is still yours to claim, so please try again later." },
+      { status: 502 }
+    );
   }
 }
