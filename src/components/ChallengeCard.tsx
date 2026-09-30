@@ -32,14 +32,17 @@ function formatNaira(kobo: number): string {
 export function ChallengeCard({ battle: b, record, mine = false }: { battle: ChallengeCardData; record: { wins: number; losses: number } | null; mine?: boolean }) {
   const rate = record ? winRate(record.wins, record.losses) : null;
   const staked = b.stakeAmount > 0;
+  // The card adapts to the room it's given (a container query, not the screen): stacked when narrow,
+  // which is what lets three sit side by side on the homepage, and laid out across when wide.
   return (
-    <Link
-      href={`/battles/${b.id}`}
-      className="group flex flex-col gap-4 rounded-[14px] border border-border bg-surface p-4 transition duration-[var(--duration-fast)] hover:border-border-strong hover:shadow-[0_6px_20px_-12px_rgba(17,19,24,0.35)] focus-visible:ring-2 focus-visible:ring-accent-volt focus-visible:outline-none"
-    >
-      <div className="flex items-start gap-3">
+    <div className="@container">
+      <Link
+        href={`/battles/${b.id}`}
+        className="group grid h-full grid-cols-[auto_1fr] gap-x-3 gap-y-4 rounded-[14px] border border-border bg-surface p-4 transition duration-[var(--duration-fast)] hover:border-border-strong hover:shadow-[0_6px_20px_-12px_rgba(17,19,24,0.35)] focus-visible:ring-2 focus-visible:ring-accent-volt focus-visible:outline-none @min-[360px]:grid-cols-[auto_1fr_auto]"
+      >
         <PlayerAvatar person={b.creator} size="md" className="!h-[52px] !w-[52px] !text-lg" />
-        <div className="flex min-w-0 flex-1 flex-col">
+
+        <div className="flex min-w-0 flex-col">
           <span className="flex min-w-0 items-center gap-2">
             <span className="truncate text-base font-semibold" title={b.creator.displayName}>
               {b.creator.displayName}
@@ -62,33 +65,36 @@ export function ChallengeCard({ battle: b, record, mine = false }: { battle: Cha
             )}
           </span>
         </div>
-        <div className="flex shrink-0 flex-col items-end">
+
+        <div className="col-span-2 flex items-baseline justify-between gap-3 border-t border-border pt-3 @min-[360px]:col-span-1 @min-[360px]:flex-col @min-[360px]:items-end @min-[360px]:justify-start @min-[360px]:border-t-0 @min-[360px]:pt-0">
           <span className={`font-display text-2xl leading-none font-bold tabular-nums ${staked ? "text-gold" : "text-success"}`}>{staked ? formatNaira(b.stakeAmount) : "Free"}</span>
-          {staked && (
-            <span className="mt-1 text-[11px] text-muted" title="Both players stake the same amount. The winner takes the whole pot.">
+          {staked ? (
+            <span className="text-[11px] text-muted @min-[360px]:mt-1" title="Both players stake the same amount. The winner takes the whole pot.">
               pot {formatNaira(potOf(b.stakeAmount))}
             </span>
+          ) : (
+            <span className="text-[11px] text-muted @min-[360px]:hidden">no stake</span>
           )}
         </div>
-      </div>
 
-      <div className="flex items-center justify-between gap-3">
-        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
-          <span className="font-semibold text-foreground">{b.game}</span>
-          <span>{b.format === "BEST_OF_3" ? "Best of 3" : "Single match"}</span>
-          {b.visibility === "FRIENDS" && (
-            <span className="flex items-center gap-1 whitespace-nowrap">
-              <Users size={11} aria-hidden />
-              Friends only
-            </span>
-          )}
-          <span>{timeAgo(b.createdAt)}</span>
-        </span>
-        <span className={`${mine ? "btn-secondary" : "btn-primary"} min-h-[44px] shrink-0 px-4 text-sm`}>
-          {mine ? "View" : "Accept"}
-          <ArrowRight size={14} aria-hidden className="transition-transform group-hover:translate-x-0.5" />
-        </span>
-      </div>
-    </Link>
+        <div className="col-span-2 flex flex-col gap-3 @min-[360px]:col-span-3 @min-[360px]:flex-row @min-[360px]:items-center @min-[360px]:justify-between">
+          <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+            <span className="font-semibold text-foreground">{b.game}</span>
+            <span>{b.format === "BEST_OF_3" ? "Best of 3" : "Single match"}</span>
+            {b.visibility === "FRIENDS" && (
+              <span className="flex items-center gap-1 whitespace-nowrap">
+                <Users size={11} aria-hidden />
+                Friends only
+              </span>
+            )}
+            <span>{timeAgo(b.createdAt)}</span>
+          </span>
+          <span className={`${mine ? "btn-secondary" : "btn-primary"} min-h-[44px] w-full shrink-0 px-4 text-sm @min-[360px]:w-auto`}>
+            {mine ? "View" : "Accept"}
+            <ArrowRight size={14} aria-hidden className="transition-transform group-hover:translate-x-0.5" />
+          </span>
+        </div>
+      </Link>
+    </div>
   );
 }

@@ -162,7 +162,7 @@ export default async function Home({
     ? leaderboard.filter((s) => s.userId === user!.id || friendIds.includes(s.userId))
     : leaderboard;
   const topLeaderboard = scopedLeaderboard.slice(0, 5);
-  const openChallengesPreview = openBattles.slice(0, 4);
+  const openChallengesPreview = openBattles.slice(0, 3);
   const challengeRecordsByKey = await challengeRecords(openChallengesPreview.map((b) => b.game));
 
   return (
@@ -185,7 +185,7 @@ export default async function Home({
 
           <ExploreTheCircuit games={gameCounts} />
 
-          <OpenChallenges battles={openChallengesPreview} records={challengeRecordsByKey} viewerId={user?.id} />
+          <OpenChallenges battles={openChallengesPreview} records={challengeRecordsByKey} total={openChallengeCount} viewerId={user?.id} />
 
           <UpcomingCompetitions tournaments={upcomingTournaments} />
         </div>
