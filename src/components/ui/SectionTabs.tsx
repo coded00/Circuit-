@@ -14,7 +14,7 @@
  * round-tripped the whole page through the router on every tab change).
  */
 
-import { createContext, startTransition, useContext, useEffect, useRef, useState, ViewTransition } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 
 export type SectionTab = { key: string; label: string; count?: number; content: React.ReactNode };
 
@@ -43,8 +43,9 @@ export function SectionTabs({
   }, []);
 
   function select(key: string) {
-    // A transition, so the panel's <ViewTransition> crossfades the swap.
-    startTransition(() => setActive(key));
+    // A plain update, so the swap is immediate. (It used to be a transition with a crossfade,
+    // which held the old tab on screen for a moment and then faded the two over each other.)
+    setActive(key);
     // On phones the tab strip scrolls sideways — keep the chosen tab visible.
     document.getElementById(`${idPrefix}-tab-${key}`)?.scrollIntoView({ block: "nearest", inline: "nearest" });
     // Coming from a "View all" link deep in Overview: scroll back so the
@@ -83,11 +84,9 @@ export function SectionTabs({
             ))}
           </div>
         </div>
-        <ViewTransition key={activeTab.key} name={`${idPrefix}-panel`} share="content-swap" enter="content-swap" default="none">
-          <div role="tabpanel" id={`${idPrefix}-panel-${activeTab.key}`} aria-labelledby={`${idPrefix}-tab-${activeTab.key}`}>
-            {activeTab.content}
-          </div>
-        </ViewTransition>
+        <div role="tabpanel" id={`${idPrefix}-panel-${activeTab.key}`} aria-labelledby={`${idPrefix}-tab-${activeTab.key}`}>
+          {activeTab.content}
+        </div>
       </div>
     </SelectTabContext.Provider>
   );

@@ -114,13 +114,15 @@ export function AppSidebar({ user }: { user: NavUser }) {
       </Link>
 
       <nav className="relative flex flex-col gap-1">
-        {activeIndex !== -1 && (
-          <span
-            aria-hidden
-            className="absolute inset-x-0 z-0 h-[46px] rounded-[9px] bg-accent-volt transition-transform duration-[var(--duration-base)] ease-[var(--ease-out)]"
-            style={{ transform: `translateY(${activeIndex * NAV_ROW_STEP}px)` }}
-          />
-        )}
+        {/* Always mounted (faded out when no item is active, e.g. on a tournament page) so it never
+            pops in or out of the nav when a navigation finishes. */}
+        <span
+          aria-hidden
+          className={`absolute inset-x-0 z-0 h-[46px] rounded-[9px] bg-accent-volt transition-[transform,opacity] duration-[var(--duration-base)] ease-[var(--ease-out)] ${
+            activeIndex === -1 ? "opacity-0" : "opacity-100"
+          }`}
+          style={{ transform: `translateY(${Math.max(activeIndex, 0) * NAV_ROW_STEP}px)` }}
+        />
         {items.map((item, i) => (
           <NavLink key={item.href} item={item} active={i === activeIndex} />
         ))}
