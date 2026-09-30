@@ -12,7 +12,9 @@ describe("formatUnavailable", () => {
     expect(formatUnavailable("HEAD_TO_HEAD", { entryType: "TEAM", structures: ["KNOCKOUT"] })).toBeNull();
   });
   it("blocks formats that only offer structures without an engine", () => {
-    expect(formatUnavailable("HEAD_TO_HEAD", { entryType: "INDIVIDUAL", structures: ["LEAGUE"] })).toBe("STRUCTURE");
+    // Every structure in the registry has an engine now, so use one the registry doesn't know.
+    expect(formatUnavailable("HEAD_TO_HEAD", { entryType: "INDIVIDUAL", structures: ["NOT_A_REAL_STRUCTURE"] })).toBe("STRUCTURE");
+    expect(formatUnavailable("HEAD_TO_HEAD", { entryType: "INDIVIDUAL", structures: ["LEAGUE"] })).toBeNull();
   });
 });
 
@@ -21,7 +23,7 @@ describe("structureOptions", () => {
     expect(structureOptions({ structures: ["LEAGUE", "SWISS", "KNOCKOUT"] }).map((s) => [s.id, s.runnable])).toEqual([
       ["KNOCKOUT", true],
       ["SWISS", true],
-      ["LEAGUE", false],
+      ["LEAGUE", true],
     ]);
   });
 });

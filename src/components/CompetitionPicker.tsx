@@ -8,6 +8,7 @@
  */
 
 import { DEFAULT_LOBBY_ROUNDS, MAX_LOBBY_GROUPS, MAX_LOBBY_ROUNDS } from "@/lib/lobbyScoring";
+import { InfoTip } from "@/components/InfoTip";
 import { UNAVAILABLE_LABEL, type PickerFormat, type PickerGame, type PickerMode } from "@/lib/competitionRules";
 
 /** Lobby settings only matter for lobby modes (numbers as typed; lobbyGroups "" = one lobby). */
@@ -20,7 +21,15 @@ export type CompetitionValue = {
   lobbyGroups: string;
   lobbyQualifiers: string;
   lobbyFinalRounds: string;
+  /** League settings (numbers as typed) — only used when the structure is a league. */
+  leagueWinPoints: string;
+  leagueAllowDraws: boolean;
+  leagueDrawPoints: string;
+  leagueLegs: string;
+  leagueMatchdayDays: string;
 };
+
+export const LEAGUE_FORM_DEFAULTS = { leagueWinPoints: "3", leagueAllowDraws: true, leagueDrawPoints: "1", leagueLegs: "1", leagueMatchdayDays: "7" };
 
 const NO_GROUPS = { lobbyGroups: "", lobbyQualifiers: "", lobbyFinalRounds: "" };
 
@@ -40,9 +49,9 @@ export function defaultCompetition(catalog: PickerGame[], gameId?: string): Comp
   for (const game of [...games.filter((g) => g.available), ...games]) {
     const mode = game.modes.find((m) => !m.unavailable) ?? game.modes[0];
     const format = mode ? (firstAvailableFormat(mode) ?? mode.formats[0]) : undefined;
-    return { gameId: game.id, gameModeId: mode?.id ?? "", gameFormatId: format?.id ?? "", structure: firstRunnable(format), lobbyRounds: DEFAULT_ROUNDS, ...NO_GROUPS };
+    return { gameId: game.id, gameModeId: mode?.id ?? "", gameFormatId: format?.id ?? "", structure: firstRunnable(format), lobbyRounds: DEFAULT_ROUNDS, ...NO_GROUPS, ...LEAGUE_FORM_DEFAULTS };
   }
-  return { gameId: "", gameModeId: "", gameFormatId: "", structure: "", lobbyRounds: DEFAULT_ROUNDS, ...NO_GROUPS };
+  return { gameId: "", gameModeId: "", gameFormatId: "", structure: "", lobbyRounds: DEFAULT_ROUNDS, ...NO_GROUPS, ...LEAGUE_FORM_DEFAULTS };
 }
 
 /** Looks up the objects behind a value. */
@@ -205,6 +214,80 @@ export function CompetitionPicker({
           <span className="field-hint">
             {format.entry} · {format.match}
             {format.unavailable ? ` — ${UNAVAILABLE_LABEL[format.unavailable].toLowerCase()}` : ""}
+          </span>
+        </div>
+      )}
+
+      {format && value.structure === "LEAGUE" && (
+        <div className="flex flex-col gap-3 rounded-[12px] border border-border bg-surface-elevated/40 p-3.5">
+          <span className="flex items-center gap-1.5 text-sm font-semibold">
+            League settings
+            <InfoTip text="In a league everyone plays everyone and earns points for each result. The most points when every match is played wins. These can't be changed once players register." />
+          </span>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <label className="flex flex-col gap-1.5">
+              <span className="field-label">Points for a win</span>
+              <input
+                id="leagueWinPoints"
+                type="number"
+                min={1}
+                max={10}
+                required
+                value={value.leagueWinPoints}
+                onChange={(e) => onChange({ ...value, leagueWinPoints: e.target.value })}
+                className="field-input"
+              />
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="field-label">Points for a draw</span>
+              <input
+                id="leagueDrawPoints"
+                type="number"
+                min={0}
+                max={9}
+                required={value.leagueAllowDraws}
+                disabled={!value.leagueAllowDraws}
+                value={value.leagueAllowDraws ? value.leagueDrawPoints : ""}
+                onChange={(e) => onChange({ ...value, leagueDrawPoints: e.target.value })}
+                className="field-input disabled:opacity-50"
+              />
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="field-label">Each pair plays</span>
+              <select id="leagueLegs" value={value.leagueLegs} onChange={(e) => onChange({ ...value, leagueLegs: e.target.value })} className="field-input">
+                <option value="1">Once</option>
+                <option value="2">Twice (home and away)</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="field-label">Days per matchday</span>
+              <input
+                id="leagueMatchdayDays"
+                type="number"
+                min={1}
+                max={30}
+                required
+                value={value.leagueMatchdayDays}
+                onChange={(e) => onChange({ ...value, leagueMatchdayDays: e.target.value })}
+                className="field-input"
+              />
+            </label>
+          </div>
+          <label className="flex items-start gap-2.5 text-sm">
+            <input
+              type="checkbox"
+              checked={value.leagueAllowDraws}
+              onChange={(e) => onChange({ ...value, leagueAllowDraws: e.target.checked })}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--accent-volt)]"
+            />
+            <span className="flex flex-col">
+              <span className="font-medium">Allow draws</span>
+              <span className="text-xs text-muted">Turn this off for games that can&apos;t end level — every match then has a winner.</span>
+            </span>
+          </label>
+          <span className="field-hint">
+            Fixtures are drawn when registration closes and grouped into matchdays. Each matchday has a play-by date {value.leagueMatchdayDays || "7"} days after the last; fixtures nobody plays by
+            then are flagged for you to settle. Up to 16 entries.
           </span>
         </div>
       )}

@@ -17,6 +17,8 @@ import { asTeam, teamEntryLabels } from "@/lib/teamEntries";
 import { BracketView, type BracketStructure } from "@/app/tournaments/[id]/bracket/BracketView";
 import { renderLobbyStandings } from "@/app/tournaments/[id]/bracket/lobbyPage";
 import { RoundRobinStandings } from "@/app/tournaments/[id]/bracket/RoundRobinStandings";
+import { LeagueStandings } from "@/app/tournaments/[id]/bracket/LeagueStandings";
+import { loadLeague } from "@/lib/leagueStandings";
 import { loadLeagueStandings } from "@/lib/roundRobinStandings";
 import { DoubleElimView } from "@/app/tournaments/[id]/bracket/DoubleElimView";
 import { isDoubleElimStructure } from "@/lib/doubleElim";
@@ -40,6 +42,17 @@ export default async function AdminBracketPage({ params }: { params: Promise<{ i
       return (
         <div className="flex flex-1 flex-col gap-6">
           <RoundRobinStandings tournament={tournament} view={view} viewerId={null} backHref={`/admin/competitions/${id}`} matchHrefBase="/admin/matches" />
+        </div>
+      );
+    }
+  }
+
+  if (tournament.format === "LEAGUE") {
+    const view = await loadLeague(tournament);
+    if (view) {
+      return (
+        <div className="flex flex-1 flex-col gap-6">
+          <LeagueStandings tournament={tournament} view={view} viewerId={null} isOrganizer={false} backHref={`/admin/competitions/${id}`} matchHrefBase="/admin/matches" />
         </div>
       );
     }

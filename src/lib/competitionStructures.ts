@@ -59,9 +59,10 @@ export const COMPETITION_STRUCTURES: readonly CompetitionStructure[] = [
   {
     id: "LEAGUE",
     label: "League",
-    description: "A season of fixtures with a standings table.",
+    description: "Everyone plays everyone on set matchdays — once, or home and away — and a points table decides the winner. Wins, draws and losses earn points.",
     style: "HEAD_TO_HEAD",
-    runnable: false,
+    runnable: true,
+    maxEntries: 16,
   },
   {
     id: "LOBBY_POINTS",

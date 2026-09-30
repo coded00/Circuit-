@@ -16,6 +16,8 @@ import { asTeam, teamEntryLabels } from "@/lib/teamEntries";
 import { BracketView, type BracketStructure } from "./BracketView";
 import { renderLobbyStandings } from "./lobbyPage";
 import { RoundRobinStandings } from "./RoundRobinStandings";
+import { LeagueStandings } from "./LeagueStandings";
+import { loadLeague } from "@/lib/leagueStandings";
 import { loadLeagueStandings } from "@/lib/roundRobinStandings";
 import { getCurrentUser } from "@/lib/session";
 import { DoubleElimView } from "./DoubleElimView";
@@ -54,6 +56,26 @@ export default async function BracketPage({
             tournament={tournament}
             view={view}
             viewerId={viewer?.id ?? null}
+            backHref={`/tournaments/${id}`}
+            matchHrefBase="/matches"
+            shareUrl={`${process.env.NEXT_PUBLIC_APP_URL}/tournaments/${id}/bracket`}
+          />
+        </div>
+      );
+    }
+  }
+
+  if (tournament.format === "LEAGUE") {
+    const [view, viewer] = await Promise.all([loadLeague(tournament), getCurrentUser()]);
+    if (view) {
+      return (
+        <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6 sm:px-8 sm:py-10">
+          <Poller />
+          <LeagueStandings
+            tournament={tournament}
+            view={view}
+            viewerId={viewer?.id ?? null}
+            isOrganizer={viewer?.id === tournament.organizerId}
             backHref={`/tournaments/${id}`}
             matchHrefBase="/matches"
             shareUrl={`${process.env.NEXT_PUBLIC_APP_URL}/tournaments/${id}/bracket`}

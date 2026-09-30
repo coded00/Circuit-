@@ -614,6 +614,13 @@ model Tournament {
   lobbyGroups         Int?
   lobbyQualifiers     Int?
   lobbyFinalRounds    Int?
+  /// League settings (format LEAGUE only; null otherwise): points for a win,
+  /// points for a draw (null = draws aren't allowed in this league), how many
+  /// times everyone meets (1 = single, 2 = home and away), and days per matchday.
+  leagueWinPoints     Int?
+  leagueDrawPoints    Int?
+  leagueLegs          Int?
+  leagueMatchdayDays  Int?
   placementPoints     Int[]            @default([])
   killPoints          Int              @default(1)
   /// Minor currency units (kobo), never a float. 0 = free tournament.

@@ -16,6 +16,7 @@ import { parseLobbyGroups, parseLobbyRounds, type LobbyGroupsConfig } from "@/li
 import { getStructure } from "@/lib/competitionStructures";
 import { maxPrizePlaces, parsePrizeSplit } from "@/lib/prizes";
 import { resolveCompetition } from "@/lib/competitionConfig";
+import { parseLeagueSettings } from "@/lib/leagueTable";
 import { notifyAllUsers } from "@/lib/notifications";
 import { enableCommunity, postSystemMessage } from "@/lib/community";
 import { hostableCommunities } from "@/lib/communityDirectory";
@@ -131,6 +132,25 @@ export async function POST(request: Request) {
     groups = parsedGroups.value;
   }
 
+  // League: points, draws, home-and-away and matchday length (src/lib/leagueTable.ts).
+  let leagueData: { leagueWinPoints: number | null; leagueDrawPoints: number | null; leagueLegs: number | null; leagueMatchdayDays: number | null } = {
+    leagueWinPoints: null,
+    leagueDrawPoints: null,
+    leagueLegs: null,
+    leagueMatchdayDays: null,
+  };
+  if (competition.fields.format === "LEAGUE") {
+    const league = parseLeagueSettings({
+      winPoints: body.leagueWinPoints,
+      drawPoints: body.leagueDrawPoints,
+      allowDraws: body.leagueAllowDraws,
+      legs: body.leagueLegs,
+      matchdayDays: body.leagueMatchdayDays,
+    });
+    if (!league.ok) return NextResponse.json({ error: league.error }, { status: 400 });
+    leagueData = { leagueWinPoints: league.value.winPoints, leagueDrawPoints: league.value.drawPoints, leagueLegs: league.value.legs, leagueMatchdayDays: league.value.matchdayDays };
+  }
+
   // How the prize pool is shared (src/lib/prizes.ts); only with a cash prize.
   const finalists = groups ? groups.groups * groups.qualifiers : null;
   const split = parsePrizeSplit(body.prizeSplit, maxPrizePlaces(competition.fields.format, participantCap, finalists));
@@ -210,6 +230,7 @@ export async function POST(request: Request) {
       organizerId: organizerProfile.userId,
       name,
       ...competition.fields,
+      ...leagueData,
       lobbyRounds,
       lobbyGroups: groups?.groups ?? null,
       lobbyQualifiers: groups?.qualifiers ?? null,

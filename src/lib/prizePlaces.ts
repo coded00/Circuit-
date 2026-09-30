@@ -15,13 +15,24 @@ import type { Tournament } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { loadLobby } from "@/lib/lobby";
 import { loadLeagueStandings } from "@/lib/roundRobinStandings";
+import { loadLeague } from "@/lib/leagueStandings";
 import { doubleElimPlacements, isDoubleElimStructure } from "@/lib/doubleElim";
 import { prizeShares, type FinishGroup, type PrizeShare } from "@/lib/prizes";
 import { splitByBasisPoints } from "@/lib/teamPrize";
 
 type TournamentShape = Pick<
   Tournament,
-  "id" | "status" | "format" | "competitionStyle" | "placementPoints" | "killPoints" | "lobbyGroups" | "lobbyQualifiers" | "lobbyFinalRounds"
+  | "id"
+  | "status"
+  | "format"
+  | "competitionStyle"
+  | "placementPoints"
+  | "killPoints"
+  | "lobbyGroups"
+  | "lobbyQualifiers"
+  | "lobbyFinalRounds"
+  | "leagueWinPoints"
+  | "leagueDrawPoints"
 >;
 
 function groupByRank<T>(rows: readonly T[], rank: (r: T) => number, id: (r: T) => string): FinishGroup[] {
@@ -55,6 +66,18 @@ export async function finishingGroups(tournament: TournamentShape): Promise<Fini
       return [{ userIds: [winner] }, { userIds: [loser] }, ...groupByRank(rest, (r) => r.rank, (r) => r.entryId)];
     }
     return groupByRank(view.table as { entryId: string; rank: number }[], (r) => r.rank, (r) => r.entryId);
+  }
+
+  if (tournament.format === "LEAGUE") {
+    const view = await loadLeague(tournament);
+    if (!view || view.outcome.state !== "DECIDED") return null;
+    if (view.decider?.winnerId) {
+      const winner = view.decider.winnerId;
+      const loser = view.decider.playerAId === winner ? view.decider.playerBId : view.decider.playerAId;
+      const rest = view.table.filter((r) => r.entryId !== winner && r.entryId !== loser);
+      return [{ userIds: [winner] }, { userIds: [loser] }, ...groupByRank(rest, (r) => r.rank, (r) => r.entryId)];
+    }
+    return groupByRank(view.table, (r) => r.rank, (r) => r.entryId);
   }
 
   if (tournament.format === "DOUBLE_ELIMINATION") {

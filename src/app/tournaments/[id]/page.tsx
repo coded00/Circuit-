@@ -114,7 +114,8 @@ export default async function TournamentPage({ params }: { params: Promise<{ id:
 
   const isTeam = tournament.entryType === "TEAM";
   const isLobby = tournament.competitionStyle === "LOBBY";
-  const isRoundRobin = tournament.format === "ROUND_ROBIN" || tournament.format === "SWISS";
+  const isLeague = tournament.format === "LEAGUE";
+  const isRoundRobin = tournament.format === "ROUND_ROBIN" || tournament.format === "SWISS" || isLeague;
   const bracketWord = isLobby || isRoundRobin ? "Standings" : "Bracket";
   const entrantWord = isTeam ? "teams" : "players";
   const [registrantCount, user, participants, teamLabels] = await Promise.all([
@@ -407,7 +408,9 @@ export default async function TournamentPage({ params }: { params: Promise<{ id:
                     : isRoundRobin
                       ? tournament.format === "SWISS"
                         ? "Swiss rounds are live — each round is drawn when the last one finishes."
-                        : "Everyone plays everyone — follow the standings as matches finish."
+                        : isLeague
+                          ? "The league is live — follow the table and play each matchday's fixture before its deadline."
+                          : "Everyone plays everyone — follow the standings as matches finish."
                       : "The bracket is live. Follow every round as results come in."}
                 </p>
                 <Link href={`/tournaments/${tournament.id}/bracket`} className="btn-primary">
@@ -416,7 +419,9 @@ export default async function TournamentPage({ params }: { params: Promise<{ id:
               </>
             ) : isRoundRobin ? (
               <p className="text-sm text-muted">
-                {tournament.format === "SWISS"
+                {isLeague
+                  ? `When registration closes on ${formatDate(tournament.registrationCloseAt)}, every fixture is drawn — everyone plays everyone${tournament.leagueLegs === 2 ? " twice, home and away" : " once"}, a matchday every ${tournament.leagueMatchdayDays ?? 7} days. ${tournament.leagueWinPoints ?? 3} points for a win${tournament.leagueDrawPoints != null ? `, ${tournament.leagueDrawPoints} for a draw` : " (no draws)"}; the top of the table takes it.`
+                  : tournament.format === "SWISS"
                   ? `When registration closes on ${formatDate(tournament.registrationCloseAt)}, round 1 is drawn. Each round pairs players on the same record — never the same opponent twice — and the most wins after the last round takes it.`
                   : `When registration closes on ${formatDate(tournament.registrationCloseAt)}, every pairing is drawn at once — everyone plays everyone, in any order. Most wins takes it.`}
               </p>

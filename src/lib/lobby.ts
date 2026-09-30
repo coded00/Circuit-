@@ -20,6 +20,7 @@
  * claimed through the same payout route as a bracket winner.
  */
 
+import { loadLeague } from "@/lib/leagueStandings";
 import type { LobbyFlagStatus, LobbyStage, Tournament, User } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { notify, notifyStaff } from "@/lib/notifications";
@@ -317,7 +318,7 @@ export async function loadLobby(
  * match's winner. Null while it's still running.
  */
 export async function tournamentWinnerId(
-  tournament: Pick<Tournament, "id" | "status" | "competitionStyle" | "format" | "placementPoints" | "killPoints" | "lobbyGroups" | "lobbyQualifiers" | "lobbyFinalRounds">
+  tournament: Pick<Tournament, "id" | "status" | "competitionStyle" | "format" | "placementPoints" | "killPoints" | "lobbyGroups" | "lobbyQualifiers" | "lobbyFinalRounds" | "leagueWinPoints" | "leagueDrawPoints">
 ): Promise<string | null> {
   if (tournament.status !== "COMPLETE") return null;
   if (tournament.competitionStyle === "LOBBY") {
@@ -326,6 +327,10 @@ export async function tournamentWinnerId(
   if (tournament.format === "ROUND_ROBIN" || tournament.format === "SWISS") {
     const rr = await loadLeagueStandings(tournament);
     return rr?.outcome.state === "DECIDED" ? rr.outcome.winnerId : null;
+  }
+  if (tournament.format === "LEAGUE") {
+    const league = await loadLeague(tournament);
+    return league?.outcome.state === "DECIDED" ? league.outcome.winnerId : null;
   }
   if (tournament.format === "DOUBLE_ELIMINATION") {
     const bracket = await prisma.bracket.findUnique({ where: { tournamentId: tournament.id } });

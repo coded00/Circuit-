@@ -113,6 +113,7 @@ export async function cleanupAll(): Promise<void> {
   await prisma.notification.deleteMany({ where: { userId: { in: userIds } } });
   await prisma.rateLimitAttempt.deleteMany({ where: { key: { contains: "test-" } } });
   await prisma.auditLogEntry.deleteMany({ where: { actorId: { in: userIds } } });
+  await prisma.bracket.deleteMany({ where: { tournamentId: { in: tournamentIds } } });
   await prisma.tournament.deleteMany({ where: { id: { in: tournamentIds } } });
   await prisma.organizerProfile.deleteMany({ where: { userId: { in: userIds } } });
   await prisma.user.deleteMany({ where: { id: { in: userIds } } });

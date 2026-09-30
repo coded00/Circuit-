@@ -55,6 +55,10 @@ export type MatchViewData = {
   playerA: MatchPlayer;
   playerB: MatchPlayer;
   winnerId: string | null;
+  /** The match finished level (a league draw). */
+  isDraw: boolean;
+  /** A league fixture where a draw can be reported or ruled. */
+  drawAllowed: boolean;
   /** The agreed score once decided (from the accepted report). */
   finalScore: string | null;
   viewer: {
@@ -270,6 +274,16 @@ function NextStep({ data }: { data: MatchViewData }) {
   // --- Finished ---
   if (data.status === "COMPLETE") {
     const winner = data.winnerId === playerA.id ? playerA : data.winnerId === playerB.id ? playerB : null;
+    if (me && data.isDraw) {
+      return (
+        <section className="card flex flex-col gap-1">
+          <span className="font-display text-xl font-bold tracking-tight uppercase">Draw</span>
+          <span className="text-sm text-muted">
+            You and {opponent.displayName} finished level{data.finalScore ? ` (${data.finalScore})` : ""}. A draw earns a point in the table.
+          </span>
+        </section>
+      );
+    }
     if (me && winner?.id === me.id) {
       return (
         <section className="celebrate-fade flex flex-col gap-4 rounded-[var(--radius-lg)] border border-gold/30 bg-gold/10 p-5 sm:flex-row sm:items-center sm:justify-between">
@@ -306,7 +320,7 @@ function NextStep({ data }: { data: MatchViewData }) {
     }
     return (
       <section className="card text-sm text-muted">
-        {winner ? `${winner.displayName} won this match.` : "This match was voided — neither side takes the win."}
+        {winner ? `${winner.displayName} won this match.` : data.isDraw ? "This match ended in a draw." : "This match was voided — neither side takes the win."}
       </section>
     );
   }
@@ -327,6 +341,7 @@ function NextStep({ data }: { data: MatchViewData }) {
               playerA={playerA}
               playerB={playerB}
               voidUnsupportedReason={data.voidUnsupportedReason}
+              drawAllowed={data.drawAllowed}
             />
           )}
         </PanelBody>
@@ -413,7 +428,7 @@ function NextStep({ data }: { data: MatchViewData }) {
               </li>
             </ol>
           )}
-          <ResultForm matchId={data.id} matchCode={data.code} playerA={playerA} playerB={playerB} />
+          <ResultForm matchId={data.id} matchCode={data.code} playerA={playerA} playerB={playerB} drawAllowed={data.drawAllowed} />
         </PanelBody>
       </Panel>
     );

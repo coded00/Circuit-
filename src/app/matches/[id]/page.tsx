@@ -6,6 +6,8 @@
  * Queries and derives here; MatchView.tsx renders the head-to-head screen.
  */
 
+import { DRAW_RESULT } from "@/lib/leagueTable";
+import { isLeagueStructure } from "@/lib/leagueStandings";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
@@ -34,7 +36,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
       playerA: true,
       playerB: true,
       winner: true,
-      tournament: { select: { id: true, name: true, game: true, organizerId: true, format: true } },
+      tournament: { select: { id: true, name: true, game: true, organizerId: true, format: true, leagueDrawPoints: true } },
       battle: { select: { id: true, game: true, format: true, stakeAmount: true } },
       dispute: true,
     },
@@ -66,8 +68,15 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   // Round robin: the extra match after the last round is the tie-for-first decider;
   // double elimination: which bracket and round this is.
   let roundLabel = `Round ${match.round}`;
-  if (["ROUND_ROBIN", "SWISS", "DOUBLE_ELIMINATION"].includes(match.tournament?.format ?? "") && match.tournamentId) {
+  let drawAllowed = false;
+  if (["ROUND_ROBIN", "SWISS", "DOUBLE_ELIMINATION", "LEAGUE"].includes(match.tournament?.format ?? "") && match.tournamentId) {
     const bracket = await prisma.bracket.findUnique({ where: { tournamentId: match.tournamentId } });
+    if (isLeagueStructure(bracket?.structure)) {
+      const isDecider = (match.round ?? 0) > bracket.structure.totalRounds;
+      roundLabel = isDecider ? "Decider" : `Matchday ${match.round}`;
+      // Draws are worth points only if the organizer allowed them; a decider has to have a winner.
+      drawAllowed = match.tournament?.leagueDrawPoints != null && !isDecider;
+    }
     if ((isRoundRobinStructure(bracket?.structure) || isSwissStructure(bracket?.structure)) && (match.round ?? 0) > bracket.structure.totalRounds) roundLabel = "Decider";
     if (isDoubleElimStructure(bracket?.structure)) {
       const n = nodeByMatch(bracket.structure, match.id);
@@ -90,8 +99,9 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
 
   // The accepted score: whichever report named the actual winner.
   const reports = [match.resultA, match.resultB].filter(Boolean) as ResultPayload[];
+  const isDraw = match.status === "COMPLETE" && !match.winnerId && reports.some((r) => r.winnerId === DRAW_RESULT);
   const finalScore =
-    match.status === "COMPLETE" && match.winnerId ? (reports.find((r) => r.winnerId === match.winnerId)?.score ?? null) : null;
+    match.status === "COMPLETE" && (match.winnerId || isDraw) ? (reports.find((r) => r.winnerId === (match.winnerId ?? DRAW_RESULT))?.score ?? null) : null;
 
   const bothReady = match.playerAReadyAt !== null && match.playerBReadyAt !== null;
   // Live-refresh while genuinely waiting on something to change.
@@ -112,6 +122,8 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
     playerA: toPlayer(match.playerA, "A"),
     playerB: toPlayer(match.playerB, "B"),
     winnerId: match.winnerId,
+    isDraw,
+    drawAllowed,
     finalScore,
     viewer: {
       signedIn: user !== null,

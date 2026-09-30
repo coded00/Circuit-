@@ -46,6 +46,8 @@ import {
 } from "@/lib/doubleElim";
 import { isRoundRobinStructure, isSwissStructure, toRRMatch, type RoundRobinStructure, type SwissStructure } from "@/lib/roundRobinStandings";
 import { buildSwissTable, pairSwissRound, swissOutcome, swissRoundsFor } from "@/lib/swiss";
+import { buildLeagueTable, DEFAULT_MATCHDAY_DAYS, DRAW_RESULT, leagueOutcome, leagueSchedule, matchdayDeadlines, totalMatchdays } from "@/lib/leagueTable";
+import { isLeagueStructure, leagueRulesOf, toLeagueMatch, type LeagueStructure } from "@/lib/leagueStandings";
 
 export class MatchError extends Error {
   code:
@@ -107,6 +109,8 @@ export type ResultPayload = {
    *  per-match kill count (e.g. EA FC, Rocket League), so this is never
    *  required. */
   kills?: number;
+  /** Set when the organizer awarded this result (an unplayed league fixture) instead of a player reporting it. */
+  awarded?: boolean;
 };
 
 const AUTO_ACCEPT_WINDOW_MS = 2 * 60 * 60 * 1000; // BRK-10, 2h placeholder
@@ -179,6 +183,7 @@ export async function generateBracket(tournamentId: string): Promise<void> {
   const kind = await prisma.tournament.findUnique({ where: { id: tournamentId }, select: { competitionStyle: true, format: true } });
   if (kind?.competitionStyle === "LOBBY") return startLobby(tournamentId);
   if (kind?.format === "ROUND_ROBIN") return generateRoundRobin(tournamentId);
+  if (kind?.format === "LEAGUE") return generateLeague(tournamentId);
   if (kind?.format === "DOUBLE_ELIMINATION") return generateDoubleElim(tournamentId);
   if (kind?.format === "SWISS") return generateSwiss(tournamentId);
 
@@ -526,6 +531,125 @@ async function advanceRoundRobin(tournamentId: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// League (src/lib/leagueTable.ts): every pairing is created up front, grouped
+// into matchdays with a play-by date. Matches can end level when the organizer
+// allows draws; the table (points, head-to-head, goal difference) decides, and
+// a decider settles a dead tie for first.
+// ---------------------------------------------------------------------------
+
+async function generateLeague(tournamentId: string): Promise<void> {
+  const existing = await prisma.bracket.findUnique({ where: { tournamentId } });
+  if (existing) return;
+  const [tournament, confirmed] = await Promise.all([
+    prisma.tournament.findUnique({ where: { id: tournamentId }, select: { name: true, leagueLegs: true, leagueMatchdayDays: true } }),
+    prisma.registration.findMany({ where: { tournamentId, status: "CONFIRMED" }, select: { userId: true } }),
+  ]);
+  if (!tournament || confirmed.length < 2) return;
+  const legs = tournament.leagueLegs === 2 ? 2 : 1;
+  const ids = shuffle(confirmed.map((r) => r.userId));
+  const schedule = leagueSchedule(ids, legs);
+  const startedAt = new Date();
+  const structure: LeagueStructure = {
+    type: "LEAGUE",
+    totalRounds: totalMatchdays(ids.length, legs),
+    legs,
+    startedAt: startedAt.toISOString(),
+    deadlines: matchdayDeadlines(totalMatchdays(ids.length, legs), startedAt.getTime(), tournament.leagueMatchdayDays ?? DEFAULT_MATCHDAY_DAYS),
+  };
+  try {
+    await prisma.$transaction(
+      async (tx) => {
+        // Created first: the unique tournamentId makes a concurrent second call fail here, before any match exists.
+        await tx.bracket.create({ data: { tournamentId, structure: structure as unknown as Prisma.InputJsonValue } });
+        for (const round of schedule) {
+          for (const [playerAId, playerBId] of round.pairs) {
+            await createMatchWithUniqueCode({ tournamentId, round: round.round, playerAId, playerBId }, tx);
+          }
+        }
+        await tx.tournament.update({ where: { id: tournamentId }, data: { status: "LIVE" } });
+      },
+      { timeout: 60_000 }
+    );
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") return;
+    throw err;
+  }
+  await Promise.all(
+    ids.map((userId) =>
+      notify(userId, "LEAGUE_STARTED", {
+        tournamentId,
+        tournamentName: tournament.name,
+        matches: String((ids.length - 1) * legs),
+        firstDeadline: structure.deadlines[0],
+      })
+    )
+  );
+}
+
+/** After a league match completes: create the decider if first is tied on everything, or complete the tournament. */
+async function advanceLeague(tournamentId: string): Promise<void> {
+  for (let attempt = 0; attempt < ADVANCEMENT_MAX_RETRIES; attempt++) {
+    let decider: { id: string; playerAId: string; playerBId: string } | null = null;
+    let completed: { organizerId: string; winnerId: string } | null = null;
+    try {
+      await prisma.$transaction(
+        async (tx) => {
+          const [bracket, tournament, regs, rows] = await Promise.all([
+            tx.bracket.findUnique({ where: { tournamentId } }),
+            tx.tournament.findUnique({ where: { id: tournamentId }, select: { status: true, organizerId: true, leagueWinPoints: true, leagueDrawPoints: true } }),
+            tx.registration.findMany({ where: { tournamentId, status: "CONFIRMED" }, select: { userId: true } }),
+            tx.match.findMany({ where: { tournamentId } }),
+          ]);
+          if (!bracket || !isLeagueStructure(bracket.structure) || tournament?.status !== "LIVE") return;
+          const total = bracket.structure.totalRounds;
+          const all = rows.map(toLeagueMatch);
+          const regular = all.filter((m) => (m.round ?? 0) <= total);
+          const existingDecider = all.find((m) => (m.round ?? 0) > total) ?? null;
+          const table = buildLeagueTable(regs.map((r) => r.userId), regular, leagueRulesOf(tournament));
+          const outcome = leagueOutcome(table, regular, existingDecider);
+          if (outcome.state === "NEEDS_DECIDER") {
+            const [playerAId, playerBId] = outcome.between;
+            const match = await createMatchWithUniqueCode({ tournamentId, round: total + 1, playerAId, playerBId }, tx);
+            decider = { id: match.id, playerAId, playerBId };
+          } else if (outcome.state === "DECIDED") {
+            await tx.tournament.update({ where: { id: tournamentId }, data: { status: "COMPLETE", completedAt: new Date() } });
+            completed = { organizerId: tournament.organizerId, winnerId: outcome.winnerId };
+          }
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+      );
+      if (decider) {
+        const d: { id: string; playerAId: string; playerBId: string } = decider;
+        await Promise.all([notify(d.playerAId, "MATCH_READY", { matchId: d.id }), notify(d.playerBId, "MATCH_READY", { matchId: d.id })]);
+      }
+      if (completed) {
+        const c: { organizerId: string; winnerId: string } = completed;
+        await Promise.all([
+          notify(c.winnerId, "TOURNAMENT_COMPLETE", { tournamentId, isOrganizer: false }),
+          notify(c.organizerId, "TOURNAMENT_COMPLETE", { tournamentId, isOrganizer: true }),
+        ]);
+      }
+      return;
+    } catch (err) {
+      const isSerializationFailure = err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2034";
+      if (isSerializationFailure && attempt < ADVANCEMENT_MAX_RETRIES - 1) continue;
+      throw err;
+    }
+  }
+}
+
+/** A match can end level only in a league that allows draws, and never in its decider. */
+async function drawAllowed(match: Pick<Match, "tournamentId" | "round">): Promise<boolean> {
+  if (!match.tournamentId) return false;
+  const t = await prisma.tournament.findUnique({
+    where: { id: match.tournamentId },
+    select: { format: true, leagueDrawPoints: true, bracket: { select: { structure: true } } },
+  });
+  if (t?.format !== "LEAGUE" || t.leagueDrawPoints === null) return false;
+  return isLeagueStructure(t.bracket?.structure) && (match.round ?? 0) <= t.bracket.structure.totalRounds;
+}
+
+// ---------------------------------------------------------------------------
 // Double elimination (src/lib/doubleElim.ts): the node graph lives on the
 // Bracket row; a Match is created for each node once both its players are
 // known, and byes resolve on their own.
@@ -754,7 +878,9 @@ export async function submitResult(input: SubmitResultInput): Promise<{ match: M
   if (input.submittingUserId !== match.playerAId && input.submittingUserId !== match.playerBId) {
     throw new MatchError("NOT_A_PARTICIPANT", "Only the two players in this match can submit a result.");
   }
-  if (input.winnerId !== match.playerAId && input.winnerId !== match.playerBId) {
+  if (input.winnerId === DRAW_RESULT) {
+    if (!(await drawAllowed(match))) throw new MatchError("INVALID_WINNER", "A draw isn't allowed in this match — one player has to win.");
+  } else if (input.winnerId !== match.playerAId && input.winnerId !== match.playerBId) {
     throw new MatchError("INVALID_WINNER", "The declared winner must be one of the two players.");
   }
 
@@ -832,9 +958,13 @@ async function resolveAfterSubmission(
  * row as whichever call got there first left it.
  */
 async function completeMatch(match: Match, winnerId: string): Promise<Match> {
+  // A league match that ends level is stored as complete with no winner.
+  const isDraw = winnerId === DRAW_RESULT;
+  if (isDraw && !(await drawAllowed(match))) throw new MatchError("INVALID_WINNER", "A draw isn't allowed in this match — one player has to win.");
+  const storedWinner = isDraw ? null : winnerId;
   const result = await prisma.match.updateMany({
     where: { id: match.id, status: { not: "COMPLETE" } },
-    data: { status: "COMPLETE", winnerId, reportWindowExpiresAt: null },
+    data: { status: "COMPLETE", winnerId: storedWinner, reportWindowExpiresAt: null },
   });
 
   if (result.count === 0) {
@@ -848,12 +978,13 @@ async function completeMatch(match: Match, winnerId: string): Promise<Match> {
   trackEvent("match_completed_verified", {
     matchId: match.id,
     tournamentId: match.tournamentId ?? undefined,
-    userId: winnerId,
+    userId: storedWinner ?? undefined,
   });
 
   if (match.tournamentId) {
     const tournament = await prisma.tournament.findUnique({ where: { id: match.tournamentId }, select: { format: true } });
     if (tournament?.format === "ROUND_ROBIN") await advanceRoundRobin(match.tournamentId);
+    else if (tournament?.format === "LEAGUE") await advanceLeague(match.tournamentId);
     else if (tournament?.format === "DOUBLE_ELIMINATION") await advanceDoubleElim(match.tournamentId, match.id, winnerId);
     else if (tournament?.format === "SWISS") await advanceSwiss(match.tournamentId);
     else await applyWinnerAdvancement(match.tournamentId, match.id, winnerId);
@@ -870,7 +1001,7 @@ async function completeMatch(match: Match, winnerId: string): Promise<Match> {
     notify(match.playerBId, "MATCH_COMPLETE", { matchId: match.id }),
   ]);
 
-  return { ...match, status: "COMPLETE", winnerId, reportWindowExpiresAt: null };
+  return { ...match, status: "COMPLETE", winnerId: storedWinner, reportWindowExpiresAt: null };
 }
 
 /**
@@ -1105,7 +1236,9 @@ export async function ruleDispute(input: RulingInput): Promise<Dispute> {
     return voidResult;
   }
 
-  if (!input.winnerId || ![dispute.match.playerAId, dispute.match.playerBId].includes(input.winnerId)) {
+  if (input.winnerId === DRAW_RESULT) {
+    if (!(await drawAllowed(dispute.match))) throw new MatchError("INVALID_WINNER", "A draw isn't allowed in this match — one player has to win.");
+  } else if (!input.winnerId || ![dispute.match.playerAId, dispute.match.playerBId].includes(input.winnerId)) {
     throw new MatchError("INVALID_WINNER", "The ruled winner must be one of the two players.");
   }
 
@@ -1150,6 +1283,54 @@ export async function ruleDispute(input: RulingInput): Promise<Dispute> {
   ]);
 
   return updatedDispute;
+}
+
+// ---------------------------------------------------------------------------
+// League: an organizer settles a fixture nobody played by its matchday
+// deadline — a forfeit win for one side, or a draw where draws are allowed.
+// ---------------------------------------------------------------------------
+
+export async function awardLeagueResult(input: { matchId: string; organizerId: string; outcome: string; score?: string }): Promise<Match> {
+  const match = await prisma.match.findUnique({ where: { id: input.matchId }, include: { tournament: { include: { bracket: { select: { structure: true } } } } } });
+  if (!match || !match.tournament) throw new MatchError("NOT_FOUND", "Match not found.");
+  const tournament = match.tournament;
+  if (tournament.format !== "LEAGUE") throw new MatchError("FORBIDDEN", "Results can only be awarded in a league.");
+  if (tournament.organizerId !== input.organizerId) throw new MatchError("FORBIDDEN", "Only this league's organizer can award a result.");
+  if ([match.playerAId, match.playerBId].includes(input.organizerId)) throw new MatchError("FORBIDDEN", "An organizer can't award their own match.");
+  if (tournament.status === "CANCELLED") throw new MatchError("TOURNAMENT_CANCELLED", "This tournament was cancelled.");
+  if (match.status === "COMPLETE") throw new MatchError("ALREADY_COMPLETE", "This match is already complete.");
+  if (match.status === "DISPUTED") throw new MatchError("DISPUTED", "This match is under dispute review — rule on the dispute instead.");
+
+  const structure = tournament.bracket?.structure;
+  const deadline = isLeagueStructure(structure) ? structure.deadlines[(match.round ?? 0) - 1] : undefined;
+  if (!deadline) throw new MatchError("FORBIDDEN", "Only a scheduled matchday fixture can be awarded.");
+  if (Date.now() < new Date(deadline).getTime()) throw new MatchError("FORBIDDEN", "This fixture isn't overdue yet — players can still play it.");
+
+  const isDraw = input.outcome === DRAW_RESULT;
+  if (isDraw && !(await drawAllowed(match))) throw new MatchError("INVALID_WINNER", "Draws aren't allowed in this league.");
+  if (!isDraw && input.outcome !== match.playerAId && input.outcome !== match.playerBId) throw new MatchError("INVALID_WINNER", "The awarded winner must be one of the two players.");
+
+  const payload: ResultPayload = {
+    winnerId: input.outcome,
+    score: input.score?.trim() || (isDraw ? "0-0" : "3-0"),
+    submittedAt: new Date().toISOString(),
+    awarded: true,
+  };
+  const json = payload as unknown as Prisma.InputJsonValue;
+  const updated = await prisma.match.update({ where: { id: match.id }, data: { resultA: json, resultB: json } });
+  const completed = await completeMatch(updated, input.outcome);
+
+  await logAdminAction({
+    actorId: input.organizerId,
+    action: "league.award",
+    targetType: "Match",
+    targetId: match.id,
+    metadata: { tournamentId: tournament.id, outcome: input.outcome, score: payload.score },
+  }).catch(() => undefined);
+  await Promise.all(
+    [match.playerAId, match.playerBId].map((id) => notify(id, "LEAGUE_RESULT_AWARDED", { matchId: match.id, tournamentId: tournament.id, tournamentName: tournament.name, outcome: isDraw ? "DRAW" : input.outcome === id ? "WIN" : "LOSS" }))
+  );
+  return completed;
 }
 
 // ---------------------------------------------------------------------------
@@ -1325,11 +1506,12 @@ async function repairStalledAdvancement(): Promise<{ repaired: number; errors: s
       if (!bracket) continue;
       const matches = await prisma.match.findMany({ where: { tournamentId: t.id }, select: { id: true, status: true, winnerId: true } });
       const done = matches.filter((m) => m.status === "COMPLETE" && m.winnerId);
-      if (isRoundRobinStructure(bracket.structure) || isSwissStructure(bracket.structure)) {
+      if (isRoundRobinStructure(bracket.structure) || isSwissStructure(bracket.structure) || isLeagueStructure(bracket.structure)) {
         // Stalled only when nothing is left to play: the next step (a new
         // Swiss round, a decider, or completing) never ran.
         if (matches.length > 0 && matches.every((m) => m.status === "COMPLETE")) {
           if (isSwissStructure(bracket.structure)) await advanceSwiss(t.id);
+          else if (isLeagueStructure(bracket.structure)) await advanceLeague(t.id);
           else await advanceRoundRobin(t.id);
           repaired++;
         }

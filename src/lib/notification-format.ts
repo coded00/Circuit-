@@ -145,6 +145,18 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
         message: `You have a bye in round ${str(p, "round")} of ${str(p, "rounds")} of ${str(p, "tournamentName") || "your tournament"} — it counts as a win.`,
         href: `/tournaments/${str(p, "tournamentId")}/bracket`,
       };
+    case "LEAGUE_STARTED":
+      return {
+        message: `${str(p, "tournamentName") || "Your league"} has started — ${str(p, "matches") || "several"} matches to play. The first matchday is due ${str(p, "firstDeadline") ? new Date(str(p, "firstDeadline")).toLocaleDateString("en-NG", { day: "numeric", month: "short" }) : "soon"}.`,
+        href: `/tournaments/${str(p, "tournamentId")}/bracket`,
+      };
+    case "LEAGUE_RESULT_AWARDED": {
+      const outcome = str(p, "outcome");
+      return {
+        message: `The organizer settled your unplayed fixture in ${str(p, "tournamentName") || "the league"}: ${outcome === "WIN" ? "you were awarded the win" : outcome === "LOSS" ? "it was awarded to your opponent" : "it was recorded as a draw"}.`,
+        href: `/matches/${str(p, "matchId")}`,
+      };
+    }
     case "ROUND_ROBIN_STARTED":
       return {
         message: `${str(p, "tournamentName") || "Your tournament"} has started — you have ${str(p, "matches") || "several"} matches to play, in any order.`,

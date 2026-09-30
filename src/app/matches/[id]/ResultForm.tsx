@@ -22,11 +22,14 @@ export default function ResultForm({
   matchCode,
   playerA,
   playerB,
+  drawAllowed = false,
 }: {
   matchId: string;
   matchCode: string;
   playerA: PlayerOption;
   playerB: PlayerOption;
+  /** League fixtures that can end level. */
+  drawAllowed?: boolean;
 }) {
   const router = useRouter();
   const [winnerId, setWinnerId] = useState("");
@@ -40,7 +43,7 @@ export default function ResultForm({
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!winnerId) {
-      setError("Pick who won.");
+      setError(drawAllowed ? "Pick who won, or a draw." : "Pick who won.");
       return;
     }
     setError(null);
@@ -67,8 +70,8 @@ export default function ResultForm({
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5">
       <fieldset className="flex flex-col gap-2">
-        <legend className="field-label mb-2">Who won?</legend>
-        <div className="grid grid-cols-2 gap-3">
+        <legend className="field-label mb-2">{drawAllowed ? "Who won — or was it a draw?" : "Who won?"}</legend>
+        <div className={`grid gap-3 ${drawAllowed ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2"}`}>
           {[playerA, playerB].map((player) => {
             const selected = winnerId === player.id;
             return (
@@ -97,6 +100,27 @@ export default function ResultForm({
               </button>
             );
           })}
+          {drawAllowed && (
+            <button
+              type="button"
+              onClick={() => {
+                setWinnerId("DRAW");
+                setError(null);
+              }}
+              aria-pressed={winnerId === "DRAW"}
+              className={`relative col-span-2 flex flex-col items-center justify-center gap-1 rounded-[12px] border px-3 py-4 text-center transition duration-[var(--duration-fast)] active:scale-[0.98] sm:col-span-1 ${
+                winnerId === "DRAW" ? "border-accent-volt bg-accent-volt-soft" : "border-border hover:border-border-strong hover:bg-surface-elevated"
+              }`}
+            >
+              {winnerId === "DRAW" && (
+                <span className="absolute top-2 right-2 flex h-5 w-5 items-center justify-center rounded-full bg-accent-volt text-accent-volt-foreground">
+                  <Check size={12} strokeWidth={3} />
+                </span>
+              )}
+              <span className="text-sm font-semibold">Draw</span>
+              <span className="text-xs text-muted">Level score</span>
+            </button>
+          )}
         </div>
       </fieldset>
 

@@ -154,7 +154,7 @@ export default function TournamentForm({
           </span>
         ) : structureMax ? (
           <span className="field-hint">
-            {competition.structure === "ROUND_ROBIN"
+            {["ROUND_ROBIN", "LEAGUE"].includes(competition.structure)
               ? `Up to ${structureMax} entries — every pairing is a match (${(structureMax * (structureMax - 1)) / 2} matches at ${structureMax}).`
               : `Up to ${structureMax} entries.`}
           </span>

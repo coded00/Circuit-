@@ -63,6 +63,11 @@ export default function EditForm({
           lobbyGroups: tournament.lobbyGroups ? String(tournament.lobbyGroups) : "",
           lobbyQualifiers: tournament.lobbyQualifiers ? String(tournament.lobbyQualifiers) : "",
           lobbyFinalRounds: tournament.lobbyFinalRounds ? String(tournament.lobbyFinalRounds) : "",
+          leagueWinPoints: String(tournament.leagueWinPoints ?? 3),
+          leagueAllowDraws: tournament.format !== "LEAGUE" || tournament.leagueDrawPoints != null,
+          leagueDrawPoints: String(tournament.leagueDrawPoints ?? 1),
+          leagueLegs: String(tournament.leagueLegs ?? 1),
+          leagueMatchdayDays: String(tournament.leagueMatchdayDays ?? 7),
         }
       : null;
   const originalInCatalog = !!original && !!selectedParts(catalog, original).format;
@@ -119,6 +124,15 @@ export default function EditForm({
             ...(competition && !competitionLocked
               ? { lobbyGroups: competition.lobbyGroups, lobbyQualifiers: competition.lobbyQualifiers, lobbyFinalRounds: competition.lobbyFinalRounds }
               : {}),
+          }
+        : {}),
+      ...(!competitionChanged && competition?.structure === "LEAGUE" && !competitionLocked && roundsEditable
+        ? {
+            leagueWinPoints: competition.leagueWinPoints,
+            leagueAllowDraws: competition.leagueAllowDraws,
+            leagueDrawPoints: competition.leagueDrawPoints,
+            leagueLegs: competition.leagueLegs,
+            leagueMatchdayDays: competition.leagueMatchdayDays,
           }
         : {}),
       participantCap: Number(participantCap),
@@ -198,6 +212,12 @@ export default function EditForm({
               ? "Locked — players have already registered for this game and format."
               : "Saved before the game catalog existed. Change it to pick from the current modes and formats."}
           </span>
+          {tournament.format === "LEAGUE" && (
+            <span className="field-hint">
+              League: {tournament.leagueWinPoints ?? 3} for a win{tournament.leagueDrawPoints != null ? `, ${tournament.leagueDrawPoints} for a draw` : ", no draws"} · {tournament.leagueLegs === 2 ? "home and away" : "played once"} ·{" "}
+              a matchday every {tournament.leagueMatchdayDays ?? 7} days.
+            </span>
+          )}
           {tournament.competitionStyle === "LOBBY" && roundsEditable && (
             <label className="mt-2 flex w-40 flex-col gap-1.5">
               <span className="field-label">Rounds</span>
@@ -236,7 +256,7 @@ export default function EditForm({
           </span>
         ) : structureMax ? (
           <span className="field-hint">
-            {(competition?.structure ?? tournament.format) === "ROUND_ROBIN"
+            {["ROUND_ROBIN", "LEAGUE"].includes(competition?.structure ?? tournament.format)
               ? `Up to ${structureMax} entries — every pairing is a match (${(structureMax * (structureMax - 1)) / 2} matches at ${structureMax}).`
               : `Up to ${structureMax} entries.`}
           </span>

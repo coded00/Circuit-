@@ -14,6 +14,7 @@ import { parseOptionalUrl, parseOptionalImageUrl } from "@/lib/validation";
 import { logAdminAction } from "@/lib/auditLog";
 import { entriesPerMatch } from "@/lib/gameCatalog";
 import { parseLobbyGroups, parseLobbyRounds } from "@/lib/lobbyScoring";
+import { parseLeagueSettings } from "@/lib/leagueTable";
 import { getStructure } from "@/lib/competitionStructures";
 import { maxPrizePlaces, parsePrizeSplit } from "@/lib/prizes";
 import { resolveCompetition } from "@/lib/competitionConfig";
@@ -105,6 +106,42 @@ export async function PATCH(
       const rounds = parseLobbyRounds(body.lobbyRounds ?? tournament.lobbyRounds);
       if (!rounds.ok) return NextResponse.json({ error: rounds.error }, { status: 400 });
       data.lobbyRounds = rounds.value;
+    }
+  }
+  // League settings: fixed once the league has started. Changing to or from a league resets them.
+  const structureNow = (data.format as string | undefined) ?? tournament.format;
+  if (structureNow !== "LEAGUE") {
+    if (tournament.format === "LEAGUE") Object.assign(data, { leagueWinPoints: null, leagueDrawPoints: null, leagueLegs: null, leagueMatchdayDays: null });
+  } else {
+    const touched = ["leagueWinPoints", "leagueDrawPoints", "leagueAllowDraws", "leagueLegs", "leagueMatchdayDays"].some((k) => body[k] !== undefined);
+    if (touched || changesCompetition) {
+      const current = {
+        winPoints: tournament.leagueWinPoints ?? 3,
+        drawPoints: tournament.leagueDrawPoints,
+        legs: tournament.leagueLegs ?? 1,
+        matchdayDays: tournament.leagueMatchdayDays ?? 7,
+      };
+      const league = parseLeagueSettings({
+        winPoints: body.leagueWinPoints ?? current.winPoints,
+        drawPoints: body.leagueDrawPoints ?? current.drawPoints ?? undefined,
+        allowDraws: body.leagueAllowDraws ?? (tournament.format === "LEAGUE" ? current.drawPoints !== null : true),
+        legs: body.leagueLegs ?? current.legs,
+        matchdayDays: body.leagueMatchdayDays ?? current.matchdayDays,
+      });
+      if (!league.ok) return NextResponse.json({ error: league.error }, { status: 400 });
+      const same =
+        tournament.format === "LEAGUE" &&
+        league.value.winPoints === current.winPoints &&
+        league.value.drawPoints === current.drawPoints &&
+        league.value.legs === current.legs &&
+        league.value.matchdayDays === current.matchdayDays;
+      if (!same) {
+        const registered = await prisma.registration.count({ where: { tournamentId: id, status: { in: ["PENDING_PAYMENT", "CONFIRMED"] } } });
+        if (registered > 0 || tournament.status === "LIVE" || tournament.status === "COMPLETE") {
+          return NextResponse.json({ error: "The league's points and schedule are locked once players have registered." }, { status: 409 });
+        }
+      }
+      Object.assign(data, { leagueWinPoints: league.value.winPoints, leagueDrawPoints: league.value.drawPoints, leagueLegs: league.value.legs, leagueMatchdayDays: league.value.matchdayDays });
     }
   }
   // Groups, then a final: fixed once the lobby has started.

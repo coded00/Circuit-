@@ -88,7 +88,7 @@ export async function getWalletActivity(userId: string): Promise<WalletActivity>
   // tournamentWinnerId) for every finished tournament this user entered.
   const finished = await prisma.tournament.findMany({
     where: { status: "COMPLETE", registrations: { some: { userId, status: "CONFIRMED" } } },
-    select: { id: true, status: true, competitionStyle: true, format: true, placementPoints: true, killPoints: true, lobbyGroups: true, lobbyQualifiers: true, lobbyFinalRounds: true },
+    select: { id: true, status: true, competitionStyle: true, format: true, placementPoints: true, killPoints: true, lobbyGroups: true, lobbyQualifiers: true, lobbyFinalRounds: true, leagueWinPoints: true, leagueDrawPoints: true },
   });
   const championTournamentIds = (await Promise.all(finished.map(async (t) => ((await tournamentWinnerId(t)) === userId ? t.id : null)))).filter(
     (id): id is string => id !== null

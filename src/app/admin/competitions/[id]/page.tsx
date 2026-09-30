@@ -75,7 +75,7 @@ export default async function AdminCompetitionDetailPage({ params }: { params: P
       : null;
 
   const structure = getStructure(tournament.format);
-  const standingsLabel = tournament.competitionStyle === "LOBBY" || ["ROUND_ROBIN", "SWISS"].includes(tournament.format) ? "Standings" : "Bracket";
+  const standingsLabel = tournament.competitionStyle === "LOBBY" || ["ROUND_ROBIN", "SWISS", "LEAGUE"].includes(tournament.format) ? "Standings" : "Bracket";
   const started = tournament.status === "LIVE" || tournament.status === "COMPLETE";
   const confirmed = registrations.filter((r) => r.status === "CONFIRMED").length;
 
