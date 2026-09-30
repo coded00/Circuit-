@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Search } from "lucide-react";
 import type { PlayerSearchState } from "@/lib/playerSearch";
 
@@ -28,28 +28,24 @@ export function PlayerPicker({
   disabled?: boolean;
 }) {
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<Result[]>([]);
-  const [loading, setLoading] = useState(false);
+  // The last search the server answered; results are shown only while they match what's typed.
+  const [found, setFound] = useState<{ q: string; players: Result[] } | null>(null);
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
+  const listId = useId();
   const q = query.trim().replace(/^@/, "");
+  const results = found?.q === q ? found.players : [];
+  const loading = q.length >= 2 && found?.q !== q;
 
   useEffect(() => {
-    if (q.length < 2) {
-      setResults([]);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
+    if (q.length < 2) return;
     const timer = setTimeout(async () => {
       try {
         const res = await fetch(`/api/players/search?q=${encodeURIComponent(q)}${teamId ? `&teamId=${teamId}` : ""}`);
         const data = await res.json();
-        setResults(res.ok ? data.players : []);
+        setFound({ q, players: res.ok ? data.players : [] });
       } catch {
-        setResults([]);
-      } finally {
-        setLoading(false);
+        setFound({ q, players: [] });
       }
     }, 250);
     return () => clearTimeout(timer);
@@ -66,7 +62,6 @@ export function PlayerPicker({
   async function choose(player: Result) {
     setOpen(false);
     setQuery("");
-    setResults([]);
     await onPick({ id: player.id, handle: player.handle, displayName: player.displayName, avatarUrl: player.avatarUrl });
   }
 
@@ -86,13 +81,14 @@ export function PlayerPicker({
           placeholder={placeholder}
           role="combobox"
           aria-expanded={open && q.length >= 2}
+          aria-controls={listId}
           aria-autocomplete="list"
           autoComplete="off"
           className="field-input w-full pl-9"
         />
       </div>
       {open && q.length >= 2 && (
-        <ul role="listbox" className="absolute z-20 mt-1.5 max-h-72 w-full overflow-auto rounded-[12px] border border-border bg-surface-elevated p-1 shadow-lg">
+        <ul id={listId} role="listbox" className="absolute z-20 mt-1.5 max-h-72 w-full overflow-auto rounded-[12px] border border-border bg-surface-elevated p-1 shadow-lg">
           {loading && visible.length === 0 && <li className="px-3 py-2 text-xs text-muted">Searching…</li>}
           {!loading && visible.length === 0 && <li className="px-3 py-2 text-xs text-muted">No players found for “{q}”.</li>}
           {visible.map((p) => {

@@ -39,22 +39,22 @@ export default function RegistrationForm({
   const [nameChoice, setNameChoice] = useState<"username" | "custom">(savedName ? "custom" : "username");
   const [customName, setCustomName] = useState(savedName ?? "");
   const inGameId = nameChoice === "username" ? username : customName.trim();
-  const [nameStatus, setNameStatus] = useState<"idle" | "checking" | "free" | "taken">("idle");
+  // The last name the server answered for — the status below is derived from it, so typing
+  // shows "checking" until the answer for exactly that name arrives.
+  const [checked, setChecked] = useState<{ name: string; free: boolean } | null>(null);
+  const nameStatus: "idle" | "checking" | "free" | "taken" = !inGameId ? "idle" : checked?.name !== inGameId ? "checking" : checked.free ? "free" : "taken";
 
   // Live "is this name still free in this tournament?" check, once they stop typing.
   useEffect(() => {
-    if (!inGameId) {
-      setNameStatus("idle");
-      return;
-    }
-    setNameStatus("checking");
+    if (!inGameId) return;
     const timer = setTimeout(async () => {
       try {
         const res = await fetch(`/api/tournaments/${tournamentId}/in-game-name?name=${encodeURIComponent(inGameId)}`);
         const data = await res.json();
-        setNameStatus(data.available ? "free" : "taken");
+        setChecked({ name: inGameId, free: !!data.available });
       } catch {
-        setNameStatus("idle");
+        // Can't tell: leave it to the server's own check when they register.
+        setChecked({ name: inGameId, free: true });
       }
     }, 400);
     return () => clearTimeout(timer);
