@@ -1,123 +1,115 @@
 /**
- * Circuit — one open Challenge as a fight card. Shared by the /battles board
- * and the homepage's Open challenges, so both read the same.
+ * Circuit — shared "open Challenge" card, used by both the homepage's Open
+ * Challenges carousel and the full `/battles` board. One component so both
+ * surfaces render the exact same head-to-head visual system: host on the
+ * left, a real "VS", an empty dashed slot on the right standing in for
+ * whoever accepts. There's no separate "matched" variant of this card —
+ * both callers query `status: "OPEN"` only, so a Battle that's already
+ * been accepted never reaches either list; the Challenge detail page is
+ * the only place a real, filled-in matchup ever renders.
  *
- * The purse is the loudest thing on it: the stake each player puts up and
- * what the winner takes home. The challenger stands on one side, an empty
- * dashed slot waits on the other for whoever accepts, and the game's art
- * sits behind it all, dimmed so the numbers stay readable. Every challenge
- * in a list is open (accepted ones never reach it), so there is no status
- * badge. The biggest purse can be `featured`: a wider card with bigger type.
+ * Stake shown when the Battle is real staked money (`Battle.stakeAmount`
+ * > 0, escrowed at creation — see the creation route's own comment);
+ * otherwise the footer says "Free entry" plainly, same as before staking
+ * existed.
  */
 
 import Link from "next/link";
-import { ArrowRight, Plus, Swords, Users } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { GameArtTile } from "@/components/GameArtTile";
-import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
-import { formatStake, potOf, timeAgo } from "@/lib/challengeView";
+import { StatusPill } from "@/components/StatusPill";
 
-export type ChallengeCardData = {
-  id: string;
-  game: string;
-  format: string;
-  visibility: string;
-  stakeAmount: number;
-  createdAt: Date;
-  creator: { displayName: string; avatarUrl: string | null };
-};
+function formatLabel(format: string): string {
+  return format === "BEST_OF_3" ? "Best of 3" : "Single match";
+}
+
+function formatNaira(kobo: number): string {
+  return `₦${(kobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 0 })}`;
+}
 
 export function ChallengeCard({
-  battle: b,
-  mine = false,
-  featured = false,
-  wide = false,
+  battle,
 }: {
-  battle: ChallengeCardData;
-  mine?: boolean;
-  /** The biggest purse: wider, with bigger type. */
-  featured?: boolean;
-  /** Spans both columns without the bigger type, for a card that would otherwise sit alone on its row. */
-  wide?: boolean;
+  battle: {
+    id: string;
+    game: string;
+    format: string;
+    visibility: string;
+    stakeAmount: number;
+    creator: { displayName: string; avatarUrl: string | null };
+  };
 }) {
-  const staked = b.stakeAmount > 0;
   return (
     <Link
-      href={`/battles/${b.id}`}
+      href={`/battles/${battle.id}`}
       data-surface="dark"
-      className={`group relative isolate flex flex-col gap-6 overflow-hidden rounded-[var(--radius-lg)] border border-border bg-background p-5 transition duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:-translate-y-0.5 hover:border-accent-volt/50 focus-visible:ring-2 focus-visible:ring-accent-volt/60 focus-visible:outline-none active:translate-y-0 active:scale-[0.99] ${
-        featured ? "sm:col-span-2 sm:p-7" : wide ? "sm:col-span-2" : ""
-      }`}
+      className="group relative flex h-full w-full flex-col gap-4 overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface p-5 transition duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:border-border-hover hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] active:duration-[var(--duration-instant)]"
     >
-      <GameArtTile game={b.game} fill hideLabel imgWidth={featured ? 900 : 560} className="-z-20 opacity-45 transition-transform duration-500 group-hover:scale-[1.04]" />
-      <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-t from-background via-background/85 to-background/45" />
+      {/* The real per-game art (or the deterministic gradient fallback for
+          an unrecognized game) shown at real strength, not crushed to near-
+          invisibility — a translucent scrim (same color-mix idiom the hero
+          banners use) keeps every text element legible on top instead. */}
+      <div className="absolute inset-0 transition-transform duration-[var(--duration-base)] ease-[var(--ease-standard)] group-hover:scale-[1.05]">
+        <GameArtTile game={battle.game} fill hideLabel imgWidth={480} />
+      </div>
+      <div aria-hidden className="absolute inset-0" style={{ backgroundColor: "color-mix(in srgb, var(--surface) 55%, transparent)" }} />
 
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1.5 text-xs">
-          <span className="truncate text-sm font-semibold text-foreground">{b.game}</span>
-          <span className="flex items-center gap-1 rounded-full bg-foreground/10 px-2 py-0.5 font-medium text-foreground">
-            <Swords size={11} aria-hidden />
-            {b.format === "BEST_OF_3" ? "Best of 3" : "Single match"}
-          </span>
-          {b.visibility === "FRIENDS" && (
-            <span className="flex items-center gap-1 rounded-full bg-foreground/10 px-2 py-0.5 font-medium text-foreground">
-              <Users size={11} aria-hidden />
-              Friends only
-            </span>
-          )}
-        </div>
-        <span className="shrink-0 pt-0.5 text-xs text-muted">{timeAgo(b.createdAt)}</span>
+      <div className="relative z-10 flex items-center justify-between gap-2">
+        <span className="truncate text-xs font-bold tracking-wide text-muted uppercase">{battle.game}</span>
+        <StatusPill tone="live" pulse>
+          Open
+        </StatusPill>
       </div>
 
-      <div className={`grid grid-cols-[1fr_auto_1fr] items-center gap-3 ${featured ? "sm:gap-8 sm:py-2" : wide ? "sm:mx-auto sm:w-full sm:max-w-xl sm:gap-8" : ""}`}>
-        <div className="flex min-w-0 flex-col items-center gap-2 text-center">
-          <PlayerAvatar
-            person={b.creator}
-            size={featured ? "lg" : "md"}
-            className={`ring-2 ring-accent-volt/60 ring-offset-2 ring-offset-background ${featured ? "" : "!h-14 !w-14 !text-lg"}`}
-          />
-          <span className="flex w-full min-w-0 flex-col leading-tight">
-            <span className="truncate text-sm font-semibold" title={b.creator.displayName}>{b.creator.displayName}</span>
-            <span className="text-[11px] text-muted">{mine ? "You" : "Challenger"}</span>
-          </span>
-        </div>
-
-        <div className="flex flex-col items-center gap-1 text-center">
-          <span className="font-display text-[11px] font-bold tracking-[0.2em] text-muted">VS</span>
-          {staked ? (
-            <>
-              <span className={`font-display leading-none font-bold tracking-tight whitespace-nowrap text-gold tabular-nums ${featured ? "text-[34px] sm:text-6xl" : "text-[34px]"}`}>
-                {formatStake(b.stakeAmount)}
-              </span>
-              <span className="text-[11px] whitespace-nowrap text-muted">
-                <span className="hidden sm:inline">each, </span>winner takes {formatStake(potOf(b.stakeAmount))}
-              </span>
-            </>
+      <div className="relative z-10 flex items-center justify-center gap-2">
+        <div className="flex flex-1 flex-col items-center gap-2">
+          <span className="text-[10px] font-semibold tracking-wide text-accent-volt uppercase">Host</span>
+          {battle.creator.avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs
+            <img
+              src={battle.creator.avatarUrl}
+              alt=""
+              width={48}
+              height={48}
+              className="h-12 w-12 rounded-full border-2 border-accent-volt/50 object-cover"
+            />
           ) : (
-            <>
-              <span className={`font-display leading-none font-bold tracking-tight text-success ${featured ? "text-[34px] sm:text-6xl" : "text-[34px]"}`}>Free</span>
-              <span className="text-[11px] whitespace-nowrap text-muted">just bragging rights</span>
-            </>
+            <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-accent-volt/50 bg-surface-elevated text-sm font-semibold text-muted">
+              {battle.creator.displayName.slice(0, 1).toUpperCase()}
+            </div>
           )}
+          <span className="w-full truncate text-center text-xs font-medium text-foreground">
+            {battle.creator.displayName}
+          </span>
         </div>
 
-        <div className="flex min-w-0 flex-col items-center gap-2 text-center">
-          <span
-            className={`flex items-center justify-center rounded-full border-2 border-dashed border-border-strong text-muted transition group-hover:border-accent-volt group-hover:text-accent-volt ${
-              featured ? "h-16 w-16 sm:h-24 sm:w-24" : "h-14 w-14"
-            }`}
-          >
-            <Plus size={featured ? 28 : 20} aria-hidden />
-          </span>
-          <span className="flex w-full min-w-0 flex-col leading-tight">
-            <span className="truncate text-sm font-semibold text-muted transition group-hover:text-foreground">Open slot</span>
-            <span className="text-[11px] text-muted">{mine ? "Still open" : "Could be you"}</span>
+        <span className="font-display shrink-0 pb-4 text-sm font-bold text-muted">VS</span>
+
+        <div className="flex flex-1 flex-col items-center gap-2">
+          <span className="text-[10px] font-semibold tracking-wide text-accent-orange uppercase">Open slot</span>
+          <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-dashed border-border-strong text-base font-bold text-muted">
+            ?
+          </div>
+          <span className="w-full truncate text-center text-xs text-muted">
+            {battle.visibility === "FRIENDS" ? "Friends only" : "Anyone"}
           </span>
         </div>
       </div>
 
-      <span className={`${mine ? "btn-secondary" : "btn-primary"} mt-auto w-full text-sm`}>
-        {mine ? "Manage your challenge" : "Accept challenge"}
-        <ArrowRight size={14} aria-hidden className="transition-transform duration-[var(--duration-base)] ease-[var(--ease-standard)] group-hover:translate-x-0.5" />
+      {/* flex-wrap: a large stake amount ("₦500,000,000 stake · Best of 3")
+          has no natural break point on this ~240px card — wrap to a
+          second line rather than overflow it. */}
+      <div className="relative z-10 flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-[11px] text-muted">
+        <span className={battle.stakeAmount > 0 ? "font-semibold text-gold" : undefined}>
+          {battle.stakeAmount > 0 ? `${formatNaira(battle.stakeAmount)} stake` : "Free entry"}
+        </span>
+        <span aria-hidden>·</span>
+        <span>{formatLabel(battle.format)}</span>
+      </div>
+
+      <span className="btn-primary relative z-10 mt-auto w-full text-sm">
+        Accept Challenge
+        <ArrowRight size={14} className="transition-transform duration-[var(--duration-base)] ease-[var(--ease-standard)] group-hover:translate-x-0.5" />
       </span>
     </Link>
   );
