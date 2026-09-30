@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { prisma } from "@/lib/db";
-import { applyRefundOutcome, applyTransferOutcome, issueEntryFeeRefund, reconcilePendingMoney, refundRef } from "./transfers";
+import { applyRefundOutcome, applyTransferOutcome, currentPaidEntryFee, issueEntryFeeRefund, reconcilePendingMoney, refundRef, voidEntryFeeRevenue } from "./transfers";
 import { confirmEntryFeePayment } from "./confirm";
 import { paystackClient } from "./paystack";
 import { createTestOrganizer, createTestTournament, createTestUser, cleanupAll, uniqueSuffix } from "@/testHelpers";
@@ -105,6 +105,68 @@ describe("entry-fee refunds", () => {
     expect(await applyRefundOutcome(reference, "SUCCESS")).toBe("APPLIED");
     expect(await applyRefundOutcome(reference, "FAILED")).toBe("NO_CHANGE");
     expect((await prisma.escrowTransaction.findUniqueOrThrow({ where: { id: refund.id } })).status).toBe("COMPLETE");
+  });
+
+  it("tells a withdrawing player their card refund started, and again when it completes", async () => {
+    const { player, tournament, registration, reference } = await paidEntry("CONFIRMED", "COMPLETE");
+    vi.spyOn(paystackClient, "refundCharge").mockResolvedValue({ status: "PENDING", providerReference: reference });
+
+    await issueEntryFeeRefund({ tournamentId: tournament.id, registrationId: registration.id, provider: "PAYSTACK", chargeRef: reference, amount: 100_000, notifyPlayer: true });
+    await applyRefundOutcome(reference, "SUCCESS");
+    await applyRefundOutcome(reference, "SUCCESS");
+
+    const stages = (await prisma.notification.findMany({ where: { userId: player.id, type: "ENTRY_FEE_REFUND" }, orderBy: { createdAt: "asc" } })).map(
+      (n) => (n.payload as { stage: string }).stage
+    );
+    expect(stages).toEqual(["STARTED", "DONE"]);
+  });
+
+  it("refunds a wallet-paid entry into the wallet, without calling the provider", async () => {
+    const { player, tournament, registration } = await paidEntry("CONFIRMED", "COMPLETE");
+    const walletRef = `wallet_entry_${uniqueSuffix()}`;
+    await prisma.escrowTransaction.updateMany({ where: { registrationId: registration.id, type: "ENTRY_FEE" }, data: { providerRef: walletRef } });
+    const providerCall = vi.spyOn(paystackClient, "refundCharge");
+
+    expect(
+      await issueEntryFeeRefund({ tournamentId: tournament.id, registrationId: registration.id, provider: "PAYSTACK", chargeRef: walletRef, amount: 100_000, notifyPlayer: true })
+    ).toBe("COMPLETE");
+
+    expect(providerCall).not.toHaveBeenCalled();
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: player.id } })).walletBalance).toBe(100_000);
+    expect(await prisma.walletTransaction.count({ where: { userId: player.id, type: "ENTRY_FEE_REFUND", status: "COMPLETE" } })).toBe(1);
+    expect((await prisma.escrowTransaction.findUniqueOrThrow({ where: { providerRef: refundRef(walletRef) } })).status).toBe("COMPLETE");
+    const note = await prisma.notification.findFirstOrThrow({ where: { userId: player.id, type: "ENTRY_FEE_REFUND" } });
+    expect((note.payload as { stage: string }).stage).toBe("WALLET");
+  });
+
+  it("after a refund, picks the newer payment of a player who joined again — not the refunded one", async () => {
+    const { tournament, registration, reference } = await paidEntry("CONFIRMED", "COMPLETE");
+    await issueEntryFeeRefund({ tournamentId: tournament.id, registrationId: registration.id, provider: "PAYSTACK", chargeRef: `wallet_entry_${reference}`, amount: 1 }).catch(() => undefined);
+    const oldRef = `wallet_entry_${uniqueSuffix()}`;
+    const newRef = `wallet_entry_${uniqueSuffix()}`;
+    const at = (ms: number) => new Date(Date.now() + ms);
+    const rows = await Promise.all([
+      prisma.escrowTransaction.create({ data: { tournamentId: tournament.id, registrationId: registration.id, type: "ENTRY_FEE", provider: "PAYSTACK", providerRef: oldRef, amount: 100_000, status: "COMPLETE", createdAt: at(-2000) } }),
+      prisma.escrowTransaction.create({ data: { tournamentId: tournament.id, registrationId: registration.id, type: "REFUND", provider: "PAYSTACK", providerRef: refundRef(oldRef), amount: 100_000, status: "COMPLETE", createdAt: at(-1000) } }),
+      prisma.escrowTransaction.create({ data: { tournamentId: tournament.id, registrationId: registration.id, type: "ENTRY_FEE", provider: "PAYSTACK", providerRef: newRef, amount: 100_000, status: "COMPLETE", createdAt: at(0) } }),
+    ]);
+    expect(currentPaidEntryFee(rows)?.providerRef).toBe(newRef);
+    expect(currentPaidEntryFee(rows.slice(0, 2))).toBeUndefined();
+  });
+
+  it("voids the platform fee and the organizer's share of a refunded entry", async () => {
+    const { tournament, registration } = await paidEntry("CONFIRMED", "COMPLETE");
+    await prisma.escrowTransaction.createMany({
+      data: [
+        { tournamentId: tournament.id, registrationId: registration.id, type: "PLATFORM_FEE", amount: 5_000, status: "COMPLETE" },
+        { tournamentId: tournament.id, registrationId: registration.id, type: "ORGANIZER_REVENUE", amount: 95_000, status: "PENDING" },
+      ],
+    });
+    await voidEntryFeeRevenue(registration.id);
+    const rows = await prisma.escrowTransaction.findMany({ where: { registrationId: registration.id } });
+    expect(rows.find((r) => r.type === "PLATFORM_FEE")?.status).toBe("FAILED");
+    expect(rows.find((r) => r.type === "ORGANIZER_REVENUE")?.status).toBe("FAILED");
+    expect(rows.find((r) => r.type === "ENTRY_FEE")?.status).toBe("COMPLETE");
   });
 
   it("leaves no REFUND row behind when the provider call throws", async () => {

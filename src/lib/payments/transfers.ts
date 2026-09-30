@@ -42,6 +42,9 @@ export type TransferOutcome = Exclude<TransferStatus, "PENDING">;
  */
 export const refundRef = (chargeRef: string) => `refund_${chargeRef}`;
 
+/** A charge reference for an entry fee paid from the wallet (see the registrations route). */
+const WALLET_ENTRY_PREFIX = "wallet_entry_";
+
 /** Records a transfer's final outcome, by our own reference. Safe to call repeatedly. */
 export async function applyTransferOutcome(reference: string, outcome: TransferOutcome): Promise<"APPLIED" | "NO_CHANGE" | "UNKNOWN"> {
   const withdrawal = await prisma.walletTransaction.findUnique({ where: { providerRef: reference } });
@@ -112,13 +115,79 @@ export async function applyTransferOutcome(reference: string, outcome: TransferO
  * throws, nothing went out and the row is removed so a retry can record a
  * fresh one. Returns the recorded status.
  */
+/**
+ * The entry fee a registration currently holds: paid, and not yet refunded.
+ * A player who withdraws and joins again keeps one registration that carries
+ * every payment they've made, so "the paid ENTRY_FEE row" alone may be an old,
+ * already-refunded one.
+ */
+export function currentPaidEntryFee<T extends { type: string; status: string; providerRef: string | null; createdAt: Date }>(txns: T[]): T | undefined {
+  const refunded = new Set(txns.filter((t) => t.type === "REFUND").map((t) => t.providerRef));
+  return txns
+    .filter((t) => t.type === "ENTRY_FEE" && t.status === "COMPLETE" && t.providerRef && !refunded.has(refundRef(t.providerRef)))
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+}
+
+/**
+ * Takes back the platform fee and the organizer's share carved out of an
+ * entry fee that has just been refunded. Left alone, the organizer would still
+ * be paid their share when the tournament settles, and the fee would still
+ * count as earned.
+ */
+export async function voidEntryFeeRevenue(registrationId: string): Promise<void> {
+  await prisma.escrowTransaction.updateMany({ where: { registrationId, type: "PLATFORM_FEE", status: "COMPLETE" }, data: { status: "FAILED" } });
+  await prisma.escrowTransaction.updateMany({ where: { registrationId, type: "ORGANIZER_REVENUE", status: "PENDING" }, data: { status: "FAILED" } });
+}
+
 export async function issueEntryFeeRefund(input: {
   tournamentId: string;
   registrationId: string;
   provider: PaymentProviderName;
   chargeRef: string;
   amount: number;
+  /** Tell the player about it. Off by default: cancellations and late-payment refunds send their own message. */
+  notifyPlayer?: boolean;
 }): Promise<"COMPLETE" | "PENDING"> {
+  const registration = await prisma.registration.findUnique({
+    where: { id: input.registrationId },
+    select: { userId: true, tournament: { select: { id: true, name: true } } },
+  });
+  const message = { tournamentId: input.tournamentId, tournamentName: registration?.tournament.name, amount: input.amount };
+
+  // Paid from the wallet: Paystack never saw this payment, so there's
+  // nothing to refund there. The money goes back into the wallet.
+  if (input.chargeRef.startsWith(WALLET_ENTRY_PREFIX)) {
+    if (!registration) throw new Error(`No registration ${input.registrationId} to refund into a wallet`);
+    await prisma.$transaction(async (tx) => {
+      await tx.escrowTransaction.create({
+        data: {
+          tournamentId: input.tournamentId,
+          registrationId: input.registrationId,
+          type: "REFUND",
+          amount: input.amount,
+          provider: input.provider,
+          providerRef: refundRef(input.chargeRef),
+          status: "COMPLETE",
+        },
+      });
+      await tx.user.update({ where: { id: registration.userId }, data: { walletBalance: { increment: input.amount } } });
+      await tx.walletTransaction.create({
+        data: {
+          userId: registration.userId,
+          type: "ENTRY_FEE_REFUND",
+          amount: input.amount,
+          provider: input.provider,
+          providerRef: refundRef(input.chargeRef),
+          status: "COMPLETE",
+        },
+      });
+    });
+    if (input.notifyPlayer && registration) {
+      await notify(registration.userId, "ENTRY_FEE_REFUND", { ...message, stage: "WALLET" }).catch(() => undefined);
+    }
+    return "COMPLETE";
+  }
+
   const row = await prisma.escrowTransaction.create({
     data: {
       tournamentId: input.tournamentId,
@@ -139,14 +208,19 @@ export async function issueEntryFeeRefund(input: {
   }
   if (result.status === "SUCCESS") {
     await prisma.escrowTransaction.updateMany({ where: { id: row.id, status: "PENDING" }, data: { status: "COMPLETE" } });
-    return "COMPLETE";
   }
-  return "PENDING";
+  if (input.notifyPlayer && registration) {
+    await notify(registration.userId, "ENTRY_FEE_REFUND", { ...message, stage: result.status === "SUCCESS" ? "DONE" : "STARTED" }).catch(() => undefined);
+  }
+  return result.status === "SUCCESS" ? "COMPLETE" : "PENDING";
 }
 
 /** Records a refund's outcome from the provider, by the original charge's reference. */
 export async function applyRefundOutcome(chargeRef: string, outcome: "SUCCESS" | "FAILED"): Promise<"APPLIED" | "NO_CHANGE" | "UNKNOWN"> {
-  const row = await prisma.escrowTransaction.findUnique({ where: { providerRef: refundRef(chargeRef) } });
+  const row = await prisma.escrowTransaction.findUnique({
+    where: { providerRef: refundRef(chargeRef) },
+    include: { registration: { select: { userId: true, tournament: { select: { id: true, name: true } } } } },
+  });
   if (!row || row.type !== "REFUND") return "UNKNOWN";
   const flipped = await prisma.escrowTransaction.updateMany({
     where: { id: row.id, status: "PENDING" },
@@ -161,6 +235,14 @@ export async function applyRefundOutcome(chargeRef: string, outcome: "SUCCESS" |
       registrationId: row.registrationId,
       amount: row.amount,
     });
+  }
+  if (flipped.count && row.registration) {
+    await notify(row.registration.userId, "ENTRY_FEE_REFUND", {
+      tournamentId: row.registration.tournament.id,
+      tournamentName: row.registration.tournament.name,
+      amount: row.amount,
+      stage: outcome === "SUCCESS" ? "DONE" : "FAILED",
+    }).catch(() => undefined);
   }
   return flipped.count ? "APPLIED" : "NO_CHANGE";
 }

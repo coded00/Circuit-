@@ -5,7 +5,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
-import { issueEntryFeeRefund } from "@/lib/payments/transfers";
+import { currentPaidEntryFee, issueEntryFeeRefund, voidEntryFeeRevenue } from "@/lib/payments/transfers";
 
 export async function POST(
   request: Request,
@@ -51,9 +51,7 @@ export async function POST(
   // completes afterwards, confirmEntryFeePayment sees a WITHDRAWN
   // registration with a paid fee and refunds it (from the webhook, or the
   // sweep's reconcilePendingMoney() if the webhook never comes).
-  const paidEntryFeeTxn = registration.escrowTxns.find(
-    (txn) => txn.type === "ENTRY_FEE" && txn.status === "COMPLETE"
-  );
+  const paidEntryFeeTxn = currentPaidEntryFee(registration.escrowTxns);
 
   if (registration.status === "CONFIRMED" && paidEntryFeeTxn) {
     // Claim atomically BEFORE calling the payment provider — refundCharge
@@ -78,7 +76,9 @@ export async function POST(
         provider: paidEntryFeeTxn.provider!, // always set for an ENTRY_FEE row
         chargeRef: paidEntryFeeTxn.providerRef!,
         amount: paidEntryFeeTxn.amount,
+        notifyPlayer: true,
       });
+      await voidEntryFeeRevenue(registration.id);
     } catch (err) {
       // The refund call itself threw (network/provider error) — nothing
       // confirmed to have left custody. Revert the claim so the player

@@ -185,6 +185,19 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
         message: `Your ${money(p, "amount")} entry-fee payment for ${str(p, "tournamentName") || "a tournament"} came through after you'd left, so it's been refunded.`,
         href: "/wallet",
       };
+    case "ENTRY_FEE_REFUND": {
+      const what = `${money(p, "amount")} entry fee for ${str(p, "tournamentName") || "a tournament"}`;
+      const stage = str(p, "stage");
+      const message =
+        stage === "WALLET"
+          ? `Your ${what} has been refunded to your Circuit wallet.`
+          : stage === "DONE"
+            ? `Your ${what} refund has been completed. Your bank may take a few days to show it.`
+            : stage === "FAILED"
+              ? `Your ${what} refund didn't go through. Circuit has been alerted and will sort it out — you don't need to do anything.`
+              : `Your ${what} is being refunded to the card or account you paid with. It can take a few days to show up.`;
+      return { message, href: stage === "WALLET" ? "/wallet" : `/tournaments/${str(p, "tournamentId")}` };
+    }
     case "ORGANIZER_REVENUE_SETTLED":
       return { message: "Your tournament revenue was credited to your wallet.", href: "/wallet" };
     case "QUICK_MATCH_CHALLENGE":

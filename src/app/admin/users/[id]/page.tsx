@@ -22,6 +22,7 @@ const WALLET_TYPE: Record<string, { label: string; credit: boolean }> = {
   FUND: { label: "Deposit", credit: true },
   WITHDRAWAL: { label: "Withdrawal", credit: false },
   ENTRY_FEE_DEBIT: { label: "Entry fee", credit: false },
+  ENTRY_FEE_REFUND: { label: "Entry fee refund", credit: true },
   STAKE_DEBIT: { label: "Challenge stake", credit: false },
   STAKE_CREDIT: { label: "Challenge winnings", credit: true },
   ORGANIZER_REVENUE_CREDIT: { label: "Organizer revenue", credit: true },

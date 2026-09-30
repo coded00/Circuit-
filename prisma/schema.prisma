@@ -294,6 +294,10 @@ enum AdminRole {
 }
 
 enum WalletTransactionType {
+  /// An entry fee that was paid from the wallet, refunded back into it when
+  /// the player withdrew or the tournament was cancelled — internal only,
+  /// the mirror of ENTRY_FEE_DEBIT. (Card-paid entries refund to the card.)
+  ENTRY_FEE_REFUND
   /// Real money in, via Paystack/Flutterwave checkout.
   FUND
   /// Real money out, via Paystack/Flutterwave transfer to payoutMethodRef.

@@ -66,7 +66,8 @@ export type NotificationType =
   | "SWISS_BYE"
   | "WITHDRAWAL_RETURNED"
   | "PRIZE_PAYOUT_FAILED"
-  | "PAYMENT_REFUNDED";
+  | "PAYMENT_REFUNDED"
+  | "ENTRY_FEE_REFUND";
 
 export interface NotificationChannel {
   send(userId: string, type: NotificationType, payload: Record<string, unknown>): Promise<void>;

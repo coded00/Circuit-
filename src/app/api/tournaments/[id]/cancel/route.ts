@@ -12,7 +12,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
-import { issueEntryFeeRefund } from "@/lib/payments/transfers";
+import { currentPaidEntryFee, issueEntryFeeRefund } from "@/lib/payments/transfers";
 import { notify } from "@/lib/notifications";
 import { logAdminAction } from "@/lib/auditLog";
 import { captureException } from "@/lib/observability";
@@ -108,9 +108,7 @@ export async function POST(
   let refundedCount = 0;
 
   for (const registration of confirmedRegistrations) {
-    const paidEntryFeeTxn = registration.escrowTxns.find(
-      (txn) => txn.type === "ENTRY_FEE" && txn.status === "COMPLETE"
-    );
+    const paidEntryFeeTxn = currentPaidEntryFee(registration.escrowTxns);
     if (!paidEntryFeeTxn) continue; // free registration — nothing to refund
 
     // V1 audit follow-up: refunding the ENTRY_FEE alone left that
@@ -136,6 +134,7 @@ export async function POST(
         provider: paidEntryFeeTxn.provider!, // always set for an ENTRY_FEE row
         chargeRef: paidEntryFeeTxn.providerRef!,
         amount: paidEntryFeeTxn.amount,
+        notifyPlayer: true,
       });
 
       await prisma.$transaction([
