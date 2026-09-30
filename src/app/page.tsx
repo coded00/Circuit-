@@ -24,7 +24,7 @@ import { GamerNews } from "@/components/GamerNews";
 import { CommunitiesCard } from "@/components/CommunitiesCard";
 import { getJoinedCommunities } from "@/lib/community";
 import { publishedGames } from "@/lib/gameCatalogQueries";
-import { globalStandings } from "@/lib/standings";
+import { challengeRecords, globalStandings } from "@/lib/standings";
 import { getFriendIds } from "@/lib/friends";
 import { getActiveAnnouncement } from "@/lib/announcements";
 import { openDueTournaments } from "@/lib/tournaments";
@@ -138,7 +138,7 @@ export default async function Home({
       orderBy: { createdAt: "desc" },
       take: 6,
       include: {
-        creator: { select: { displayName: true, avatarUrl: true } },
+        creator: { select: { displayName: true, handle: true, avatarUrl: true } },
       },
     }),
     globalStandings(),
@@ -163,6 +163,7 @@ export default async function Home({
     : leaderboard;
   const topLeaderboard = scopedLeaderboard.slice(0, 5);
   const openChallengesPreview = openBattles.slice(0, 4);
+  const challengeRecordsByKey = await challengeRecords(openChallengesPreview.map((b) => b.game));
 
   return (
     <div className="flex w-full flex-1 flex-col gap-8 px-4 py-6 sm:px-8 sm:py-10">
@@ -184,7 +185,7 @@ export default async function Home({
 
           <ExploreTheCircuit games={gameCounts} />
 
-          <OpenChallenges battles={openChallengesPreview} viewerId={user?.id} />
+          <OpenChallenges battles={openChallengesPreview} records={challengeRecordsByKey} viewerId={user?.id} />
 
           <UpcomingCompetitions tournaments={upcomingTournaments} />
         </div>

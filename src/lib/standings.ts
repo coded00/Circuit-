@@ -6,6 +6,7 @@
  */
 
 import { prisma } from "@/lib/db";
+import { recordKey } from "@/lib/challengeView";
 
 export type Standing = {
   userId: string;
@@ -92,4 +93,16 @@ export async function playerRankInGame(game: string, userId: string): Promise<nu
   const standings = await gameStandings(game);
   const index = standings.findIndex((s) => s.userId === userId);
   return index === -1 ? null : index + 1;
+}
+
+/**
+ * Each player's win-loss record in each of these games (one query per game),
+ * keyed by recordKey(game, userId). A player with no finished matches in a
+ * game has no entry.
+ */
+export async function challengeRecords(games: readonly string[]): Promise<Map<string, { wins: number; losses: number }>> {
+  const records = new Map<string, { wins: number; losses: number }>();
+  const tables = await Promise.all([...new Set(games)].map(async (game) => [game, await gameStandings(game)] as const));
+  for (const [game, standings] of tables) for (const s of standings) records.set(recordKey(game, s.userId), { wins: s.wins, losses: s.losses });
+  return records;
 }

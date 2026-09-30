@@ -1,35 +1,38 @@
 /**
  * Circuit — homepage "Open challenges": the newest few open Battles as the
- * same lobby rows as the /battles board (ChallengeRow), in one panel.
+ * same opponent cards as the /battles board (ChallengeCard).
  */
 
-import { Panel, PanelRows } from "@/components/ui/Panel";
-import { ChallengeRow, type ChallengeRowData } from "@/components/ChallengeRow";
 import Link from "next/link";
+import { ChallengeCard, type ChallengeCardData } from "@/components/ChallengeCard";
+import { recordKey } from "@/lib/challengeView";
 
 export function OpenChallenges({
   battles,
+  records,
   viewerId,
 }: {
-  battles: (ChallengeRowData & { creatorId: string })[];
+  battles: (ChallengeCardData & { creatorId: string })[];
+  /** Win-loss records keyed by recordKey(game, userId). */
+  records: Map<string, { wins: number; losses: number }>;
   viewerId?: string | null;
 }) {
   if (battles.length === 0) return null;
   return (
-    <Panel
-      title="Open challenges"
-      meta={battles.length}
-      action={
+    <section className="flex flex-col gap-4">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="font-display text-xl font-bold tracking-tight">
+          Open challenges <span className="font-mono text-xs font-normal text-muted tabular-nums">{battles.length}</span>
+        </h2>
         <Link href="/battles" className="text-xs font-medium text-accent-blue hover:underline">
           View all
         </Link>
-      }
-    >
-      <PanelRows>
+      </div>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {battles.map((b) => (
-          <ChallengeRow key={b.id} battle={b} mine={viewerId === b.creatorId} />
+          <ChallengeCard key={b.id} battle={b} record={records.get(recordKey(b.game, b.creatorId)) ?? null} mine={viewerId === b.creatorId} />
         ))}
-      </PanelRows>
-    </Panel>
+      </div>
+    </section>
   );
 }

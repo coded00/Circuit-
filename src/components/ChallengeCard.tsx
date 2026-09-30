@@ -1,116 +1,94 @@
 /**
- * Circuit — shared "open Challenge" card, used by both the homepage's Open
- * Challenges carousel and the full `/battles` board. One component so both
- * surfaces render the exact same head-to-head visual system: host on the
- * left, a real "VS", an empty dashed slot on the right standing in for
- * whoever accepts. There's no separate "matched" variant of this card —
- * both callers query `status: "OPEN"` only, so a Battle that's already
- * been accepted never reaches either list; the Challenge detail page is
- * the only place a real, filled-in matchup ever renders.
+ * Circuit — one open Challenge as an opponent card. Shared by the /battles
+ * board and the homepage's Open challenges.
  *
- * Stake shown when the Battle is real staked money (`Battle.stakeAmount`
- * > 0, escrowed at creation — see the creation route's own comment);
- * otherwise the footer says "Free entry" plainly, same as before staking
- * existed.
+ * It leads with who you would be playing, because that is what decides
+ * whether to accept: their name and their win-loss record in this game. The
+ * stake sits opposite (with the pot the winner takes), then the game, format
+ * and age, and an Accept button. Every listed challenge is open (accepted
+ * ones never reach a list), so there is no status badge. The whole card is
+ * the link; the button is only a button in looks.
  */
 
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
-import { GameArtTile } from "@/components/GameArtTile";
-import { StatusPill } from "@/components/StatusPill";
+import { ArrowRight, Users } from "lucide-react";
+import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
+import { potOf, timeAgo, winRate } from "@/lib/challengeView";
 
-function formatLabel(format: string): string {
-  return format === "BEST_OF_3" ? "Best of 3" : "Single match";
-}
+export type ChallengeCardData = {
+  id: string;
+  game: string;
+  format: string;
+  visibility: string;
+  stakeAmount: number;
+  createdAt: Date;
+  creator: { displayName: string; handle: string; avatarUrl: string | null };
+};
 
 function formatNaira(kobo: number): string {
-  return `₦${(kobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 0 })}`;
+  return `₦${(kobo / 100).toLocaleString("en-NG", { maximumFractionDigits: 0 })}`;
 }
 
-export function ChallengeCard({
-  battle,
-}: {
-  battle: {
-    id: string;
-    game: string;
-    format: string;
-    visibility: string;
-    stakeAmount: number;
-    creator: { displayName: string; avatarUrl: string | null };
-  };
-}) {
+export function ChallengeCard({ battle: b, record, mine = false }: { battle: ChallengeCardData; record: { wins: number; losses: number } | null; mine?: boolean }) {
+  const rate = record ? winRate(record.wins, record.losses) : null;
+  const staked = b.stakeAmount > 0;
   return (
     <Link
-      href={`/battles/${battle.id}`}
-      data-surface="dark"
-      className="group relative flex h-full w-full flex-col gap-4 overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface p-5 transition duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:border-border-hover hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] active:duration-[var(--duration-instant)]"
+      href={`/battles/${b.id}`}
+      className="group flex flex-col gap-4 rounded-[14px] border border-border bg-surface p-4 transition duration-[var(--duration-fast)] hover:border-border-strong hover:shadow-[0_6px_20px_-12px_rgba(17,19,24,0.35)] focus-visible:ring-2 focus-visible:ring-accent-volt focus-visible:outline-none"
     >
-      {/* The real per-game art (or the deterministic gradient fallback for
-          an unrecognized game) shown at real strength, not crushed to near-
-          invisibility — a translucent scrim (same color-mix idiom the hero
-          banners use) keeps every text element legible on top instead. */}
-      <div className="absolute inset-0 transition-transform duration-[var(--duration-base)] ease-[var(--ease-standard)] group-hover:scale-[1.05]">
-        <GameArtTile game={battle.game} fill hideLabel imgWidth={480} />
-      </div>
-      <div aria-hidden className="absolute inset-0" style={{ backgroundColor: "color-mix(in srgb, var(--surface) 55%, transparent)" }} />
-
-      <div className="relative z-10 flex items-center justify-between gap-2">
-        <span className="truncate text-xs font-bold tracking-wide text-muted uppercase">{battle.game}</span>
-        <StatusPill tone="live" pulse>
-          Open
-        </StatusPill>
-      </div>
-
-      <div className="relative z-10 flex items-center justify-center gap-2">
-        <div className="flex flex-1 flex-col items-center gap-2">
-          <span className="text-[10px] font-semibold tracking-wide text-accent-volt uppercase">Host</span>
-          {battle.creator.avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs
-            <img
-              src={battle.creator.avatarUrl}
-              alt=""
-              width={48}
-              height={48}
-              className="h-12 w-12 rounded-full border-2 border-accent-volt/50 object-cover"
-            />
-          ) : (
-            <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-accent-volt/50 bg-surface-elevated text-sm font-semibold text-muted">
-              {battle.creator.displayName.slice(0, 1).toUpperCase()}
-            </div>
+      <div className="flex items-start gap-3">
+        <PlayerAvatar person={b.creator} size="md" className="!h-[52px] !w-[52px] !text-lg" />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="truncate text-base font-semibold" title={b.creator.displayName}>
+              {b.creator.displayName}
+            </span>
+            {mine && <span className="badge shrink-0 bg-accent-volt-soft text-foreground">Yours</span>}
+          </span>
+          <span className="truncate font-mono text-xs text-muted">@{b.creator.handle}</span>
+          <span className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+            {rate !== null && record ? (
+              <>
+                <span className="font-display text-base font-bold tabular-nums">
+                  <span className="text-success">{record.wins}W</span> <span className="text-muted">{record.losses}L</span>
+                </span>
+                <span className="text-muted">
+                  {rate}% in {b.game}
+                </span>
+              </>
+            ) : (
+              <span className="rounded-full bg-accent-volt-soft px-2 py-0.5 font-semibold text-foreground">New to {b.game}</span>
+            )}
+          </span>
+        </div>
+        <div className="flex shrink-0 flex-col items-end">
+          <span className={`font-display text-2xl leading-none font-bold tabular-nums ${staked ? "text-gold" : "text-success"}`}>{staked ? formatNaira(b.stakeAmount) : "Free"}</span>
+          {staked && (
+            <span className="mt-1 text-[11px] text-muted" title="Both players stake the same amount. The winner takes the whole pot.">
+              pot {formatNaira(potOf(b.stakeAmount))}
+            </span>
           )}
-          <span className="w-full truncate text-center text-xs font-medium text-foreground">
-            {battle.creator.displayName}
-          </span>
-        </div>
-
-        <span className="font-display shrink-0 pb-4 text-sm font-bold text-muted">VS</span>
-
-        <div className="flex flex-1 flex-col items-center gap-2">
-          <span className="text-[10px] font-semibold tracking-wide text-accent-orange uppercase">Open slot</span>
-          <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-dashed border-border-strong text-base font-bold text-muted">
-            ?
-          </div>
-          <span className="w-full truncate text-center text-xs text-muted">
-            {battle.visibility === "FRIENDS" ? "Friends only" : "Anyone"}
-          </span>
         </div>
       </div>
 
-      {/* flex-wrap: a large stake amount ("₦500,000,000 stake · Best of 3")
-          has no natural break point on this ~240px card — wrap to a
-          second line rather than overflow it. */}
-      <div className="relative z-10 flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-[11px] text-muted">
-        <span className={battle.stakeAmount > 0 ? "font-semibold text-gold" : undefined}>
-          {battle.stakeAmount > 0 ? `${formatNaira(battle.stakeAmount)} stake` : "Free entry"}
+      <div className="flex items-center justify-between gap-3">
+        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+          <span className="font-semibold text-foreground">{b.game}</span>
+          <span>{b.format === "BEST_OF_3" ? "Best of 3" : "Single match"}</span>
+          {b.visibility === "FRIENDS" && (
+            <span className="flex items-center gap-1 whitespace-nowrap">
+              <Users size={11} aria-hidden />
+              Friends only
+            </span>
+          )}
+          <span>{timeAgo(b.createdAt)}</span>
         </span>
-        <span aria-hidden>·</span>
-        <span>{formatLabel(battle.format)}</span>
+        <span className={`${mine ? "btn-secondary" : "btn-primary"} min-h-[44px] shrink-0 px-4 text-sm`}>
+          {mine ? "View" : "Accept"}
+          <ArrowRight size={14} aria-hidden className="transition-transform group-hover:translate-x-0.5" />
+        </span>
       </div>
-
-      <span className="btn-primary relative z-10 mt-auto w-full text-sm">
-        Accept Challenge
-        <ArrowRight size={14} className="transition-transform duration-[var(--duration-base)] ease-[var(--ease-standard)] group-hover:translate-x-0.5" />
-      </span>
     </Link>
   );
 }
