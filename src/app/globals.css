@@ -1597,3 +1597,16 @@ html:not([data-nav-morph])::view-transition-new(.tournament-morph) {
 [data-admin] .font-code {
   font-family: var(--font-geist-mono);
 }
+
+/* Tournament tabs at the narrowest two-column laptop widths: six tabs need about 526px but the
+   column only has 416px at a 1024px window (the Registration panel takes the rest), so the last
+   tab used to be cut off. Slightly tighter tabs fit all six; above this band nothing changes. */
+@media (min-width: 1024px) and (max-width: 1139px) {
+  .section-tabs .tab {
+    padding-inline: 0.5rem;
+    font-size: 13px;
+  }
+  .section-tabs .tabs {
+    gap: 2px;
+  }
+}

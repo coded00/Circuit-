@@ -62,7 +62,7 @@ export function SectionTabs({
 
   return (
     <SelectTabContext.Provider value={select}>
-      <div ref={rootRef} className="flex min-w-0 flex-col gap-6">
+      <div ref={rootRef} className="section-tabs flex min-w-0 flex-col gap-6">
         <div className="sticky top-[60px] z-20 -mx-4 bg-background/90 px-4 backdrop-blur-md sm:-mx-8 sm:px-8">
           <div role="tablist" aria-label={label} className="tabs scrollbar-hide overflow-x-auto">
             {tabs.map((t) => (

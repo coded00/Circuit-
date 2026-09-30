@@ -633,7 +633,7 @@ export default async function TournamentPage({ params }: { params: Promise<{ id:
         />
       </header>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_300px] min-[1140px]:lg:grid-cols-[minmax(0,1fr)_340px]">
         <SectionTabs tabs={tabs} label="Tournament sections" idPrefix="tournament" />
 
         <aside className="order-first flex h-fit flex-col gap-4 lg:sticky lg:top-[76px] lg:order-none">
