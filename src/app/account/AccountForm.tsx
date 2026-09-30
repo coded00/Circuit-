@@ -10,6 +10,7 @@ type Bank = {
   slug: string;
 };
 
+const BANK_VALUE_SEPARATOR = "::";
 const MAX_FAVORITE_GAMES = 6;
 const MAX_BIO_LENGTH = 160;
 const MAX_REGION_LENGTH = 60;
@@ -68,7 +69,15 @@ export default function AccountForm({
         if (res.ok) {
           const data = await res.json();
           if (active && Array.isArray(data.banks)) {
-            setBanks(data.banks);
+            const seen = new Set<string>();
+            setBanks(
+              (data.banks as Bank[]).filter((b) => {
+                const key = `${b.code}${BANK_VALUE_SEPARATOR}${b.name}`;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+              })
+            );
           }
         }
       } catch (err) {
@@ -93,7 +102,7 @@ export default function AccountForm({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          bankCode: selectedBank,
+          bankCode: selectedBank.split(BANK_VALUE_SEPARATOR)[0],
           accountNumber,
         }),
       });
@@ -322,7 +331,8 @@ export default function AccountForm({
                 >
                   <option value="">{loadingBanks ? "Loading banks…" : "— Choose Bank —"}</option>
                   {banks.map((b) => (
-                    <option key={b.code} value={b.code}>
+                    // Paystack lists some different banks under one code, so the code alone isn't a unique key.
+                    <option key={`${b.code}${BANK_VALUE_SEPARATOR}${b.name}`} value={`${b.code}${BANK_VALUE_SEPARATOR}${b.name}`}>
                       {b.name}
                     </option>
                   ))}
