@@ -5,10 +5,13 @@
  */
 
 import Link from "next/link";
-import { redirect, notFound } from "next/navigation";
+import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { loginPath } from "@/lib/safeRedirect";
 import { getCurrentUser } from "@/lib/session";
 import { prisma } from "@/lib/db";
+import { buildMetadata, SITE_URL } from "@/lib/seo";
+import { ShareButton } from "@/components/ShareButton";
 import { teamRoleFor } from "@/lib/teams";
 import { communityHref } from "@/lib/community";
 import { CommunityAvatar } from "@/components/community/CommunityAvatar";
@@ -19,12 +22,25 @@ import { TeamActionButton } from "@/components/teams/TeamActionButton";
 import { TeamInviteBanner } from "@/components/teams/TeamInviteBanner";
 import { TeamMembershipButton } from "@/components/teams/TeamMembershipButton";
 
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const team = await prisma.team.findUnique({
+    where: { id },
+    select: { name: true, tag: true, game: true, captain: { select: { handle: true } }, _count: { select: { members: { where: { accepted: true } } } } },
+  });
+  if (!team) return buildMetadata({ title: "Team not found", description: "This team doesn't exist on Circuit.", path: `/teams/${id}`, noindex: true });
+  const members = team._count.members;
+  return buildMetadata({
+    title: `${team.name}${team.tag ? ` [${team.tag}]` : ""} — Circuit team`,
+    description: `${team.name}${team.game ? `, a ${team.game} team` : ""} on Circuit. ${members} player${members === 1 ? "" : "s"}, captained by @${team.captain.handle}. See the roster and join the Circuit.`,
+    path: `/teams/${id}`,
+  });
+}
+
 export default async function TeamDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  // Public: a shared team link has to open for people who aren't signed in.
   const user = await getCurrentUser();
-  if (!user) {
-    redirect(loginPath(`/teams/${id}`));
-  }
 
   const team = await prisma.team.findUnique({
     where: { id },
@@ -42,12 +58,13 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ id:
   });
   if (!team) notFound();
 
-  const role = await teamRoleFor(id, user.id);
+  const role: Awaited<ReturnType<typeof teamRoleFor>> = user ? await teamRoleFor(id, user.id) : { role: "none" };
   const isCaptain = role.role === "captain";
   const isInvited = role.role === "invited";
 
   const acceptedMembers = team.members.filter((m) => m.accepted && m.userId !== team.captainId);
-  const pendingMembers = team.members.filter((m) => !m.accepted);
+  // Invites and join requests are private: the captain sees them all, an invited or requesting player sees their own.
+  const pendingMembers = team.members.filter((m) => !m.accepted && (isCaptain || m.userId === user?.id));
   // `team.members` already includes the captain's own membership row
   // (created alongside the team), so its length alone is the real total.
   const totalMembers = team.members.length;
@@ -82,15 +99,23 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ id:
             {team.region && <span>{team.region}</span>}
           </p>
         </div>
-        {role.role === "none" && <TeamMembershipButton teamId={id} viewerId={user.id} status={{ state: "none" }} />}
-        {role.role === "requested" && (
-          <TeamMembershipButton teamId={id} viewerId={user.id} status={{ state: "requested", membershipId: role.membershipId }} />
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <ShareButton title={`Check out ${team.name} on Circuit`} url={`${SITE_URL}/teams/${id}`} />
+          {!user && (
+            <Link href={loginPath(`/teams/${id}`)} className="btn-primary">
+              Sign in to join
+            </Link>
+          )}
+          {user && role.role === "none" && <TeamMembershipButton teamId={id} viewerId={user.id} status={{ state: "none" }} />}
+          {user && role.role === "requested" && (
+            <TeamMembershipButton teamId={id} viewerId={user.id} status={{ state: "requested", membershipId: role.membershipId }} />
+          )}
+        </div>
       </div>
 
       {communitiesSection}
 
-      {isInvited && <TeamInviteBanner teamId={id} viewerId={user.id} />}
+      {isInvited && user && <TeamInviteBanner teamId={id} viewerId={user.id} />}
 
       <div className="flex flex-col gap-2">
         <h2 className="text-section-heading">Roster</h2>
@@ -107,7 +132,7 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ id:
               isCaptain={false}
               isPending
               isJoinRequest={m.requestedByMember}
-              canRemove={isCaptain || m.userId === user.id}
+              canRemove={isCaptain || m.userId === user?.id}
               canAccept={isCaptain && m.requestedByMember}
             />
           ))}
@@ -129,8 +154,8 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ id:
       )}
 
       <div className="flex justify-end">
-        {isCaptain && <TeamActionButton teamId={id} userId={user.id} kind="disband" />}
-        {role.role === "member" && <TeamActionButton teamId={id} userId={user.id} kind="leave" />}
+        {isCaptain && user && <TeamActionButton teamId={id} userId={user.id} kind="disband" />}
+        {role.role === "member" && user && <TeamActionButton teamId={id} userId={user.id} kind="leave" />}
       </div>
     </div>
   );
