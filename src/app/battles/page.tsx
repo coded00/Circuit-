@@ -9,11 +9,11 @@
  * everyone but its target (delivered via notification, BTL-3), not a
  * variant of this board.
  *
- * Laid out as a lobby list, not a card grid: every row is the same kind
- * of thing (someone waiting for an opponent), so a scannable list — game,
- * host, format, stake, age — beats a wall of art cards. Game filter chips
- * come from the games actually on the board right now. Rows are the
- * shared ChallengeRow (also used by the homepage's Open Challenges).
+ * Each challenge is a fight card (the shared ChallengeCard, also used by the
+ * homepage's Open challenges): the challenger, the purse and an open slot for
+ * whoever accepts. The biggest purse gets a wider card so the board has a
+ * centre of gravity instead of a wall of identical tiles. Game filter chips
+ * come from the games actually on the board right now.
  */
 
 import Link from "next/link";
@@ -22,8 +22,9 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { getFriendIds } from "@/lib/friends";
 import Poller from "@/app/Poller";
-import { Panel, PanelEmpty, PanelRows } from "@/components/ui/Panel";
-import { ChallengeRow } from "@/components/ChallengeRow";
+import { Panel, PanelEmpty } from "@/components/ui/Panel";
+import { ChallengeCard } from "@/components/ChallengeCard";
+import { pickBiggestPurse } from "@/lib/challengeView";
 
 export default async function BattleBoardPage({ searchParams }: { searchParams: Promise<{ game?: string }> }) {
   const { game } = await searchParams;
@@ -45,6 +46,8 @@ export default async function BattleBoardPage({ searchParams }: { searchParams: 
   const activeGame = game ? (gameCounts.find(([g]) => g.toLowerCase() === game.toLowerCase())?.[0] ?? game) : null;
   const battles = activeGame ? allOpen.filter((b) => b.game.toLowerCase() === activeGame.toLowerCase()) : allOpen;
   const staked = allOpen.filter((b) => b.stakeAmount > 0).length;
+  const biggest = pickBiggestPurse(battles);
+  const rest = battles.filter((b) => b.id !== biggest?.id);
 
   const chipClass = (active: boolean) =>
     `flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
@@ -99,8 +102,8 @@ export default async function BattleBoardPage({ searchParams }: { searchParams: 
         </nav>
       )}
 
-      <Panel title={activeGame ?? "Open now"} meta={battles.length || undefined}>
-        {battles.length === 0 ? (
+      {battles.length === 0 ? (
+        <Panel title={activeGame ?? "Open now"}>
           <PanelEmpty>
             {activeGame ? (
               <>
@@ -113,14 +116,16 @@ export default async function BattleBoardPage({ searchParams }: { searchParams: 
               "No open challenges right now."
             )}
           </PanelEmpty>
-        ) : (
-          <PanelRows>
-            {battles.map((b) => (
-              <ChallengeRow key={b.id} battle={b} mine={user?.id === b.creator.id} />
-            ))}
-          </PanelRows>
-        )}
-      </Panel>
+        </Panel>
+      ) : (
+        <section aria-label={activeGame ?? "Open challenges"} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {biggest && <ChallengeCard battle={biggest} mine={user?.id === biggest.creator.id} featured />}
+          {rest.map((b, i) => (
+            // A card left alone on the last row spans it, so the grid never ends on an empty cell.
+            <ChallengeCard key={b.id} battle={b} mine={user?.id === b.creator.id} wide={rest.length % 2 === 1 && i === rest.length - 1} />
+          ))}
+        </section>
+      )}
 
       <p className="text-center text-xs text-muted">
         Want a game right now?{" "}
