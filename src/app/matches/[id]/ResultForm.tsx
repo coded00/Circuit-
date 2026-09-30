@@ -8,6 +8,7 @@
  * since that's what binds a screenshot to this specific match.
  */
 
+import { InfoTip } from "@/components/InfoTip";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, ImageUp } from "lucide-react";
@@ -144,7 +145,8 @@ export default function ResultForm({
           <span className="flex min-w-0 flex-col">
             <span className="truncate text-sm font-medium">{fileName ?? "Upload a screenshot or clip"}</span>
             <span className="text-xs text-muted">
-              Must show the final score and code <span className="font-mono font-semibold text-foreground">{matchCode}</span>
+              Must show the final score and code <span className="font-mono font-semibold text-foreground">{matchCode}</span>{" "}
+              <InfoTip align="end" text="The match code links your proof to this exact match. A screenshot without it can be rejected if the other player disputes the result." />
             </span>
           </span>
         </label>

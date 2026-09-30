@@ -13,6 +13,7 @@
  *   Evidence, Activity.
  */
 
+import { InfoTip } from "@/components/InfoTip";
 import Link from "next/link";
 import { ArrowLeft, Check, Flag, Share2, Timer, Trophy, Wallet } from "lucide-react";
 import { GameArtTile } from "@/components/GameArtTile";
@@ -195,7 +196,10 @@ function HeadToHead({ data }: { data: MatchViewData }) {
 
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-border px-5 py-4 sm:px-7">
         <div className="flex flex-col gap-0.5">
-          <span className="text-eyebrow text-muted">Match code</span>
+          <span className="text-eyebrow flex items-center gap-1.5 text-muted">
+            Match code
+            <InfoTip text="A code made just for this match. Put it in your custom room name or chat, then make sure it shows in your result screenshot. It proves the screenshot is from this game and not an old one." />
+          </span>
           <CopyCode code={data.code} label="Copy match code" />
         </div>
         <div className="flex flex-col items-end gap-0.5 text-right">
