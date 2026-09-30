@@ -116,6 +116,7 @@ Drive real pages. Create data through API helpers, not through the UI, and only 
 **Cross-cutting rules for every E2E test:**
 - **Fail on any browser console error or failed network request** (would have caught the dropdown key bug).
 - Run at a desktop and a phone viewport (most players are on Android Chrome). Nightly also runs Firefox and WebKit.
+- **Layout audit on every key page at 375, 768, 1024 and 1440 pixels wide:** scroll the page and assert that no visible element is covered by another, nothing runs past the screen edge, and no text spills out of its box. (A version of this scan found the cut-off tabs on the tournament page; the script is easy to turn into a reusable Playwright helper.)
 - Use saved login state so tests do not repeat the login form.
 - Page objects for the 10 most used screens; no selectors copied between tests.
 - Traces, screenshots and video kept on failure only.

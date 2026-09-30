@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // The dev-only "Compiling..." pill and round N button sat on top of the sidebar and
+  // the mobile tab bar while clicking around. Errors still show in the error overlay.
+  devIndicators: false,
   // `output: "standalone"` was removed here — it was a leftover from a
   // past Netlify-targeted config (this app deploys to Vercel per
   // docs/pre-launch-checklist.md, whose own build pipeline already does

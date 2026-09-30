@@ -15,6 +15,7 @@
  * invented (no Platform/Mode/Map block: Circuit has no such fields).
  */
 
+import { spotsLabel } from "@/lib/competeView";
 import { cache, ViewTransition } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -626,17 +627,17 @@ export default async function TournamentPage({ params }: { params: Promise<{ id:
                   <span className="text-muted">/{tournament.participantCap}</span>
                 </>
               ),
-              sub: registrantCount >= tournament.participantCap ? "Full" : `${tournament.participantCap - registrantCount} spots left`,
+              sub: spotsLabel(registrantCount, tournament.participantCap).text,
             },
             { label: hasBracket ? "Started" : "Starts", value: formatShortDate(tournament.startAt), sub: formatTime(tournament.startAt) },
           ]}
         />
       </header>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
         <SectionTabs tabs={tabs} label="Tournament sections" idPrefix="tournament" />
 
-        <aside className="order-first flex h-fit flex-col gap-4 lg:sticky lg:top-[76px] lg:order-none">
+        <aside className="order-first flex h-fit flex-col gap-4 xl:sticky xl:top-[76px] xl:order-none">
           <Panel title="Registration">
             <PanelBody className="flex flex-col gap-4">
               <div className="flex items-end justify-between gap-3">
