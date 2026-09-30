@@ -23,6 +23,9 @@ export default async function RegisterPage({
   const isTeam = tournament.entryType === "TEAM";
   const bounds = rosterBounds(tournament);
   const teamOptions = isTeam ? await captainTeamOptions(user.id, tournament.id) : [];
+  const savedName = tournament.gameId
+    ? (await prisma.userGameName.findUnique({ where: { userId_gameId: { userId: user.id, gameId: tournament.gameId } }, select: { name: true } }))?.name ?? null
+    : null;
 
   return (
     <div className="mx-auto flex w-full max-w-lg flex-col gap-6 px-4 py-6 sm:px-8 sm:py-10">
@@ -46,6 +49,8 @@ export default async function RegisterPage({
           tournamentId={tournament.id}
           entryFee={tournament.entryFee}
           walletBalance={user.walletBalance}
+          username={user.handle}
+          savedName={savedName}
           team={isTeam ? { options: teamOptions, bounds, profileHref: `/players/${user.handle}?tab=teams` } : undefined}
         />
       </div>

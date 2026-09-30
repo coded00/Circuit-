@@ -185,6 +185,11 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
         message: `Your ${money(p, "amount")} entry-fee payment for ${str(p, "tournamentName") || "a tournament"} came through after you'd left, so it's been refunded.`,
         href: "/wallet",
       };
+    case "REGISTRATION_NAME_TAKEN":
+      return {
+        message: `Your entry for ${str(p, "tournamentName") || "a tournament"} couldn't be confirmed: another player took the in-game name "${str(p, "inGameName")}" while you were paying. Your payment is being refunded — register again with a different name.`,
+        href: `/tournaments/${str(p, "tournamentId")}`,
+      };
     case "ENTRY_FEE_REFUND": {
       const what = `${money(p, "amount")} entry fee for ${str(p, "tournamentName") || "a tournament"}`;
       const stage = str(p, "stage");

@@ -30,6 +30,7 @@ import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
 import { computePlatformFee } from "@/lib/platformFee";
 import { trackEvent } from "@/lib/analytics";
 import { claimSlot, RegistrationFullError } from "@/lib/registrationCapacity";
+import { assertInGameNamesFree, InGameNameTakenError, rememberInGameName, requestedInGameNames } from "@/lib/inGameNames";
 import { notifyRoster, saveRoster, TeamEntryError, validateTeamEntry, type ValidRoster } from "@/lib/teamEntries";
 
 class InsufficientWalletBalanceError extends Error {}
@@ -113,11 +114,23 @@ export async function POST(
   }
   const teamData = roster ? { teamId: roster.teamId, teamName: roster.teamName } : {};
 
+  // In-game names are unique per tournament. This early check gives a clear
+  // error; the locked one inside each transaction below is the real guard.
+  const requestedNames = requestedInGameNames(inGameId, user.id, roster);
+  try {
+    await assertInGameNamesFree(prisma, tournamentId, user.id, requestedNames);
+  } catch (err) {
+    if (err instanceof InGameNameTakenError) return NextResponse.json({ error: err.message }, { status: 409 });
+    throw err;
+  }
+  const rememberName = body?.saveInGameName === true;
+
   if (tournament.entryFee === 0) {
     let registration;
     try {
       registration = await prisma.$transaction(async (tx) => {
         await claimSlot(tx, tournamentId, tournament.participantCap);
+        await assertInGameNamesFree(tx, tournamentId, user.id, requestedNames);
         return existing
           ? tx.registration.update({
               where: { id: existing.id },
@@ -129,8 +142,10 @@ export async function POST(
       });
     } catch (err) {
       if (err instanceof RegistrationFullError) return NextResponse.json({ error: "Registration is full." }, { status: 409 });
+      if (err instanceof InGameNameTakenError) return NextResponse.json({ error: err.message }, { status: 409 });
       throw err;
     }
+    if (rememberName) await rememberInGameName(user.id, tournament.gameId, inGameId);
     if (roster) {
       await saveRoster(registration.id, roster.members);
       await notifyRoster(registration.id);
@@ -173,6 +188,7 @@ export async function POST(
     try {
       const registration = await prisma.$transaction(async (tx) => {
         await claimSlot(tx, tournamentId, tournament.participantCap);
+        await assertInGameNamesFree(tx, tournamentId, user.id, requestedNames);
         // Atomic guard: a single conditional UPDATE, not a read-then-write —
         // two concurrent registration attempts can't both pass this check
         // and overdraw the balance.
@@ -240,6 +256,7 @@ export async function POST(
         return reg;
       });
 
+      if (rememberName) await rememberInGameName(user.id, tournament.gameId, inGameId);
       if (roster) {
         await saveRoster(registration.id, roster.members);
         await notifyRoster(registration.id);
@@ -252,6 +269,7 @@ export async function POST(
         return NextResponse.json({ error: "Insufficient wallet balance." }, { status: 402 });
       }
       if (err instanceof RegistrationFullError) return NextResponse.json({ error: "Registration is full." }, { status: 409 });
+      if (err instanceof InGameNameTakenError) return NextResponse.json({ error: err.message }, { status: 409 });
       throw err;
     }
   }
@@ -264,6 +282,7 @@ export async function POST(
     : await prisma.registration.create({
         data: { tournamentId, userId: user.id, inGameId, status: "PENDING_PAYMENT", ...teamData },
       });
+  if (rememberName) await rememberInGameName(user.id, tournament.gameId, inGameId);
   // Held while the captain pays; roster players are told once it's confirmed.
   if (roster) await saveRoster(registration.id, roster.members);
 

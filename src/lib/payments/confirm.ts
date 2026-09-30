@@ -28,6 +28,7 @@ import { notifyRoster } from "@/lib/teamEntries";
 import { captureException } from "@/lib/observability";
 import { issueEntryFeeRefund } from "@/lib/payments/transfers";
 import { lockTournament } from "@/lib/registrationCapacity";
+import { assertInGameNamesFree, InGameNameTakenError } from "@/lib/inGameNames";
 
 export async function confirmEntryFeePayment(reference: string): Promise<void> {
   const escrowTxn = await prisma.escrowTransaction.findUnique({
@@ -114,6 +115,21 @@ export async function confirmEntryFeePayment(reference: string): Promise<void> {
       return "OVER_CAPACITY" as const;
     }
 
+    // The name was free when checkout started; someone else may have taken it
+    // while this payment was processing. Only confirmed entries count here.
+    const rosterNames = await tx.rosterMember.findMany({
+      where: { registrationId: registration.id, userId: { not: registration.userId } },
+      select: { inGameId: true },
+    });
+    try {
+      await assertInGameNamesFree(tx, registration.tournamentId, registration.userId, [registration.inGameId, ...rosterNames.map((r) => r.inGameId)], { confirmedOnly: true });
+    } catch (err) {
+      if (!(err instanceof InGameNameTakenError)) throw err;
+      await tx.registration.update({ where: { id: registration.id }, data: { status: "REFUNDED" } });
+      await tx.escrowTransaction.update({ where: { id: escrowTxn.id }, data: { status: "FAILED" } });
+      return "NAME_TAKEN" as const;
+    }
+
     await tx.escrowTransaction.update({
       where: { id: escrowTxn.id },
       data: { status: "COMPLETE" },
@@ -158,6 +174,26 @@ export async function confirmEntryFeePayment(reference: string): Promise<void> {
     // A concurrent call already confirmed (or refunded) this exact
     // registration — its own success/refund path already ran once.
     // Nothing left for this call to do.
+    return;
+  }
+
+  if (confirmed === "NAME_TAKEN") {
+    try {
+      await issueEntryFeeRefund({
+        tournamentId: registration.tournamentId,
+        registrationId: registration.id,
+        provider: escrowTxn.provider!,
+        chargeRef: reference,
+        amount: result.amount,
+      });
+    } catch (refundErr) {
+      captureException(refundErr, { source: "confirmEntryFeePayment", reason: "name-taken refund", reference });
+    }
+    await notify(registration.userId, "REGISTRATION_NAME_TAKEN", {
+      tournamentId: registration.tournamentId,
+      tournamentName: registration.tournament.name,
+      inGameName: registration.inGameId,
+    });
     return;
   }
 

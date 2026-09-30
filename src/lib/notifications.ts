@@ -67,7 +67,8 @@ export type NotificationType =
   | "WITHDRAWAL_RETURNED"
   | "PRIZE_PAYOUT_FAILED"
   | "PAYMENT_REFUNDED"
-  | "ENTRY_FEE_REFUND";
+  | "ENTRY_FEE_REFUND"
+  | "REGISTRATION_NAME_TAKEN";
 
 export interface NotificationChannel {
   send(userId: string, type: NotificationType, payload: Record<string, unknown>): Promise<void>;

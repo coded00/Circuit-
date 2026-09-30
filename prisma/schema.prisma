@@ -252,6 +252,7 @@ model User {
   appeals                 Appeal[]
   eventRsvps              EventRsvp[]
   rosterMemberships       RosterMember[]           @relation("RosterMemberships")
+  gameNames               UserGameName[]
   lobbyFlags              LobbyFlag[]              @relation("LobbyFlagsRaised")
   walletTransactions      WalletTransaction[]
   auditLogEntries         AuditLogEntry[]
@@ -470,6 +471,7 @@ model Game {
   modes       GameMode[]
   communities Community[]
   tournaments Tournament[]
+  playerNames UserGameName[]
 
   @@index([enabled])
 }
@@ -1957,4 +1959,18 @@ model MessageReaction {
 
   @@unique([messageId, userId, emoji])
   @@index([messageId])
+}
+
+/// The in-game name a player last typed when registering for a game, so the
+/// registration form can pre-fill it next time. One per player per game.
+model UserGameName {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gameId    String
+  game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  name      String
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, gameId])
 }
