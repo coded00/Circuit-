@@ -35,7 +35,10 @@ describe("recordKey", () => {
 describe("avatarHue", () => {
   it("is stable per handle, in range, and varies between handles", () => {
     expect(avatarHue("amaka_k")).toBe(avatarHue("amaka_k"));
-    for (const h of ["a", "tunde_b", "ckay_nnamdi", ""]) expect(avatarHue(h)).toBeGreaterThanOrEqual(0), expect(avatarHue(h)).toBeLessThan(360);
+    for (const h of ["a", "tunde_b", "ckay_nnamdi", ""]) {
+      expect(avatarHue(h)).toBeGreaterThanOrEqual(0);
+      expect(avatarHue(h)).toBeLessThan(360);
+    }
     expect(new Set(["amaka_k", "tunde_b", "zee", "ckay_nnamdi", "paytest_org"].map(avatarHue)).size).toBeGreaterThan(3);
   });
 });
