@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { avatarHue, isFresh, potOf, recordKey, timeAgo, winRate } from "./challengeView";
+import { avatarHue, challengerTier, isFresh, potOf, recordKey, timeAgo, winRate } from "./challengeView";
 
 describe("timeAgo", () => {
   const now = Date.UTC(2026, 9, 1, 12, 0, 0);
@@ -48,5 +48,20 @@ describe("isFresh", () => {
   it("is true for the first ten minutes only", () => {
     expect(isFresh(new Date(now - 9 * 60_000), now)).toBe(true);
     expect(isFresh(new Date(now - 11 * 60_000), now)).toBe(false);
+  });
+});
+
+describe("challengerTier", () => {
+  it("only calls someone hard to beat with the matches to back it up", () => {
+    expect(challengerTier(41, 9)).toEqual({ label: "Hard to beat", tone: "strong" });
+    expect(challengerTier(7, 3)).toEqual({ label: "Hard to beat", tone: "strong" });
+    expect(challengerTier(6, 1).label).toBe("Solid record"); // 86% but only 7 matches
+  });
+  it("is gentle with small samples and with losing records", () => {
+    expect(challengerTier(0, 0)).toEqual({ label: "No record yet", tone: "other" });
+    expect(challengerTier(3, 0).label).toBe("Just getting started");
+    expect(challengerTier(5, 5).label).toBe("Still climbing");
+    expect(challengerTier(11, 9).label).toBe("Solid record"); // 55%
+    expect(challengerTier(10, 9).label).toBe("Still climbing"); // 53%
   });
 });

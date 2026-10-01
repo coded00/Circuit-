@@ -11,9 +11,9 @@
  */
 
 import Link from "next/link";
-import { ArrowRight, Users } from "lucide-react";
+import { ArrowRight, Swords, Users } from "lucide-react";
 import { GameArtTile } from "@/components/GameArtTile";
-import { avatarHue, isFresh, potOf, timeAgo, winRate } from "@/lib/challengeView";
+import { avatarHue, challengerTier, isFresh, potOf, timeAgo, winRate } from "@/lib/challengeView";
 
 export type ChallengeCardData = {
   id: string;
@@ -50,6 +50,7 @@ function ChallengerAvatar({ person }: { person: ChallengeCardData["creator"] }) 
 
 export function ChallengeCard({ battle: b, record, mine = false }: { battle: ChallengeCardData; record: { wins: number; losses: number } | null; mine?: boolean }) {
   const rate = record ? winRate(record.wins, record.losses) : null;
+  const tier = record ? challengerTier(record.wins, record.losses) : challengerTier(0, 0);
   const staked = b.stakeAmount > 0;
   const fresh = isFresh(b.createdAt);
   // The card adapts to the room it's given (a container query, not the screen): stacked when narrow,
@@ -62,26 +63,30 @@ export function ChallengeCard({ battle: b, record, mine = false }: { battle: Cha
       >
         <ChallengerAvatar person={b.creator} />
 
-        <div className="flex min-w-0 flex-col">
+        <div className="flex min-w-0 flex-col gap-1">
           <span className="flex min-w-0 items-center gap-2">
-            <span className="truncate font-display text-xl leading-tight font-bold tracking-tight uppercase" title={b.creator.displayName}>
+            <span className="truncate font-display text-xl leading-tight font-bold tracking-tight uppercase" title={`${b.creator.displayName} (@${b.creator.handle})`}>
               {b.creator.displayName}
             </span>
             {mine && <span className="badge shrink-0 bg-accent-volt-soft text-foreground">Yours</span>}
           </span>
-          <span className="truncate font-mono text-xs text-muted">@{b.creator.handle}</span>
-          <span className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-            {rate !== null && record ? (
-              <>
-                <span className="font-display text-base font-bold tabular-nums">
-                  <span className="text-success">{record.wins}W</span> <span className="text-muted">{record.losses}L</span>
-                </span>
-                <span className="text-muted">
-                  {rate}% in {b.game}
-                </span>
-              </>
-            ) : (
-              <span className="rounded-full bg-accent-volt-soft px-2 py-0.5 font-semibold text-foreground">New to {b.game}</span>
+          <span className="hidden truncate font-mono text-xs text-muted @min-[360px]:block">@{b.creator.handle}</span>
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs" title={record ? `${record.wins} wins and ${record.losses} losses in ${b.game} challenges` : `No finished ${b.game} challenges yet`}>
+            <span
+              className={`font-semibold ${
+                tier.tone === "strong"
+                  ? "rounded-full bg-accent-volt px-2 py-0.5 text-accent-volt-foreground"
+                  : tier.tone === "solid"
+                    ? "rounded-full bg-surface-elevated px-2 py-0.5 text-foreground"
+                    : "py-0.5 text-muted"
+              }`}
+            >
+              {tier.label}
+            </span>
+            {record && rate !== null && (
+              <span className="text-muted tabular-nums">
+                {rate}% won, {record.wins}W {record.losses}L
+              </span>
             )}
           </span>
         </div>
@@ -95,41 +100,39 @@ export function ChallengeCard({ battle: b, record, mine = false }: { battle: Cha
               Free
             </span>
           )}
-          <span className="text-[11px] text-muted @min-[360px]:mt-1" title={staked ? "Both players stake the same amount. The winner takes the whole pot." : undefined}>
-            {staked ? (
-              <>
-                <span className="@min-[360px]:hidden">pot {formatNaira(potOf(b.stakeAmount))}</span>
-                <span className="hidden @min-[360px]:inline">winner takes {formatNaira(potOf(b.stakeAmount))}</span>
-              </>
-            ) : (
-              "just for bragging rights"
-            )}
+          <span className="text-[11px] text-muted @min-[360px]:mt-1" title={staked ? "Both players put in the same stake. The winner takes the whole pot." : undefined}>
+            {staked ? `to win ${formatNaira(potOf(b.stakeAmount))}` : "nothing at stake"}
           </span>
         </div>
 
         <div className="col-span-2 flex flex-col gap-3 @min-[360px]:col-span-3 @min-[360px]:flex-row @min-[360px]:items-center @min-[360px]:justify-between">
-          <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
-            <span className="flex items-center gap-1.5 font-semibold text-foreground">
-              <GameArtTile game={b.game} className="h-5 w-5 shrink-0 rounded-[5px]" hideLabel imgWidth={64} />
-              {b.game}
-            </span>
-            <span>{b.format === "BEST_OF_3" ? "Best of 3" : "Single match"}</span>
-            {b.visibility === "FRIENDS" && (
-              <span className="flex items-center gap-1 whitespace-nowrap">
-                <Users size={11} aria-hidden />
-                Friends only
+          <span className="flex min-w-0 flex-col gap-2 text-xs text-muted">
+            <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+              <span className="flex items-center gap-1.5 pr-1 font-semibold text-foreground">
+                <GameArtTile game={b.game} className="h-5 w-5 shrink-0 rounded-[5px]" hideLabel imgWidth={64} />
+                {b.game}
               </span>
-            )}
+              <span className="flex items-center gap-1 rounded-full border border-border px-2 py-0.5 whitespace-nowrap text-foreground">
+                <Swords size={11} aria-hidden />
+                {b.format === "BEST_OF_3" ? "Best of 3" : "Single match"}
+              </span>
+              {b.visibility === "FRIENDS" && (
+                <span className="flex items-center gap-1 rounded-full border border-border px-2 py-0.5 whitespace-nowrap text-foreground">
+                  <Users size={11} aria-hidden />
+                  Friends only
+                </span>
+              )}
+            </span>
             {fresh ? (
               <span className="flex items-center gap-1.5 font-semibold text-foreground">
                 <span className="relative flex h-2 w-2" aria-hidden>
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-60 motion-reduce:animate-none" />
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
                 </span>
-                {timeAgo(b.createdAt)}
+                Posted {timeAgo(b.createdAt)}
               </span>
             ) : (
-              <span>{timeAgo(b.createdAt)}</span>
+              <span>Posted {timeAgo(b.createdAt)}</span>
             )}
           </span>
           <span className={`${mine ? "btn-secondary" : "btn-primary"} min-h-[44px] w-full shrink-0 px-4 text-sm @min-[360px]:w-auto`}>

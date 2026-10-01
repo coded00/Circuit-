@@ -36,3 +36,20 @@ export function avatarHue(handle: string): number {
 
 /** Posted within the last ten minutes: worth a small "live" cue on the card. */
 export const isFresh = (date: Date, now = Date.now()): boolean => now - date.getTime() < 10 * 60_000;
+
+export type ChallengerTier = { label: string; tone: "strong" | "solid" | "other" };
+
+/**
+ * A plain-words read of a challenger's record in the game, so nobody has to
+ * do the sums: "Hard to beat" is earned (70% or better over at least ten
+ * matches); fewer than five matches is "Just getting started", not a verdict.
+ */
+export function challengerTier(wins: number, losses: number): ChallengerTier {
+  const played = wins + losses;
+  const rate = winRate(wins, losses);
+  if (rate === null) return { label: "No record yet", tone: "other" };
+  if (played < 5) return { label: "Just getting started", tone: "other" };
+  if (rate >= 70 && played >= 10) return { label: "Hard to beat", tone: "strong" };
+  if (rate >= 55) return { label: "Solid record", tone: "solid" };
+  return { label: "Still climbing", tone: "other" };
+}
