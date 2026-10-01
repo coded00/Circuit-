@@ -26,3 +26,13 @@ export function winRate(wins: number, losses: number): number | null {
 
 /** Key for a player's record in one game. */
 export const recordKey = (game: string, userId: string): string => `${game}|${userId}`;
+
+/** A stable 0-359 hue for a handle, so a player's placeholder avatar is always the same colour. */
+export function avatarHue(handle: string): number {
+  let hash = 0;
+  for (let i = 0; i < handle.length; i++) hash = (hash * 31 + handle.charCodeAt(i)) >>> 0;
+  return hash % 360;
+}
+
+/** Posted within the last ten minutes: worth a small "live" cue on the card. */
+export const isFresh = (date: Date, now = Date.now()): boolean => now - date.getTime() < 10 * 60_000;

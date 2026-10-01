@@ -12,8 +12,8 @@
 
 import Link from "next/link";
 import { ArrowRight, Users } from "lucide-react";
-import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
-import { potOf, timeAgo, winRate } from "@/lib/challengeView";
+import { GameArtTile } from "@/components/GameArtTile";
+import { avatarHue, isFresh, potOf, timeAgo, winRate } from "@/lib/challengeView";
 
 export type ChallengeCardData = {
   id: string;
@@ -29,22 +29,42 @@ function formatNaira(kobo: number): string {
   return `₦${(kobo / 100).toLocaleString("en-NG", { maximumFractionDigits: 0 })}`;
 }
 
+/** Their own picture if they have one; otherwise a disc in a colour that is theirs alone, so a board of
+ *  players without photos still reads as different people instead of a column of grey circles. */
+function ChallengerAvatar({ person }: { person: ChallengeCardData["creator"] }) {
+  if (person.avatarUrl) {
+    // eslint-disable-next-line @next/next/no-img-element -- uploaded or external avatar URL
+    return <img src={person.avatarUrl} alt="" className="h-[52px] w-[52px] shrink-0 rounded-full object-cover ring-2 ring-surface" />;
+  }
+  const hue = avatarHue(person.handle);
+  return (
+    <span
+      aria-hidden
+      className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full font-display text-2xl font-bold text-white ring-2 ring-surface"
+      style={{ backgroundImage: `linear-gradient(145deg, hsl(${hue} 62% 46%), hsl(${(hue + 28) % 360} 66% 30%))` }}
+    >
+      {person.displayName.slice(0, 1).toUpperCase()}
+    </span>
+  );
+}
+
 export function ChallengeCard({ battle: b, record, mine = false }: { battle: ChallengeCardData; record: { wins: number; losses: number } | null; mine?: boolean }) {
   const rate = record ? winRate(record.wins, record.losses) : null;
   const staked = b.stakeAmount > 0;
+  const fresh = isFresh(b.createdAt);
   // The card adapts to the room it's given (a container query, not the screen): stacked when narrow,
   // which is what lets three sit side by side on the homepage, and laid out across when wide.
   return (
     <div className="@container">
       <Link
         href={`/battles/${b.id}`}
-        className="group grid h-full grid-cols-[auto_1fr] gap-x-3 gap-y-4 rounded-[14px] border border-border bg-surface p-4 transition duration-[var(--duration-fast)] hover:border-border-strong hover:shadow-[0_6px_20px_-12px_rgba(17,19,24,0.35)] focus-visible:ring-2 focus-visible:ring-accent-volt focus-visible:outline-none @min-[360px]:grid-cols-[auto_1fr_auto]"
+        className="group grid h-full grid-cols-[auto_1fr] gap-x-3 gap-y-4 rounded-[14px] border border-border bg-surface p-4 transition duration-[var(--duration-fast)] hover:-translate-y-px hover:border-foreground/25 hover:shadow-[0_10px_24px_-14px_rgba(17,19,24,0.45)] active:translate-y-0 focus-visible:ring-2 focus-visible:ring-accent-volt focus-visible:outline-none @min-[360px]:grid-cols-[auto_1fr_auto]"
       >
-        <PlayerAvatar person={b.creator} size="md" className="!h-[52px] !w-[52px] !text-lg" />
+        <ChallengerAvatar person={b.creator} />
 
         <div className="flex min-w-0 flex-col">
           <span className="flex min-w-0 items-center gap-2">
-            <span className="truncate text-base font-semibold" title={b.creator.displayName}>
+            <span className="truncate font-display text-xl leading-tight font-bold tracking-tight uppercase" title={b.creator.displayName}>
               {b.creator.displayName}
             </span>
             {mine && <span className="badge shrink-0 bg-accent-volt-soft text-foreground">Yours</span>}
@@ -66,20 +86,33 @@ export function ChallengeCard({ battle: b, record, mine = false }: { battle: Cha
           </span>
         </div>
 
-        <div className="col-span-2 flex items-baseline justify-between gap-3 border-t border-border pt-3 @min-[360px]:col-span-1 @min-[360px]:flex-col @min-[360px]:items-end @min-[360px]:justify-start @min-[360px]:border-t-0 @min-[360px]:pt-0">
-          <span className={`font-display text-2xl leading-none font-bold tabular-nums ${staked ? "text-gold" : "text-success"}`}>{staked ? formatNaira(b.stakeAmount) : "Free"}</span>
+        <div className="col-span-2 flex items-center justify-between gap-3 border-t border-border pt-3 @min-[360px]:col-span-1 @min-[360px]:flex-col @min-[360px]:items-end @min-[360px]:justify-start @min-[360px]:border-t-0 @min-[360px]:pt-0">
           {staked ? (
-            <span className="text-[11px] text-muted @min-[360px]:mt-1" title="Both players stake the same amount. The winner takes the whole pot.">
-              pot {formatNaira(potOf(b.stakeAmount))}
-            </span>
+            <span className="rounded-[10px] bg-foreground px-3 py-1.5 font-display text-2xl leading-none font-bold tracking-tight text-gold tabular-nums">{formatNaira(b.stakeAmount)}</span>
           ) : (
-            <span className="text-[11px] text-muted @min-[360px]:hidden">no stake</span>
+            <span className="flex items-center gap-1.5 rounded-[10px] bg-accent-volt-soft px-3 py-1.5 font-display text-2xl leading-none font-bold tracking-tight text-foreground">
+              <span aria-hidden className="h-2 w-2 rounded-full bg-accent-volt-foreground/80" />
+              Free
+            </span>
           )}
+          <span className="text-[11px] text-muted @min-[360px]:mt-1" title={staked ? "Both players stake the same amount. The winner takes the whole pot." : undefined}>
+            {staked ? (
+              <>
+                <span className="@min-[360px]:hidden">pot {formatNaira(potOf(b.stakeAmount))}</span>
+                <span className="hidden @min-[360px]:inline">winner takes {formatNaira(potOf(b.stakeAmount))}</span>
+              </>
+            ) : (
+              "just for bragging rights"
+            )}
+          </span>
         </div>
 
         <div className="col-span-2 flex flex-col gap-3 @min-[360px]:col-span-3 @min-[360px]:flex-row @min-[360px]:items-center @min-[360px]:justify-between">
           <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
-            <span className="font-semibold text-foreground">{b.game}</span>
+            <span className="flex items-center gap-1.5 font-semibold text-foreground">
+              <GameArtTile game={b.game} className="h-5 w-5 shrink-0 rounded-[5px]" hideLabel imgWidth={64} />
+              {b.game}
+            </span>
             <span>{b.format === "BEST_OF_3" ? "Best of 3" : "Single match"}</span>
             {b.visibility === "FRIENDS" && (
               <span className="flex items-center gap-1 whitespace-nowrap">
@@ -87,7 +120,17 @@ export function ChallengeCard({ battle: b, record, mine = false }: { battle: Cha
                 Friends only
               </span>
             )}
-            <span>{timeAgo(b.createdAt)}</span>
+            {fresh ? (
+              <span className="flex items-center gap-1.5 font-semibold text-foreground">
+                <span className="relative flex h-2 w-2" aria-hidden>
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-60 motion-reduce:animate-none" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
+                </span>
+                {timeAgo(b.createdAt)}
+              </span>
+            ) : (
+              <span>{timeAgo(b.createdAt)}</span>
+            )}
           </span>
           <span className={`${mine ? "btn-secondary" : "btn-primary"} min-h-[44px] w-full shrink-0 px-4 text-sm @min-[360px]:w-auto`}>
             {mine ? "View" : "Accept"}

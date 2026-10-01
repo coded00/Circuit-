@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { potOf, recordKey, timeAgo, winRate } from "./challengeView";
+import { avatarHue, isFresh, potOf, recordKey, timeAgo, winRate } from "./challengeView";
 
 describe("timeAgo", () => {
   const now = Date.UTC(2026, 9, 1, 12, 0, 0);
@@ -30,4 +30,20 @@ describe("winRate", () => {
 
 describe("recordKey", () => {
   it("separates the same player across games", () => expect(recordKey("CODM", "u1")).not.toBe(recordKey("EA FC", "u1")));
+});
+
+describe("avatarHue", () => {
+  it("is stable per handle, in range, and varies between handles", () => {
+    expect(avatarHue("amaka_k")).toBe(avatarHue("amaka_k"));
+    for (const h of ["a", "tunde_b", "ckay_nnamdi", ""]) expect(avatarHue(h)).toBeGreaterThanOrEqual(0), expect(avatarHue(h)).toBeLessThan(360);
+    expect(new Set(["amaka_k", "tunde_b", "zee", "ckay_nnamdi", "paytest_org"].map(avatarHue)).size).toBeGreaterThan(3);
+  });
+});
+
+describe("isFresh", () => {
+  const now = Date.UTC(2026, 9, 1, 12, 0, 0);
+  it("is true for the first ten minutes only", () => {
+    expect(isFresh(new Date(now - 9 * 60_000), now)).toBe(true);
+    expect(isFresh(new Date(now - 11 * 60_000), now)).toBe(false);
+  });
 });
