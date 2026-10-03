@@ -121,7 +121,7 @@ function PlayerSide({
       : { label: "Not ready", className: "bg-surface-elevated text-muted" };
 
   return (
-    <div className={`flex min-w-0 flex-col items-center gap-3 text-center transition-opacity ${isLoser ? "opacity-60" : ""}`}>
+    <div className={`flex min-w-0 flex-col items-center gap-3 text-center transition-opacity ${side === "A" ? "vs-left" : "vs-right"} ${isLoser ? "opacity-60" : ""}`}>
       <div className="relative">
         <div
           className={`rounded-full p-[3px] ring-2 ${
@@ -193,7 +193,7 @@ function HeadToHead({ data }: { data: MatchViewData }) {
 
       <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-2 px-3 py-8 sm:gap-6 sm:px-7">
         <PlayerSide player={data.playerA} data={data} side="A" />
-        <div className="flex flex-col items-center gap-1 pt-6 sm:pt-8">
+        <div className="vs-mid flex flex-col items-center gap-1 pt-6 sm:pt-8">
           {data.finalScore ? (
             <>
               <span className="text-stat text-3xl leading-none sm:text-4xl">{data.finalScore}</span>

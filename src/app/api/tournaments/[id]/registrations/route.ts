@@ -33,6 +33,7 @@ import { notify } from "@/lib/notifications";
 import { claimSlot, RegistrationFullError } from "@/lib/registrationCapacity";
 import { assertInGameNamesFree, InGameNameTakenError, rememberInGameName, requestedInGameNames } from "@/lib/inGameNames";
 import { notifyRoster, saveRoster, TeamEntryError, validateTeamEntry, type ValidRoster } from "@/lib/teamEntries";
+import { emailVerificationRequired } from "@/lib/emailGate";
 
 class InsufficientWalletBalanceError extends Error {}
 
@@ -164,6 +165,8 @@ export async function POST(
 
   // ACC-3: paid registration is a cash-touching action — age-gated, unlike
   // free registration or plain browsing (TRU-5).
+  const unverified = emailVerificationRequired(user);
+  if (unverified) return unverified;
   try {
     assertAgeGate(user.dateOfBirth);
   } catch (err) {

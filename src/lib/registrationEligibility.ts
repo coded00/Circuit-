@@ -6,6 +6,7 @@
  */
 
 import { isOldEnough, MINIMUM_AGE_YEARS } from "@/lib/age-gate";
+import { needsEmailVerification } from "@/lib/emailGate";
 
 export type Blocker = { title: string; detail: string; fix?: { href: string; label: string } };
 
@@ -16,7 +17,7 @@ export function registrationBlockers({
   now = new Date(),
 }: {
   tournament: { status: string; entryFee: number; registrationOpenAt: Date; registrationCloseAt: Date; participantCap: number };
-  user: { isSuspended: boolean; suspensionReason: string | null; dateOfBirth: Date | null };
+  user: { isSuspended: boolean; suspensionReason: string | null; dateOfBirth: Date | null; emailVerifiedAt: Date | null };
   /** Confirmed entries so far. */
   registered: number;
   now?: Date;
@@ -35,6 +36,9 @@ export function registrationBlockers({
     blockers.push({ title: "This tournament is full", detail: "Every spot has been taken." });
   }
   if (tournament.entryFee > 0) {
+    if (needsEmailVerification(user)) {
+      blockers.push({ title: "Verify your email", detail: "Paid tournaments need a verified email, so we can reach you about your money.", fix: { href: "/account", label: "Verify in account settings" } });
+    }
     if (!user.dateOfBirth) {
       blockers.push({ title: "Add your date of birth", detail: "Paid tournaments need a date of birth on your account.", fix: { href: "/account", label: "Open account settings" } });
     } else if (!isOldEnough(user.dateOfBirth)) {

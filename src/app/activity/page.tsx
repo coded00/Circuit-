@@ -89,7 +89,7 @@ export default async function ActivityPage() {
           </Link>
         </div>
       ) : (
-        <ul className="card divide-y divide-border overflow-hidden p-0">
+        <ul data-stagger className="card divide-y divide-border overflow-hidden p-0">
           {items.map((item) => (
             <li key={item.id}>
               <Row item={item} />

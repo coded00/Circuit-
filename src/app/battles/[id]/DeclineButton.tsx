@@ -3,10 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useConfirmDialog } from "@/components/ConfirmDialogProvider";
+import { useToast } from "@/components/ToastProvider";
 
 /** The player a challenge was sent to says no. */
 export default function DeclineButton({ battleId }: { battleId: string }) {
   const router = useRouter();
+  const toast = useToast();
   const confirmDialog = useConfirmDialog();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,6 +31,7 @@ export default function DeclineButton({ battleId }: { battleId: string }) {
       setBusy(false);
       return;
     }
+    toast({ title: "Challenge declined", message: "We've let them know." });
     router.refresh();
   }
 

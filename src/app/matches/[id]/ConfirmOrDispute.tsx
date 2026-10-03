@@ -12,6 +12,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, ExternalLink, Flag } from "lucide-react";
 import { Spinner } from "@/components/Spinner";
+import { useToast } from "@/components/ToastProvider";
 import ResultForm from "./ResultForm";
 
 type PlayerOption = { id: string; displayName: string; handle: string; avatarUrl: string | null };
@@ -34,6 +35,7 @@ export default function ConfirmOrDispute({
   drawAllowed: boolean;
 }) {
   const router = useRouter();
+  const toast = useToast();
   const [mode, setMode] = useState<"choose" | "dispute">("choose");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +57,7 @@ export default function ConfirmOrDispute({
       setBusy(false);
       return;
     }
+    toast({ title: "Result confirmed", message: "The match is complete." });
     router.refresh();
   }
 

@@ -19,6 +19,7 @@ import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
 import { trackEvent } from "@/lib/analytics";
 import { captureException } from "@/lib/observability";
 import { InsufficientWalletBalanceError, recoverFailedAccept, resolveQuickMatchAcceptance } from "@/lib/quickMatch";
+import { emailVerificationRequired } from "@/lib/emailGate";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -52,6 +53,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   if (challenge.stakeAmount > 0) {
+    const unverified = emailVerificationRequired(user);
+    if (unverified) return unverified;
     try {
       assertAgeGate(user.dateOfBirth);
     } catch (err) {

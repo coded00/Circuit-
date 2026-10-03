@@ -20,6 +20,7 @@ import { formatNotification } from "@/lib/notification-format";
 
 export type NotificationType =
   | "REGISTRATION_CONFIRMED"
+  | "TOURNAMENT_UPDATE"
   | "MATCH_READY"
   | "MATCH_LIVE"
   | "RESULT_SUBMITTED"

@@ -19,6 +19,7 @@ import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
 import { trackEvent } from "@/lib/analytics";
 import { applyTransferOutcome } from "@/lib/payments/transfers";
 import { captureException, captureMessage } from "@/lib/observability";
+import { emailVerificationRequired } from "@/lib/emailGate";
 
 // A row still PENDING or already COMPLETE means this prize is spoken for;
 // a FAILED row (the transfer call itself errored, or the provider reported
@@ -87,6 +88,8 @@ export async function POST(
   }
 
   // ACC-3: payout claim is a cash-touching action.
+  const unverified = emailVerificationRequired(user);
+  if (unverified) return unverified;
   try {
     assertAgeGate(user.dateOfBirth);
   } catch (err) {

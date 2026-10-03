@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import { Check, ImageUp } from "lucide-react";
 import { Spinner } from "@/components/Spinner";
 import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
+import { useToast } from "@/components/ToastProvider";
 
 /** Mirrors the server limit, so a too-big clip fails here and not after a long upload. */
 const MAX_PROOF_BYTES = 10 * 1024 * 1024;
@@ -35,6 +36,7 @@ export default function ResultForm({
   drawAllowed?: boolean;
 }) {
   const router = useRouter();
+  const toast = useToast();
   const [winnerId, setWinnerId] = useState("");
   const [score, setScore] = useState("");
   const [kills, setKills] = useState("");
@@ -79,6 +81,9 @@ export default function ResultForm({
       return;
     }
 
+    if (data?.status === "AUTO_COMPLETED") toast({ title: "Result confirmed", message: "Both reports match, so the match is complete." });
+    else if (data?.status === "DISPUTED") toast({ title: "Reports don't match", message: "The match has gone to review.", tone: "info" });
+    else toast({ title: "Result submitted", message: "Waiting for your opponent to confirm or dispute it." });
     router.refresh();
   }
 

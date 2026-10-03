@@ -27,6 +27,7 @@ import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
 import { trackEvent } from "@/lib/analytics";
 import { applyTransferOutcome } from "@/lib/payments/transfers";
 import { captureException } from "@/lib/observability";
+import { emailVerificationRequired } from "@/lib/emailGate";
 
 const MIN_WITHDRAW_AMOUNT = 10000; // ₦100
 
@@ -53,6 +54,8 @@ export async function POST(request: Request) {
     );
   }
 
+  const unverified = emailVerificationRequired(user);
+  if (unverified) return unverified;
   try {
     assertAgeGate(user.dateOfBirth);
   } catch (err) {

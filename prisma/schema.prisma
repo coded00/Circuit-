@@ -238,6 +238,7 @@ model User {
   updatedAt         DateTime   @updatedAt
 
   organizerProfile        OrganizerProfile?
+  tournamentUpdates       TournamentUpdate[] @relation("TournamentUpdateAuthor")
   registrations           Registration[]
   matchesAsPlayerA        Match[]                  @relation("MatchPlayerA")
   matchesAsPlayerB        Match[]                  @relation("MatchPlayerB")
@@ -697,6 +698,7 @@ model Tournament {
   escrowTxns      EscrowTransaction[]
   videos          Video[]
   community       Community?
+  updates         TournamentUpdate[]
   /// Set when a community hosts this tournament: it shows as that
   /// community's event and is announced there. The organizer must be an
   /// owner or moderator of it.
@@ -1996,4 +1998,19 @@ model UserGameName {
   updatedAt DateTime @updatedAt
 
   @@unique([userId, gameId])
+}
+
+/// An organizer's announcement on their tournament's page ("room details
+/// are in the community", "start pushed back 30 minutes"). Registrants are
+/// notified when one is posted. Plain text, written by the organizer only.
+model TournamentUpdate {
+  id           String     @id @default(cuid())
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  authorId     String
+  author       User       @relation("TournamentUpdateAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  body         String
+  createdAt    DateTime   @default(now())
+
+  @@index([tournamentId, createdAt])
 }

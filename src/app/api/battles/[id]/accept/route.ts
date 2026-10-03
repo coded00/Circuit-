@@ -16,6 +16,7 @@ import { notify } from "@/lib/notifications";
 import { getFriendIds } from "@/lib/friends";
 import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
 import { battleExpiresAt } from "@/lib/battles";
+import { emailVerificationRequired } from "@/lib/emailGate";
 
 class InsufficientWalletBalanceError extends Error {}
 
@@ -60,6 +61,8 @@ export async function POST(
 
   if (battle.stakeAmount > 0) {
     // ACC-3: matching a stake is cash-touching, same age gate as opening one.
+    const unverified = emailVerificationRequired(user);
+    if (unverified) return unverified;
     try {
       assertAgeGate(user.dateOfBirth);
     } catch (err) {

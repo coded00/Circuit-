@@ -20,6 +20,7 @@ import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
 import { isRateLimited, recordAttempt } from "@/lib/rateLimit";
 import { captureException } from "@/lib/observability";
 import { parseExpiryHours } from "@/lib/battles";
+import { emailVerificationRequired } from "@/lib/emailGate";
 
 const VALID_FORMATS = ["SINGLE", "BEST_OF_3"];
 const VALID_VISIBILITIES = ["OPEN", "TARGETED", "FRIENDS"];
@@ -121,6 +122,8 @@ export async function POST(request: Request) {
   if (stakeAmount > 0) {
     // ACC-3: staking real money is cash-touching, same age gate as paid
     // tournament registration (TRU-5).
+    const unverified = emailVerificationRequired(user);
+    if (unverified) return unverified;
     try {
       assertAgeGate(user.dateOfBirth);
     } catch (err) {

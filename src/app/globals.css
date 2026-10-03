@@ -1146,6 +1146,13 @@ body {
     transition-duration: 0.01ms !important;
   }
 
+  /* A delayed entrance would otherwise sit hidden through its delay. */
+  *,
+  *::before,
+  *::after {
+    animation-delay: 0s !important;
+  }
+
   html {
     scroll-behavior: auto;
   }
@@ -1610,3 +1617,80 @@ html:not([data-nav-morph])::view-transition-new(.tournament-morph) {
     gap: 2px;
   }
 }
+
+
+/*
+ * ============================================================================
+ * Game feel — toast, the match "versus" entrance, staggered lists.
+ * Every one is plain CSS, so the prefers-reduced-motion block above (which
+ * also zeroes animation delays) turns them all off.
+ * ============================================================================
+ */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.toast-in {
+  animation: toast-in var(--duration-base) var(--ease-out) both;
+}
+
+@keyframes versus-from-left {
+  from {
+    opacity: 0;
+    transform: translateX(-32px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes versus-from-right {
+  from {
+    opacity: 0;
+    transform: translateX(32px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes versus-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.18);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.vs-left {
+  animation: versus-from-left var(--duration-reveal) var(--ease-reveal) both;
+}
+.vs-right {
+  animation: versus-from-right var(--duration-reveal) var(--ease-reveal) both;
+}
+.vs-mid {
+  animation: versus-pop var(--duration-celebration) var(--ease-spring) 180ms both;
+}
+
+/* A list whose first rows slide up one after another instead of all at once. */
+[data-stagger] > * {
+  animation: motion-slide-up var(--duration-base) var(--ease-out) both;
+}
+[data-stagger] > *:nth-child(2) { animation-delay: 40ms; }
+[data-stagger] > *:nth-child(3) { animation-delay: 80ms; }
+[data-stagger] > *:nth-child(4) { animation-delay: 120ms; }
+[data-stagger] > *:nth-child(5) { animation-delay: 160ms; }
+[data-stagger] > *:nth-child(6) { animation-delay: 200ms; }
+[data-stagger] > *:nth-child(n + 7) { animation-delay: 240ms; }

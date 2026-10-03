@@ -28,6 +28,11 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
   const p = asRecord(payload);
 
   switch (type as NotificationType) {
+    case "TOURNAMENT_UPDATE":
+      return {
+        message: `${str(p, "tournamentName") || "A tournament you're in"}: ${str(p, "snippet")}`,
+        href: `/tournaments/${str(p, "tournamentId")}?tab=updates`,
+      };
     case "REGISTRATION_CONFIRMED":
       return {
         message: str(p, "tournamentName") ? `You're in ${str(p, "tournamentName")}. Your registration is confirmed.` : "Your registration is confirmed.",

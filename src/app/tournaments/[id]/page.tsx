@@ -42,6 +42,8 @@ import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
 import { SectionTabs, type SectionTab } from "@/components/ui/SectionTabs";
 import CancelButton from "./CancelButton";
 import WithdrawButton from "./WithdrawButton";
+import UpdateForm from "./UpdateForm";
+import DeleteUpdateButton from "./DeleteUpdateButton";
 import ClaimPrizeButton from "./ClaimPrizeButton";
 import { buildMetadata, parseIdSegment, tournamentPath, gamePath, organiserPath, absoluteUrl, DEFAULT_DESCRIPTION } from "@/lib/seo";
 
@@ -102,7 +104,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   });
 }
 
-export default async function TournamentPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function TournamentPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
   const { id: rawId } = await params;
   const id = parseIdSegment(rawId);
   await openDueTournaments();
@@ -136,8 +138,10 @@ export default async function TournamentPage({ params }: { params: Promise<{ id:
       })
     : null;
 
+  const { tab: requestedTab } = await searchParams;
   const now = new Date();
   const isOrganizer = user !== null && tournament.organizerId === user.id;
+  const updates = await prisma.tournamentUpdate.findMany({ where: { tournamentId: tournament.id }, orderBy: { createdAt: "desc" }, take: 50, select: { id: true, body: true, createdAt: true } });
   // Same cancel guard as dashboard/tournaments/[id]/page.tsx and the
   // cancel route itself: no working-looking button that would just 409.
   const pastCancellationLock = !!(tournament.cancellationLockAt && now >= tournament.cancellationLockAt);
@@ -514,6 +518,35 @@ export default async function TournamentPage({ params }: { params: Promise<{ id:
         </Panel>
       ),
     },
+    {
+      key: "updates",
+      label: "Updates",
+      count: updates.length,
+      content: (
+        <Panel title="Updates" meta={updates.length || undefined}>
+          {isOrganizer && <UpdateForm tournamentId={tournament.id} entrants={registrantCount} />}
+          {updates.length === 0 ? (
+            <PanelEmpty>
+              {isOrganizer ? "Nothing posted yet. Updates you post are sent to everyone who's entered." : "The organiser hasn't posted any updates yet."}
+            </PanelEmpty>
+          ) : (
+            <ul className="divide-y divide-border border-t border-border">
+              {updates.map((u) => (
+                <li key={u.id} className="flex items-start gap-3 px-5 py-4">
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{u.body}</p>
+                    <time dateTime={u.createdAt.toISOString()} className="text-metadata" suppressHydrationWarning>
+                      {formatDate(u.createdAt)} · {formatTime(u.createdAt)}
+                    </time>
+                  </div>
+                  {(isOrganizer || user?.isStaff) && <DeleteUpdateButton tournamentId={tournament.id} updateId={u.id} />}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+      ),
+    },
     // Hidden for a non-organizer if the community was never enabled —
     // nothing to see there. The organizer still sees it, to reach Edit.
     ...(communityVisible
@@ -634,7 +667,7 @@ export default async function TournamentPage({ params }: { params: Promise<{ id:
       </header>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_300px] min-[1140px]:lg:grid-cols-[minmax(0,1fr)_340px]">
-        <SectionTabs tabs={tabs} label="Tournament sections" idPrefix="tournament" />
+        <SectionTabs tabs={tabs} initialTab={requestedTab} label="Tournament sections" idPrefix="tournament" />
 
         <aside className="order-first flex h-fit flex-col gap-4 lg:sticky lg:top-[76px] lg:order-none">
           <Panel title="Registration">

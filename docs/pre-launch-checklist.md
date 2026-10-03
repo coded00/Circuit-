@@ -37,6 +37,7 @@ withdrawals or prizes are switched on.
 | `CRON_SECRET` | **Yes** | `openssl rand -base64 32`. The sweep runner and the app must share it. |
 | `PAYSTACK_SECRET_KEY` | **Yes (money)** | `sk_live_…` for launch, `sk_test_…` while testing. Also verifies webhooks. There's no public key. Checkout is hosted by Paystack. |
 | `RESEND_API_KEY` | **Yes** | Password-reset and notification emails. Without it, emails are only printed to the server log, and nobody can reset a password. |
+| `REQUIRE_VERIFIED_EMAIL` | Optional | Players must verify their email before paid entry, staking, withdrawing or claiming a prize. Turns on by itself once `RESEND_API_KEY` is set; `true` / `false` forces it. |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | If Google sign-in is on | The redirect URI in Google Cloud must be `https://<domain>/api/auth/google/callback`. |
 | `YOUTUBE_API_KEY` | Optional | Videos on the homepage and admin Content page. |
 | `ONESIGNAL_API_KEY` / `NEXT_PUBLIC_ONESIGNAL_APP_ID` | Optional | Browser push. In-app notifications work without it. |

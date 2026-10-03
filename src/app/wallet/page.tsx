@@ -21,6 +21,9 @@ import { loginPath } from "@/lib/safeRedirect";
 import { Landmark } from "lucide-react";
 import { getCurrentUser } from "@/lib/session";
 import { getWalletActivity } from "@/lib/wallet";
+import { needsEmailVerification } from "@/lib/emailGate";
+import { accountEmail } from "@/lib/emailVerification";
+import { EmailVerificationBanner } from "@/components/EmailVerificationBanner";
 import { StatStrip } from "@/components/ui/StatStrip";
 import { FundWalletButton } from "./FundWalletButton";
 import { WithdrawButton } from "./WithdrawButton";
@@ -123,6 +126,8 @@ export default async function WalletPage() {
           ]}
         />
       </section>
+
+      {needsEmailVerification(user) && accountEmail(user) && <EmailVerificationBanner email={accountEmail(user)!} reason={`Confirm ${accountEmail(user)} is yours to withdraw, claim prizes and enter paid tournaments.`} />}
 
       {!user.payoutMethodRef && (
         <div className="flex items-center gap-3 rounded-[var(--radius-lg)] border border-dashed border-border-strong px-4 py-3">

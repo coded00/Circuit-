@@ -23,6 +23,7 @@ import {
   VALID_FORMATS,
   getEligibleRecipients,
 } from "@/lib/quickMatch";
+import { emailVerificationRequired } from "@/lib/emailGate";
 
 const QUICK_MATCH_CREATE_MAX_ATTEMPTS = 10;
 const QUICK_MATCH_CREATE_WINDOW_MS = 60 * 60 * 1000;
@@ -78,6 +79,8 @@ export async function POST(request: Request) {
   }
 
   if (stakeAmount > 0) {
+    const unverified = emailVerificationRequired(user);
+    if (unverified) return unverified;
     try {
       assertAgeGate(user.dateOfBirth);
     } catch (err) {

@@ -9,6 +9,7 @@ import { TopBar } from "@/components/nav/TopBar";
 import { MobileTabBar } from "@/components/nav/MobileTabBar";
 import { AppShell } from "@/components/AppShell";
 import { ConfirmDialogProvider } from "@/components/ConfirmDialogProvider";
+import { ToastProvider } from "@/components/ToastProvider";
 import { OneSignalInit } from "@/components/OneSignalInit";
 import { PresenceHeartbeat } from "@/components/PresenceHeartbeat";
 import { BackForwardRefresh } from "@/components/BackForwardRefresh";
@@ -153,6 +154,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             layout (see AppShell.tsx / AuthSplitLayout.tsx). */}
         <GameImageProvider images={gameImages}>
         <ConfirmDialogProvider>
+        <ToastProvider>
           <AppShell
             sidebar={<AppSidebar user={navUser} />}
             topBar={<TopBar user={user} disputeCount={disputeCount} />}
@@ -162,6 +164,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           >
             {children}
           </AppShell>
+        </ToastProvider>
         </ConfirmDialogProvider>
         </GameImageProvider>
         {user && <OneSignalInit userId={user.id} notifyNewContent={user.notifyNewContent} />}
