@@ -109,14 +109,11 @@ export async function TopBar({ user, disputeCount = 0 }: { user: User | null; di
                 />
               </div>
             ) : (
-              <div className="flex items-center gap-1 cut-sm [--cut-line:rgb(255_255_255/0.08)] border border-white/[0.08] bg-white/[0.03] p-1">
-                <GuestAuthLink mode="login" className="rounded-none px-3 py-2 text-sm font-semibold text-white/80 transition hover:bg-white/[0.07] hover:text-white">
+              <div className="flex items-center gap-1.5">
+                <GuestAuthLink mode="login" className="flex h-8 items-center px-2.5 text-[13px] font-semibold text-white/80 transition hover:text-white sm:h-9 sm:px-3 sm:text-sm">
                   Log in
                 </GuestAuthLink>
-                <GuestAuthLink
-                  mode="signup"
-                  className="flex h-9 items-center rounded-none bg-accent-volt px-3.5 text-sm font-semibold text-accent-volt-foreground transition hover:brightness-95"
-                >
+                <GuestAuthLink mode="signup" className="btn-primary !h-8 !px-3.5 !py-0 text-[13px] sm:!h-9 sm:!px-4 sm:text-sm">
                   Sign up
                 </GuestAuthLink>
               </div>

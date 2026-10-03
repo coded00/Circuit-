@@ -60,7 +60,7 @@ export async function AuthSplitLayout({ children }: { children: React.ReactNode 
     // a hardcoded colour here would drift from it and show as a seam.
     <div data-surface="dark" className="relative flex min-h-dvh w-full bg-background text-foreground lg:h-dvh lg:overflow-hidden">
       {/* Phones/tablets: the key art as a header, fading into the panel. */}
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[38vh] min-h-[240px] overflow-hidden lg:hidden">
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[26vh] min-h-[150px] overflow-hidden lg:hidden">
         {/* eslint-disable-next-line @next/next/no-img-element -- local /public asset, no next/image usage elsewhere in this codebase */}
         <img src="/auth-hero.jpg" alt="" className="h-full w-full object-cover object-[50%_18%]" />
         {/* Reaches solid well before the edge, so there's no seam where the panel starts. */}
@@ -90,7 +90,7 @@ export async function AuthSplitLayout({ children }: { children: React.ReactNode 
 
         {/* Phones: starts just under the art header (the switch overlaps its
             faded bottom edge); lg+: vertically centred beside the art. */}
-        <main className="flex flex-1 flex-col px-6 pt-[max(180px,calc(38vh-64px))] pb-10 sm:px-10 lg:justify-center lg:px-14 lg:py-12">
+        <main className="flex flex-1 flex-col px-6 pt-[max(110px,calc(26vh-40px))] pb-10 sm:px-10 lg:justify-center lg:px-14 lg:py-12">
           <div className="motion-slide-up w-full max-w-[400px] sm:mx-auto lg:mx-0">{children}</div>
         </main>
 

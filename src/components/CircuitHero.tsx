@@ -196,15 +196,17 @@ export function CircuitHero({
         </div>
 
         {slideCount > 1 && (
-          <div className="absolute bottom-5 left-8 z-10 flex gap-1.5 sm:left-10">
+          <div className="absolute bottom-3 left-7 z-10 flex sm:left-9">
             {Array.from({ length: slideCount }, (_, i) => (
               <button
                 key={i}
                 type="button"
                 onClick={() => goTo(i)}
                 aria-label={`Go to slide ${i + 1}`}
-                className={`h-1.5 rounded-full transition-all ${i === index ? "w-5 bg-accent-volt" : "w-1.5 bg-foreground/40"}`}
-              />
+                className="flex h-7 items-center px-1"
+              >
+                <span className={`block h-1.5 rounded-full transition-all ${i === index ? "w-5 bg-accent-volt" : "w-1.5 bg-foreground/40"}`} />
+              </button>
             ))}
           </div>
         )}

@@ -74,7 +74,7 @@ export default function LoginForm() {
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         labelAside={
-          <Link href="/forgot-password" className="text-xs font-medium text-muted transition hover:text-foreground">
+          <Link href="/forgot-password" className="-my-2 py-2 pl-3 text-xs font-medium text-muted transition hover:text-foreground">
             Forgot password?
           </Link>
         }
