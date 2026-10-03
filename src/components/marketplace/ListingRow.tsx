@@ -18,7 +18,7 @@ export function ListingRow({ title, hint, listings, href }: { title: string; hin
           </Link>
         )}
       </div>
-      <div data-stagger className="scrollbar-hide -mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 lg:grid-cols-4">
+      <div data-stagger className="scrollbar-hide -mx-4 flex scroll-pl-4 snap-x gap-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 lg:grid-cols-4">
         {listings.slice(0, 4).map((l) => (
           <div key={l.id} className="w-[72%] shrink-0 snap-start sm:w-auto">
             <ListingCard listing={l} />

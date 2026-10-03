@@ -34,7 +34,7 @@ export default async function MarketplacePage({ searchParams }: { searchParams: 
   const maxPrice = parseMaxPriceNaira(sp.max);
   const game = sp.game?.trim() || null;
   const inStock = sp.stock === "1";
-  const filtering = !!(category || q || game || maxPrice || inStock || sort !== "new");
+  const filtering = !!(category || q || game || maxPrice || inStock || sp.sort);
 
   const user = await getCurrentUser();
   const home = await marketplaceHome(user?.id ?? null);
@@ -119,7 +119,7 @@ export default async function MarketplacePage({ searchParams }: { searchParams: 
         <>
           <MarketHero picks={heroPicks} total={home.total} />
           <CategoryTiles counts={home.countByCategory} />
-          <ListingRow title="Just added" hint="The newest things on sale" listings={home.fresh} href="/marketplace?sort=new&category=" />
+          <ListingRow title="Just added" hint="The newest things on sale" listings={home.fresh} href="/marketplace?sort=new" />
           <ListingRow title={`Under ₦${(CHEAP_ROW_KOBO / 100).toLocaleString("en-NG")}`} hint="Easy picks, in stock now" listings={home.cheap} href={`/marketplace?max=${CHEAP_ROW_KOBO / 100}&sort=price-asc&stock=1`} />
           <ListingRow title="Going fast" hint="Five or fewer left" listings={home.limited} href="/marketplace?sort=price-asc&stock=1" />
         </>

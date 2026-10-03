@@ -61,7 +61,7 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Pro
           Discover
         </span>
         <h1 className="font-display text-[32px] leading-[0.95] font-bold tracking-tight sm:text-[44px]">
-          {onTeams ? "Find your squad" : "Find your people"}
+          {onTeams ? "Find a squad worth joining." : "Find a rival. Or a teammate."}
         </h1>
         <p className="max-w-xl text-[15px] text-muted">
           {onTeams
@@ -103,7 +103,7 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Pro
               className="h-12 w-full cut-sm [--cut-line:var(--border)] border border-border bg-surface pr-4 pl-11 text-[15px] outline-none transition placeholder:text-muted-strong focus:border-border-strong"
             />
           </label>
-          <div className="grid grid-cols-[1fr_1fr_auto] gap-2 lg:flex">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-[1fr_1fr_auto] lg:flex">
             {games.length > 0 ? (
               <select
                 name="game"
@@ -137,9 +137,9 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Pro
                 className="h-12 w-full min-w-0 cut-sm [--cut-line:var(--border)] border border-border bg-surface pr-3 pl-9 text-sm outline-none placeholder:text-muted-strong focus:border-border-strong lg:w-40"
               />
             </label>
-            <button type="submit" aria-label="Search" className="btn-primary h-12 w-12 cut-sm p-0 lg:w-auto lg:px-5">
+            <button type="submit" aria-label="Search" className="btn-primary col-span-2 h-12 w-full cut-sm p-0 sm:col-span-1 sm:w-12 lg:w-auto lg:px-5">
               <Search size={17} />
-              <span className="hidden lg:inline">Search</span>
+              <span className="sm:hidden lg:inline">Search</span>
             </button>
           </div>
         </form>

@@ -86,7 +86,7 @@ export function QuickMatchChallengeCard({
           {challenge.hostDisplayName.slice(0, 1).toUpperCase()}
         </span>
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="flex items-center gap-1.5 font-mono text-[10px] font-semibold tracking-[0.16em] text-accent-volt uppercase">
+          <span className="flex items-center gap-1.5 font-mono text-[11px] font-semibold tracking-[0.16em] text-accent-volt uppercase">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent-volt" aria-hidden />
             <Swords size={11} /> Battle request
           </span>
@@ -111,7 +111,7 @@ export function QuickMatchChallengeCard({
           ["Entry", formatNaira(challenge.stakeAmount)],
         ].map(([label, value]) => (
           <div key={label} className="flex min-w-0 flex-col gap-0.5 px-4 py-3">
-            <dt className="font-mono text-[10px] tracking-[0.12em] text-muted-strong uppercase">{label}</dt>
+            <dt className="font-mono text-[11px] tracking-[0.12em] text-muted-strong uppercase">{label}</dt>
             <dd className="truncate text-sm font-semibold">{value}</dd>
           </div>
         ))}

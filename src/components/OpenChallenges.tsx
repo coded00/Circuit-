@@ -27,7 +27,7 @@ export function OpenChallenges({
         <h2 className="font-display text-xl font-bold tracking-tight">
           Open challenges <span className="font-mono text-xs font-normal text-muted tabular-nums">{total}</span>
         </h2>
-        <Link href="/battles" className="text-xs font-medium text-accent-blue hover:underline">
+        <Link href="/battles" className="-my-2.5 py-2.5 pl-3 text-xs font-medium text-accent-blue hover:underline">
           View all{total > battles.length ? ` (${total})` : ""}
         </Link>
       </div>

@@ -25,7 +25,7 @@ export function PlayerDiscoveryCard({ player }: { player: DiscoveryPlayer }) {
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
         {player.primaryGame && (
-          <span className="absolute right-2.5 bottom-2 max-w-[60%] truncate rounded-none bg-black/55 px-1.5 py-0.5 font-mono text-[10px] font-semibold tracking-[0.08em] text-white uppercase backdrop-blur-sm">
+          <span className="absolute right-2.5 bottom-2 max-w-[60%] truncate rounded-none bg-black/55 px-1.5 py-0.5 font-mono text-[11px] font-semibold tracking-[0.08em] text-white uppercase backdrop-blur-sm">
             {player.primaryGame}
           </span>
         )}
@@ -53,18 +53,18 @@ export function PlayerDiscoveryCard({ player }: { player: DiscoveryPlayer }) {
           {winRate !== null ? (
             <>
               <div className="flex flex-col">
-                <dt className="font-mono text-[10px] tracking-[0.12em] text-muted-strong uppercase">Record</dt>
+                <dt className="font-mono text-[11px] tracking-[0.12em] text-muted-strong uppercase">Record</dt>
                 <dd className="font-display text-sm font-bold tabular-nums">
                   {player.wins}–{player.losses}
                 </dd>
               </div>
               <div className="flex flex-col">
-                <dt className="font-mono text-[10px] tracking-[0.12em] text-muted-strong uppercase">Win rate</dt>
+                <dt className="font-mono text-[11px] tracking-[0.12em] text-muted-strong uppercase">Win rate</dt>
                 <dd className="font-display text-sm font-bold tabular-nums">{winRate}%</dd>
               </div>
             </>
           ) : (
-            <span className="rounded-none bg-accent-volt-soft px-2 py-0.5 font-mono text-[10px] font-bold tracking-[0.12em] text-foreground uppercase">New player</span>
+            <span className="rounded-none bg-accent-volt-soft px-2 py-0.5 font-mono text-[11px] font-bold tracking-[0.12em] text-foreground uppercase">New player</span>
           )}
           {player.mutualFriends > 0 && (
             <span className="ml-auto flex items-center gap-1 text-xs text-muted">

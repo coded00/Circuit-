@@ -298,7 +298,7 @@ export function MessageRow({
         </PickerPopover>
       )}
       <DialogOverlay open={picker === "sheet"} onClose={() => setPicker(null)} label="React to message">
-        <p className="px-5 pb-2 text-center font-mono text-[10px] font-semibold tracking-[0.16em] text-muted uppercase">React</p>
+        <p className="px-5 pb-2 text-center font-mono text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">React</p>
         <ReactionPicker reacted={reacted} onPick={pick} />
         {(onReply || onStartThread || onTogglePin) && (
           <div className="grid grid-cols-3 gap-2 border-t border-border px-4 pt-2">

@@ -134,7 +134,7 @@ export function CommunityProfile({
                   {communityEvents.map((e) => (
                     <Link key={e.id} href={e.href} className="card-row flex items-center gap-3 cut-sm [--cut-line:var(--border)] border border-border bg-surface p-3">
                       <span className="flex h-10 w-10 shrink-0 flex-col items-center justify-center cut-avatar bg-accent-volt text-accent-volt-foreground">
-                        <span className="font-mono text-[9px] leading-none font-semibold uppercase">{e.startsAt.toLocaleDateString("en-NG", { month: "short", timeZone: "Africa/Lagos" })}</span>
+                        <span className="font-mono text-[10px] leading-none font-semibold uppercase">{e.startsAt.toLocaleDateString("en-NG", { month: "short", timeZone: "Africa/Lagos" })}</span>
                         <span className="font-display text-base leading-none font-bold">{e.startsAt.toLocaleDateString("en-NG", { day: "numeric", timeZone: "Africa/Lagos" })}</span>
                       </span>
                       <span className="flex min-w-0 flex-1 flex-col">

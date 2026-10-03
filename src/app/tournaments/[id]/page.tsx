@@ -160,7 +160,7 @@ export default async function TournamentPage({ params, searchParams }: { params:
   const structure = getStructure(tournament.format);
   const formatText = structure?.label ?? formatLabel(tournament.format);
   const competitionRows = [
-    { label: "Game mode", value: tournament.modeName ?? tournament.teamSize },
+    { label: "Game mode", value: tournament.modeName ?? tournament.teamSize, wide: false },
     ...(tournament.formatName ? [{ label: "Format", value: tournament.formatName }] : []),
     {
       label: "Entry",
@@ -170,16 +170,27 @@ export default async function TournamentPage({ params, searchParams }: { params:
     ...(isLobby
       ? [
           {
+            wide: false,
             label: "Rounds",
             value:
               tournament.lobbyGroups && tournament.lobbyQualifiers
                 ? `${tournament.lobbyGroups} groups × ${tournament.lobbyRounds ?? 1} rounds, then the top ${tournament.lobbyQualifiers} of each play a ${tournament.lobbyFinalRounds ?? 1}-round final`
                 : `${tournament.lobbyRounds ?? 1} in one lobby`,
           },
-          { label: "Scoring", value: describePoints(effectiveTable(tournament)) },
+          { label: "Scoring", value: describePoints(effectiveTable(tournament)), wide: true },
         ]
       : []),
-    { label: "How it's run", value: structure ? `${structure.label}, ${structure.description}` : formatText },
+    {
+      label: "How it's run",
+      value: structure ? (
+        <>
+          <span className="font-semibold text-foreground">{structure.label}.</span> <span className="text-muted">{structure.description}</span>
+        </>
+      ) : (
+        formatText
+      ),
+      wide: true,
+    },
   ];
   const hasBracket = tournament.status === "LIVE" || tournament.status === "COMPLETE";
   // A real countdown only makes sense before the bracket actually starts.
@@ -296,13 +307,26 @@ export default async function TournamentPage({ params, searchParams }: { params:
 
           <Panel title="Format">
             <PanelBody>
-              <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
-                {competitionRows.map((row) => (
-                  <div key={row.label} className="flex flex-col gap-0.5">
-                    <dt className="font-mono text-[10px] font-semibold tracking-[0.14em] text-muted uppercase">{row.label}</dt>
-                    <dd className="text-sm">{row.value}</dd>
-                  </div>
-                ))}
+              {/* Short facts as tiles; the two long explanations (scoring, how it's run) get the full width below. */}
+              <dl className="flex flex-col gap-3">
+                <div className="grid grid-cols-2 gap-2">
+                  {competitionRows
+                    .filter((row) => !row.wide && !(typeof row.value === "string" && row.value.length > 40))
+                    .map((row) => (
+                      <div key={row.label} className="flex min-w-0 flex-col gap-1 border border-border bg-surface-elevated/50 p-3">
+                        <dt className="font-mono text-[11px] font-semibold tracking-[0.12em] text-muted uppercase">{row.label}</dt>
+                        <dd className="text-sm leading-snug font-medium">{row.value}</dd>
+                      </div>
+                    ))}
+                </div>
+                {competitionRows
+                  .filter((row) => row.wide || (typeof row.value === "string" && row.value.length > 40))
+                  .map((row) => (
+                    <div key={row.label} className="flex flex-col gap-1 border-t border-border pt-3">
+                      <dt className="font-mono text-[11px] font-semibold tracking-[0.12em] text-muted uppercase">{row.label}</dt>
+                      <dd className="text-sm leading-relaxed">{row.value}</dd>
+                    </div>
+                  ))}
               </dl>
             </PanelBody>
           </Panel>
@@ -592,17 +616,23 @@ export default async function TournamentPage({ params, searchParams }: { params:
       <Poller />
 
       <header data-surface="dark" className={`overflow-hidden cut-lg border bg-surface ${tournament.status === "LIVE" ? "live-glow border-live/60" : "border-border"}`}>
-        <div className="relative aspect-[5/3] w-full sm:aspect-[16/6]">
+        {/* An organiser's banner is shown whole, with the title below it; without one, the game's art fills this and the title sits over it. */}
+        <div className={`relative w-full ${tournament.posterUrl ? "aspect-[3/1]" : "aspect-[5/3] sm:aspect-[16/6]"}`}>
           {/* Same name as the card/row art it was opened from — morphs between them. */}
           <ViewTransition name={tournamentArtName(tournament.id)} share="tournament-morph" default="none">
             <GameArtTile game={tournament.game} posterUrl={tournament.posterUrl} fill hideLabel imgWidth={1400} />
           </ViewTransition>
           {/* The game's own colour across the art, and a fade into the details below. */}
-          <ArenaGlow game={tournament.game} className="opacity-70" />
-          <div aria-hidden className="arena-vignette absolute inset-0" />
-          <div aria-hidden className="absolute inset-x-0 bottom-0 h-3/4 bg-gradient-to-t from-surface via-surface/70 to-transparent" />
-          <div className="absolute top-4 left-4 z-10 flex flex-wrap items-center gap-2">
-            <StatusPill tone={status.tone} pulse={status.pulse} solid size="md">
+          {!tournament.posterUrl && (
+            <>
+              <ArenaGlow game={tournament.game} className="opacity-70" />
+              <div aria-hidden className="arena-vignette absolute inset-0" />
+              <div aria-hidden className="absolute inset-x-0 bottom-0 h-3/4 bg-gradient-to-t from-surface via-surface/70 to-transparent" />
+            </>
+          )}
+          {!tournament.posterUrl && (
+            <div className="absolute top-4 left-4 z-10 flex flex-wrap items-center gap-2">
+            <StatusPill tone={status.tone} pulse={status.pulse} solid>
               {status.label}
             </StatusPill>
             {startingSoon && (
@@ -611,11 +641,26 @@ export default async function TournamentPage({ params, searchParams }: { params:
                 Starts in <CountdownTimer target={tournament.startAt.toISOString()} />
               </span>
             )}
-          </div>
+            </div>
+          )}
         </div>
 
-        <div className="relative z-10 -mt-24 flex flex-col gap-4 p-5 sm:-mt-32 sm:flex-row sm:items-end sm:justify-between sm:p-7">
+        <div className={`relative z-10 flex flex-col gap-4 p-4 sm:flex-row sm:items-end sm:justify-between sm:p-7 ${tournament.posterUrl ? "" : "-mt-24 sm:-mt-32"}`}>
           <div className="flex min-w-0 flex-col gap-2">
+            {/* Over a banner the pills would hide its lettering, so they sit above the title instead. */}
+            {tournament.posterUrl && (
+              <div className="flex flex-wrap items-center gap-2">
+            <StatusPill tone={status.tone} pulse={status.pulse} solid>
+                {status.label}
+              </StatusPill>
+              {startingSoon && (
+                <span className="badge bg-black/70 text-white backdrop-blur-sm">
+                  <Timer size={11} />
+                  Starts in <CountdownTimer target={tournament.startAt.toISOString()} />
+                </span>
+              )}
+              </div>
+            )}
             <span className="text-xs text-muted">
               <Link href={gamePath(tournament.game)} className="font-medium text-foreground/80 transition hover:text-accent-volt">
                 {tournament.game}

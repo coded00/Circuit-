@@ -15,11 +15,11 @@ export function WalletBalanceChip({ balance }: { balance: number }) {
     <Link
       href="/wallet"
       aria-label={`Wallet: ₦${naira}`}
-      className="group flex h-9 shrink-0 items-center gap-2 rounded-none pr-2 pl-1.5 text-white transition hover:bg-white/[0.07]"
+      className="group flex h-9 shrink-0 items-center gap-2 rounded-none pr-2 pl-2 min-[380px]:pl-1.5 text-white transition hover:bg-white/[0.07]"
     >
-      <Wallet size={16} className="text-accent-volt" />
+      <Wallet size={16} className="hidden text-accent-volt min-[380px]:block" />
       <span className="font-display text-[15px] leading-none font-bold tabular-nums">₦{naira}</span>
-      <span aria-hidden className="flex h-5 w-5 items-center justify-center cut-avatar bg-accent-volt text-accent-volt-foreground transition group-hover:brightness-95">
+      <span aria-hidden className="hidden h-5 w-5 items-center justify-center cut-avatar bg-accent-volt min-[360px]:flex text-accent-volt-foreground transition group-hover:brightness-95">
         <Plus size={12} strokeWidth={3} />
       </span>
     </Link>

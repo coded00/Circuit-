@@ -75,7 +75,7 @@ export function ReportDialog({ open, onClose, target, title }: { open: boolean; 
         ) : (
           <>
             <div className="flex flex-col gap-1">
-              <p className="font-mono text-[10px] font-semibold tracking-[0.16em] text-muted uppercase">Report</p>
+              <p className="font-mono text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">Report</p>
               <h2 className="font-display text-xl font-bold tracking-tight">{title}</h2>
             </div>
             <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Reason">

@@ -61,7 +61,7 @@ export function groupNotificationsByDay<T extends { createdAt: string | Date }>(
 
 export function NotificationGroupLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="flex items-center gap-2 px-4 pt-4 pb-1.5 font-mono text-[10px] font-semibold tracking-[0.16em] text-muted-strong uppercase sm:px-5">
+    <p className="flex items-center gap-2 px-4 pt-4 pb-1.5 font-mono text-[11px] font-semibold tracking-[0.16em] text-muted-strong uppercase sm:px-5">
       {children}
       <span className="h-px flex-1 bg-border" aria-hidden />
     </p>
@@ -90,7 +90,7 @@ export function NotificationItem({ notification: n, onClick }: { notification: N
         <span className={`line-clamp-2 text-[13.5px] leading-snug ${unread ? "font-medium text-foreground" : "text-muted"}`}>
           {n.message}
         </span>
-        <span className="flex items-center gap-1.5 font-mono text-[10px] tracking-[0.08em] text-muted-strong uppercase">
+        <span className="flex items-center gap-1.5 font-mono text-[11px] tracking-[0.08em] text-muted-strong uppercase">
           {label}
           <span aria-hidden>·</span>
           <time dateTime={new Date(n.createdAt).toISOString()}>{formatShortAge(n.createdAt)}</time>

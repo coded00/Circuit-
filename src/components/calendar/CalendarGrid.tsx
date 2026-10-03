@@ -46,7 +46,7 @@ export function CalendarGrid({
         {WEEKDAY_LABELS.map((label, i) => (
           <div
             key={label}
-            className={`py-2.5 text-center font-mono text-[10px] font-semibold tracking-[0.14em] uppercase sm:px-3 sm:text-left ${
+            className={`py-2.5 text-center font-mono text-[11px] font-semibold tracking-[0.14em] uppercase sm:px-3 sm:text-left ${
               i === 0 || i === 6 ? "text-muted-strong" : "text-muted"
             }`}
           >
@@ -99,7 +99,7 @@ export function CalendarGrid({
                   {day.getDate()}
                 </span>
                 {isToday && (
-                  <span className="hidden font-mono text-[9px] font-bold tracking-[0.14em] text-muted uppercase lg:inline">Today</span>
+                  <span className="hidden font-mono text-[10px] font-bold tracking-[0.14em] text-muted uppercase lg:inline">Today</span>
                 )}
               </span>
 
@@ -124,12 +124,12 @@ export function CalendarGrid({
                     className="cal-event flex min-w-0 items-baseline gap-1.5 rounded-none py-[3px] pr-1.5 pl-2 text-[11px] leading-tight"
                     style={{ "--ev": eventColor(event) } as React.CSSProperties}
                   >
-                    <span className="hidden shrink-0 font-mono text-[10px] text-muted tabular-nums 2xl:inline">{eventTimeLabel(event)}</span>
+                    <span className="hidden shrink-0 font-mono text-[11px] text-muted tabular-nums 2xl:inline">{eventTimeLabel(event)}</span>
                     <span className="truncate font-medium text-foreground">{eventTitle(event)}</span>
                   </span>
                 ))}
                 {overflow > 0 && (
-                  <span className="px-1.5 pt-0.5 font-mono text-[10px] font-semibold text-muted group-hover:text-foreground">
+                  <span className="px-1.5 pt-0.5 font-mono text-[11px] font-semibold text-muted group-hover:text-foreground">
                     +{overflow} more
                   </span>
                 )}

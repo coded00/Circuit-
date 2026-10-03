@@ -115,7 +115,7 @@ export function CreateEventDialog({ communityId, open, onClose, communityHref }:
     <DialogOverlay open={open} onClose={onClose} label="Create event" maxWidth={480}>
       <form onSubmit={submit} className="flex flex-col gap-3 px-5 pb-5 sm:pt-5">
         <div className="flex flex-col gap-1">
-          <p className="font-mono text-[10px] font-semibold tracking-[0.16em] text-muted uppercase">New event</p>
+          <p className="font-mono text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">New event</p>
           <h2 className="font-display text-xl font-bold tracking-tight">What&apos;s happening?</h2>
         </div>
         <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={80} placeholder="e.g. FIFA Night" className="field-input h-11" aria-label="Event title" required />

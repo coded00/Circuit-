@@ -141,13 +141,13 @@ export function WalletActivityList({ entries }: { entries: WalletEntry[] }) {
                       type="button"
                       onClick={() => setOpenId(open ? null : e.id)}
                       aria-expanded={open}
-                      className="flex w-full items-center gap-3 px-5 py-3 text-left transition hover:bg-surface-elevated/50"
+                      className="flex w-full items-center gap-2.5 px-4 py-3 text-left transition hover:bg-surface-elevated/50 sm:gap-3 sm:px-5"
                     >
-                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${className}`}>
+                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center cut-avatar ${className}`}>
                         <Icon size={16} />
                       </span>
                       <div className="flex min-w-0 flex-1 flex-col">
-                        <span className="truncate text-sm font-medium">{e.title}</span>
+                        <span className="line-clamp-2 text-sm leading-snug font-medium">{e.title}</span>
                         <span className="text-metadata truncate">{e.subtitle}</span>
                       </div>
                       <div className="flex shrink-0 flex-col items-end gap-0.5">
@@ -161,10 +161,10 @@ export function WalletActivityList({ entries }: { entries: WalletEntry[] }) {
                           </span>
                         )}
                       </div>
-                      <ChevronDown size={15} className={`shrink-0 text-muted transition-transform ${open ? "rotate-180" : ""}`} aria-hidden />
+                      <ChevronDown size={15} className={`hidden shrink-0 text-muted transition-transform min-[360px]:block ${open ? "rotate-180" : ""}`} aria-hidden />
                     </button>
                     {open && (
-                      <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5 bg-surface-elevated/40 px-5 py-3.5 text-xs sm:grid-cols-3">
+                      <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5 bg-surface-elevated/40 px-4 py-3.5 sm:px-5 text-xs sm:grid-cols-3">
                         <div className="flex flex-col gap-0.5">
                           <dt className="text-muted">Type</dt>
                           <dd className="font-medium">{TYPE_LABEL[e.kind]}</dd>

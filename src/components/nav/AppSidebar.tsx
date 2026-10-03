@@ -84,7 +84,7 @@ function NavLink({ item, active, badge }: { item: Item; active: boolean; badge?:
           {/* Tablet (icon-only): a small dot on the icon itself. Desktop
               (labeled): the full count pill at the end of the row. */}
           <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-live lg:hidden" aria-hidden />
-          <span className="hidden lg:ml-auto lg:flex lg:h-4 lg:min-w-4 lg:items-center lg:justify-center lg:rounded-full lg:bg-live lg:px-1 lg:font-mono lg:text-[10px] lg:font-semibold lg:text-white">
+          <span className="hidden lg:ml-auto lg:flex lg:h-4 lg:min-w-4 lg:items-center lg:justify-center lg:rounded-full lg:bg-live lg:px-1 lg:font-mono lg:text-[11px] lg:font-semibold lg:text-white">
             {badge > 9 ? "9+" : badge}
           </span>
         </>
@@ -152,7 +152,7 @@ export function AppSidebar({ user }: { user: NavUser }) {
             </span>
             <div className="flex min-w-0 flex-1 flex-col leading-tight">
               <span className="truncate text-xs font-medium text-foreground">{user.displayName}</span>
-              <span className="truncate text-[10px] text-muted">@{user.handle}</span>
+              <span className="truncate text-[11px] text-muted">@{user.handle}</span>
             </div>
             <Link
               href="/account"
@@ -164,7 +164,7 @@ export function AppSidebar({ user }: { user: NavUser }) {
             </Link>
           </div>
         ) : (
-          <p className="px-1 text-[10px] leading-snug text-muted-strong">
+          <p className="px-1 text-[11px] leading-snug text-muted-strong">
             © 2026 CIRCUIT
             <br />
             Play Connected.

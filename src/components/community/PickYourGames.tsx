@@ -51,7 +51,7 @@ export function PickYourGames({ games, preselected }: { games: GameOption[]; pre
       />
       <div className="relative flex flex-col gap-4">
         <div className="flex flex-col gap-1">
-          <span className="font-mono text-[10px] font-semibold tracking-[0.16em] text-muted uppercase">Start here</span>
+          <span className="font-mono text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">Start here</span>
           <h2 className="font-display text-xl font-bold tracking-tight sm:text-2xl">Which games do you play?</h2>
           <p className="text-sm text-muted">We&apos;ll drop you into each game&apos;s official hub. Squads, clips and tournament news.</p>
         </div>

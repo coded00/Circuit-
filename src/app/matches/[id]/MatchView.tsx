@@ -147,7 +147,7 @@ function PlayerSide({
         </Link>
         <span className="flex items-center justify-center gap-1.5 text-xs text-muted">
           <span className="truncate">@{player.handle}</span>
-          {isYou && <span className="cut-xs bg-accent-volt px-1.5 py-px text-[10px] font-bold text-accent-volt-foreground">YOU</span>}
+          {isYou && <span className="cut-xs bg-accent-volt px-1.5 py-px text-[11px] font-bold text-accent-volt-foreground">YOU</span>}
           {data.viewer.signedIn && !isYou && (
             <Link
               href={`/players/${player.handle}/report`}

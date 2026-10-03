@@ -109,7 +109,7 @@ export async function AuthSplitLayout({ children }: { children: React.ReactNode 
           <dl className="absolute right-10 bottom-9 left-16 flex flex-wrap gap-x-8 gap-y-3">
             {stats.map((s) => (
               <div key={s.label} className="flex flex-col">
-                <dt className="order-2 font-mono text-[10px] font-semibold tracking-[0.16em] text-white/60 uppercase">{s.label}</dt>
+                <dt className="order-2 font-mono text-[11px] font-semibold tracking-[0.16em] text-white/60 uppercase">{s.label}</dt>
                 <dd className="order-1 flex items-center gap-2 font-display text-3xl font-bold tracking-tight text-white">
                   {s.live && <span className="h-2 w-2 animate-pulse rounded-full bg-live" aria-hidden />}
                   {s.value}

@@ -280,7 +280,7 @@ export function ChatComposer({
           className="absolute inset-x-2 bottom-full z-20 mb-1.5 overflow-hidden cut-sm [--cut-line:var(--border)] border border-border bg-surface py-1"
           style={{ boxShadow: "var(--shadow-float)" }}
         >
-          <p className="px-3 pt-1.5 pb-1 font-mono text-[10px] font-semibold tracking-[0.14em] text-muted uppercase">
+          <p className="px-3 pt-1.5 pb-1 font-mono text-[11px] font-semibold tracking-[0.14em] text-muted uppercase">
             Members{mention?.query ? ` matching “${mention.query}”` : ""}
           </p>
           {suggestions.map((user, i) => (
@@ -337,13 +337,13 @@ export function ChatComposer({
         </div>
       )}
 
-      <div className="flex items-end gap-2 p-3">
+      <div className="flex items-end gap-1.5 p-2 sm:gap-2 sm:p-3">
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
           disabled={preparing || sending}
           aria-label="Attach image"
-          className="btn-icon shrink-0"
+          className="btn-icon !h-9 !w-9 shrink-0 sm:!h-11 sm:!w-11"
         >
           <ImagePlus size={20} />
         </button>
@@ -372,10 +372,10 @@ export function ChatComposer({
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
             onFocus={() => setTray(null)}
-            placeholder={image ? "Add a caption…" : (placeholder ?? `Message #${channelName}`)}
+            placeholder={image ? "Add a caption…" : (placeholder ?? (channelName.length <= 9 ? `Message #${channelName}` : "Write a message…"))}
             maxLength={2000}
             rows={1}
-            className="scrollbar-hide max-h-32 min-w-0 flex-1 resize-none bg-transparent py-2.5 pl-4 text-[15px] leading-5 outline-none placeholder:text-muted"
+            className="scrollbar-hide max-h-32 min-w-0 flex-1 resize-none bg-transparent py-2.5 pl-3 sm:pl-4 text-[15px] leading-5 outline-none placeholder:text-muted"
           />
           <button
             type="button"
@@ -385,7 +385,7 @@ export function ChatComposer({
             }}
             aria-label="Emoji"
             aria-pressed={tray === "emoji"}
-            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition hover:text-foreground ${tray === "emoji" ? "text-accent-blue" : "text-muted"}`}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center transition hover:text-foreground sm:h-10 sm:w-10 ${tray === "emoji" ? "text-accent-blue" : "text-muted"}`}
           >
             <Smile size={20} />
           </button>
@@ -397,7 +397,7 @@ export function ChatComposer({
             }}
             aria-label="Stickers"
             aria-pressed={tray === "stickers"}
-            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition hover:text-foreground ${tray === "stickers" ? "text-accent-blue" : "text-muted"}`}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center transition hover:text-foreground sm:h-10 sm:w-10 ${tray === "stickers" ? "text-accent-blue" : "text-muted"}`}
           >
             <StickerIcon size={20} />
           </button>
@@ -408,7 +408,7 @@ export function ChatComposer({
           onClick={submit}
           disabled={!canSend}
           aria-label="Send message"
-          className="btn-primary !h-11 !w-11 shrink-0 !rounded-full !p-0"
+          className="btn-primary !h-10 !w-10 shrink-0 !p-0 sm:!h-11 sm:!w-11"
         >
           {sending ? <Spinner size={16} /> : <Send size={18} />}
         </button>

@@ -151,7 +151,7 @@ function StatsRow({ standing }: { standing: Standing | undefined }) {
       ].map((s) => (
         <div key={s.label} className="flex flex-col items-center">
           <span className="text-sm font-bold text-foreground">{s.value}</span>
-          <span className="text-[10px] tracking-wide text-muted uppercase">{s.label}</span>
+          <span className="text-[11px] tracking-wide text-muted uppercase">{s.label}</span>
         </div>
       ))}
     </div>

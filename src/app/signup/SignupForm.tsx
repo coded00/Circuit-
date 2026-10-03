@@ -624,7 +624,7 @@ export default function SignupForm({ games, countries }: { games: GameOption[]; 
                       <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
                       <span className="absolute inset-x-2.5 bottom-2 flex flex-col">
                         <span className="truncate text-[13px] font-semibold text-white">{g.name}</span>
-                        {g.category && <span className="truncate font-mono text-[10px] tracking-wide text-white/60 uppercase">{g.category}</span>}
+                        {g.category && <span className="truncate font-mono text-[11px] tracking-wide text-white/60 uppercase">{g.category}</span>}
                       </span>
                       {on && (
                         <span className="absolute top-2 right-2 flex h-6 w-6 items-center justify-center rounded-full bg-accent-volt text-accent-volt-foreground">

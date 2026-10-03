@@ -46,20 +46,20 @@ export function RoundRobinStandings({
   const standings = (
     <section className="card overflow-hidden p-0">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[420px] text-sm">
+        <table className="w-full text-sm sm:min-w-[420px]">
           <thead>
             <tr className="border-b border-border text-left">
-              <th className="text-eyebrow w-12 px-4 py-2.5 text-muted">#</th>
+              <th className="text-eyebrow w-9 py-2.5 pr-1 pl-3 text-muted sm:w-12 sm:px-4">#</th>
               <th className="text-eyebrow px-2 py-2.5 text-muted">{unit}</th>
               <th className="text-eyebrow w-12 px-1 py-2.5 text-center text-muted" title="Played">P</th>
               <th className="text-eyebrow w-12 px-1 py-2.5 text-center text-muted" title="Wins">W</th>
-              <th className="text-eyebrow w-12 px-1 py-2.5 text-center text-muted" title="Losses">L</th>
+              <th className="text-eyebrow hidden w-12 px-1 py-2.5 text-center text-muted sm:table-cell" title="Losses">L</th>
               {swiss && (
                 <th className="text-eyebrow w-12 px-1 py-2.5 text-center text-muted" title="Buchholz. Your opponents' combined wins">
                   Bh
                 </th>
               )}
-              <th className="text-eyebrow w-16 px-4 py-2.5 text-right text-muted" title="Score difference">+/-</th>
+              <th className="text-eyebrow w-14 py-2.5 pr-3 pl-1 text-right text-muted sm:w-16 sm:px-4" title="Score difference">+/-</th>
             </tr>
           </thead>
           <tbody>
@@ -69,7 +69,7 @@ export function RoundRobinStandings({
               const you = row.entryId === viewerId;
               return (
                 <tr key={row.entryId} className={`border-b border-border last:border-b-0 ${you ? "bg-accent-volt/5" : ""}`}>
-                  <td className="px-4 py-2.5 font-mono text-xs text-muted tabular-nums">
+                  <td className="py-2.5 pr-1 pl-3 font-mono text-xs text-muted tabular-nums sm:px-4">
                     {champion?.userId === row.entryId ? <Crown size={15} className="text-gold" aria-label="Champion" /> : done ? row.rank : "–"}
                   </td>
                   <td className="max-w-0 px-2 py-2.5">
@@ -82,9 +82,9 @@ export function RoundRobinStandings({
                   </td>
                   <td className="px-1 py-2.5 text-center font-mono text-xs tabular-nums">{row.played}</td>
                   <td className="px-1 py-2.5 text-center font-mono text-sm font-bold tabular-nums">{row.wins}</td>
-                  <td className="px-1 py-2.5 text-center font-mono text-xs tabular-nums">{row.losses}</td>
+                  <td className="hidden px-1 py-2.5 text-center font-mono text-xs tabular-nums sm:table-cell">{row.losses}</td>
                   {swiss && <td className="px-1 py-2.5 text-center font-mono text-xs tabular-nums">{"buchholz" in row ? row.buchholz : ""}</td>}
-                  <td className="px-4 py-2.5 text-right font-mono text-xs tabular-nums">{row.diff > 0 ? `+${row.diff}` : row.diff}</td>
+                  <td className="py-2.5 pr-3 pl-1 text-right font-mono text-xs tabular-nums sm:px-4">{row.diff > 0 ? `+${row.diff}` : row.diff}</td>
                 </tr>
               );
             })}

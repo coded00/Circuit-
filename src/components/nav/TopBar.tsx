@@ -75,7 +75,7 @@ export async function TopBar({ user, disputeCount = 0 }: { user: User | null; di
             around the page rather than two unrelated bars. */}
         <div
           data-surface="dark"
-          className="col-start-1 flex h-full items-center gap-3 border-b border-white/[0.06] bg-background px-4 sm:col-start-2 sm:gap-5 sm:px-6 lg:px-8"
+          className="col-start-1 flex h-full items-center gap-2 border-b border-white/[0.06] bg-background px-3 sm:col-start-2 sm:gap-5 sm:px-6 lg:px-8"
         >
           <Link href="/" className="flex shrink-0 items-center sm:hidden" aria-label="Circuit home">
             {/* eslint-disable-next-line @next/next/no-img-element -- local /public asset, no next/image usage elsewhere in this codebase */}

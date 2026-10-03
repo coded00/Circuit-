@@ -154,6 +154,22 @@ the same way; Paystack's test cards are on its docs site):
 - [ ] Upload a proof screenshot and open it as the other player. It loads.
 - [ ] Admin Overview shows **All clear** once the test is tidied up.
 
+## 8b. Marketplace (if it is switched on)
+
+- [ ] Migrations applied through `20261005100000_listing_delivery_url`
+      (listings, orders, featured picks, instant-download links).
+- [ ] Only staff can sell for now. Stock it from admin → Marketplace; the
+      nine placeholder products from development are removed.
+- [ ] **Order emails** (receipt, delivered, refunded) need `RESEND_API_KEY`.
+      Without it they are only printed to the server log.
+- [ ] Instant-download ebooks: the file is hosted outside Circuit and the
+      link is only ever revealed to people who bought it, but a buyer can
+      still see where it points. Host files somewhere that lets you expire
+      or rotate links, and change the link in admin if one leaks.
+- [ ] Buy one item with a test account, deliver it from admin → Marketplace
+      → Orders, then refund it. The wallet balance returns and the buyer's
+      download stops.
+
 ## After launch
 
 - [ ] Check admin **Overview → Needs attention** daily. **Refunds that

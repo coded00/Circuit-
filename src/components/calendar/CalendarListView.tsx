@@ -39,7 +39,7 @@ export function CalendarListView({
               >
                 {group.date.getDate()}
               </span>
-              <span className="font-mono text-[10px] font-semibold tracking-[0.14em] text-muted uppercase">
+              <span className="font-mono text-[11px] font-semibold tracking-[0.14em] text-muted uppercase">
                 {group.date.toLocaleDateString("en-NG", { weekday: "short" })}
                 {isToday && <span className="ml-1.5 text-foreground">· Today</span>}
               </span>

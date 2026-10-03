@@ -11,7 +11,7 @@ export function DiscoverySectionRow({ title, count, children }: { title: string;
         <h2 className="font-display text-lg font-bold tracking-tight">{title}</h2>
         {count !== undefined && <span className="font-mono text-xs text-muted-strong tabular-nums">{count}</span>}
       </div>
-      <div className="scrollbar-hide -mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:gap-4 sm:px-0">{children}</div>
+      <div className="scrollbar-hide -mx-4 flex scroll-pl-4 snap-x gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:gap-4 sm:px-0">{children}</div>
     </section>
   );
 }

@@ -130,17 +130,17 @@ export function AgendaEventBody({ event }: { event: CalendarEvent }) {
 
 /** Time column + coloured node on a vertical rail + the event body. */
 export function AgendaRow({ event, last }: { event: CalendarEvent; last: boolean }) {
+  const colour = { "--ev": eventColor(event) } as React.CSSProperties;
   return (
-    <li className="relative flex gap-3">
-      <span className="w-11 shrink-0 pt-3 text-right font-mono text-[11px] font-semibold text-foreground tabular-nums">
+    // Phones: the time sits on its own line above the event, so the event gets the whole width. From `sm` it is a column with a rail.
+    <li className="relative flex flex-col gap-1.5 sm:flex-row sm:gap-3">
+      <span className="flex items-center gap-2 font-mono text-[11px] font-semibold text-foreground tabular-nums sm:w-11 sm:shrink-0 sm:justify-end sm:pt-3">
+        <span aria-hidden className="cal-dot h-2 w-2 shrink-0 rounded-full sm:hidden" style={colour} />
         {eventTimeLabel(event)}
       </span>
-      <span aria-hidden className="relative flex w-3 shrink-0 justify-center">
+      <span aria-hidden className="relative hidden w-3 shrink-0 justify-center sm:flex">
         <span className={`absolute top-0 w-px bg-border ${last ? "h-4" : "bottom-[-12px]"}`} />
-        <span
-          className="cal-dot relative mt-[15px] h-2.5 w-2.5 rounded-full ring-4 ring-surface"
-          style={{ "--ev": eventColor(event) } as React.CSSProperties}
-        />
+        <span className="cal-dot relative mt-[15px] h-2.5 w-2.5 rounded-full ring-4 ring-surface" style={colour} />
       </span>
       <AgendaEventBody event={event} />
     </li>
@@ -167,7 +167,7 @@ export function CalendarDayPanel({
         <span className="flex flex-col">
           <span className="text-sm font-semibold">
             {date.toLocaleDateString("en-NG", { weekday: "long" })}
-            {isToday && <span className="ml-2 rounded-none bg-accent-volt px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-[0.12em] text-accent-volt-foreground uppercase align-middle">Today</span>}
+            {isToday && <span className="ml-2 rounded-none bg-accent-volt px-1.5 py-0.5 font-mono text-[10px] font-bold tracking-[0.12em] text-accent-volt-foreground uppercase align-middle">Today</span>}
           </span>
           <span className="text-xs text-muted">{date.toLocaleDateString("en-NG", { month: "long", year: "numeric" })}</span>
         </span>
@@ -191,7 +191,7 @@ export function CalendarDayPanel({
                 aria-hidden
               />
               <span className="flex min-w-0 flex-1 flex-col">
-                <span className="font-mono text-[10px] font-semibold tracking-[0.14em] text-muted uppercase">
+                <span className="font-mono text-[11px] font-semibold tracking-[0.14em] text-muted uppercase">
                   Next up · {nextUp.event.date.toLocaleDateString("en-NG", { weekday: "short", day: "numeric", month: "short" })}
                 </span>
                 <span className="truncate text-sm font-semibold">{eventTitle(nextUp.event)}</span>

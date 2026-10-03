@@ -99,7 +99,7 @@ export function CardCarousel({ children, label }: { children: React.ReactNode; l
               onClick={() => goTo(i)}
               aria-label={`Show ${i + 1} of ${items.length}`}
               aria-current={i === active ? "true" : undefined}
-              className="flex h-6 items-center justify-center px-0.5"
+              className="flex h-8 items-center justify-center px-1.5"
             >
               <span
                 className={`block h-1.5 rounded-full transition-all duration-[var(--duration-base)] ease-[var(--ease-standard)] ${

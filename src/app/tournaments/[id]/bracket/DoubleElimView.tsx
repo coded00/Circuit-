@@ -24,7 +24,7 @@ function Slot({ id, name, won, you, pending }: { id: string | null; name: string
         <span className="truncate">{name}</span>
         {you && <span className="badge badge-open shrink-0">You</span>}
       </span>
-      {won && !pending && <span className="text-[10px] font-bold tracking-wide text-success uppercase">Won</span>}
+      {won && !pending && <span className="text-[11px] font-bold tracking-wide text-success uppercase">Won</span>}
     </div>
   );
 }
@@ -71,7 +71,7 @@ export function DoubleElimView({
               {status.label}
             </StatusPill>
           ) : n.resolved && (n.playerAId || n.playerBId) ? (
-            <span className="text-[10px] font-semibold text-muted uppercase">Bye</span>
+            <span className="text-[11px] font-semibold text-muted uppercase">Bye</span>
           ) : null}
         </div>
         <Slot id={n.playerAId} name={nameOf(n.playerAId, n, "a")} won={!!n.winnerId && n.winnerId === n.playerAId} you={!!viewerId && n.playerAId === viewerId} pending={!n.resolved} />

@@ -27,7 +27,7 @@ export function SectionHeader({
       {href && (
         <Link
           href={href}
-          className="flex shrink-0 items-center gap-0.5 text-xs font-medium text-accent-blue transition-all hover:gap-1"
+          className="-my-2.5 flex shrink-0 items-center gap-0.5 py-2.5 pl-3 text-xs font-medium text-accent-blue transition-all hover:gap-1"
         >
           {linkLabel}
           <ChevronRight size={13} />

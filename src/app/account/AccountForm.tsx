@@ -271,7 +271,7 @@ export default function AccountForm({
         </span>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-none border border-border bg-card/50 p-4">
+      <div className="flex flex-col gap-3 border-t border-border pt-5 sm:border sm:bg-card/50 sm:p-4">
         <div className="flex items-center justify-between">
           <div>
             <label className="text-sm font-semibold text-foreground">
@@ -374,7 +374,7 @@ export default function AccountForm({
               type="button"
               disabled={resolvingAccount || !selectedBank || accountNumber.length !== 10}
               onClick={handleResolveAndLink}
-              className="btn-secondary self-start text-xs py-1.5 px-3"
+              className="btn-secondary self-start !px-3 !py-2 text-xs"
             >
               {resolvingAccount ? "Verifying with Paystack…" : "Verify & Link Bank Account"}
             </button>

@@ -49,6 +49,8 @@ type Banner = {
   ctaHref: string | null;
 };
 
+import { compactNaira } from "@/lib/money";
+
 function formatNaira(kobo: number): string {
   return `₦${(kobo / 100).toLocaleString("en-NG")}`;
 }
@@ -176,18 +178,17 @@ export function CircuitHero({
             </>
           ) : (
             <>
-              <h1 className="text-hero line-clamp-3 normal-case">
-                This is where
-                <br />
-                <span className="text-accent-volt">your name takes shape.</span>
+              <h1 className="text-hero line-clamp-3 text-[26px] normal-case sm:text-[38px] lg:text-[46px]">
+                This is where <span className="text-accent-volt">your name takes shape.</span>
               </h1>
               <p className="max-w-[440px] text-sm text-muted sm:text-base">Enter the competition. Find your rivals. Build your legacy, one match at a time.</p>
-              <div className="flex flex-wrap gap-2 pt-1">
-                <Link href="/compete" className="btn-primary">
+              {/* Side by side on a phone too, so the pair takes one row instead of two and stays clear of the slide dots. */}
+              <div className="flex gap-2 pt-1">
+                <Link href="/compete" className="btn-primary !px-4 !py-2 text-[13px] whitespace-nowrap sm:!px-5 sm:!py-2.5 sm:text-sm">
                   Enter Circuit
                 </Link>
-                <Link href="/battles" className="btn-secondary">
-                  Challenge a player
+                <Link href="/battles" className="btn-secondary !px-4 !py-2 text-[13px] whitespace-nowrap sm:!px-5 sm:!py-2.5 sm:text-sm">
+                  Challenge <span className="hidden min-[400px]:inline">a player</span>
                 </Link>
               </div>
             </>
@@ -209,11 +210,11 @@ export function CircuitHero({
         )}
       </div>
       {stats && (
-        <dl className="grid grid-cols-3 gap-px border-t border-border bg-border">
+        <dl className="grid grid-cols-[0.8fr_1.35fr_0.85fr] gap-px border-t border-border bg-border sm:grid-cols-3">
           {[
             {
               label: "Open tournaments",
-              short: "Tournaments",
+              short: "Events",
               value: stats.openTournaments.toLocaleString("en-NG"),
               hint: "Tournaments you can register for right now.",
             },
@@ -226,13 +227,18 @@ export function CircuitHero({
             {
               label: "Prize money",
               short: "Prizes",
-              value: formatNaira(stats.prizeMoney),
+              value: (
+                <>
+                  <span className="sm:hidden">{compactNaira(stats.prizeMoney)}</span>
+                  <span className="hidden sm:inline">{formatNaira(stats.prizeMoney)}</span>
+                </>
+              ),
               hint: "Total prize pools of tournaments that are open or live now.",
               gold: true,
             },
           ].map((item) => (
             <div key={item.label} className="flex min-w-0 flex-col gap-1 bg-surface px-4 py-3 sm:px-8 sm:py-4">
-              <dt className="flex items-center gap-1.5 text-[10px] font-medium tracking-wide text-muted uppercase sm:text-[11px]">
+              <dt className="flex items-center gap-1.5 text-[11px] font-medium tracking-normal text-muted uppercase sm:tracking-wide">
                 {/* Short labels on phones: three columns leave ~100px each. */}
                 <span className="truncate sm:hidden">{item.short}</span>
                 <span className="hidden truncate sm:inline">{item.label}</span>

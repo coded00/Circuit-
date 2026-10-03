@@ -492,7 +492,7 @@ function Overview({ data }: { data: ProfileData }) {
           meta="Self-reported"
           action={
             isOwnProfile ? (
-              <Link href="/account" className="text-xs font-medium text-accent-blue hover:underline">
+              <Link href="/account" className="-my-2.5 py-2.5 pl-3 text-xs font-medium text-accent-blue hover:underline">
                 Edit
               </Link>
             ) : undefined

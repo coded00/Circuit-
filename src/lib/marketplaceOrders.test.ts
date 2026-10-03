@@ -94,4 +94,21 @@ describe("marketplace orders", () => {
     expect(await prisma.walletTransaction.count({ where: { userId: buyer.id, type: "MARKETPLACE_REFUND" } })).toBe(1);
     expect(await prisma.listing.findUniqueOrThrow({ where: { id: listing.id } })).toMatchObject({ stock: 1, status: "ACTIVE" });
   });
+
+  it("refunds a delivered order only when staff ask for it, and keeps a delivered item out of stock", async () => {
+    const seller = await createTestStaff();
+    const buyer = await createTestUser({ walletBalance: 1_000_000 });
+    const listing = await listingFor(seller.id, { category: "DIGITAL", stock: 5, deliveryUrl: "https://files.example.com/book.pdf" });
+    const order = await placeOrder(buyer, { listingId: listing.id });
+    expect(order.status).toBe("FULFILLED");
+
+    expect(await cancelOrder(order.id, "wrong file")).toBeNull();
+    expect(await wallet(buyer.id)).toBe(500_000);
+
+    const refunded = await cancelOrder(order.id, "wrong file", { refundDelivered: true });
+    expect(refunded).toMatchObject({ status: "CANCELLED", fulfilmentNote: "wrong file" });
+    expect(await wallet(buyer.id)).toBe(1_000_000);
+    expect((await prisma.listing.findUniqueOrThrow({ where: { id: listing.id } })).stock).toBe(4);
+    expect(await cancelOrder(order.id, "again", { refundDelivered: true })).toBeNull();
+  });
 });

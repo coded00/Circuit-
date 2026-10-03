@@ -39,7 +39,7 @@ export function MarketFilters({ games }: { games: string[] }) {
   const game = params.get("game") ?? "";
   const max = params.get("max") ?? "";
   const inStock = params.get("stock") === "1";
-  const chip = (active: boolean) => `cut-xs px-3 py-1.5 text-xs font-medium transition ${active ? "bg-foreground text-background" : "bg-surface-elevated text-muted hover:text-foreground"}`;
+  const chip = (active: boolean) => `cut-xs min-h-9 px-3 py-1.5 text-xs font-medium transition ${active ? "bg-foreground text-background" : "bg-surface-elevated text-muted hover:text-foreground"}`;
 
   return (
     <div className="flex flex-col gap-3" aria-busy={pending}>

@@ -113,7 +113,7 @@ function PodiumStat({ label, value, animate }: { label: string; value: string | 
       <span className="text-sm font-bold text-foreground">
         {animate && typeof value === "number" ? <CountUp value={value} /> : value}
       </span>
-      <span className="text-[10px] tracking-wide text-muted uppercase">{label}</span>
+      <span className="text-[11px] tracking-wide text-muted uppercase">{label}</span>
     </div>
   );
 }
@@ -215,7 +215,8 @@ export default async function LeaderboardPage({
           style={{ backgroundImage: "linear-gradient(100deg, var(--surface) 35%, transparent)" }}
         />
         <div className="relative z-10 flex flex-col gap-2">
-          <h1 className="font-display text-4xl leading-none font-bold tracking-tight uppercase sm:text-5xl">Leaderboard</h1>
+          <span className="text-eyebrow text-accent-volt">Leaderboard</span>
+          <h1 className="font-display text-4xl leading-none font-bold tracking-tight sm:text-5xl">Where names get made.</h1>
           <p className="text-sm text-muted">Ranked by real wins, across every Challenge played on Circuit.</p>
         </div>
       </div>

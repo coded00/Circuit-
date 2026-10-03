@@ -55,17 +55,17 @@ export function LeagueStandings({
   const standings = (
     <section className="card overflow-hidden p-0">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[460px] text-sm">
+        <table className="w-full text-sm sm:min-w-[460px]">
           <thead>
             <tr className="border-b border-border text-left">
-              <th className="text-eyebrow w-12 px-4 py-2.5 text-muted">#</th>
+              <th className="text-eyebrow w-9 pr-1 pl-3 py-2.5 text-muted sm:w-12 sm:px-4">#</th>
               <th className="text-eyebrow px-2 py-2.5 text-muted">{unit}</th>
               <th className="text-eyebrow w-10 px-1 py-2.5 text-center text-muted" title="Played">P</th>
               <th className="text-eyebrow w-10 px-1 py-2.5 text-center text-muted" title="Won">W</th>
               {draws && <th className="text-eyebrow w-10 px-1 py-2.5 text-center text-muted" title="Drawn">D</th>}
-              <th className="text-eyebrow w-10 px-1 py-2.5 text-center text-muted" title="Lost">L</th>
-              <th className="text-eyebrow w-12 px-1 py-2.5 text-center text-muted" title="Goal/score difference">+/-</th>
-              <th className="text-eyebrow w-14 px-4 py-2.5 text-right text-muted" title="Points">Pts</th>
+              <th className="text-eyebrow hidden w-10 px-1 py-2.5 text-center text-muted sm:table-cell" title="Lost">L</th>
+              <th className="text-eyebrow hidden w-12 px-1 py-2.5 text-center text-muted sm:table-cell" title="Goal/score difference">+/-</th>
+              <th className="text-eyebrow w-12 py-2.5 pr-3 pl-1 text-right text-muted sm:w-14 sm:px-4" title="Points">Pts</th>
             </tr>
           </thead>
           <tbody>
@@ -75,7 +75,7 @@ export function LeagueStandings({
               const you = row.entryId === viewerId;
               return (
                 <tr key={row.entryId} className={`border-b border-border last:border-b-0 ${you ? "bg-accent-volt/5" : ""}`}>
-                  <td className="px-4 py-2.5 font-mono text-xs text-muted tabular-nums">
+                  <td className="py-2.5 pr-1 pl-3 font-mono text-xs text-muted tabular-nums sm:px-4">
                     {champion?.userId === row.entryId ? <Crown size={15} className="text-gold" aria-label="Champion" /> : done > 0 ? row.rank : "–"}
                   </td>
                   <td className="max-w-0 px-2 py-2.5">
@@ -89,16 +89,16 @@ export function LeagueStandings({
                   <td className="px-1 py-2.5 text-center font-mono text-xs tabular-nums">{row.played}</td>
                   <td className="px-1 py-2.5 text-center font-mono text-xs tabular-nums">{row.wins}</td>
                   {draws && <td className="px-1 py-2.5 text-center font-mono text-xs tabular-nums">{row.draws}</td>}
-                  <td className="px-1 py-2.5 text-center font-mono text-xs tabular-nums">{row.losses}</td>
-                  <td className="px-1 py-2.5 text-center font-mono text-xs tabular-nums">{row.gd > 0 ? `+${row.gd}` : row.gd}</td>
-                  <td className="px-4 py-2.5 text-right font-mono text-sm font-bold tabular-nums">{row.points}</td>
+                  <td className="hidden px-1 py-2.5 text-center font-mono text-xs tabular-nums sm:table-cell">{row.losses}</td>
+                  <td className="hidden px-1 py-2.5 text-center font-mono text-xs tabular-nums sm:table-cell">{row.gd > 0 ? `+${row.gd}` : row.gd}</td>
+                  <td className="py-2.5 pr-3 pl-1 text-right font-mono text-sm font-bold tabular-nums sm:px-4">{row.points}</td>
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
-      <p className="border-t border-border px-5 py-2.5 text-xs text-muted">
+      <p className="border-t border-border px-4 py-2.5 text-xs text-muted sm:px-5">
         {rules.winPoints} point{rules.winPoints === 1 ? "" : "s"} for a win{draws ? `, ${rules.drawPoints} for a draw` : ""}, 0 for a loss. Level on points? Head-to-head results
         between the tied {unit.toLowerCase()}s come first, then score difference, then score for. If first place is still level, the top two play a decider.
       </p>

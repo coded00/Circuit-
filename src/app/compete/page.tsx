@@ -199,13 +199,13 @@ function CompetitionRow({ t }: { t: Row }) {
         {live ? (
           <span className="flex flex-col items-center gap-1.5 text-live">
             <span className="pulse-dot" aria-hidden />
-            <span className="text-[10px] font-bold tracking-wide uppercase">Live</span>
+            <span className="text-[11px] font-bold tracking-wide uppercase">Live</span>
           </span>
         ) : (
           <>
             <span className="font-display text-[28px] font-bold tabular-nums">{day}</span>
             <span className="mt-1 text-[11px] font-semibold tracking-wide text-muted uppercase">{month}</span>
-            <span className="mt-1 text-[10px] text-muted tabular-nums">{time}</span>
+            <span className="mt-1 text-[11px] text-muted tabular-nums">{time}</span>
           </>
         )}
       </div>
@@ -416,7 +416,7 @@ export default async function CompetePage({ searchParams }: { searchParams: Prom
           {play && <input type="hidden" name="play" value={play} />}
           <Search size={16} className="pointer-events-none absolute left-3.5 text-muted" />
           <span className="sr-only">Search tournaments</span>
-          <input type="search" name="q" defaultValue={q ?? ""} placeholder="Search by name" className="field-input w-full pl-10" />
+          <input type="search" name="q" aria-label="Search tournaments" defaultValue={q ?? ""} placeholder="Search by name" className="field-input w-full pl-10" />
         </form>
       </header>
 

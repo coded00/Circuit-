@@ -74,11 +74,18 @@ export async function fulfilOrder(orderId: string, note: string | null) {
   return done.count === 0 ? null : prisma.order.findUniqueOrThrow({ where: { id: orderId } });
 }
 
-/** Cancel a paid order and put the money back in the buyer's wallet. Returns null if it wasn't PAID. */
-export async function cancelOrder(orderId: string, reason: string | null) {
+/**
+ * Cancel an order and put the money back in the buyer's wallet. Returns null if it
+ * wasn't in a state that allows it. A PAID order (not yet delivered) always can;
+ * `refundDelivered` also lets staff refund one already marked delivered (a wrong
+ * file, a bad code). That one stops the buyer's download, and a delivered item is
+ * not put back in stock.
+ */
+export async function cancelOrder(orderId: string, reason: string | null, options: { refundDelivered?: boolean } = {}) {
   return prisma.$transaction(async (tx) => {
+    const before = await tx.order.findUnique({ where: { id: orderId }, select: { status: true } });
     const claimed = await tx.order.updateMany({
-      where: { id: orderId, status: "PAID" },
+      where: { id: orderId, status: { in: options.refundDelivered ? ["PAID", "FULFILLED"] : ["PAID"] } },
       data: { status: "CANCELLED", fulfilmentNote: reason, cancelledAt: new Date() },
     });
     if (claimed.count === 0) return null;
@@ -87,7 +94,7 @@ export async function cancelOrder(orderId: string, reason: string | null) {
     await tx.walletTransaction.create({ data: { userId: order.buyerId, type: "MARKETPLACE_REFUND", amount: order.amountKobo, status: "COMPLETE" } });
     // Give the unit back; a listing that sold out because of it opens again.
     const listing = await tx.listing.findUnique({ where: { id: order.listingId }, select: { stock: true, status: true } });
-    if (listing && listing.stock !== null) {
+    if (before?.status === "PAID" && listing && listing.stock !== null) {
       await tx.listing.update({
         where: { id: order.listingId },
         data: { stock: { increment: 1 }, ...(listing.stock === 0 && listing.status === "SOLD" ? { status: "ACTIVE" } : {}) },

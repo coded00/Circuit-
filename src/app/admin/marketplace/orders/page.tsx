@@ -70,6 +70,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
               {o.buyerNote && <p className="text-[13px]"><span className="text-muted">Buyer details: </span>{o.buyerNote}</p>}
               {o.fulfilmentNote && <p className="text-[13px] whitespace-pre-wrap"><span className="text-muted">Note to buyer: </span>{o.fulfilmentNote}</p>}
               {o.status === "PAID" && <OrderActions id={o.id} />}
+              {o.status === "FULFILLED" && <OrderActions id={o.id} delivered />}
             </li>
           ))}
         </ul>

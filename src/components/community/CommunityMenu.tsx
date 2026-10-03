@@ -69,7 +69,7 @@ export function CommunityMenu({ communityId, communityName, canInvite, aboutHref
             <UserPlus size={15} /> Invite
           </button>
         )}
-        <button type="button" onClick={() => setOpen((v) => !v)} aria-label="Community options" aria-expanded={open} className="btn-icon">
+        <button type="button" onClick={() => setOpen((v) => !v)} aria-label="Community options" aria-expanded={open} className="btn-icon !h-9 !w-9 sm:!h-11 sm:!w-11">
           <MoreHorizontal size={18} />
         </button>
       </div>
@@ -176,7 +176,7 @@ export function InviteDialog({ open, onClose, communityId, communityName }: { op
     >
       <div className="flex flex-col gap-4 px-5 pb-5 sm:pt-5">
         <div className="flex flex-col gap-1">
-          <p className="font-mono text-[10px] font-semibold tracking-[0.16em] text-muted uppercase">Invite</p>
+          <p className="font-mono text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">Invite</p>
           <h2 className="font-display text-xl font-bold tracking-tight">Bring your people to {communityName}</h2>
         </div>
         {url ? (

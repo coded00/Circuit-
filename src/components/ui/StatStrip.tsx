@@ -21,7 +21,7 @@ export function StatStrip({
     <dl className={`grid gap-px border-t border-border bg-border ${columns}`}>
       {stats.map((s) => (
         <div key={s.label} className={`flex min-w-0 flex-col gap-1 bg-surface py-4 sm:px-7 ${compact ? "px-3" : "px-4"}`}>
-          <dt className={`text-eyebrow text-muted ${compact ? "text-[10px] tracking-[0.08em] sm:text-[11px] sm:tracking-[0.14em]" : ""}`}>{s.label}</dt>
+          <dt className={`text-eyebrow text-muted ${compact ? "text-[11px] tracking-[0.08em] sm:text-[11px] sm:tracking-[0.14em]" : ""}`}>{s.label}</dt>
           <dd className={`text-stat leading-tight [overflow-wrap:anywhere] sm:text-2xl sm:leading-none ${compact ? "text-base" : "text-xl"} ${s.valueClassName ?? ""}`}>{s.value}</dd>
           {s.sub && <dd className="truncate text-xs text-muted">{s.sub}</dd>}
         </div>

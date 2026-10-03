@@ -113,7 +113,7 @@ export function ChallengeCard({ battle: b, record, mine = false }: { battle: Cha
               <span className="text-white/90">
                 {fresh ? "Just posted" : (<><span className="@min-[420px]:hidden">Open</span><span className="hidden @min-[420px]:inline">Open challenge</span></>)}
               </span>
-              {mine && <span className="rounded bg-accent-volt px-1.5 py-px text-[10px] font-bold text-accent-volt-foreground">YOURS</span>}
+              {mine && <span className="rounded bg-accent-volt px-1.5 py-px text-[11px] font-bold text-accent-volt-foreground">YOURS</span>}
             </span>
             <span className="truncate font-display text-lg leading-none font-bold tracking-tight uppercase">{b.game}</span>
           </div>
@@ -139,7 +139,7 @@ export function ChallengeCard({ battle: b, record, mine = false }: { battle: Cha
                 {b.creator.displayName}
               </span>
               <span
-                className={`font-mono text-[10px] leading-tight font-semibold tracking-[0.1em] uppercase ${tier.tone === "strong" ? "text-accent-volt" : "text-white/70"}`}
+                className={`font-mono text-[11px] leading-tight font-semibold tracking-[0.1em] uppercase ${tier.tone === "strong" ? "text-accent-volt" : "text-white/70"}`}
                 title={record ? `${record.wins} wins and ${record.losses} losses in ${b.game} challenges` : `No finished ${b.game} challenges yet`}
               >
                 {record && rate !== null ? `${record.wins}W ${record.losses}L · ${rate}%` : "New challenger"}

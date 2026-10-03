@@ -34,27 +34,39 @@ function relative(date: Date): string {
   return rel.format(Math.round(hr / 24), "day");
 }
 
+/** Each kind of event gets its own tint, so a scan down the feed sorts itself. */
+const TONE: Record<ActivityKind, string> = {
+  announcement: "bg-accent-volt text-accent-volt-foreground",
+  tournament: "bg-gold/15 text-gold",
+  finished: "bg-success/15 text-success",
+  result: "bg-accent-orange-soft text-accent-orange",
+  community: "bg-accent-blue-soft text-accent-blue",
+};
+
 function Row({ item }: { item: ActivityItem }) {
   const Icon = ICON[item.kind];
+  const when = (
+    <time dateTime={item.at.toISOString()} className="shrink-0 font-mono text-[11px] tracking-wide text-muted-strong uppercase" suppressHydrationWarning>
+      {relative(item.at)}
+    </time>
+  );
   const body = (
     <>
-      <span
-        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-          item.kind === "announcement" ? "bg-accent-volt text-accent-volt-foreground" : "bg-surface-elevated text-foreground"
-        }`}
-      >
+      <span className={`flex h-9 w-9 shrink-0 items-center justify-center cut-avatar sm:h-10 sm:w-10 ${TONE[item.kind]}`}>
         <Icon size={17} aria-hidden />
       </span>
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="text-[15px] leading-snug font-semibold">{item.title}</span>
-        {item.detail && <span className="line-clamp-2 text-sm text-muted">{item.detail}</span>}
+      <span className="flex min-w-0 flex-1 flex-col gap-1">
+        {/* On a phone the time sits under the text, so the title gets the full width instead of wrapping beside it. */}
+        <span className="flex items-start justify-between gap-3">
+          <span className="text-[15px] leading-snug font-semibold">{item.title}</span>
+          <span className="hidden pt-0.5 sm:block">{when}</span>
+        </span>
+        {item.detail && <span className="line-clamp-2 text-[13px] leading-snug text-muted">{item.detail}</span>}
+        <span className="sm:hidden">{when}</span>
       </span>
-      <time dateTime={item.at.toISOString()} className="shrink-0 pt-0.5 text-xs text-muted" suppressHydrationWarning>
-        {relative(item.at)}
-      </time>
     </>
   );
-  const cls = "flex items-start gap-3.5 px-5 py-4";
+  const cls = "flex items-start gap-3 px-4 py-3.5 sm:gap-3.5 sm:px-5 sm:py-4";
   return item.href ? (
     <Link href={item.href} className={`${cls} transition hover:bg-surface-elevated/60`}>
       {body}

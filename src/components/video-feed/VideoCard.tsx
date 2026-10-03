@@ -214,11 +214,11 @@ export function VideoCard({
         {/* Bottom-left: title/description/tags/attribution/discovery links */}
         <div className="absolute right-16 bottom-4 left-4 z-10 flex flex-col gap-2 text-white sm:right-20">
           {video.source === "YOUTUBE" ? (
-            <span className="w-fit cut-xs bg-black/50 px-2.5 py-1 text-[10px] font-semibold tracking-wide uppercase backdrop-blur-sm">
+            <span className="w-fit cut-xs bg-black/50 px-2.5 py-1 text-[11px] font-semibold tracking-wide uppercase backdrop-blur-sm">
               Powered by YouTube{video.sourceAuthor ? ` · ${video.sourceAuthor}` : ""}
             </span>
           ) : (
-            <span className="w-fit cut-xs bg-accent-volt/90 px-2.5 py-1 text-[10px] font-semibold tracking-wide text-accent-volt-foreground uppercase">
+            <span className="w-fit cut-xs bg-accent-volt/90 px-2.5 py-1 text-[11px] font-semibold tracking-wide text-accent-volt-foreground uppercase">
               Circuit
             </span>
           )}

@@ -66,7 +66,7 @@ export function MarketHero({ picks, total }: { picks: HeroListing[]; total: numb
             className="group cut-lg flex flex-1 flex-col justify-end gap-1 overflow-hidden border border-border bg-surface-elevated p-4 transition [--cut-line:var(--border)] hover:border-border-hover"
             style={l.imageUrl ? { backgroundImage: `linear-gradient(to top, rgb(0 0 0 / 0.9), rgb(0 0 0 / 0.25)), url(${l.imageUrl})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
           >
-            <span className="font-mono text-[10px] tracking-wide text-white/70 uppercase">{categoryLabel(l.category)}</span>
+            <span className="font-mono text-[11px] tracking-wide text-white/70 uppercase">{categoryLabel(l.category)}</span>
             <span className="line-clamp-2 font-display text-lg leading-[1.05] font-bold tracking-tight text-white uppercase">{l.title}</span>
             <span className="text-stat text-gold">{formatListingPrice(l.priceKobo)}</span>
           </Link>

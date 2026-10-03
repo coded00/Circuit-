@@ -373,7 +373,7 @@ body {
  */
 @layer components {
   .card {
-    @apply rounded-none border border-border bg-surface p-5 transition duration-[var(--duration-base)] ease-[var(--ease-standard)];
+    @apply rounded-none border border-border bg-surface p-4 sm:p-5 transition duration-[var(--duration-base)] ease-[var(--ease-standard)];
   }
 
   /* Level 2 Interactive: hover lift (unchanged from before) plus real
@@ -777,7 +777,7 @@ body {
 
   /* Small dark compact key-style element — the ⌘K search hint (Phase 3). */
   .kbd {
-    @apply rounded-md border border-border-strong bg-surface-elevated px-1.5 py-0.5 font-mono text-[10px] text-muted;
+    @apply rounded-md border border-border-strong bg-surface-elevated px-1.5 py-0.5 font-mono text-[11px] text-muted;
   }
 }
 

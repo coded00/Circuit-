@@ -364,12 +364,12 @@ export function MessageList({
                       {group.author.displayName}
                     </Link>
                     {group.author.tag && (
-                      <Link href={group.author.tagHref ?? "#"} className="shrink-0 rounded-none border border-border px-1 font-mono text-[10px] font-semibold tracking-wide text-muted hover:text-foreground">
+                      <Link href={group.author.tagHref ?? "#"} className="shrink-0 rounded-none border border-border px-1 font-mono text-[11px] font-semibold tracking-wide text-muted hover:text-foreground">
                         {group.author.tag}
                       </Link>
                     )}
                     {roleBadges[group.author.id] && (
-                      <span className="shrink-0 rounded-none bg-accent-volt/20 px-1 font-mono text-[10px] font-semibold tracking-wide text-foreground uppercase">
+                      <span className="shrink-0 rounded-none bg-accent-volt/20 px-1 font-mono text-[11px] font-semibold tracking-wide text-foreground uppercase">
                         {ROLE_BADGE[roleBadges[group.author.id]]}
                       </span>
                     )}

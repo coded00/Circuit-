@@ -15,7 +15,7 @@ export const RESULT_CHIP_CLASS: Record<FormResult | "VOID", string> = {
 
 export function FormChips({ form, size = "sm" }: { form: FormResult[]; size?: "sm" | "md" }) {
   if (form.length === 0) return null;
-  const box = size === "md" ? "h-7 w-7 cut-avatar text-xs" : "h-5 w-5 rounded-none text-[10px]";
+  const box = size === "md" ? "h-7 w-7 cut-avatar text-xs" : "h-5 w-5 rounded-none text-[11px]";
   return (
     <div className={`flex flex-wrap items-center ${size === "md" ? "gap-1.5" : "gap-1"}`} aria-label={`Last ${form.length} results, most recent first: ${form.join(" ")}`}>
       {form.map((r, i) => (

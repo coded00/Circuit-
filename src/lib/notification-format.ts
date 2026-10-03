@@ -79,9 +79,9 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
         href: `/battles/${str(p, "battleId")}`,
       };
     case "ORDER_FULFILLED":
-      return { message: `Your order is ready: ${str(p, "title") || "see the details"}.`, href: "/marketplace/orders" };
+      return { message: `Order delivered: ${str(p, "title") || "see the details"}.`, href: "/marketplace/orders" };
     case "ORDER_CANCELLED":
-      return { message: `Your order was cancelled and refunded to your wallet: ${str(p, "title") || ""}.`.replace(": .", "."), href: "/marketplace/orders" };
+      return { message: `Order refunded to your wallet: ${str(p, "title") || ""}.`.replace(": .", "."), href: "/marketplace/orders" };
     case "BATTLE_EXPIRED":
       return { message: `Your ${str(p, "game") || ""} challenge expired with no takers.`.replace("  ", " "), href: `/battles/${str(p, "battleId")}` };
     case "REGISTRATION_CAP_FILLED":

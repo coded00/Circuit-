@@ -199,7 +199,7 @@ async function HomeContent({ searchParams }: { searchParams: Promise<{ leaderboa
             <Panel
               title="Leaderboard"
               action={
-                <Link href="/leaderboard" className="text-xs font-medium text-accent-blue hover:underline">
+                <Link href="/leaderboard" className="-my-2.5 py-2.5 pl-3 text-xs font-medium text-accent-blue hover:underline">
                   View all
                 </Link>
               }

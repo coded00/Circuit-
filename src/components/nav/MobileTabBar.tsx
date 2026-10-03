@@ -64,7 +64,7 @@ function TabLink({
     <Link
       href={href}
       aria-current={active ? "page" : undefined}
-      className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 px-0.5 py-2.5 text-[10px] leading-none font-medium transition-colors duration-[var(--duration-fast)] ${active ? "text-foreground" : "text-muted"}`}
+      className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 px-0.5 py-2.5 text-[11px] leading-none font-medium tracking-tight transition-colors duration-[var(--duration-fast)] ${active ? "text-foreground" : "text-muted"}`}
     >
       <Icon size={20} className={active ? "text-accent-volt" : undefined} />
       <span className="max-w-full truncate">{label}</span>
@@ -120,7 +120,7 @@ export function MobileTabBar({ user }: { user: NavUser }) {
         <button
           type="button"
           onClick={() => setMenuOpen(true)}
-          className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 px-0.5 py-2.5 text-[10px] leading-none font-medium transition-colors duration-[var(--duration-fast)] ${onProfile ? "text-foreground" : "text-muted"}`}
+          className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 px-0.5 py-2.5 text-[11px] leading-none font-medium transition-colors duration-[var(--duration-fast)] ${onProfile ? "text-foreground" : "text-muted"}`}
         >
           <PlayerIcon size={20} className={onProfile ? "text-accent-volt" : undefined} />
           <span className="max-w-full truncate">Profile</span>

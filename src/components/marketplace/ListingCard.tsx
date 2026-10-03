@@ -33,15 +33,15 @@ export function ListingCard({ listing: l }: { listing: ListingCardData }) {
           </div>
         )}
         {l.stock !== null && l.stock <= 5 ? (
-          <span className="cut-xs absolute top-3 right-3 bg-accent-orange px-2 py-1 font-mono text-[10px] font-semibold tracking-wide text-black uppercase">
+          <span className="cut-xs absolute top-3 right-3 bg-accent-orange px-2 py-1 font-mono text-[11px] font-semibold tracking-wide text-black uppercase">
             {l.stock === 0 ? "Sold out" : `${l.stock} left`}
           </span>
         ) : (
           isNewListing(l.createdAt) && (
-            <span className="cut-xs absolute top-3 right-3 bg-accent-volt px-2 py-1 font-mono text-[10px] font-semibold tracking-wide text-accent-volt-foreground uppercase">New</span>
+            <span className="cut-xs absolute top-3 right-3 bg-accent-volt px-2 py-1 font-mono text-[11px] font-semibold tracking-wide text-accent-volt-foreground uppercase">New</span>
           )
         )}
-        <span className="cut-xs absolute top-3 left-3 flex items-center gap-1 bg-black/70 px-2 py-1 font-mono text-[10px] font-semibold tracking-wide text-white uppercase">
+        <span className="cut-xs absolute top-3 left-3 flex items-center gap-1 bg-black/70 px-2 py-1 font-mono text-[11px] font-semibold tracking-wide text-white uppercase">
           <CategoryIcon category={l.category} size={11} />
           {categoryLabel(l.category)}
         </span>

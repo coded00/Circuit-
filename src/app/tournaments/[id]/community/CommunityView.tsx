@@ -246,7 +246,7 @@ export function CommunityView({
   }
 
   const headerButton = (label: string, icon: React.ReactNode, active: boolean, onClick: () => void) => (
-    <button type="button" onClick={onClick} aria-label={label} title={label} aria-pressed={active} className={`btn-icon ${active ? "bg-surface-elevated text-foreground" : ""}`}>
+    <button type="button" onClick={onClick} aria-label={label} title={label} aria-pressed={active} className={`btn-icon !h-9 !w-9 sm:!h-11 sm:!w-11 ${active ? "bg-surface-elevated text-foreground" : ""}`}>
       {icon}
     </button>
   );
@@ -256,8 +256,8 @@ export function CommunityView({
     // app-style. The page exports `interactiveWidget: "resizes-content"`,
     // so the Android keyboard shrinks this box rather than covering the composer.
     <div className="fixed inset-x-0 top-[60px] bottom-[calc(3.5rem_+_env(safe-area-inset-bottom))] z-[1] flex flex-col bg-background sm:static sm:mx-auto sm:h-[calc(100dvh-96px)] sm:w-full sm:max-w-7xl sm:bg-transparent sm:p-6">
-      <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-3 sm:gap-3 sm:rounded-t-[14px] sm:border sm:border-b-0 sm:bg-surface sm:px-5 sm:py-4">
-        <button type="button" onClick={() => setSidebarOpen(true)} className="btn-icon sm:hidden" aria-label="Open channels">
+      <div className="flex shrink-0 items-center gap-1.5 border-b border-border px-2 py-2.5 sm:gap-3 sm:rounded-t-[14px] sm:border sm:border-b-0 sm:bg-surface sm:px-5 sm:py-4">
+        <button type="button" onClick={() => setSidebarOpen(true)} className="btn-icon !h-9 !w-9 sm:hidden" aria-label="Open channels">
           <Menu size={18} />
         </button>
         <Link href={backHref} className="flex items-center gap-1.5 text-sm font-medium text-muted transition hover:text-foreground">
@@ -484,7 +484,7 @@ export function CommunityView({
 
       <DialogOverlay open={!!newThread} onClose={() => setNewThread(null)} label="Start a thread" maxWidth={440}>
         <div className="flex flex-col gap-3 px-5 pb-5 sm:pt-5">
-          <p className="font-mono text-[10px] font-semibold tracking-[0.16em] text-muted uppercase">New thread in #{activeChannel?.name}</p>
+          <p className="font-mono text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">New thread in #{activeChannel?.name}</p>
           {newThread?.fromMessage && (
             <p className="line-clamp-2 rounded-none border-l-2 border-border-strong bg-surface-elevated/50 px-3 py-2 text-sm text-muted">
               <span className="font-semibold text-foreground">{newThread.fromMessage.author.displayName}:</span> {newThread.fromMessage.content || "📷 Image"}

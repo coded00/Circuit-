@@ -58,7 +58,7 @@ function NotificationInbox({
           <h2 className="font-display flex items-center gap-2 text-[17px] font-bold tracking-tight">
             Notifications
             {unreadCount > 0 && (
-              <span className="cut-xs bg-accent-volt px-1.5 py-0.5 font-mono text-[10px] leading-none font-bold text-accent-volt-foreground">
+              <span className="cut-xs bg-accent-volt px-1.5 py-0.5 font-mono text-[11px] leading-none font-bold text-accent-volt-foreground">
                 {unreadCount > 99 ? "99+" : unreadCount}
               </span>
             )}

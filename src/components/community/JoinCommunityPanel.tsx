@@ -111,7 +111,7 @@ export function JoinCommunityPanel({ communityId, name, joinPolicy, rules, appli
       <DialogOverlay open={open} onClose={() => setOpen(false)} label={label} maxWidth={480}>
         <div className="flex flex-col gap-4 px-5 pb-5 sm:pt-5">
           <div className="flex flex-col gap-1">
-            <p className="font-mono text-[10px] font-semibold tracking-[0.16em] text-muted uppercase">{applying ? "Apply" : "Before you join"}</p>
+            <p className="font-mono text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">{applying ? "Apply" : "Before you join"}</p>
             <h2 className="font-display text-xl font-bold tracking-tight">{name}</h2>
           </div>
 
