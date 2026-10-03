@@ -55,9 +55,9 @@ export function MemberRow({
       <Link href={`/players/${person.handle}`} className="flex min-w-0 flex-1 items-center gap-3">
         {person.avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs
-          <img src={person.avatarUrl} alt="" className="h-10 w-10 shrink-0 rounded-full border border-border object-cover" />
+          <img src={person.avatarUrl} alt="" className="h-10 w-10 shrink-0 cut-avatar border border-border object-cover" />
         ) : (
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-surface-elevated font-semibold text-muted">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center cut-avatar border border-border bg-surface-elevated font-semibold text-muted">
             {person.displayName.slice(0, 1).toUpperCase()}
           </div>
         )}

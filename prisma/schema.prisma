@@ -11,8 +11,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ---------------------------------------------------------------------------
@@ -40,6 +41,28 @@ enum MatchStatus {
   NEEDS_RESULT
   DISPUTED
   COMPLETE
+}
+
+/// MAIN = the one lobby of an ungrouped tournament.
+enum LobbyStage {
+  MAIN
+  GROUP
+  FINAL
+}
+
+enum LobbyRoundStatus {
+  PENDING
+  POSTED
+}
+
+/// A player's objection to a posted lobby round: the organizer answers
+/// first (RESOLVED = corrected, DISMISSED = results stand); the player
+/// can escalate to Circuit staff, whose answer is final.
+enum LobbyFlagStatus {
+  OPEN
+  ESCALATED
+  RESOLVED
+  DISMISSED
 }
 
 enum DisputeStatus {
@@ -104,6 +127,8 @@ enum BattleStatus {
   ACCEPTED
   CANCELLED
   COMPLETE
+  /// Nobody accepted before `Battle.expiresAt`; any stake went back to the creator.
+  EXPIRED
 }
 
 enum ReportStatus {
@@ -121,65 +146,88 @@ enum ReportStatus {
 /// Account creation is deferred (D4) — a User row is only created at
 /// register-with-intent-to-pay, Battle accept, or payout claim.
 model User {
-  id                String     @id @default(cuid())
-  displayName       String
-  handle            String     @unique
-  emailOrPhone      String     @unique
-  passwordHash      String?
-  avatarUrl         String?
+  id                  String                @id @default(cuid())
+  displayName         String
+  handle              String                @unique
+  emailOrPhone        String                @unique
+  passwordHash        String?
+  avatarUrl           String?
   /// Short public profile tagline (ACC-6 profile edit) — free text,
   /// entirely optional, never used anywhere else in the app.
-  bio               String?
+  bio                 String?
   /// Free-text city/state/country — same optional-profile-field convention
   /// as bio. Not shown anywhere yet; exists so Player Discovery's region
   /// filter (a later phase) has real values to query instead of starting
   /// from zero once that filter ships.
-  region            String?
+  region              String?
   /// Self-curated list of games shown on the public profile — player-typed
   /// free text, not derived from real match history and NOT sourced from
   /// the `Game` catalog the way Tournament.game/Battle.game are: a
   /// player's "games I play" is a personal claim, not a real competition,
   /// so it isn't constrained to what organizers can actually host.
-  favoriteGames     String[]   @default([])
-  dateOfBirth       DateTime?
-  ageVerified       Boolean    @default(false)
+  favoriteGames       String[]              @default([])
+  dateOfBirth         DateTime?
+  ageVerified         Boolean               @default(false)
   /// P0-7: linked payout destination — what REG-6's payout actually pays out to.
-  payoutMethodRef   String?
+  payoutMethodRef     String?
   /// Real, validated email — separate from `emailOrPhone` above, which may
   /// hold a phone number instead and was never format-checked at signup.
   /// Only ever set through Account Settings' own validation. Nullable:
   /// nobody is required to add one, they just don't get the email side of
   /// notifyNewContent below until they do.
-  email             String?    @unique
+  email               String?               @unique
+  /// Set when they click the link in a verification email (or sign up
+  /// with Google, which verifies the address). Cleared if the email changes.
+  emailVerifiedAt     DateTime?
+  /// Finished (or skipped) the post-signup /welcome flow.
+  onboardedAt         DateTime?
+  /// Nigerian mobile in +234… form (src/lib/phone.ts). Optional at signup;
+  /// not SMS-verified. Can be used to log in when present.
+  phone               String?               @unique
+  /// ISO 3166-1 alpha-2 code picked at signup (src/lib/countries.ts). Null
+  /// for accounts created before the country field existed.
+  country             String?
+  /// When they ticked "I agree to the Terms and Privacy Policy" at signup.
+  /// Null for accounts created before the checkbox existed.
+  termsAcceptedAt     DateTime?
+  /// Privacy: false hides them from search and Discover (their profile is
+  /// still reachable by direct link). See src/lib/privacy.ts.
+  searchable          Boolean               @default(true)
+  /// Privacy: who may send them a direct challenge (a challenge aimed at
+  /// them, or a Quick Match request).
+  directChallenges    DirectChallengePolicy @default(ANYONE)
+  /// Set when they asked for their account to be deleted. Staff process it
+  /// by hand (money and records have to be settled first); null otherwise.
+  deletionRequestedAt DateTime?
   /// Single opt-out switch for "new tournament/challenge" broadcast
   /// announcements (email + push only — in-app notifications are always-on
   /// regardless, per InAppChannel's own comment in notifications.ts).
   /// Defaults to on so a real audience exists for the feature at all.
-  notifyNewContent  Boolean    @default(true)
+  notifyNewContent    Boolean               @default(true)
   /// Set once this user's browser subscribes via OneSignal. Not the
   /// broadcast targeting mechanism (that uses OneSignal's own "Subscribed
   /// Users" segment) — kept mainly for future debugging/visibility.
-  oneSignalPlayerId String?
+  oneSignalPlayerId   String?
   /// P6-1/P6-2/P6-4: Circuit staff access — dispute-queue escalation
   /// ruling, account suspension. No self-serve grant path exists yet;
   /// setting this currently means a direct DB write, which is fine at V1's
   /// staffing size but is itself worth flagging as a gap.
-  isStaff           Boolean    @default(false)
+  isStaff             Boolean               @default(false)
   /// Only meaningful when `isStaff` is true — which of the two fixed
   /// admin roles this staff account has. Null for an ordinary player.
   /// See `AdminRole`'s own comment for what each role can actually do.
-  adminRole         AdminRole?
+  adminRole           AdminRole?
   /// P6-4/TRU-4: blocks registering, paying, or accepting Battles —
   /// checked at those specific write actions, never at login or browsing
   /// (same "don't touch the read path" discipline as the age gate, TRU-5).
-  isSuspended       Boolean    @default(false)
-  suspensionReason  String?
+  isSuspended         Boolean               @default(false)
+  suspensionReason    String?
   /// Real, spendable Circuit balance (kobo) — funded via Fund Wallet,
   /// spent on entry fees, cashed out via Withdraw. The authoritative
   /// running total; `WalletTransaction` below is the immutable ledger
   /// that justifies it, kept in sync in the same DB transaction as every
   /// balance change so the two can never drift apart.
-  walletBalance     Int        @default(0)
+  walletBalance       Int                   @default(0)
   /// Quick Match presence (BTL-Q1): refreshed every ~25s by a client
   /// heartbeat while a signed-in tab is open (`PresenceHeartbeat.tsx`) —
   /// "online" for Quick Match eligibility means this timestamp is within
@@ -188,43 +236,67 @@ model User {
   /// an "online now" signal from stale login timestamps, so this is a
   /// narrowly-scoped, frequently-refreshed field for Quick Match only,
   /// not a general presence system other features should assume is fresh.
-  lastActiveAt      DateTime?
-  createdAt         DateTime   @default(now())
+  lastActiveAt        DateTime?
+  createdAt           DateTime              @default(now())
   /// V1 audit follow-up (money-relevant models) — walletBalance and the
   /// suspension/staff flags above all mutate after creation with no
   /// signal of when; useful for debugging a balance that looks stale and
   /// for reconciliation, same reasoning as the other money-relevant
   /// models this was added to alongside (WalletTransaction,
   /// EscrowTransaction, Registration, Tournament, Battle).
-  updatedAt         DateTime   @updatedAt
+  updatedAt           DateTime              @updatedAt
 
-  organizerProfile     OrganizerProfile?
-  registrations        Registration[]
-  matchesAsPlayerA     Match[]               @relation("MatchPlayerA")
-  matchesAsPlayerB     Match[]               @relation("MatchPlayerB")
-  matchesWon           Match[]               @relation("MatchWinner")
-  battlesCreated       Battle[]              @relation("BattleCreator")
-  battlesTargeted      Battle[]              @relation("BattleTarget")
-  quickMatchesHosted   QuickMatchChallenge[] @relation("QuickMatchHost")
-  quickMatchesAccepted QuickMatchChallenge[] @relation("QuickMatchAcceptedBy")
-  quickMatchInvites    QuickMatchRecipient[] @relation("QuickMatchRecipient")
-  disputesRaised       Dispute[]             @relation("DisputeRaisedBy")
-  notifications        Notification[]
-  reportsFiled         Report[]              @relation("ReportFiledBy")
-  reportsReceived      Report[]              @relation("ReportAgainstUser")
-  communityPosts       CommunityPost[]       @relation("CommunityPostAuthor")
-  passwordResetTokens  PasswordResetToken[]
-  walletTransactions   WalletTransaction[]
-  auditLogEntries      AuditLogEntry[]
-  friendshipsSent      Friendship[]          @relation("FriendshipRequester")
-  friendshipsReceived  Friendship[]          @relation("FriendshipAddressee")
-  teamsCaptained       Team[]                @relation("TeamCaptain")
-  teamMemberships      TeamMembership[]
-  escrowTransactions   EscrowTransaction[]
-  videoLikes           VideoLike[]
-  videoSaves           VideoSave[]
-  communityMemberships CommunityMember[]
-  messages             Message[]
+  organizerProfile        OrganizerProfile?
+  blocking                UserBlock[]              @relation("Blocker")
+  blockedBy               UserBlock[]              @relation("Blocked")
+  tournamentUpdates       TournamentUpdate[]       @relation("TournamentUpdateAuthor")
+  registrations           Registration[]
+  matchesAsPlayerA        Match[]                  @relation("MatchPlayerA")
+  matchesAsPlayerB        Match[]                  @relation("MatchPlayerB")
+  matchesWon              Match[]                  @relation("MatchWinner")
+  listings                Listing[]
+  marketplaceOrders       Order[]
+  battlesCreated          Battle[]                 @relation("BattleCreator")
+  battlesTargeted         Battle[]                 @relation("BattleTarget")
+  quickMatchesHosted      QuickMatchChallenge[]    @relation("QuickMatchHost")
+  quickMatchesAccepted    QuickMatchChallenge[]    @relation("QuickMatchAcceptedBy")
+  quickMatchInvites       QuickMatchRecipient[]    @relation("QuickMatchRecipient")
+  disputesRaised          Dispute[]                @relation("DisputeRaisedBy")
+  notifications           Notification[]
+  reportsFiled            Report[]                 @relation("ReportFiledBy")
+  reportsReceived         Report[]                 @relation("ReportAgainstUser")
+  communityPosts          CommunityPost[]          @relation("CommunityPostAuthor")
+  passwordResetTokens     PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
+  communityMutes          CommunityMute[]          @relation("CommunityMuted")
+  communityReportsFiled   CommunityReport[]        @relation("CommunityReportFiledBy")
+  communityReportsAgainst CommunityReport[]        @relation("CommunityReportAgainst")
+  appeals                 Appeal[]
+  eventRsvps              EventRsvp[]
+  rosterMemberships       RosterMember[]           @relation("RosterMemberships")
+  gameNames               UserGameName[]
+  lobbyFlags              LobbyFlag[]              @relation("LobbyFlagsRaised")
+  walletTransactions      WalletTransaction[]
+  auditLogEntries         AuditLogEntry[]
+  friendshipsSent         Friendship[]             @relation("FriendshipRequester")
+  friendshipsReceived     Friendship[]             @relation("FriendshipAddressee")
+  teamsCaptained          Team[]                   @relation("TeamCaptain")
+  teamMemberships         TeamMembership[]
+  escrowTransactions      EscrowTransaction[]
+  videoLikes              VideoLike[]
+  videoSaves              VideoSave[]
+  communityMemberships    CommunityMember[]
+  ownedCommunities        Community[]              @relation("CommunityOwner")
+  communityInvites        CommunityInvite[]        @relation("CommunityInviteCreator")
+  communityApplications   CommunityApplication[]   @relation("CommunityApplicant")
+  communityBans           CommunityBan[]           @relation("CommunityBanned")
+  /// The community whose tag shows next to their name (must be a member).
+  featuredCommunityId     String?
+  featuredCommunity       Community?               @relation("FeaturedCommunity", fields: [featuredCommunityId], references: [id], onDelete: SetNull)
+  messages                Message[]
+  messageMentions         MessageMention[]         @relation("MessageMentions")
+  messageReactions        MessageReaction[]        @relation("MessageReactions")
+  authIdentities          AuthIdentity[]
 
   @@index([emailOrPhone])
   @@index([lastActiveAt])
@@ -245,6 +317,15 @@ enum AdminRole {
 }
 
 enum WalletTransactionType {
+  /// A Marketplace purchase paid from the wallet — internal only, no provider
+  /// touched. The matching `Order` row carries what was bought.
+  MARKETPLACE_DEBIT
+  /// A cancelled Marketplace order refunded back into the wallet.
+  MARKETPLACE_REFUND
+  /// An entry fee that was paid from the wallet, refunded back into it when
+  /// the player withdrew or the tournament was cancelled — internal only,
+  /// the mirror of ENTRY_FEE_DEBIT. (Card-paid entries refund to the card.)
+  ENTRY_FEE_REFUND
   /// Real money in, via Paystack/Flutterwave checkout.
   FUND
   /// Real money out, via Paystack/Flutterwave transfer to payoutMethodRef.
@@ -315,6 +396,49 @@ model WalletTransaction {
 /// "never store the secret itself" discipline as `passwordHash` on User.
 /// Single-use: `usedAt` is set the moment a reset succeeds, and the reset
 /// route rejects any token that's expired, already used, or unknown.
+/// A way to sign in to an existing User other than their password —
+/// today only Google. One person = one User: an identity always points at
+/// an existing account (new Google users get their User created first,
+/// then this row), and a Google account can only ever be attached to one
+/// User. Adding another provider later is new rows, not a new table.
+///
+/// No provider tokens are stored — Circuit only needs to know *who* signed
+/// in (the verified ID token's claims at login), never to call Google on
+/// the user's behalf.
+model AuthIdentity {
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// "google"
+  provider          String
+  /// The provider's stable account id (Google's `sub`), never the email —
+  /// emails can change or be recycled.
+  providerAccountId String
+  /// The provider-verified email at the time of linking, for display only.
+  email             String?
+  createdAt         DateTime  @default(now())
+  lastUsedAt        DateTime?
+
+  @@unique([provider, providerAccountId])
+  @@unique([userId, provider])
+}
+
+/// One-time link proving they own `email` (the address at the time it was
+/// sent — a later email change makes it useless). Stored hashed, like
+/// password reset tokens.
+model EmailVerificationToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email     String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
 model PasswordResetToken {
   id        String    @id @default(cuid())
   userId    String
@@ -339,19 +463,127 @@ model OrganizerProfile {
 /// Maps to TRN-1..TRN-6.
 /// Admin-curated catalog of games organizers can pick from when creating a
 /// tournament or challenge (see Tournament.game / Battle.game) — Admin >
-/// Games manages these rows. Deliberately not a foreign key: Tournament.game
-/// and Battle.game stay plain strings so every existing row and every read
-/// site that already treats `game` as a string keeps working unchanged —
-/// this table only constrains what the *creation/edit forms* offer as
-/// options, not what's already stored or how it's queried elsewhere.
+/// Games manages these rows. Tournament.game and Battle.game stay plain
+/// strings so every existing row and read site keeps working unchanged.
+///
+/// Configuration-driven competition rules hang off this row:
+/// Game → GameMode → GameFormat. Nothing about how a game is played
+/// competitively (which modes exist, team sizes, lobby sizes, which
+/// tournament structures apply) lives in code — it's all these rows, so a
+/// brand-new game needs no code change. See src/lib/gameCatalog.ts.
 model Game {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  iconUrl   String?
-  enabled   Boolean  @default(true)
-  createdAt DateTime @default(now())
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  /// Square logo (upload purpose "game-icon").
+  iconUrl     String?
+  /// Wide cover art (upload purpose "game-cover") — what GameArtTile shows
+  /// for this game everywhere, ahead of the built-in stock photo map.
+  coverUrl    String?
+  /// Free text, e.g. "Battle Royale", "Sports", "Tactical Shooter".
+  category    String?
+  /// e.g. ["Mobile", "PC", "PlayStation"]. Free text, admin-entered.
+  platforms   String[]  @default([])
+  publisher   String?
+  /// Active/inactive — an inactive game is hidden from creation forms.
+  enabled     Boolean   @default(true)
+  /// Null = draft. Organizers only see games that are both enabled and
+  /// published; publishing requires at least one active mode with an
+  /// active format (enforced by the publish route).
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  /// DB default only so the column could be added to existing rows.
+  updatedAt   DateTime  @default(now()) @updatedAt
+
+  modes       GameMode[]
+  communities Community[]
+  tournaments Tournament[]
+  playerNames UserGameName[]
 
   @@index([enabled])
+}
+
+/// How a mode is actually contested: two sides meeting in a bracket match,
+/// or many entries sharing one lobby and scored by placement.
+enum CompetitionStyle {
+  HEAD_TO_HEAD
+  LOBBY
+}
+
+enum EntryType {
+  INDIVIDUAL
+  TEAM
+}
+
+/// A way a game is played competitively (Battle Royale, Team Deathmatch,
+/// Search & Destroy...). Unlimited per game, admin-ordered.
+model GameMode {
+  id          String           @id @default(cuid())
+  gameId      String
+  game        Game             @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  style       CompetitionStyle @default(HEAD_TO_HEAD)
+  /// False = the mode has no separate format layer (Game → Mode →
+  /// Competition): it owns exactly one `isDefault` GameFormat holding its
+  /// player/team rules, edited inline on the mode. True = admins manage
+  /// any number of named formats under it (Solo/Duo/Squad...). Either way
+  /// a competition always points at a GameFormat, so nothing downstream
+  /// has to special-case the two shapes.
+  usesFormats Boolean          @default(true)
+  enabled     Boolean          @default(true)
+  sortOrder   Int              @default(0)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  formats     GameFormat[]
+  tournaments Tournament[]
+
+  @@unique([gameId, name])
+  @@index([gameId, sortOrder])
+}
+
+/// A player/team configuration within a mode (Solo, Duo, Squad, 5v5...).
+/// Every field is admin-set — none are implied by the game or mode name.
+model GameFormat {
+  id                 String    @id @default(cuid())
+  modeId             String
+  mode               GameMode  @relation(fields: [modeId], references: [id], onDelete: Cascade)
+  name               String
+  description        String?
+  entryType          EntryType @default(INDIVIDUAL)
+  /// Players who actually play for one side at a time (1 for individual).
+  playersPerTeam     Int       @default(1)
+  /// Roster bounds for team entries (substitutes allowed when max >
+  /// playersPerTeam). Null = exactly playersPerTeam.
+  minRoster          Int?
+  maxRoster          Int?
+  /// Sides per match/lobby. 2 for head-to-head; null = "multiple" (a
+  /// lobby holds as many entries as maxPlayersPerMatch allows).
+  teamsPerMatch      Int?
+  /// Lobby/match player cap, e.g. 100 for a Battle Royale lobby.
+  maxPlayersPerMatch Int?
+  /// Competition structures organizers may run this format as — codes
+  /// from src/lib/competitionStructures.ts (e.g. "KNOCKOUT").
+  structures         String[]  @default([])
+  /// Starting rules text offered to organizers for this format.
+  defaultRules       String?
+  /// The single implicit format of a mode with usesFormats = false.
+  /// LOBBY formats: points by finishing place, index 0 = 1st; places past
+  /// the end score 0. Empty = the standard table (src/lib/lobbyScoring.ts).
+  placementPoints    Int[]     @default([])
+  /// LOBBY formats: points per kill.
+  killPoints         Int       @default(1)
+  isDefault          Boolean   @default(false)
+  enabled            Boolean   @default(true)
+  sortOrder          Int       @default(0)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  tournaments Tournament[]
+
+  @@unique([modeId, name])
+  @@index([modeId, sortOrder])
 }
 
 model Tournament {
@@ -379,10 +611,52 @@ model Tournament {
   /// outside the platform. Bracket matches themselves are always a real
   /// 1-vs-1 `Match` row regardless of teamSize.
   teamSize            String           @default("1v1")
+  /// Game catalog link (Admin → Games) and a snapshot of the configuration
+  /// chosen at creation — catalog edits later must not change a
+  /// competition that's already running. `game`/`teamSize`/`format` stay
+  /// filled (name, "Mode · Format" label, structure id) for every reader
+  /// that predates the catalog. Null ids = created before the catalog, or
+  /// the catalog entry was since deleted (the snapshot still describes it).
+  gameId              String?
+  gameRef             Game?            @relation(fields: [gameId], references: [id], onDelete: SetNull)
+  gameModeId          String?
+  gameMode            GameMode?        @relation(fields: [gameModeId], references: [id], onDelete: SetNull)
+  gameFormatId        String?
+  gameFormat          GameFormat?      @relation(fields: [gameFormatId], references: [id], onDelete: SetNull)
+  modeName            String?
+  formatName          String?
+  competitionStyle    CompetitionStyle @default(HEAD_TO_HEAD)
+  entryType           EntryType        @default(INDIVIDUAL)
+  playersPerTeam      Int              @default(1)
+  /// TEAM entries: how many players a roster may list (snapshot of the
+  /// format's minRoster/maxRoster; null = exactly playersPerTeam).
+  minRoster           Int?
+  maxRoster           Int?
+  /// LOBBY tournaments: how many rounds (games) every entry plays, and
+  /// the scoring snapshotted from the format at creation.
+  lobbyRounds         Int?
+  /// LOBBY tournaments run as groups, then a final (null = one lobby):
+  /// how many group lobbies, how many of each qualify, and the final's
+  /// rounds. lobbyRounds is then the group stage's rounds.
+  lobbyGroups         Int?
+  lobbyQualifiers     Int?
+  lobbyFinalRounds    Int?
+  /// League settings (format LEAGUE only; null otherwise): points for a win,
+  /// points for a draw (null = draws aren't allowed in this league), how many
+  /// times everyone meets (1 = single, 2 = home and away), and days per matchday.
+  leagueWinPoints     Int?
+  leagueDrawPoints    Int?
+  leagueLegs          Int?
+  leagueMatchdayDays  Int?
+  placementPoints     Int[]            @default([])
+  killPoints          Int              @default(1)
   /// Minor currency units (kobo), never a float. 0 = free tournament.
   entryFee            Int              @default(0)
   prizeAmount         Int?
   prizeText           String?
+  /// How prizeAmount is shared: percent per finishing place, index 0 =
+  /// 1st (sums to 100). Empty = winner takes all. See src/lib/prizes.ts.
+  prizeSplit          Int[]            @default([])
   rulesText           String?
   /// Just a link (Twitch/YouTube/anything) — no embed, no live-status
   /// check. Full streaming integration is a documented V2 item (PRD's
@@ -390,9 +664,8 @@ model Tournament {
   /// streaming build-out"); this is the lightweight V1 slice of it.
   streamUrl           String?
   /// The organizer's own real poster/banner for this specific tournament
-  /// — a pasted URL, not a file upload (Circuit has no object-storage/CDN
-  /// upload pipeline anywhere, same "paste a URL" convention as
-  /// HomepageBanner.imageUrl/User.avatarUrl). Null falls back to
+  /// — usually an upload (a site-relative `/api/images/<ref>` path, see
+  /// src/lib/uploads.ts), or an older/linked external URL. Null falls back to
   /// GameArtTile's generic per-game stock photo/gradient (see that
   /// component's own comment) rather than a broken image.
   posterUrl           String?
@@ -436,12 +709,19 @@ model Tournament {
   /// what changed and when on a specific tournament during a dispute.
   updatedAt           DateTime         @updatedAt
 
-  registrations Registration[]
-  bracket       Bracket?
-  matches       Match[]
-  escrowTxns    EscrowTransaction[]
-  videos        Video[]
-  community     Community?
+  registrations   Registration[]
+  bracket         Bracket?
+  rounds          LobbyRound[]
+  matches         Match[]
+  escrowTxns      EscrowTransaction[]
+  videos          Video[]
+  community       Community?
+  updates         TournamentUpdate[]
+  /// Set when a community hosts this tournament: it shows as that
+  /// community's event and is announced there. The organizer must be an
+  /// owner or moderator of it.
+  hostCommunityId String?
+  hostCommunity   Community?          @relation("TournamentHostCommunity", fields: [hostCommunityId], references: [id], onDelete: SetNull)
 
   @@index([game, status])
   // V1 audit follow-up — dashboard/payouts, dashboard's own overview, and
@@ -466,13 +746,26 @@ model Registration {
   /// init and echoed back by both PaymentProviderClient implementations —
   /// what a webhook looks up a Registration by.
   paymentRef   String?            @unique
+  /// TEAM tournaments: the team this entry is for. The registration's
+  /// user is its captain — they pay, play the bracket slot, report
+  /// results and receive any prize. `teamName` keeps the name as it was
+  /// at registration (and survives the team being disbanded).
+  teamId       String?
+  team         Team?              @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  teamName     String?
   createdAt    DateTime           @default(now())
   /// V1 audit follow-up — status moves through the whole
   /// PENDING_PAYMENT→CONFIRMED→WITHDRAWN/REFUNDED lifecycle with no
   /// record of when each transition happened.
   updatedAt    DateTime           @updatedAt
 
-  escrowTxns EscrowTransaction[]
+  escrowTxns    EscrowTransaction[]
+  roster        RosterMember[]
+  lobbyResults  LobbyResult[]
+  /// Grouped lobby tournaments: the entry's group (1 = A), and whether it
+  /// qualified for the final.
+  lobbyGroup    Int?
+  lobbyFinalist Boolean             @default(false)
 
   @@unique([tournamentId, userId])
   @@index([tournamentId, status])
@@ -481,6 +774,90 @@ model Registration {
   // homepage, a player's public profile, admin's user detail page, and
   // the discovery feed's personalization all run exactly that).
   @@index([userId])
+}
+
+/// One player on a team entry's roster (the captain included).
+model RosterMember {
+  id             String       @id @default(cuid())
+  registrationId String
+  registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation("RosterMemberships", fields: [userId], references: [id], onDelete: Cascade)
+  inGameId       String?
+  /// This player's share of the team's prize, in basis points (10,000 = 100%).
+  /// Set by the captain when entering; null on entries made before prizes were
+  /// shared, which pay the captain (src/lib/prizePlaces.ts).
+  prizeBp        Int?
+  createdAt      DateTime     @default(now())
+
+  @@unique([registrationId, userId])
+  @@index([userId])
+}
+
+/// LOBBY tournaments: one game everyone plays. The organizer enters each
+/// entry's placement and kills; points follow the tournament's table.
+model LobbyRound {
+  id           String           @id @default(cuid())
+  tournamentId String
+  tournament   Tournament       @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  /// Unique across the tournament (used in URLs); stage/group/stageRound
+  /// say which lobby it is and which of that lobby's rounds.
+  number       Int
+  stage        LobbyStage       @default(MAIN)
+  /// GROUP rounds: 1 = Group A. 0 otherwise.
+  group        Int              @default(0)
+  /// The round's number within its stage and group (1, 2, …).
+  stageRound   Int              @default(0)
+  status       LobbyRoundStatus @default(PENDING)
+  /// Optional screenshot of the end-of-game results (an /api/images path).
+  proofUrl     String?
+  postedAt     DateTime?
+  /// The in-game custom room for this round. Only confirmed entrants
+  /// (and roster players), the organizer and staff can see these.
+  roomCode     String?
+  roomPassword String?
+  roomPostedAt DateTime?
+  postedById   String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  results LobbyResult[]
+  flags   LobbyFlag[]
+
+  @@unique([tournamentId, number])
+}
+
+/// One entry's result in one lobby round. placement null = didn't play.
+model LobbyResult {
+  id             String       @id @default(cuid())
+  roundId        String
+  round          LobbyRound   @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  registrationId String
+  registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  placement      Int?
+  kills          Int          @default(0)
+  points         Int          @default(0)
+
+  @@unique([roundId, registrationId])
+  @@index([registrationId])
+}
+
+model LobbyFlag {
+  id            String          @id @default(cuid())
+  roundId       String
+  round         LobbyRound      @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User            @relation("LobbyFlagsRaised", fields: [userId], references: [id], onDelete: Cascade)
+  reason        String
+  status        LobbyFlagStatus @default(OPEN)
+  /// The latest answer (organizer's, or staff's once escalated).
+  response      String?
+  respondedById String?
+  escalatedAt   DateTime?
+  resolvedAt    DateTime?
+  createdAt     DateTime        @default(now())
+
+  @@index([roundId, status])
 }
 
 /// 1:1 with Tournament. Maps to BRK-1.
@@ -582,6 +959,10 @@ model Battle {
   streamUrl    String?
   status       BattleStatus     @default(OPEN)
   createdAt    DateTime         @default(now())
+  /// When an unaccepted challenge lapses (the creator picks 24h / 3 days /
+  /// 7 days). Null on challenges made before this existed: those are
+  /// treated as lapsing 7 days after `createdAt` (src/lib/battles.ts).
+  expiresAt    DateTime?
   /// V1 audit follow-up — status moves OPEN→ACCEPTED→COMPLETE/CANCELLED,
   /// and a staked Battle's stake sits locked the whole time; useful for
   /// spotting how long a Battle has actually been in its current state.
@@ -744,6 +1125,9 @@ model EscrowTransaction {
   /// orphans that history, even though nothing deletes a User today.
   user                  User?                @relation(fields: [userId], references: [id], onDelete: Restrict)
   type                  EscrowType
+  /// PRIZE_PAYOUT: the finishing place this share is for (1 = champion).
+  /// Null on payouts from before split prizes (always the champion's).
+  place                 Int?
   /// Minor currency units (kobo).
   amount                Int
   /// Null for a Battle-stake row — wallet-balance-only, no external
@@ -848,7 +1232,9 @@ model Team {
   captain   User     @relation("TeamCaptain", fields: [captainId], references: [id])
   createdAt DateTime @default(now())
 
-  members TeamMembership[]
+  members       TeamMembership[]
+  communities   CommunityTeam[]
+  registrations Registration[]
 
   // V1 audit follow-up — a player's public profile and the team-role
   // lookup in src/lib/teams.ts both filter by captainId directly, with no
@@ -905,10 +1291,9 @@ model Report {
 
 /// One slide in the homepage hero carousel — admin-authored, real content
 /// `CircuitHero` renders alongside its own real tournament-spotlight
-/// slides (see that component's own comment). `imageUrl` is a plain URL
-/// field, not a file upload: Circuit has no object-storage/CDN upload
-/// pipeline anywhere in the codebase (avatarUrl/streamUrl are the same
-/// "paste a URL" shape), and standing one up wasn't part of this request.
+/// slides (see that component's own comment). `imageUrl` is an uploaded
+/// image's `/api/images/<ref>` path (src/lib/uploads.ts) or a linked
+/// external URL — same shape as User.avatarUrl/Tournament.posterUrl.
 model HomepageBanner {
   id          String    @id @default(cuid())
   headline    String
@@ -1118,43 +1503,331 @@ model VideoSave {
 }
 
 // ---------------------------------------------------------------------------
-// Circuit Community, Phase 1 — a Discord-style chat attached to one specific
-// Tournament. Unrelated to `CommunityPost` above despite the name overlap:
-// that model is a flat, global, Twitter-like public feed with no channels,
-// no per-tournament scope, and no relation to any of the models below —
-// don't conflate the two when reading either.
+// Circuit Communities — Discord-style communities with channels, roles,
+// moderation and invite links. Four kinds (CommunityKind): the platform-
+// wide Circuit community, one per tournament, an official hub per catalog
+// game, and player-made communities. Unrelated to `CommunityPost` above
+// despite the name (that is the retired flat feed).
 //
-// Deliberately minimal for Phase 1 (validate whether people actually talk
-// around a tournament before building reactions/roles/moderation nobody's
-// asked for yet): one Community per Tournament, four fixed channels, plain
-// text messages, join/leave, and a single last-read timestamp per member
-// for a basic unread indicator. No real-time transport — messages are read
-// via ordinary polling (see `Poller.tsx`'s own doc on why: no WebSocket
-// infra exists, Vercel serverless can't hold one open anyway, and the
-// stack docs already name Pusher/Ably as the escalation path if polling
-// ever stops feeling live enough).
+// No real-time transport — messages are read via polling (see
+// `Poller.tsx`: no WebSocket infra, and Vercel serverless can't hold one
+// open; Pusher/Ably are the escalation path). Code: src/lib/community*.ts.
 // ---------------------------------------------------------------------------
 
-/// 1:1 with Tournament for a normal community — `enabled` is the
-/// organizer's on/off switch (set at tournament creation or toggled
-/// later from the edit form), and the row itself, once created, is never
-/// deleted just by disabling, so re-enabling doesn't lose channel/
-/// message history. `tournamentId` is nullable for exactly one
-/// exception: the single platform-wide "Circuit" community every user
-/// is auto-joined to at signup (`isGlobal: true`, no tournament at all).
-/// Application code (`getOrCreateGlobalCommunity`), not a DB constraint,
-/// is what keeps that singleton to one row — see that function's own
-/// comment for why a schema-level constraint wasn't worth it at V1.
+/// A community. TOURNAMENT ones are 1:1 with their tournament and
+/// `enabled` is the organizer's switch (disabling keeps history).
+/// PLAYER ones are "closed" by setting enabled = false, keeping the slug
+/// taken. The GLOBAL singleton is kept to one row by
+/// getOrCreateGlobalCommunity plus its unique slug.
 model Community {
-  id           String      @id @default(cuid())
-  tournamentId String?     @unique
-  tournament   Tournament? @relation(fields: [tournamentId], references: [id])
-  isGlobal     Boolean     @default(false)
-  enabled      Boolean     @default(true)
-  createdAt    DateTime    @default(now())
+  id                  String              @id @default(cuid())
+  kind                CommunityKind       @default(TOURNAMENT)
+  tournamentId        String?             @unique
+  tournament          Tournament?         @relation(fields: [tournamentId], references: [id])
+  /// Mirrors kind == GLOBAL (older code paths read it).
+  isGlobal            Boolean             @default(false)
+  enabled             Boolean             @default(true)
+  /// URL name: /communities/<slug>. Null for TOURNAMENT communities,
+  /// which live under their tournament instead.
+  slug                String?             @unique
+  /// Null for TOURNAMENT communities (they show the tournament's name).
+  name                String?
+  description         String?
+  iconUrl             String?
+  bannerUrl           String?
+  /// 2-5 character tag members can wear next to their name.
+  tag                 String?
+  /// GAME_HUB: the game it's for. PLAYER: optional main game (discovery filter).
+  gameId              String?
+  game                Game?               @relation(fields: [gameId], references: [id])
+  /// Free-text city/state, same convention as User.region.
+  region              String?
+  joinPolicy          CommunityJoinPolicy @default(OPEN)
+  /// What it's about (discovery filter). Null for GLOBAL/TOURNAMENT.
+  category            CommunityCategory?
+  /// Set when Circuit staff suspend it (enabled is false too). The owner
+  /// can appeal; a closed-by-owner community has enabled false but no suspendedAt.
+  suspendedAt         DateTime?
+  suspensionReason    String?
+  /// Shown before joining; joining means accepting them.
+  rules               String?
+  /// APPLY only: the one question applicants answer.
+  applicationQuestion String?
+  ownerId             String?
+  owner               User?               @relation("CommunityOwner", fields: [ownerId], references: [id])
+  /// Bumped on every message: discovery ranks by recent activity.
+  lastActivityAt      DateTime?
+  createdAt           DateTime            @default(now())
 
-  channels Channel[]
-  members  CommunityMember[]
+  channels          Channel[]
+  members           CommunityMember[]
+  invites           CommunityInvite[]
+  applications      CommunityApplication[]
+  bans              CommunityBan[]
+  hostedTournaments Tournament[]           @relation("TournamentHostCommunity")
+  featuredBy        User[]                 @relation("FeaturedCommunity")
+  mutes             CommunityMute[]
+  reports           CommunityReport[]
+  appeals           Appeal[]
+  teams             CommunityTeam[]
+  events            CommunityEvent[]
+
+  @@index([kind, enabled])
+  @@index([gameId])
+}
+
+/// What a community is for. GLOBAL: the single platform-wide "Circuit"
+/// community every account is in. TOURNAMENT: 1:1 with a tournament, for
+/// its players. GAME_HUB: the official, staff-run community for one
+/// catalog game. PLAYER: made by a player (crews, campus groups, city scenes).
+enum CommunityKind {
+  GLOBAL
+  TOURNAMENT
+  GAME_HUB
+  /// Staff-run location or interest community (Lagos, Competitive Gaming…).
+  OFFICIAL
+  PLAYER
+}
+
+/// How people get in. OPEN: listed in discovery, anyone joins. APPLY:
+/// listed, a moderator approves each application. INVITE: unlisted, only
+/// an invite link gets you in.
+enum CommunityJoinPolicy {
+  OPEN
+  APPLY
+  INVITE
+}
+
+enum CommunityCategory {
+  GAME
+  LOCATION
+  INTEREST
+  SCHOOL
+  CLUB
+  ORGANISATION
+  CREATOR
+}
+
+/// A team that's part of a community. Communities are the social layer,
+/// teams the competitive unit: a team can be in many communities and a
+/// community holds many teams. The captain adds it (they must be a member);
+/// the captain or the community's moderators can remove it.
+model CommunityTeam {
+  id          String    @id @default(cuid())
+  communityId String
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  teamId      String
+  team        Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  addedById   String
+  createdAt   DateTime  @default(now())
+
+  @@unique([communityId, teamId])
+  @@index([teamId])
+}
+
+/// Something a community is doing at a set time — FIFA night, a meetup, a
+/// watch party. (Tournaments a community hosts show alongside these; see
+/// Tournament.hostCommunityId.) Moderators create them; members RSVP.
+model CommunityEvent {
+  id          String    @id @default(cuid())
+  communityId String
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  startsAt    DateTime
+  endsAt      DateTime?
+  /// Where: "Online — #general", a venue, an address.
+  location    String?
+  createdById String
+  cancelledAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  rsvps EventRsvp[]
+
+  @@index([communityId, startsAt])
+}
+
+enum RsvpStatus {
+  GOING
+  INTERESTED
+}
+
+model EventRsvp {
+  id        String         @id @default(cuid())
+  eventId   String
+  event     CommunityEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status    RsvpStatus
+  createdAt DateTime       @default(now())
+
+  @@unique([eventId, userId])
+}
+
+/// A timeout: they can still read, but can't post or react until `until`.
+model CommunityMute {
+  id          String    @id @default(cuid())
+  communityId String
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation("CommunityMuted", fields: [userId], references: [id], onDelete: Cascade)
+  mutedById   String
+  until       DateTime
+  reason      String?
+  createdAt   DateTime  @default(now())
+
+  @@unique([communityId, userId])
+}
+
+enum ReportReason {
+  HARASSMENT
+  HATE
+  SPAM
+  SCAM
+  SEXUAL
+  CHEATING
+  THREATS
+  IMPERSONATION
+  OTHER
+}
+
+enum CommunityReportTarget {
+  MESSAGE
+  MEMBER
+  COMMUNITY
+  THREAD
+}
+
+/// OPEN: with the community's moderators. ESCALATED: with Circuit staff
+/// (serious reasons and reports about a whole community go straight here).
+enum CommunityReportStatus {
+  OPEN
+  ESCALATED
+  ACTIONED
+  DISMISSED
+}
+
+/// A report about something inside a community. `messageContent` keeps a
+/// copy of the reported text so the evidence survives the message being
+/// removed.
+model CommunityReport {
+  id             String                @id @default(cuid())
+  communityId    String
+  community      Community             @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  targetType     CommunityReportTarget
+  messageId      String?
+  message        Message?              @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  messageContent String?
+  threadId       String?
+  thread         Thread?               @relation(fields: [threadId], references: [id], onDelete: SetNull)
+  targetUserId   String?
+  targetUser     User?                 @relation("CommunityReportAgainst", fields: [targetUserId], references: [id], onDelete: SetNull)
+  reporterId     String
+  reporter       User                  @relation("CommunityReportFiledBy", fields: [reporterId], references: [id], onDelete: Cascade)
+  reason         ReportReason
+  details        String?
+  status         CommunityReportStatus @default(OPEN)
+  escalatedAt    DateTime?
+  handledById    String?
+  handledAt      DateTime?
+  resolution     String?
+  createdAt      DateTime              @default(now())
+
+  @@index([communityId, status])
+  @@index([status])
+}
+
+enum AppealKind {
+  COMMUNITY_SUSPENSION
+  ACCOUNT_SUSPENSION
+}
+
+enum AppealStatus {
+  OPEN
+  UPHELD
+  OVERTURNED
+}
+
+/// Asking Circuit staff to reverse a suspension (of an account, or of a
+/// community they own). One open appeal at a time per subject.
+model Appeal {
+  id          String       @id @default(cuid())
+  kind        AppealKind
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  communityId String?
+  community   Community?   @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  message     String
+  status      AppealStatus @default(OPEN)
+  response    String?
+  handledById String?
+  handledAt   DateTime?
+  createdAt   DateTime     @default(now())
+
+  @@index([status])
+  @@index([userId])
+}
+
+enum CommunityRole {
+  OWNER
+  MODERATOR
+  MEMBER
+}
+
+/// A shareable join link: /invite/<code>. Optional expiry and use limit.
+model CommunityInvite {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  communityId String
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  createdById String
+  createdBy   User      @relation("CommunityInviteCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  expiresAt   DateTime?
+  maxUses     Int?
+  uses        Int       @default(0)
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([communityId])
+}
+
+enum CommunityApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+/// A request to join an APPLY community. One row per person per
+/// community; re-applying after a rejection resets it to PENDING.
+model CommunityApplication {
+  id           String                     @id @default(cuid())
+  communityId  String
+  community    Community                  @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User                       @relation("CommunityApplicant", fields: [userId], references: [id], onDelete: Cascade)
+  answer       String                     @default("")
+  status       CommunityApplicationStatus @default(PENDING)
+  reviewedById String?
+  reviewedAt   DateTime?
+  createdAt    DateTime                   @default(now())
+
+  @@unique([communityId, userId])
+  @@index([communityId, status])
+}
+
+/// Removed by a moderator and kept out: joining, applying and invite
+/// links all refuse until the ban is lifted.
+model CommunityBan {
+  id          String    @id @default(cuid())
+  communityId String
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation("CommunityBanned", fields: [userId], references: [id], onDelete: Cascade)
+  bannedById  String
+  reason      String?
+  createdAt   DateTime  @default(now())
+
+  @@unique([communityId, userId])
 }
 
 /// The four fixed V1 channels (general/announcements/matches/results),
@@ -1164,14 +1837,21 @@ model Community {
 /// channel" programmatically by a stable identifier, not by matching on
 /// a human-editable display name.
 model Channel {
-  id          String    @id @default(cuid())
-  communityId String
-  community   Community @relation(fields: [communityId], references: [id])
-  key         String
-  name        String
-  createdAt   DateTime  @default(now())
+  id              String    @id @default(cuid())
+  communityId     String
+  community       Community @relation(fields: [communityId], references: [id])
+  key             String
+  name            String
+  /// Display order, ascending.
+  position        Int       @default(0)
+  /// Only owners/moderators may post (e.g. #announcements).
+  modOnly         Boolean   @default(false)
+  /// Members may post once per this many seconds (0 = off). Moderators are exempt.
+  slowModeSeconds Int       @default(0)
+  createdAt       DateTime  @default(now())
 
   messages Message[]
+  threads  Thread[]
 
   @@unique([communityId, key])
 }
@@ -1181,30 +1861,290 @@ model Channel {
 /// deliberately basic unread signal: "anything new since I last opened
 /// this community," not a per-channel read receipt.
 model CommunityMember {
-  id          String    @id @default(cuid())
+  id          String        @id @default(cuid())
   communityId String
-  community   Community @relation(fields: [communityId], references: [id])
+  community   Community     @relation(fields: [communityId], references: [id])
   userId      String
-  user        User      @relation(fields: [userId], references: [id])
-  joinedAt    DateTime  @default(now())
-  lastReadAt  DateTime  @default(now())
+  user        User          @relation(fields: [userId], references: [id])
+  role        CommunityRole @default(MEMBER)
+  joinedAt    DateTime      @default(now())
+  lastReadAt  DateTime      @default(now())
 
   @@unique([communityId, userId])
+  @@index([userId])
 }
 
-/// Plain text only for Phase 1 — no attachments, no edit history. `isSystem`
-/// is unused today (nothing sets it true yet) but exists so Phase 3's
-/// auto-generated match/tournament event messages don't need a schema
-/// change to be visually distinguished from a real user's message.
+/// What a chat Message carries beyond its text. TEXT is the original
+/// Phase 1 plain-text message; IMAGE has an uploaded picture/GIF
+/// (`attachmentRef`) with optional caption in `content`; STICKER is one
+/// of Circuit's built-in stickers (`stickerId`, see src/lib/stickers.ts)
+/// with empty `content`.
+enum MessageKind {
+  TEXT
+  IMAGE
+  STICKER
+}
+
+/// No edit history. `isSystem` is unused today (nothing sets it true yet)
+/// but exists so Phase 3's auto-generated match/tournament event messages
+/// don't need a schema change to be visually distinguished from a real
+/// user's message.
 model Message {
-  id        String   @id @default(cuid())
-  channelId String
-  channel   Channel  @relation(fields: [channelId], references: [id])
-  authorId  String
-  author    User     @relation(fields: [authorId], references: [id])
-  content   String
-  isSystem  Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id                 String      @id @default(cuid())
+  channelId          String
+  channel            Channel     @relation(fields: [channelId], references: [id])
+  authorId           String
+  author             User        @relation(fields: [authorId], references: [id])
+  kind               MessageKind @default(TEXT)
+  /// The text, or an IMAGE's optional caption. Empty for a STICKER.
+  content            String      @default("")
+  /// IMAGE only — an opaque, signed proofStorage reference (never a
+  /// public URL), served through the membership-checked
+  /// /api/messages/[id]/attachment route, same access discipline as
+  /// match proof and report evidence.
+  attachmentRef      String?
+  /// IMAGE only — the uploaded file's real pixel size, so the client can
+  /// reserve the right box before the image loads (no scroll jump).
+  attachmentWidth    Int?
+  attachmentHeight   Int?
+  /// STICKER only — a key into the fixed sticker set in src/lib/stickers.ts.
+  stickerId          String?
+  isSystem           Boolean     @default(false)
+  createdAt          DateTime    @default(now())
+  /// Removed by its author or a moderator. Kept as a row (content wiped)
+  /// so polling clients learn about it: removal bumps reactionsChangedAt.
+  deletedAt          DateTime?
+  /// Bumped on every reaction add/remove. Polling only asks for messages
+  /// newer than the last one it has, so this is how a reaction change on
+  /// an older message reaches other viewers (`reactionsSince` on the
+  /// channel messages GET) — removals leave no row behind to find.
+  reactionsChangedAt DateTime?
+  /// The message this one replies to (quoted above it). Kept if that one
+  /// is removed — it then shows as "original message removed".
+  replyToId          String?
+  replyTo            Message?    @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  /// Set for messages posted inside a thread; they don't appear in the
+  /// channel's main feed.
+  threadId           String?
+  thread             Thread?     @relation("ThreadMessages", fields: [threadId], references: [id], onDelete: Cascade)
+  /// Pinned to its channel by a moderator.
+  pinnedAt           DateTime?
+  pinnedById         String?
+
+  mentions      MessageMention[]
+  reactions     MessageReaction[]
+  reports       CommunityReport[]
+  replies       Message[]         @relation("MessageReplies")
+  startedThread Thread?           @relation("ThreadStarter")
 
   @@index([channelId, createdAt])
+  @@index([channelId, reactionsChangedAt])
+  @@index([threadId, createdAt])
+  @@index([channelId, pinnedAt])
+}
+
+/// A side conversation inside a channel ("Looking for COD teammates"),
+/// optionally started from a message. Moderators can lock it (only they
+/// can post then).
+model Thread {
+  id               String   @id @default(cuid())
+  channelId        String
+  channel          Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  /// Denormalised so a community's active threads list in one query.
+  communityId      String
+  title            String
+  creatorId        String
+  starterMessageId String?  @unique
+  starterMessage   Message? @relation("ThreadStarter", fields: [starterMessageId], references: [id], onDelete: SetNull)
+  locked           Boolean  @default(false)
+  messageCount     Int      @default(0)
+  lastMessageAt    DateTime @default(now())
+  createdAt        DateTime @default(now())
+
+  messages Message[]         @relation("ThreadMessages")
+  reports  CommunityReport[]
+
+  @@index([communityId, lastMessageAt])
+  @@index([channelId, lastMessageAt])
+}
+
+/// One `@handle` in a message's text that resolved to a real, eligible
+/// user when it was sent (a community member who wasn't suspended).
+/// Resolved server-side from the text itself — never trusted from the
+/// client — and stored with its position so rendering doesn't re-parse
+/// (and so a later handle change can't re-point an old mention).
+model MessageMention {
+  id        String   @id @default(cuid())
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation("MessageMentions", fields: [userId], references: [id], onDelete: Cascade)
+  /// UTF-16 offset/length of the "@handle" inside Message.content.
+  start     Int
+  length    Int
+  createdAt DateTime @default(now())
+
+  @@unique([messageId, start])
+  @@index([userId])
+}
+
+/// One user's reaction with one emoji on one message. The unique key is
+/// the dedupe: set-on / set-off requests are idempotent, so double taps
+/// and concurrent reactions can't produce duplicates.
+model MessageReaction {
+  id        String   @id @default(cuid())
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation("MessageReactions", fields: [userId], references: [id], onDelete: Cascade)
+  emoji     String
+  createdAt DateTime @default(now())
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+}
+
+/// The in-game name a player last typed when registering for a game, so the
+/// registration form can pre-fill it next time. One per player per game.
+model UserGameName {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gameId    String
+  game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  name      String
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, gameId])
+}
+
+/// An organizer's announcement on their tournament's page ("room details
+/// are in the community", "start pushed back 30 minutes"). Registrants are
+/// notified when one is posted. Plain text, written by the organizer only.
+model TournamentUpdate {
+  id           String     @id @default(cuid())
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  authorId     String
+  author       User       @relation("TournamentUpdateAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  body         String
+  createdAt    DateTime   @default(now())
+
+  @@index([tournamentId, createdAt])
+}
+
+enum DirectChallengePolicy {
+  ANYONE
+  FRIENDS
+  NOBODY
+}
+
+/// One player blocking another. It stops friend requests and direct
+/// challenges between them in both directions, hides the blocked player's
+/// chat messages from the blocker, and keeps them out of each other's
+/// Quick Match requests. Matches and disputes already under way are not
+/// affected. See src/lib/blocks.ts.
+model UserBlock {
+  id        String   @id @default(cuid())
+  blockerId String
+  blocker   User     @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blockedId String
+  blocked   User     @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+  @@index([blockedId])
+}
+
+/// What a Marketplace listing sells. SERVICE = a player/coach's time or skill
+/// (coaching, team spots, edits); DIGITAL = a platform-run or creator-made
+/// digital good (cosmetics, gift cards, guides); ITEM = in-game items,
+/// currency or accounts between players; STORE = organizer/brand goods
+/// (merch, entry bundles, passes).
+enum ListingCategory {
+  SERVICE
+  DIGITAL
+  ITEM
+  STORE
+}
+
+enum ListingStatus {
+  ACTIVE
+  PAUSED
+  SOLD
+  REMOVED
+}
+
+/// A thing for sale on the Marketplace. First slice: listing and browsing
+/// only. Price is kobo like every other amount in the app. There is no
+/// checkout yet; that (wallet payment held in escrow until delivery) is the
+/// next slice, so nothing here moves money.
+model Listing {
+  id          String          @id @default(cuid())
+  sellerId    String
+  seller      User            @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  category    ListingCategory
+  title       String
+  description String
+  /// Optional: which game this relates to (free text matching Game.name).
+  game        String?
+  priceKobo   Int
+  imageUrl    String?
+  /// Units left; null = unlimited (services, digital goods). Each paid order
+  /// takes one; at zero the listing flips to SOLD.
+  stock       Int?
+  /// What the buyer must tell us at checkout (e.g. "Your in-game name"),
+  /// so the order can be delivered. Null = nothing needed.
+  buyerPrompt String?
+  /// Where the file lives (an ebook hosted elsewhere, so it never sits in our
+  /// storage). When set, an order is delivered the moment it is paid and the
+  /// buyer downloads through an authenticated route; the raw link is never
+  /// sent to the page or to anyone who hasn't bought.
+  deliveryUrl String?
+  /// Staff pick: shown in the Marketplace home hero and its Featured row.
+  featured    Boolean         @default(false)
+  status      ListingStatus   @default(ACTIVE)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  orders Order[]
+
+  @@index([status, category, createdAt])
+  @@index([sellerId, status])
+}
+
+/// PAID = money taken from the buyer's wallet, awaiting delivery by Circuit;
+/// FULFILLED = delivered (with a note the buyer can read); CANCELLED =
+/// refunded to the wallet.
+enum OrderStatus {
+  PAID
+  FULFILLED
+  CANCELLED
+}
+
+/// One Marketplace purchase. Title/category/price are copied at purchase so
+/// editing or removing the listing later never rewrites history.
+model Order {
+  id             String          @id @default(cuid())
+  listingId      String
+  listing        Listing         @relation(fields: [listingId], references: [id])
+  buyerId        String
+  buyer          User            @relation(fields: [buyerId], references: [id])
+  listingTitle   String
+  category       ListingCategory
+  amountKobo     Int
+  /// The buyer's answer to the listing's `buyerPrompt`.
+  buyerNote      String?
+  status         OrderStatus     @default(PAID)
+  /// Circuit's delivery message (a code, a link, instructions) or the reason
+  /// for a cancellation. Shown to the buyer.
+  fulfilmentNote String?
+  fulfilledAt    DateTime?
+  cancelledAt    DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([buyerId, createdAt])
+  @@index([status, createdAt])
+  @@index([listingId])
 }

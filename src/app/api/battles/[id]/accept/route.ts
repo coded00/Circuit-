@@ -15,6 +15,9 @@ import { createBattleMatch } from "@/lib/matches";
 import { notify } from "@/lib/notifications";
 import { getFriendIds } from "@/lib/friends";
 import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
+import { battleExpiresAt } from "@/lib/battles";
+import { blockedBetween } from "@/lib/blocks";
+import { emailVerificationRequired } from "@/lib/emailGate";
 
 class InsufficientWalletBalanceError extends Error {}
 
@@ -41,8 +44,14 @@ export async function POST(
   if (battle.status !== "OPEN") {
     return NextResponse.json({ error: "This Battle isn't open anymore." }, { status: 409 });
   }
+  if (battleExpiresAt(battle).getTime() <= Date.now()) {
+    return NextResponse.json({ error: "This challenge has expired." }, { status: 409 });
+  }
   if (battle.creatorId === user.id) {
     return NextResponse.json({ error: "You can't accept your own Battle." }, { status: 403 });
+  }
+  if (await blockedBetween(battle.creatorId, user.id)) {
+    return NextResponse.json({ error: "This challenge isn't available to you." }, { status: 403 });
   }
   if (battle.visibility === "TARGETED" && battle.targetUserId !== user.id) {
     return NextResponse.json({ error: "This Battle was targeted at someone else." }, { status: 403 });
@@ -56,6 +65,8 @@ export async function POST(
 
   if (battle.stakeAmount > 0) {
     // ACC-3: matching a stake is cash-touching, same age gate as opening one.
+    const unverified = emailVerificationRequired(user);
+    if (unverified) return unverified;
     try {
       assertAgeGate(user.dateOfBirth);
     } catch (err) {

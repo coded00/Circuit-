@@ -1,13 +1,14 @@
 /**
- * Circuit — admin Game catalog creation. Real rows here are what the
- * tournament/battle creation and edit forms offer as game options (see
- * the `Game` model's own schema comment).
+ * Circuit — admin Game catalog creation. A new game starts as a draft
+ * (publishedAt null): admins add its modes and formats in the builder,
+ * then publish it, and only then do organizers see it.
  */
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireStaff } from "@/lib/session";
 import { logAdminAction } from "@/lib/auditLog";
+import { parseGameInput } from "@/lib/gameCatalog";
 
 export async function POST(request: Request) {
   const staffAuth = await requireStaff();
@@ -19,24 +20,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const name = typeof body.name === "string" ? body.name.trim() : "";
-  if (!name) {
-    return NextResponse.json({ error: "Name is required." }, { status: 400 });
-  }
+  const parsed = parseGameInput(body);
+  if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
 
-  const existing = await prisma.game.findUnique({ where: { name } });
+  const existing = await prisma.game.findUnique({ where: { name: parsed.value.name } });
   if (existing) {
     return NextResponse.json({ error: "A game with that name already exists." }, { status: 409 });
   }
 
-  const game = await prisma.game.create({
-    data: {
-      name,
-      iconUrl: typeof body.iconUrl === "string" ? body.iconUrl.trim() || null : null,
-    },
-  });
+  const game = await prisma.game.create({ data: parsed.value });
 
-  await logAdminAction({ actorId: admin.id, action: "game.create", targetType: "Game", targetId: game.id, metadata: { name } });
+  await logAdminAction({ actorId: admin.id, action: "game.create", targetType: "Game", targetId: game.id, metadata: { name: game.name } });
 
   return NextResponse.json({ id: game.id }, { status: 201 });
 }

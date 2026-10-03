@@ -1,18 +1,22 @@
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/session";
+import { safeNextPath } from "@/lib/safeRedirect";
 import { AuthSplitLayout } from "@/components/auth/AuthSplitLayout";
+import { AuthHeading } from "@/components/auth/AuthHeading";
 import ForgotPasswordForm from "./ForgotPasswordForm";
 
-export default function ForgotPasswordPage() {
+export default async function ForgotPasswordPage({ searchParams }: { searchParams: Promise<{ next?: string | string[] }> }) {
+  // Already signed in: this page has nothing to offer, so continue to
+  // wherever they were headed (redirect() replaces the history entry).
+  if (await getCurrentUser()) {
+    const { next } = await searchParams;
+    redirect(safeNextPath(typeof next === "string" ? next : null));
+  }
+
   return (
     <AuthSplitLayout>
-      <div className="card flex w-full flex-col gap-6">
-        <div className="flex flex-col items-center gap-3 text-center">
-          {/* eslint-disable-next-line @next/next/no-img-element -- local /public asset, no next/image usage elsewhere in this codebase */}
-          <img src="/circuit-logo.png" alt="Circuit" width={700} height={347} className="h-12 w-auto max-w-none lg:hidden" />
-          <div className="flex flex-col gap-1">
-            <h1 className="text-section-heading">Reset your password</h1>
-            <p className="text-sm text-muted">We&apos;ll email you a link to get back in.</p>
-          </div>
-        </div>
+      <div className="flex flex-col gap-7">
+        <AuthHeading eyebrow="Account recovery" title="Locked out?" sub="Enter your account email and we'll send you a link to get back in." />
         <ForgotPasswordForm />
       </div>
     </AuthSplitLayout>

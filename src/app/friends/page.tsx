@@ -8,12 +8,13 @@
  */
 
 import { redirect } from "next/navigation";
+import { loginPath } from "@/lib/safeRedirect";
 import { getCurrentUser } from "@/lib/session";
 
 export default async function FriendsRedirectPage() {
   const user = await getCurrentUser();
   if (!user) {
-    redirect("/login?next=/friends");
+    redirect(loginPath("/friends"));
   }
   redirect(`/players/${user.handle}?tab=friends`);
 }

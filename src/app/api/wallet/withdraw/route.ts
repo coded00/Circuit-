@@ -10,8 +10,12 @@
  * (credited back) in the same request — the balance was only ever
  * reserved against a transfer that's about to be attempted, not spent
  * until the provider actually confirms it left. A transfer left PENDING
- * (bank transfers aren't always instant) still counts as "gone" — same
- * as the payout route's own status handling.
+ * (bank transfers aren't always instant) stays debited until Paystack's
+ * transfer webhook (or the sweep's reconciliation) settles it — see
+ * src/lib/payments/transfers.ts, which also returns the money on a
+ * failed or reversed transfer. Every status change here goes through
+ * applyTransferOutcome's compare-and-swap, so the balance is credited
+ * back once even if the webhook lands while this request is running.
  */
 
 import { NextResponse } from "next/server";
@@ -21,7 +25,9 @@ import { getCurrentUser } from "@/lib/session";
 import { getDefaultPaymentProvider } from "@/lib/payments";
 import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
 import { trackEvent } from "@/lib/analytics";
-import { captureException, captureMessage } from "@/lib/observability";
+import { applyTransferOutcome } from "@/lib/payments/transfers";
+import { captureException } from "@/lib/observability";
+import { emailVerificationRequired } from "@/lib/emailGate";
 
 const MIN_WITHDRAW_AMOUNT = 10000; // ₦100
 
@@ -48,6 +54,8 @@ export async function POST(request: Request) {
     );
   }
 
+  const unverified = emailVerificationRequired(user);
+  if (unverified) return unverified;
   try {
     assertAgeGate(user.dateOfBirth);
   } catch (err) {
@@ -112,20 +120,10 @@ export async function POST(request: Request) {
       reason: "Circuit wallet withdrawal",
     });
 
-    await prisma.walletTransaction.update({
-      where: { id: txnId },
-      data: { status: transfer.status === "SUCCESS" ? "COMPLETE" : transfer.status === "FAILED" ? "FAILED" : "PENDING" },
-    });
+    if (transfer.status !== "PENDING") await applyTransferOutcome(reference, transfer.status);
 
     if (transfer.status === "FAILED") {
-      // Nothing actually left the platform — give the balance back.
-      await prisma.user.update({ where: { id: user.id }, data: { walletBalance: { increment: amount } } });
-      captureMessage("Wallet withdrawal reported FAILED by provider", "warning", {
-        userId: user.id,
-        walletTransactionId: txnId,
-        amount,
-        provider: provider.name,
-      });
+      // Nothing actually left the platform — the balance is back.
       return NextResponse.json({ error: "Withdrawal failed. Your balance has been restored." }, { status: 502 });
     }
 
@@ -140,10 +138,10 @@ export async function POST(request: Request) {
     // (a Paystack/Flutterwave outage mid-withdrawal) was invisible to
     // any error-monitoring dashboard.
     captureException(err, { route: "wallet/withdraw", userId: user.id, walletTransactionId: txnId, amount, provider: provider.name });
-    await prisma.$transaction([
-      prisma.user.update({ where: { id: user.id }, data: { walletBalance: { increment: amount } } }),
-      prisma.walletTransaction.update({ where: { id: txnId }, data: { status: "FAILED" } }),
-    ]);
-    throw err;
+    await applyTransferOutcome(reference, "FAILED");
+    return NextResponse.json(
+      { error: "We couldn't send your withdrawal right now. Your balance has been restored. Please try again later." },
+      { status: 502 }
+    );
   }
 }

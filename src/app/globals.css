@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* `dark:` utilities follow the site-wide theme (data-theme on <html>),
+   not the OS preference — the user's own toggle choice is what counts. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 /*
  * ============================================================================
  * CIRCUIT design system — "Light to discover. Dark to compete. Volt to
@@ -157,6 +161,13 @@
      convention .rank-row already established. */
   --stagger-step: 70ms;
 
+  /* Floating surfaces (popovers, dialogs, sheets). Layered and tight —
+     a 1px contact edge plus a soft ambient falloff — instead of one big
+     flat black blur, which read heavy and generic on the light surface. */
+  --shadow-float: 0 0 0 1px rgba(17, 19, 24, 0.04), 0 2px 4px rgba(17, 19, 24, 0.04), 0 12px 32px -6px rgba(17, 19, 24, 0.16);
+  --shadow-dialog: 0 0 0 1px rgba(17, 19, 24, 0.05), 0 8px 16px -4px rgba(17, 19, 24, 0.08), 0 32px 64px -12px rgba(17, 19, 24, 0.28);
+  --overlay-scrim: rgba(12, 14, 18, 0.42);
+
   --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-out: cubic-bezier(0, 0, 0.2, 1);
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
@@ -196,8 +207,14 @@
    text-color utility (e.g. a bare `<span>{name}</span>`) would otherwise
    inherit the light-theme color straight through, never re-evaluating
    `--foreground` at this scope. Re-declaring both here forces that
-   re-evaluation at the scope boundary. */
-[data-surface="dark"] {
+   re-evaluation at the scope boundary.
+
+   The same block also backs the site-wide dark mode: layout.tsx renders
+   `data-theme="dark"` on <html> (the app is dark-only), which turns
+   the whole app onto this palette the same way a `data-surface` wrapper
+   turns one section onto it. */
+[data-surface="dark"],
+:root[data-theme="dark"] {
   --background: #101318;
   --surface: #181c22;
   --surface-elevated: #222831;
@@ -211,9 +228,28 @@
   --muted: #9ca3af;
   --muted-strong: #6b7280;
 
+  --shadow-float: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 12px 32px -6px rgba(0, 0, 0, 0.6);
+  --shadow-dialog: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 32px 64px -12px rgba(0, 0, 0, 0.7);
+  --overlay-scrim: rgba(4, 6, 9, 0.66);
+
   background: var(--background);
   color: var(--foreground);
   color-scheme: dark;
+}
+
+/* A whole page on the dark surface (Challenge + match pages): on phones,
+   AppShell reserves bottom padding for the fixed tab bar *outside* the
+   page, which would otherwise show as a strip of the light background
+   under a dark page. Pull the page's own background down through it. */
+.dark-page {
+  margin-bottom: calc(-7rem - env(safe-area-inset-bottom));
+  padding-bottom: calc(7rem + env(safe-area-inset-bottom));
+}
+@media (min-width: 40rem) {
+  .dark-page {
+    margin-bottom: 0;
+    padding-bottom: 0;
+  }
 }
 
 @theme inline {
@@ -314,7 +350,7 @@ body {
   }
 
   .text-card-title {
-    @apply text-sm font-semibold sm:text-base;
+    @apply text-xs font-semibold;
   }
 
   .text-eyebrow {
@@ -337,7 +373,7 @@ body {
  */
 @layer components {
   .card {
-    @apply rounded-[15px] border border-border bg-surface p-5 transition duration-[var(--duration-base)] ease-[var(--ease-standard)];
+    @apply rounded-none border border-border bg-surface p-4 sm:p-5 transition duration-[var(--duration-base)] ease-[var(--ease-standard)];
   }
 
   /* Level 2 Interactive: hover lift (unchanged from before) plus real
@@ -349,18 +385,17 @@ body {
   }
 
   .card-row {
-    @apply rounded-[11px] border border-border bg-surface text-sm transition duration-[var(--duration-base)] ease-[var(--ease-standard)]
-      hover:border-border-hover hover:bg-surface-elevated active:scale-[0.99] active:duration-[var(--duration-instant)]
-      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
+    @apply rounded-none border border-border bg-surface text-sm transition duration-[var(--duration-base)] ease-[var(--ease-standard)]
+      hover:border-border-hover hover:bg-surface-elevated active:scale-[0.99] active:duration-[var(--duration-instant)] ;
   }
 
   .card-media {
-    @apply overflow-hidden rounded-[11px] border border-border bg-surface transition duration-[var(--duration-base)] ease-[var(--ease-standard)]
+    @apply overflow-hidden rounded-none border border-border bg-surface transition duration-[var(--duration-base)] ease-[var(--ease-standard)]
       hover:border-border-hover;
   }
 
   .widget {
-    @apply rounded-[15px] border border-border bg-surface p-4;
+    @apply rounded-none border border-border bg-surface p-4;
   }
 
   .surface-elevated {
@@ -393,45 +428,129 @@ body {
      light default surface and any dark-scoped one) — keyboard users get
      a real focus indicator instead of relying on the browser's default
      outline, which several of these classes visually crowd out anyway. */
+
+  /* The Circuit corner: the bottom-right is sliced off on a diagonal, the
+     other three stay sharp. --cut is the size of the slice; clip-path does the
+     cut, so the ::before below redraws the outline along the diagonal
+     (set --cut-line to the element's border colour; transparent = none). */
+  .cut-xs,
+  .cut-sm,
+  .cut-lg,
+  .btn-primary,
+  .btn-secondary,
+  .btn-ghost,
+  .btn-danger,
+  .btn-danger-solid,
+  .btn-golive,
+  .btn-icon,
+  .badge {
+    --cut-line: transparent;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%);
+    border-radius: 0;
+  }
+  .cut-xs,
+  .badge {
+    --cut: 6px;
+  }
+  .cut-sm,
+  .btn-primary,
+  .btn-secondary,
+  .btn-ghost,
+  .btn-danger,
+  .btn-danger-solid,
+  .btn-golive,
+  .btn-icon {
+    --cut: 10px;
+  }
+  .cut-lg {
+    --cut: 20px;
+  }
+  /* Avatars and other square marks: the slice scales with the box (a quarter of it). */
+  .cut-avatar {
+    clip-path: polygon(0 0, 100% 0, 100% 72%, 72% 100%, 0 100%);
+    border-radius: 0;
+  }
+  .btn-primary,
+  .btn-secondary,
+  .btn-ghost,
+  .btn-danger,
+  .btn-danger-solid,
+  .btn-golive,
+  .btn-icon,
+  .badge,
+  .cut-xs,
+  .cut-sm,
+  .cut-lg {
+    position: relative;
+  }
+  .cut-xs::before,
+  .cut-sm::before,
+  .cut-lg::before,
+  .btn-primary::before,
+  .btn-secondary::before,
+  .btn-ghost::before,
+  .btn-danger::before,
+  .btn-danger-solid::before,
+  .btn-golive::before,
+  .btn-icon::before,
+  .badge::before {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: var(--cut);
+    height: var(--cut);
+    pointer-events: none;
+    background: linear-gradient(to bottom right, transparent calc(50% - 1px), var(--cut-line) calc(50% - 1px), var(--cut-line) 50%, transparent 50%);
+  }
+  .btn-secondary {
+    --cut-line: var(--border-strong);
+  }
+  .btn-danger {
+    --cut-line: color-mix(in srgb, var(--danger) 40%, transparent);
+  }
+  .btn-golive {
+    --cut-line: var(--accent-blue);
+  }
+  .badge-solid {
+    --cut-line: rgb(255 255 255 / 0.15);
+  }
+
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-control)] bg-accent-volt px-5 py-2.5
+    @apply inline-flex items-center justify-center gap-1.5 rounded-none bg-accent-volt px-5 py-2.5
       text-sm font-semibold text-accent-volt-foreground shadow-sm transition duration-[var(--duration-base)] ease-[var(--ease-standard)]
-      hover:brightness-95 active:scale-[0.97] active:brightness-90 active:duration-[var(--duration-instant)]
-      disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100
-      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-volt/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
+      hover:brightness-105 active:brightness-95 active:duration-[var(--duration-instant)]
+      disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 ;
   }
 
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-control)] border border-border-strong
+    @apply inline-flex items-center justify-center gap-1.5 rounded-none border border-border-strong
       bg-transparent px-5 py-2.5 text-sm font-medium text-foreground transition duration-[var(--duration-base)] ease-[var(--ease-standard)]
-      hover:bg-surface-elevated active:scale-[0.97] active:duration-[var(--duration-instant)]
-      disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100
-      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
+      hover:bg-surface-elevated active:duration-[var(--duration-instant)]
+      disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 ;
   }
 
   .btn-ghost {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-control)] bg-surface-elevated px-5 py-2.5
+    @apply inline-flex items-center justify-center gap-1.5 rounded-none bg-surface-elevated px-5 py-2.5
       text-sm font-medium text-muted transition duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:text-foreground
-      active:scale-[0.97] active:duration-[var(--duration-instant)]
-      disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100
-      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
+      active:duration-[var(--duration-instant)]
+      disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 ;
   }
 
   .btn-danger {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-control)] border border-danger/40
+    @apply inline-flex items-center justify-center gap-1.5 rounded-none border border-danger/40
       px-5 py-2.5 text-sm font-medium text-danger transition duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:bg-danger/10
-      active:scale-[0.97] active:duration-[var(--duration-instant)]
-      disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100
-      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
+      active:duration-[var(--duration-instant)]
+      disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 ;
   }
 
   /* "Go Live" — streaming is out of MVP scope; this class stays defined
      only until the last two disabled buttons using it are removed
      (TopBar, YourChannel) as part of the homepage rework. */
   .btn-golive {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-control)] border px-4 py-2 text-sm font-semibold
+    @apply inline-flex items-center justify-center gap-1.5 rounded-none border px-4 py-2 text-sm font-semibold
       text-foreground transition duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:bg-surface-elevated
-      active:scale-[0.97] active:duration-[var(--duration-instant)]
+      active:duration-[var(--duration-instant)]
       disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100;
     background: var(--surface-elevated);
     border-color: var(--accent-blue);
@@ -441,10 +560,87 @@ body {
     /* 44px — the WCAG/iOS minimum touch target. One shared class, so this
        fixes every icon-only button app-wide (header actions, mobile search
        toggle, admin top bar, share triggers) in one place. */
-    @apply inline-flex h-11 w-11 items-center justify-center rounded-full text-muted transition duration-[var(--duration-base)] ease-[var(--ease-standard)]
+    @apply inline-flex h-11 w-11 items-center justify-center rounded-none text-muted transition duration-[var(--duration-base)] ease-[var(--ease-standard)]
       hover:bg-surface-elevated hover:text-foreground active:scale-90 active:duration-[var(--duration-instant)]
-      disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100
-      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
+      disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 ;
+  }
+
+  /* Game-button elevation: a solid lip along the bottom edge (an inset
+     shadow, so the sliced corner never clips it) that the button sits on.
+     Hover lifts it a touch, press sinks it onto the lip. --lip is the lip
+     colour, --lip-size its height. */
+  .btn-primary,
+  .btn-secondary,
+  .btn-ghost,
+  .btn-danger,
+  .btn-danger-solid,
+  .btn-golive,
+  .btn-icon {
+    --lip-size: 3px;
+    box-shadow: inset 0 1px 0 var(--lip-top, transparent), inset 0 calc(var(--lip-size) * -1) 0 var(--lip, transparent);
+    transition-property: transform, box-shadow, background-color, color, filter, border-color, opacity;
+  }
+  .btn-primary {
+    --lip: color-mix(in srgb, var(--accent-volt) 52%, black);
+    --lip-top: rgb(255 255 255 / 0.4);
+    --lip-size: 4px;
+  }
+  .btn-danger-solid {
+    --lip: color-mix(in srgb, var(--danger) 55%, black);
+    --lip-top: rgb(255 255 255 / 0.25);
+    --lip-size: 4px;
+  }
+  .btn-secondary,
+  .btn-golive {
+    --lip: rgb(255 255 255 / 0.1);
+  }
+  .btn-ghost {
+    --lip: rgb(0 0 0 / 0.3);
+  }
+  .btn-danger {
+    --lip: color-mix(in srgb, var(--danger) 30%, transparent);
+  }
+  .btn-icon:hover {
+    --lip: rgb(255 255 255 / 0.08);
+    --lip-size: 2px;
+  }
+  .btn-primary:hover:not(:disabled),
+  .btn-secondary:hover:not(:disabled),
+  .btn-ghost:hover:not(:disabled),
+  .btn-danger:hover:not(:disabled),
+  .btn-danger-solid:hover:not(:disabled),
+  .btn-golive:hover:not(:disabled) {
+    transform: translateY(-1px);
+    --lip-size: 4px;
+  }
+  .btn-primary:active:not(:disabled),
+  .btn-secondary:active:not(:disabled),
+  .btn-ghost:active:not(:disabled),
+  .btn-danger:active:not(:disabled),
+  .btn-danger-solid:active:not(:disabled),
+  .btn-golive:active:not(:disabled),
+  .btn-icon:active:not(:disabled) {
+    transform: translateY(2px);
+    --lip-size: 1px;
+  }
+  .btn-primary:disabled,
+  .btn-secondary:disabled,
+  .btn-ghost:disabled,
+  .btn-danger:disabled,
+  .btn-danger-solid:disabled,
+  .btn-golive:disabled {
+    --lip-size: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .btn-primary,
+    .btn-secondary,
+    .btn-ghost,
+    .btn-danger,
+    .btn-danger-solid,
+    .btn-golive,
+    .btn-icon {
+      transform: none !important;
+    }
   }
 
   /* Phase 13: a floating panel (dropdown menu, popover) — soft elevation,
@@ -452,14 +648,14 @@ body {
      Consolidates what AccountMenu/CreateMenu/NotificationBell/SearchInput
      each independently hand-rolled slightly differently. */
   .dropdown-panel {
-    @apply rounded-[11px] border border-border bg-surface;
+    @apply rounded-none border border-border bg-surface;
     /* However a caller anchors this panel (right-0, left-0, ...), it can
        never be wider than the viewport itself minus a small margin — a
        fixed-width panel anchored to a trigger that isn't near the true
        viewport edge (e.g. NotificationBell, mid-header) would otherwise
        clip off the opposite edge on narrow phones. */
     max-width: calc(100vw - 2rem);
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+    box-shadow: var(--shadow-float);
     animation: motion-panel-enter var(--duration-base) var(--ease-out) both;
     transform-origin: top right;
   }
@@ -484,9 +680,9 @@ body {
   }
 
   .field-input {
-    @apply w-full rounded-[var(--radius-control)] border border-border bg-surface-elevated px-3.5 py-2.5 text-sm
+    @apply w-full rounded-none border border-border bg-surface-elevated px-3.5 py-2.5 text-sm
       outline-none transition duration-[var(--duration-fast)] ease-[var(--ease-standard)] placeholder:text-muted-strong
-      focus:border-accent-blue focus:ring-2 focus:ring-accent-blue-soft
+      focus:border-accent-volt focus:shadow-[inset_0_0_0_1px_var(--accent-volt)]
       disabled:cursor-not-allowed disabled:opacity-50;
   }
 
@@ -497,9 +693,9 @@ body {
      CSS custom properties as a color keyword) restores it consistently,
      app-wide, one fix instead of a per-caller icon overlay. */
   .field-select {
-    @apply w-full appearance-none rounded-[var(--radius-control)] border border-border bg-surface-elevated bg-no-repeat px-3.5 py-2.5 pr-9
+    @apply w-full appearance-none rounded-none border border-border bg-surface-elevated bg-no-repeat px-3.5 py-2.5 pr-9
       text-sm outline-none transition duration-[var(--duration-fast)] ease-[var(--ease-standard)]
-      focus:border-accent-blue focus:ring-2 focus:ring-accent-blue-soft
+      focus:border-accent-volt focus:shadow-[inset_0_0_0_1px_var(--accent-volt)]
       disabled:cursor-not-allowed disabled:opacity-50;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23888f99' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 7.5L10 12.5L15 7.5'/%3E%3C/svg%3E");
     background-position: right 0.75rem center;
@@ -507,9 +703,9 @@ body {
   }
 
   .field-textarea {
-    @apply w-full resize-y rounded-[var(--radius-control)] border border-border bg-surface-elevated px-3.5 py-2.5 text-sm
+    @apply w-full resize-y rounded-none border border-border bg-surface-elevated px-3.5 py-2.5 text-sm
       outline-none transition duration-[var(--duration-fast)] ease-[var(--ease-standard)] placeholder:text-muted-strong
-      focus:border-accent-blue focus:ring-2 focus:ring-accent-blue-soft
+      focus:border-accent-volt focus:shadow-[inset_0_0_0_1px_var(--accent-volt)]
       disabled:cursor-not-allowed disabled:opacity-50;
   }
 }
@@ -521,8 +717,33 @@ body {
  */
 @layer components {
   .badge {
-    @apply inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium
+    @apply inline-flex w-fit items-center gap-1.5 rounded-none px-2.5 py-1 text-xs font-semibold
       whitespace-nowrap;
+  }
+
+  /* Solid status badges for anything laid over artwork (tournament card
+     images, heroes): a soft tint disappears on a busy, bright poster, so
+     these are a full colour fill with white text and a hairline edge. */
+  .badge-solid {
+    @apply border border-white/15 shadow-sm;
+  }
+  .badge-solid.badge-live {
+    @apply bg-live text-white;
+  }
+  .badge-solid.badge-open {
+    @apply bg-status-open text-white;
+  }
+  .badge-solid.badge-neutral {
+    @apply bg-[#2b3038] text-white;
+  }
+  .badge-solid.badge-complete {
+    @apply bg-success-strong text-white;
+  }
+  .badge-solid.badge-cancelled {
+    @apply bg-danger-strong text-white;
+  }
+  .badge-solid.badge-attention {
+    @apply bg-warning text-[#1f1300];
   }
 
   .badge-md {
@@ -556,7 +777,7 @@ body {
 
   /* Small dark compact key-style element — the ⌘K search hint (Phase 3). */
   .kbd {
-    @apply rounded-md border border-border-strong bg-surface-elevated px-1.5 py-0.5 font-mono text-[10px] text-muted;
+    @apply rounded-md border border-border-strong bg-surface-elevated px-1.5 py-0.5 font-mono text-[11px] text-muted;
   }
 }
 
@@ -572,8 +793,7 @@ body {
   }
   .tab {
     @apply border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted transition duration-[var(--duration-fast)] ease-[var(--ease-standard)]
-      hover:text-foreground active:opacity-70
-      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
+      hover:text-foreground active:opacity-70 ;
   }
   .tab-active {
     @apply border-accent-volt text-foreground;
@@ -583,7 +803,7 @@ body {
   }
 
   .table-wrap {
-    @apply overflow-x-auto rounded-[11px] border border-border;
+    @apply overflow-x-auto rounded-none border border-border;
   }
   .table {
     @apply w-full border-collapse text-sm;
@@ -603,7 +823,7 @@ body {
   }
 
   .alert {
-    @apply flex items-start gap-3 rounded-[11px] border p-4 text-sm;
+    @apply flex items-start gap-3 rounded-none border p-4 text-sm;
   }
   .alert-info {
     @apply border-info/30 bg-info/10 text-info;
@@ -633,7 +853,7 @@ body {
     @apply text-sm text-muted;
   }
   .skeleton {
-    @apply animate-pulse rounded-lg bg-surface-elevated;
+    @apply animate-pulse rounded-none bg-surface-elevated;
   }
 }
 
@@ -874,10 +1094,13 @@ body {
 /*
  * ============================================================================
  * Phase 20 — navigation & page transitions. Circuit's motion hierarchy has
- * three levels (see PageTransition.tsx for Level 1's Framer Motion side):
+ * three levels:
  *
- *   Level 1 Every navigation — fade/rise/scale, ~350ms. Framer Motion,
- *           applied everywhere via AppShell's AnimatePresence.
+ *   Level 1 Every navigation — a React <ViewTransition> (browser View
+ *           Transitions API) keyed by pathname in AppShell: slides forward/
+ *           back by URL depth, crossfades otherwise; card art morphs into
+ *           the tournament hero; tabs crossfade. See "View transitions" at
+ *           the end of this file.
  *   Level 2 Game/tournament pages — a HUD scan line + slight glitch, layered
  *           on top of Level 1 rather than replacing it. `.arena-transition`
  *           below. Scoped in AppShell to tournament/battle detail + bracket
@@ -911,12 +1134,6 @@ body {
     box-shadow: 0 0 12px var(--accent-volt);
     animation: arena-scan 0.4s var(--ease-out);
     pointer-events: none;
-  }
-
-  /* Tab content switch (TournamentTabs) — quicker than a full page
-     transition since it's a much smaller change of context. */
-  .tab-content-enter {
-    animation: motion-fade-in var(--duration-fast) var(--ease-standard) both;
   }
 
   /* Bottom-sheet modal (MobileTabBar's profile/menu sheet) — the one real
@@ -1087,7 +1304,872 @@ body {
     transition-duration: 0.01ms !important;
   }
 
+  /* A delayed entrance would otherwise sit hidden through its delay. */
+  *,
+  *::before,
+  *::after {
+    animation-delay: 0s !important;
+  }
+
   html {
     scroll-behavior: auto;
   }
+}
+
+/*
+ * ============================================================================
+ * Overlays — ui/Overlay.tsx's shell (dialogs, sheets) and the pieces the
+ * dialogs built on it share.
+ * ============================================================================
+ */
+@layer components {
+  .overlay-backdrop {
+    background: var(--overlay-scrim);
+    backdrop-filter: blur(3px) saturate(0.9);
+    -webkit-backdrop-filter: blur(3px) saturate(0.9);
+  }
+
+  .overlay-panel {
+    background: var(--surface);
+    color: var(--foreground);
+    box-shadow: var(--shadow-dialog);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  @media (min-width: 40rem) {
+    .overlay-panel {
+      padding-bottom: 0;
+    }
+  }
+
+  /* Footer action bar of a dialog: its own tinted strip, actions pushed
+     right on desktop; stacked full-width (primary on top) on phones. */
+  .overlay-actions {
+    @apply flex flex-col-reverse gap-2 border-t border-border bg-background/60 px-5 py-4 sm:flex-row sm:justify-end sm:px-6;
+  }
+  .overlay-actions > * {
+    @apply w-full justify-center sm:w-auto;
+  }
+
+  /* Solid destructive — the confirm step of a delete/cancel/withdraw.
+     .btn-danger (outlined) stays for the trigger buttons on the page. */
+  .btn-danger-solid {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-none bg-danger px-5 py-2.5
+      text-sm font-semibold text-white transition duration-[var(--duration-base)] ease-[var(--ease-standard)]
+      hover:bg-danger-strong active:duration-[var(--duration-instant)]
+      disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 ;
+  }
+}
+
+/*
+ * ============================================================================
+ * Calendar (/calendar). Event colour arrives per element as `--ev` (see
+ * components/calendar/types.ts's EVENT_KIND_META) so one rule covers all
+ * four kinds.
+ * ============================================================================
+ */
+@layer components {
+  .cal-event {
+    background: color-mix(in srgb, var(--ev) 11%, var(--surface));
+    box-shadow: inset 2px 0 0 var(--ev);
+  }
+  .cal-dot {
+    background: var(--ev);
+  }
+  /* Days outside the visible month: hatched, not just faded, so the
+     month's real edges read at a glance. */
+  .cal-outside {
+    background-image: repeating-linear-gradient(
+      135deg,
+      transparent 0 6px,
+      color-mix(in srgb, var(--foreground) 4%, transparent) 6px 7px
+    );
+  }
+}
+
+/* Community: a message opened from a mention notification flashes once. */
+@layer components {
+  .message-flash {
+    animation: message-flash 2.4s var(--ease-out) both;
+  }
+}
+@keyframes message-flash {
+  0%,
+  35% {
+    background-color: color-mix(in srgb, var(--accent-volt) 28%, transparent);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+/*
+ * ============================================================================
+ * View transitions (React <ViewTransition> + the browser View Transitions
+ * API). Browsers without support just navigate instantly.
+ *
+ *   .page-exit / .page-enter  — AppShell's page wrapper, keyed by pathname.
+ *       <html data-nav-dir="forward"> (deeper URL): old slides left, new
+ *       comes in from the right; "back": the mirror image; no direction:
+ *       a quick crossfade with a small rise. See NavigationDirection.tsx.
+ *   .tournament-morph        — card art ↔ tournament hero (same `name`),
+ *       only on navigations to/from a tournament page (<html
+ *       data-nav-morph>); otherwise the art just fades with its page.
+ *   .content-swap            — same-page content swaps (tabs, filters,
+ *       calendar views): a short crossfade, no movement.
+ *   site-header / site-sidebar / site-tabbar — the app chrome is pinned:
+ *       it never slides, and stays above the moving page.
+ * ============================================================================
+ */
+:root {
+  --vt-exit: 140ms;
+  --vt-enter: 220ms;
+  --vt-move: 360ms;
+  --vt-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Clicks during a transition reach the live page instead of the overlay. */
+::view-transition {
+  pointer-events: none;
+}
+
+::view-transition-group(site-header),
+::view-transition-group(site-sidebar),
+::view-transition-group(site-tabbar) {
+  animation: none;
+  z-index: 100;
+}
+::view-transition-old(site-header),
+::view-transition-old(site-sidebar),
+::view-transition-old(site-tabbar) {
+  display: none;
+}
+::view-transition-new(site-header),
+::view-transition-new(site-sidebar),
+::view-transition-new(site-tabbar) {
+  animation: none;
+}
+
+/* ---- Pages: default crossfade ---- */
+::view-transition-old(.page-exit) {
+  animation: var(--vt-exit) ease-in both vt-fade-out;
+}
+::view-transition-new(.page-enter) {
+  animation:
+    var(--vt-enter) ease-out var(--vt-exit) both vt-fade-in,
+    var(--vt-move) var(--vt-ease) both vt-rise;
+}
+
+/* ---- Pages: directional ---- */
+html[data-nav-dir="forward"]::view-transition-old(.page-exit) {
+  --vt-offset: -48px;
+  animation:
+    var(--vt-exit) ease-in both vt-fade-out,
+    var(--vt-move) var(--vt-ease) both vt-slide-out;
+}
+html[data-nav-dir="forward"]::view-transition-new(.page-enter) {
+  --vt-offset: 48px;
+  animation:
+    var(--vt-enter) ease-out var(--vt-exit) both vt-fade-in,
+    var(--vt-move) var(--vt-ease) both vt-slide-in;
+}
+html[data-nav-dir="back"]::view-transition-old(.page-exit) {
+  --vt-offset: 48px;
+  animation:
+    var(--vt-exit) ease-in both vt-fade-out,
+    var(--vt-move) var(--vt-ease) both vt-slide-out;
+}
+html[data-nav-dir="back"]::view-transition-new(.page-enter) {
+  --vt-offset: -48px;
+  animation:
+    var(--vt-enter) ease-out var(--vt-exit) both vt-fade-in,
+    var(--vt-move) var(--vt-ease) both vt-slide-in;
+}
+
+/* ---- Browser back/forward: entrance only (no view transition runs) ---- */
+html[data-nav-pop] .page-shell {
+  animation:
+    var(--vt-enter) ease-out both vt-fade-in,
+    var(--vt-move) var(--vt-ease) both vt-slide-in;
+}
+html[data-nav-pop="back"] .page-shell {
+  --vt-offset: -48px;
+}
+html[data-nav-pop="forward"] .page-shell {
+  --vt-offset: 48px;
+}
+html[data-nav-pop="same"] .page-shell {
+  --vt-offset: 0px;
+}
+/* Any transform/translate would make this the containing block for the
+   chat page's fixed mobile panel mid-animation — opacity only there. */
+html[data-nav-pop] .page-shell.page-shell-fade {
+  animation: var(--vt-enter) ease-out both vt-fade-in;
+}
+
+/* ---- Shared element: card art → tournament hero ---- */
+::view-transition-group(.tournament-morph) {
+  animation-duration: 420ms;
+  animation-timing-function: var(--vt-ease);
+}
+::view-transition-image-pair(.tournament-morph) {
+  animation-name: vt-morph-blur;
+}
+/* Both snapshots fill the moving box (the card and hero crop differently). */
+::view-transition-old(.tournament-morph),
+::view-transition-new(.tournament-morph) {
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Between two list pages the same art pairs up too — don't fly it
+   across; hide the old copy and fade the new one in with its page. */
+html:not([data-nav-morph])::view-transition-group(.tournament-morph) {
+  animation: none;
+}
+html:not([data-nav-morph])::view-transition-old(.tournament-morph) {
+  display: none;
+}
+html:not([data-nav-morph])::view-transition-new(.tournament-morph) {
+  animation: var(--vt-enter) ease-out var(--vt-exit) both vt-fade-in;
+}
+
+/* ---- Same-page content swaps ---- */
+::view-transition-group(.content-swap) {
+  animation-duration: 200ms;
+}
+::view-transition-old(.content-swap) {
+  animation: 120ms ease-in both vt-fade-out;
+}
+::view-transition-new(.content-swap) {
+  animation: 200ms ease-out 60ms both vt-fade-in;
+}
+
+@keyframes vt-fade-in {
+  from { opacity: 0; }
+}
+@keyframes vt-fade-out {
+  to { opacity: 0; }
+}
+@keyframes vt-rise {
+  from { transform: translateY(10px); }
+}
+@keyframes vt-slide-in {
+  from { translate: var(--vt-offset) 0; }
+}
+@keyframes vt-slide-out {
+  to { translate: var(--vt-offset) 0; }
+}
+@keyframes vt-morph-blur {
+  35% { filter: blur(2px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+}
+
+/* Admin/list filter forms: on phones the first field (search) and the last
+   control (submit) span the row and the rest pair up two per row, instead
+   of each wrapping to whatever width its min-width happens to allow. */
+@layer components {
+  .filter-bar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: end;
+    gap: 0.75rem;
+  }
+  .filter-bar > * {
+    min-width: 0;
+  }
+  .filter-bar > :first-child,
+  .filter-bar > :last-child {
+    grid-column: 1 / -1;
+  }
+  @media (min-width: 640px) {
+    .filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+    }
+  }
+}
+
+/*
+ * ============================================================================
+ * Admin control center — a calmer operator surface (Linear/Stripe-style).
+ * Scoped to `[data-admin]` (set on /admin's layout) so the player app is
+ * untouched. Same dark palette and fonts; what changes is emphasis:
+ * flat panels with hairline borders instead of floating cards, smaller
+ * controls, a quiet table, volt only on the one primary action per view
+ * and live states, muted eyebrows. Structure (page headers, sections,
+ * stat strips) comes from src/components/admin/ui.tsx.
+ * ============================================================================
+ */
+[data-admin] {
+  --background: #0d1014;
+  --surface: #13171c;
+  --surface-elevated: #1a1f26;
+  --border: rgba(255, 255, 255, 0.07);
+  --border-hover: rgba(255, 255, 255, 0.14);
+  --border-strong: rgba(255, 255, 255, 0.13);
+  --radius-control: 8px;
+  font-size: 14px;
+}
+
+@layer components {
+  /* Panels: flat, hairline, tight radius — no lift, no hover jump. */
+  [data-admin] .card,
+  [data-admin] .widget {
+    border-radius: 10px;
+    background: var(--surface);
+    box-shadow: none;
+  }
+  [data-admin] .card-hover:hover {
+    transform: none;
+  }
+
+  /* Controls: 36px tall, 13px text. */
+  [data-admin] .btn-primary,
+  [data-admin] .btn-secondary,
+  [data-admin] .btn-ghost,
+  [data-admin] .btn-danger,
+  [data-admin] .btn-danger-solid {
+    min-height: 2.25rem;
+    padding: 0.4rem 0.9rem;
+    font-size: 13px;
+    border-radius: 8px;
+    box-shadow: none;
+  }
+  [data-admin] .btn-primary:active,
+  [data-admin] .btn-secondary:active,
+  [data-admin] .btn-ghost:active,
+  [data-admin] .btn-danger:active {
+    transform: scale(0.98);
+  }
+  [data-admin] .btn-secondary {
+    border-color: var(--border-strong);
+    background: var(--surface-elevated);
+  }
+  [data-admin] .btn-secondary:hover {
+    background: #212730;
+  }
+  [data-admin] .btn-ghost {
+    background: transparent;
+  }
+  [data-admin] .btn-ghost:hover {
+    background: var(--surface-elevated);
+  }
+  [data-admin] .field-input,
+  [data-admin] .field-select,
+  [data-admin] .field-textarea {
+    background-color: var(--background);
+    border-color: var(--border-strong);
+    font-size: 13px;
+    padding-top: 0.45rem;
+    padding-bottom: 0.45rem;
+    border-radius: 8px;
+  }
+  [data-admin] .field-input,
+  [data-admin] .field-select {
+    min-height: 2.25rem;
+  }
+  [data-admin] .field-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+  }
+
+  /* Eyebrows are labels here, not accents. */
+  [data-admin] .text-eyebrow {
+    color: var(--muted-strong);
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+  }
+
+  /* Tables: no header band, sentence-case headers, 44px rows. */
+  [data-admin] .table-wrap {
+    border-radius: 10px;
+    background: var(--surface);
+  }
+  [data-admin] .table th {
+    background: transparent;
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted-strong);
+    padding: 0.6rem 1rem;
+    white-space: nowrap;
+  }
+  [data-admin] .table td {
+    padding: 0.65rem 1rem;
+    font-variant-numeric: tabular-nums;
+  }
+  [data-admin] .table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.025);
+  }
+  [data-admin] .table tbody tr[data-href] {
+    cursor: pointer;
+  }
+
+  /* Badges: small, rectangular-ish status chips. */
+  [data-admin] .badge {
+    border-radius: 6px;
+    font-size: 11px;
+    padding: 0.1rem 0.45rem;
+    font-weight: 500;
+  }
+
+  /* Admin kit pieces (src/components/admin/ui.tsx). */
+  .admin-page {
+    @apply mx-auto flex w-full max-w-[1180px] flex-col gap-8;
+  }
+  .admin-title {
+    @apply text-[22px] leading-7 font-semibold tracking-[-0.01em] text-foreground;
+  }
+  .admin-section-title {
+    @apply text-[13px] font-semibold text-foreground;
+  }
+  .admin-stat-strip {
+    @apply grid overflow-hidden rounded-[10px] border border-border bg-surface;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  }
+  .admin-stat {
+    @apply flex flex-col gap-1 px-4 py-3.5;
+    box-shadow: -1px 0 0 0 var(--border), 0 -1px 0 0 var(--border);
+  }
+  .admin-stat-value {
+    @apply text-[20px] leading-7 font-semibold tracking-[-0.01em] tabular-nums text-foreground;
+  }
+  .admin-kv {
+    @apply grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2 lg:grid-cols-3;
+  }
+}
+
+/* Admin numbers: the body face with tabular digits (no slashed zeros, a
+   normal-weight ₦). Unlayered on purpose — it has to win over the
+   `font-mono` utility wherever a component still uses it. Real codes
+   (match codes, ids) opt back into mono with .font-code. */
+[data-admin] .font-mono,
+[data-admin] .text-stat {
+  font-family: var(--font-body);
+  font-variant-numeric: tabular-nums;
+}
+[data-admin] .font-code {
+  font-family: var(--font-geist-mono);
+}
+
+/* Tournament tabs at the narrowest two-column laptop widths: six tabs need about 526px but the
+   column only has 416px at a 1024px window (the Registration panel takes the rest), so the last
+   tab used to be cut off. Slightly tighter tabs fit all six; above this band nothing changes. */
+@media (min-width: 1024px) and (max-width: 1139px) {
+  .section-tabs .tab {
+    padding-inline: 0.5rem;
+    font-size: 13px;
+  }
+  .section-tabs .tabs {
+    gap: 2px;
+  }
+}
+
+
+/*
+ * ============================================================================
+ * Game feel — toast, the match "versus" entrance, staggered lists.
+ * Every one is plain CSS, so the prefers-reduced-motion block above (which
+ * also zeroes animation delays) turns them all off.
+ * ============================================================================
+ */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.toast-in {
+  animation: toast-in var(--duration-base) var(--ease-out) both;
+}
+
+@keyframes versus-from-left {
+  from {
+    opacity: 0;
+    transform: translateX(-32px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes versus-from-right {
+  from {
+    opacity: 0;
+    transform: translateX(32px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes versus-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.18);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.vs-left {
+  animation: versus-from-left var(--duration-reveal) var(--ease-reveal) both;
+}
+.vs-right {
+  animation: versus-from-right var(--duration-reveal) var(--ease-reveal) both;
+}
+.vs-mid {
+  animation: versus-pop var(--duration-celebration) var(--ease-spring) 180ms both;
+}
+
+/* A list whose first rows slide up one after another instead of all at once. */
+[data-stagger] > * {
+  animation: motion-slide-up var(--duration-base) var(--ease-out) both;
+}
+[data-stagger] > *:nth-child(2) { animation-delay: 40ms; }
+[data-stagger] > *:nth-child(3) { animation-delay: 80ms; }
+[data-stagger] > *:nth-child(4) { animation-delay: 120ms; }
+[data-stagger] > *:nth-child(5) { animation-delay: 160ms; }
+[data-stagger] > *:nth-child(6) { animation-delay: 200ms; }
+[data-stagger] > *:nth-child(n + 7) { animation-delay: 240ms; }
+
+/*
+ * ============================================================================
+ * Atmosphere — the lighting and depth that make the dark theme feel like a
+ * space rather than a flat colour. Page glow, game-lit heroes, a glowing LIVE
+ * state, quieted finished events, and softer elevation on panels.
+ * Everything animated here is gated by the prefers-reduced-motion block above.
+ * ============================================================================
+ */
+
+/* A soft wash of colour fixed behind the whole app (dark theme only). */
+.app-ambient {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+:root[data-theme="dark"] .app-ambient {
+  display: block;
+  background:
+    radial-gradient(48rem 32rem at 12% -8%, rgba(193, 244, 0, 0.07), transparent 62%),
+    radial-gradient(56rem 36rem at 105% 4%, rgba(124, 58, 237, 0.13), transparent 62%),
+    radial-gradient(48rem 30rem at 55% 112%, rgba(59, 130, 246, 0.09), transparent 64%);
+}
+
+/* A game-coloured light across a hero: set --glow to the game's tint. */
+.arena-glow {
+  pointer-events: none;
+  background:
+    radial-gradient(75% 85% at 15% 0%, color-mix(in srgb, var(--glow, #4c1d95) 70%, transparent), transparent 70%),
+    radial-gradient(60% 70% at 100% 100%, color-mix(in srgb, var(--glow, #4c1d95) 45%, transparent), transparent 72%);
+}
+/* Dark edges, so the eye settles on the middle. */
+.arena-vignette {
+  pointer-events: none;
+  background: radial-gradient(125% 105% at 50% 38%, transparent 52%, rgba(0, 0, 0, 0.55));
+}
+
+/* A live competition glows red at the edge, and the inner light slowly swells and
+   settles. Only opacity animates (the cheap, compositor-only property); the outer
+   glow is static. The element needs a positioned parent for the ring, hence relative. */
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.live-glow {
+  position: relative;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--live) 55%, transparent),
+    0 0 26px -6px color-mix(in srgb, var(--live) 38%, transparent);
+}
+.live-glow::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--live) 90%, transparent),
+    inset 0 0 30px -12px color-mix(in srgb, var(--live) 60%, transparent);
+  animation: live-pulse var(--duration-ambient) ease-in-out infinite;
+}
+
+/* Finished or cancelled: the art recedes so live and open ones stand out. */
+.ended-art {
+  filter: grayscale(0.75) brightness(0.8);
+}
+
+/* Panels sit above the page instead of lying on it. */
+:root[data-theme="dark"] .card,
+[data-surface="dark"] .card {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.045),
+    0 22px 44px -28px rgba(0, 0, 0, 0.8);
+}
+
+/* The two lights on a duel poster: warm on the challenger's side, cool on the empty slot waiting for you. */
+.duel-lights {
+  pointer-events: none;
+  background:
+    radial-gradient(55% 85% at 20% 58%, rgba(193, 244, 0, 0.2), transparent 70%),
+    radial-gradient(55% 85% at 82% 58%, rgba(129, 140, 248, 0.28), transparent 70%);
+}
+
+
+/*
+ * ============================================================================
+ * The Circuit shape — panels, fields, menus, alerts, tables and skeletons get
+ * the sliced bottom-right corner buttons already have. clip-path does the cut;
+ * a one-pixel diagonal gradient redraws the outline along it (works on inputs,
+ * which can't have pseudo-elements). --cut is the size of the slice and
+ * --cut-line the outline colour. Inset shadows and outlines survive the clip;
+ * outer shadows and rings don't, so focus is drawn inside (see below).
+ * ============================================================================
+ */
+@layer components {
+  .card,
+  .card-row,
+  .card-media,
+  .widget,
+  .dropdown-panel,
+  .alert,
+  .table-wrap,
+  .field-input,
+  .field-select,
+  .field-textarea,
+  .skeleton {
+    --cut-line: var(--border);
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%);
+    background-repeat: no-repeat;
+    background-position: right bottom;
+    background-size: var(--cut) var(--cut);
+    background-image: linear-gradient(to bottom right, transparent calc(50% - 1px), var(--cut-line) calc(50% - 1px), var(--cut-line) 50%, transparent 50%);
+  }
+  .card,
+  .alert {
+    --cut: 18px;
+  }
+  .widget {
+    --cut: 14px;
+  }
+  .card-row,
+  .card-media,
+  .dropdown-panel,
+  .table-wrap,
+  .field-textarea {
+    --cut: 12px;
+  }
+  .field-input,
+  .field-select,
+  .skeleton {
+    --cut: 10px;
+  }
+  .alert-info {
+    --cut-line: color-mix(in srgb, var(--info) 30%, transparent);
+  }
+  .alert-success {
+    --cut-line: color-mix(in srgb, var(--success) 30%, transparent);
+  }
+  .alert-warning {
+    --cut-line: color-mix(in srgb, var(--warning) 30%, transparent);
+  }
+  .alert-danger {
+    --cut-line: color-mix(in srgb, var(--danger) 30%, transparent);
+  }
+  .field-input:focus,
+  .field-select:focus,
+  .field-textarea:focus {
+    --cut-line: var(--accent-volt);
+  }
+  /* The select keeps its chevron; the cut outline rides along as a second image. */
+  .field-select {
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23888f99' stroke-width='2' stroke-linecap='square' stroke-linejoin='miter'%3E%3Cpath d='M5 7.5L10 12.5L15 7.5'/%3E%3C/svg%3E"),
+      linear-gradient(to bottom right, transparent calc(50% - 1px), var(--cut-line) calc(50% - 1px), var(--cut-line) 50%, transparent 50%);
+    background-position:
+      right 0.75rem center,
+      right bottom;
+    background-size:
+      16px 16px,
+      var(--cut) var(--cut);
+  }
+}
+
+/*
+ * Focus. Rings are box-shadows and get clipped by the sliced corner, so focus is
+ * an outline drawn inside the shape: lime on dark surfaces, dark on lime buttons.
+ */
+:focus-visible {
+  outline: 2px solid var(--accent-volt);
+  outline-offset: 2px;
+}
+.btn-primary:focus-visible,
+.btn-secondary:focus-visible,
+.btn-ghost:focus-visible,
+.btn-danger:focus-visible,
+.btn-danger-solid:focus-visible,
+.btn-golive:focus-visible,
+.btn-icon:focus-visible,
+.badge:focus-visible,
+.cut-xs:focus-visible,
+.cut-sm:focus-visible,
+.cut-lg:focus-visible,
+.cut-avatar:focus-visible,
+.card:focus-visible,
+.card-row:focus-visible,
+.card-media:focus-visible,
+.widget:focus-visible,
+.field-input:focus-visible,
+.field-select:focus-visible,
+.field-textarea:focus-visible {
+  outline-offset: -4px;
+}
+.btn-primary:focus-visible,
+.btn-danger-solid:focus-visible {
+  outline-color: var(--accent-volt-foreground);
+}
+.btn-danger-solid:focus-visible {
+  outline-color: #fff;
+}
+.field-input:focus-visible,
+.field-select:focus-visible,
+.field-textarea:focus-visible {
+  outline-offset: -3px;
+}
+
+/* Scrollbars: thin, square, lime on hover. */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-volt);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Icons: mitred and square-ended, so the line icons read as angular and match the cut corners. */
+svg.lucide {
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+}
+
+/* Admin stays a calm, flat operator tool: rounded 8px, no sliced corners or raised lips. */
+[data-admin] .btn-primary,
+[data-admin] .btn-secondary,
+[data-admin] .btn-ghost,
+[data-admin] .btn-danger,
+[data-admin] .btn-danger-solid,
+[data-admin] .btn-golive,
+[data-admin] .btn-icon,
+[data-admin] .badge,
+[data-admin] .card,
+[data-admin] .card-row,
+[data-admin] .card-media,
+[data-admin] .widget,
+[data-admin] .dropdown-panel,
+[data-admin] .alert,
+[data-admin] .table-wrap,
+[data-admin] .field-input,
+[data-admin] .field-select,
+[data-admin] .field-textarea,
+[data-admin] .skeleton {
+  clip-path: none;
+  background-image: none;
+  border-radius: 8px;
+  --lip: transparent;
+  --lip-top: transparent;
+}
+[data-admin] .field-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23888f99' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 7.5L10 12.5L15 7.5'/%3E%3C/svg%3E");
+  background-position: right 0.75rem center;
+  background-size: 16px 16px;
+}
+[data-admin] .btn-primary::before,
+[data-admin] .btn-secondary::before,
+[data-admin] .btn-ghost::before,
+[data-admin] .btn-danger::before,
+[data-admin] .btn-danger-solid::before,
+[data-admin] .btn-golive::before,
+[data-admin] .btn-icon::before,
+[data-admin] .badge::before {
+  display: none;
+}
+
+
+/*
+ * Feel: no 300ms tap delay or grey tap flash on touch, scroll chaining kept inside
+ * menus, sheets and carousels, and heavy off-screen sections left unrendered until
+ * they are near the viewport.
+ */
+html {
+  -webkit-tap-highlight-color: transparent;
+  scroll-padding-top: 5rem;
+  text-rendering: optimizeLegibility;
+}
+a,
+button,
+summary,
+label,
+select,
+input,
+textarea,
+[role="button"],
+[role="tab"],
+[role="switch"] {
+  touch-action: manipulation;
+}
+.scrollbar-hide,
+.dropdown-panel,
+.overlay-panel,
+[role="listbox"] {
+  overscroll-behavior: contain;
+}
+.scrollbar-hide {
+  -webkit-overflow-scrolling: touch;
+}
+/* Below-the-fold sections: skip layout and paint until they near the screen. */
+.cv-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 480px;
 }

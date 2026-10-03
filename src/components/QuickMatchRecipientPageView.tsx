@@ -25,7 +25,7 @@ export function QuickMatchRecipientPageView({
     const res = await fetch(`/api/quick-match/${challenge.id}/accept`, { method: "POST" });
     const data = await res.json().catch(() => null);
     if (res.ok) {
-      router.push(`/battles/${data.battleId}`);
+      router.replace(`/battles/${data.battleId}`);
       router.refresh();
       return;
     }
@@ -38,7 +38,7 @@ export function QuickMatchRecipientPageView({
 
   async function handleDecline() {
     await fetch(`/api/quick-match/${challenge.id}/decline`, { method: "POST" });
-    router.push("/battles");
+    router.replace("/battles");
   }
 
   if (unavailable) {

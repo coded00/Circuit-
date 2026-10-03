@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------------
-# Circuit — Multi-Stage Production Dockerfile
+# Circuit — Production Dockerfile
 # Optimized for self-hosted VPS / Aeroplane / Coolify / Dokku deployments.
 # ----------------------------------------------------------------------------
 
@@ -23,6 +23,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 RUN npx prisma generate
 RUN npm run build
+RUN npm prune --production
 
 # 4. Production Runner Stage
 FROM base AS runner
@@ -36,16 +37,12 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Copy standalone Next.js server bundle and static assets
+# Copy runtime assets and built Next.js bundle
+COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-
-# Copy Prisma schema and engine for automatic migration deploys on boot
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
 
 # Copy container entrypoint
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
@@ -58,4 +55,4 @@ USER nextjs
 EXPOSE 3000
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
-CMD ["node", "server.js"]
+CMD ["npx", "next", "start", "-H", "0.0.0.0", "-p", "3000"]

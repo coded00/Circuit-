@@ -1,0 +1,474 @@
+"use client";
+
+/**
+ * Circuit Community — the message composer: auto-growing text box, an
+ * emoji/sticker tray (opens below the input, WhatsApp-style, so the
+ * message list shrinks instead of being covered), and image attach with a
+ * preview + optional caption. Also accepts a pasted image.
+ *
+ * Images go through prepareImage (src/lib/prepareImage.ts) before upload
+ * — downscaled, re-encoded, and stripped of EXIF/GPS metadata.
+ *
+ * Typing "@" opens a member suggestion list just above the input (so on
+ * phones it sits above the keyboard with the composer). Picking someone
+ * inserts "@handle "; the server resolves mentions from the text itself
+ * on send, so a hand-typed valid handle works too and an invalid one just
+ * stays text.
+ */
+
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { activeMentionQuery } from "@/lib/communityMentions";
+import { ImagePlus, Send, Smile, Sticker as StickerIcon, X } from "lucide-react";
+import { STICKERS } from "@/lib/stickers";
+import { Spinner } from "@/components/Spinner";
+import { EMOJI_CATEGORIES } from "@/lib/emojiData";
+import { StickerArt } from "./StickerArt";
+import { ACCEPTED_IMAGE_TYPES, prepareImage, type PreparedImage } from "@/lib/prepareImage";
+
+const RECENT_EMOJI_KEY = "circuit-recent-emoji";
+const MAX_RECENT_EMOJI = 16;
+
+type MentionUser = { id: string; handle: string; displayName: string; avatarUrl: string | null };
+
+export type ComposerSubmit =
+  | { kind: "TEXT"; content: string }
+  | { kind: "STICKER"; stickerId: string }
+  | { kind: "IMAGE"; image: PreparedImage; caption: string };
+
+function readRecentEmoji(): string[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(RECENT_EMOJI_KEY) ?? "[]");
+    return Array.isArray(parsed) ? parsed.filter((e) => typeof e === "string").slice(0, MAX_RECENT_EMOJI) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function ChatComposer({
+  communityId,
+  channelName,
+  sending,
+  onSubmit,
+  onError,
+  replyingTo = null,
+  onCancelReply,
+  placeholder,
+}: {
+  /** Scopes @-suggestions to this community's members. */
+  communityId: string;
+  channelName: string;
+  sending: boolean;
+  /** Resolves true once the message is actually sent, so the composer
+   *  only clears the draft/attachment on success. */
+  onSubmit: (message: ComposerSubmit) => Promise<boolean>;
+  onError: (message: string) => void;
+  /** Shows a "Replying to …" bar above the input. */
+  replyingTo?: { authorName: string; snippet: string } | null;
+  onCancelReply?: () => void;
+  /** Overrides the default "Message #channel". */
+  placeholder?: string;
+}) {
+  const [draft, setDraft] = useState("");
+  const [image, setImage] = useState<PreparedImage | null>(null);
+  const [preparing, setPreparing] = useState(false);
+  const [tray, setTray] = useState<"emoji" | "stickers" | null>(null);
+  const [emojiCategory, setEmojiCategory] = useState("recent");
+  const [recentEmoji, setRecentEmoji] = useState<string[]>([]);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [mention, setMention] = useState<{ query: string; start: number } | null>(null);
+  const [suggestions, setSuggestions] = useState<MentionUser[]>([]);
+  const [activeSuggestion, setActiveSuggestion] = useState(0);
+  /** Start offset of an @word the user dismissed with Escape — it stays
+   *  closed until the caret moves to a different @word. */
+  const dismissedMentionRef = useRef<number | null>(null);
+  /** Caret position to restore once React has written a programmatic
+   *  draft change. Applied in a layout effect — before the browser can
+   *  handle another keystroke — so fast typing right after inserting a
+   *  mention or emoji can't land in front of a caret that moves later. */
+  const pendingCaretRef = useRef<number | null>(null);
+
+  useLayoutEffect(() => {
+    const el = textareaRef.current;
+    if (el && pendingCaretRef.current !== null) {
+      el.selectionStart = el.selectionEnd = pendingCaretRef.current;
+      pendingCaretRef.current = null;
+    }
+  }, [draft]);
+
+  /** Re-derives the @query from the text before the caret. */
+  function syncMention(value = draft, caret = textareaRef.current?.selectionStart ?? value.length) {
+    let next = activeMentionQuery(value.slice(0, caret));
+    if (next && next.start === dismissedMentionRef.current) next = null;
+    else dismissedMentionRef.current = null;
+    setMention((prev) => (prev?.query === next?.query && prev?.start === next?.start ? prev : next));
+  }
+
+  function clearMention() {
+    setMention(null);
+    setSuggestions([]);
+  }
+
+  // Debounced member search for the current @query; stale responses are
+  // aborted so fast typing can't show an older list over a newer one.
+  useEffect(() => {
+    if (!mention) return;
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/communities/${communityId}/mentionable?q=${encodeURIComponent(mention.query)}`, {
+          signal: controller.signal,
+        });
+        if (!res.ok) return;
+        const data: { users: MentionUser[] } = await res.json();
+        setSuggestions(data.users);
+        setActiveSuggestion(0);
+      } catch {
+        // Aborted or offline — keep whatever is showing.
+      }
+    }, 120);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [mention, communityId]);
+
+  const showSuggestions = mention !== null && suggestions.length > 0;
+
+  function pickMention(user: MentionUser) {
+    if (!mention) return;
+    const end = mention.start + 1 + mention.query.length;
+    const insert = `@${user.handle} `;
+    pendingCaretRef.current = mention.start + insert.length;
+    setDraft(draft.slice(0, mention.start) + insert + draft.slice(end));
+    clearMention();
+    textareaRef.current?.focus();
+  }
+
+  // Read after mount (localStorage doesn't exist during SSR); fall back
+  // to the first real category when there's no history yet.
+  useEffect(() => {
+    const recent = readRecentEmoji();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time post-mount read of browser-only storage
+    setRecentEmoji(recent);
+    if (recent.length === 0) setEmojiCategory(EMOJI_CATEGORIES[0].key);
+  }, []);
+
+  // Free the preview's object URL when it's replaced or removed.
+  useEffect(() => {
+    return () => {
+      if (image) URL.revokeObjectURL(image.previewUrl);
+    };
+  }, [image]);
+
+  // Auto-grow up to ~5 lines, then scroll inside the box.
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 128)}px`;
+  }, [draft]);
+
+  async function attach(file: File) {
+    setPreparing(true);
+    try {
+      setImage(await prepareImage(file, { maxEdge: 1600 }));
+      setTray(null);
+      textareaRef.current?.focus();
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "That image couldn't be added.");
+    } finally {
+      setPreparing(false);
+    }
+  }
+
+  function insertEmoji(emoji: string) {
+    const el = textareaRef.current;
+    const start = el?.selectionStart ?? draft.length;
+    const end = el?.selectionEnd ?? draft.length;
+    pendingCaretRef.current = start + emoji.length;
+    setDraft(draft.slice(0, start) + emoji + draft.slice(end));
+
+    const nextRecent = [emoji, ...recentEmoji.filter((e) => e !== emoji)].slice(0, MAX_RECENT_EMOJI);
+    setRecentEmoji(nextRecent);
+    try {
+      localStorage.setItem(RECENT_EMOJI_KEY, JSON.stringify(nextRecent));
+    } catch {
+      // Storage blocked — recents just won't persist.
+    }
+  }
+
+  async function submit() {
+    if (sending || preparing) return;
+    if (image) {
+      if (await onSubmit({ kind: "IMAGE", image, caption: draft })) {
+        setImage(null);
+        setDraft("");
+        clearMention();
+      }
+    } else if (draft.trim()) {
+      if (await onSubmit({ kind: "TEXT", content: draft })) {
+        setDraft("");
+        clearMention();
+      }
+    }
+  }
+
+  async function sendSticker(stickerId: string) {
+    if (sending) return;
+    if (await onSubmit({ kind: "STICKER", stickerId })) setTray(null);
+  }
+
+  function handleKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (showSuggestions) {
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        const delta = event.key === "ArrowDown" ? 1 : -1;
+        setActiveSuggestion((i) => (i + delta + suggestions.length) % suggestions.length);
+        return;
+      }
+      if ((event.key === "Enter" || event.key === "Tab") && !event.nativeEvent.isComposing) {
+        event.preventDefault();
+        pickMention(suggestions[activeSuggestion]);
+        return;
+      }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        dismissedMentionRef.current = mention?.start ?? null;
+        clearMention();
+        return;
+      }
+    }
+    // Enter sends on a real keyboard; on touch devices Enter stays a
+    // newline and the send button is how you send (the norm for mobile chat).
+    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+      if (window.matchMedia("(pointer: coarse)").matches) return;
+      event.preventDefault();
+      submit();
+    }
+  }
+
+  function handlePaste(event: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const file = Array.from(event.clipboardData.files).find((f) => ACCEPTED_IMAGE_TYPES.split(",").includes(f.type));
+    if (file) {
+      event.preventDefault();
+      attach(file);
+    }
+  }
+
+  const canSend = !sending && !preparing && (image !== null || draft.trim().length > 0);
+  const emojis =
+    emojiCategory === "recent" ? recentEmoji : (EMOJI_CATEGORIES.find((c) => c.key === emojiCategory)?.emojis ?? []);
+
+  return (
+    <div className="relative flex flex-col">
+      {replyingTo && (
+        <div className="flex items-center gap-2 border-b border-border px-4 py-2 text-[13px]">
+          <span className="min-w-0 flex-1 truncate text-muted">
+            Replying to <span className="font-semibold text-foreground">{replyingTo.authorName}</span>
+            {replyingTo.snippet && <> · {replyingTo.snippet}</>}
+          </span>
+          <button type="button" onClick={onCancelReply} aria-label="Cancel reply" className="shrink-0 cut-xs px-2 py-0.5 text-xs font-semibold text-muted hover:text-foreground">
+            Cancel
+          </button>
+        </div>
+      )}
+      {showSuggestions && (
+        <div
+          role="listbox"
+          aria-label="Mention someone"
+          className="absolute inset-x-2 bottom-full z-20 mb-1.5 overflow-hidden cut-sm [--cut-line:var(--border)] border border-border bg-surface py-1"
+          style={{ boxShadow: "var(--shadow-float)" }}
+        >
+          <p className="px-3 pt-1.5 pb-1 font-mono text-[11px] font-semibold tracking-[0.14em] text-muted uppercase">
+            Members{mention?.query ? ` matching “${mention.query}”` : ""}
+          </p>
+          {suggestions.map((user, i) => (
+            <button
+              key={user.id}
+              type="button"
+              role="option"
+              aria-selected={i === activeSuggestion}
+              // mousedown, not click: keeps focus (and the caret) in the textarea.
+              onMouseDown={(e) => {
+                e.preventDefault();
+                pickMention(user);
+              }}
+              onMouseEnter={() => setActiveSuggestion(i)}
+              className={`flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors ${i === activeSuggestion ? "bg-surface-elevated" : ""}`}
+            >
+              {user.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs
+                <img src={user.avatarUrl} alt="" className="h-7 w-7 shrink-0 cut-avatar object-cover" />
+              ) : (
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center cut-avatar bg-surface-elevated text-xs font-semibold text-muted">
+                  {user.displayName.slice(0, 1).toUpperCase()}
+                </span>
+              )}
+              <span className="min-w-0 flex-1 truncate text-sm font-semibold">{user.displayName}</span>
+              <span className="max-w-[45%] shrink-0 truncate font-mono text-xs text-muted">@{user.handle}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {(image || preparing) && (
+        <div className="flex items-center gap-3 px-3 pt-3">
+          <div className="relative h-20 w-20 shrink-0 overflow-hidden cut-avatar border border-border bg-surface-elevated">
+            {image ? (
+              // eslint-disable-next-line @next/next/no-img-element -- local object URL preview
+              <img src={image.previewUrl} alt="Selected image" className="h-full w-full object-cover" />
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <Spinner size={18} className="text-muted" />
+              </div>
+            )}
+            {image && (
+              <button
+                type="button"
+                onClick={() => setImage(null)}
+                aria-label="Remove image"
+                className="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-white"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+          <span className="text-metadata">{image ? "Add a caption (optional), then send." : "Preparing image…"}</span>
+        </div>
+      )}
+
+      <div className="flex items-end gap-1.5 p-2 sm:gap-2 sm:p-3">
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          disabled={preparing || sending}
+          aria-label="Attach image"
+          className="btn-icon !h-9 !w-9 shrink-0 sm:!h-11 sm:!w-11"
+        >
+          <ImagePlus size={20} />
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept={ACCEPTED_IMAGE_TYPES}
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = ""; // allow re-picking the same file
+            if (file) attach(file);
+          }}
+        />
+
+        <div className="flex min-w-0 flex-1 items-end cut-lg [--cut-line:var(--border)] border border-border bg-surface-elevated/60 pr-1 transition focus-within:border-border-strong">
+          <textarea
+            ref={textareaRef}
+            value={draft}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              syncMention(e.target.value, e.target.selectionStart);
+            }}
+            onSelect={(e) => syncMention(e.currentTarget.value, e.currentTarget.selectionStart)}
+            onBlur={clearMention}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            onFocus={() => setTray(null)}
+            placeholder={image ? "Add a caption…" : (placeholder ?? (channelName.length <= 9 ? `Message #${channelName}` : "Write a message…"))}
+            maxLength={2000}
+            rows={1}
+            className="scrollbar-hide max-h-32 min-w-0 flex-1 resize-none bg-transparent py-2.5 pl-3 sm:pl-4 text-[15px] leading-5 outline-none placeholder:text-muted"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              setTray(tray === "emoji" ? null : "emoji");
+              textareaRef.current?.blur();
+            }}
+            aria-label="Emoji"
+            aria-pressed={tray === "emoji"}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center transition hover:text-foreground sm:h-10 sm:w-10 ${tray === "emoji" ? "text-accent-blue" : "text-muted"}`}
+          >
+            <Smile size={20} />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setTray(tray === "stickers" ? null : "stickers");
+              textareaRef.current?.blur();
+            }}
+            aria-label="Stickers"
+            aria-pressed={tray === "stickers"}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center transition hover:text-foreground sm:h-10 sm:w-10 ${tray === "stickers" ? "text-accent-blue" : "text-muted"}`}
+          >
+            <StickerIcon size={20} />
+          </button>
+        </div>
+
+        <button
+          type="button"
+          onClick={submit}
+          disabled={!canSend}
+          aria-label="Send message"
+          className="btn-primary !h-10 !w-10 shrink-0 !p-0 sm:!h-11 sm:!w-11"
+        >
+          {sending ? <Spinner size={16} /> : <Send size={18} />}
+        </button>
+      </div>
+
+      {tray === "emoji" && (
+        <div className="border-t border-border">
+          <div className="scrollbar-hide flex gap-1 overflow-x-auto px-2 pt-2">
+            {recentEmoji.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setEmojiCategory("recent")}
+                className={`shrink-0 cut-xs px-3 py-1 text-xs font-medium ${emojiCategory === "recent" ? "bg-surface-elevated text-foreground" : "text-muted"}`}
+              >
+                Recent
+              </button>
+            )}
+            {EMOJI_CATEGORIES.map((category) => (
+              <button
+                key={category.key}
+                type="button"
+                onClick={() => setEmojiCategory(category.key)}
+                className={`flex shrink-0 items-center gap-1 cut-xs px-3 py-1 text-xs font-medium ${emojiCategory === category.key ? "bg-surface-elevated text-foreground" : "text-muted"}`}
+              >
+                <span aria-hidden>{category.icon}</span>
+                {category.label}
+              </button>
+            ))}
+          </div>
+          <div className="scrollbar-hide grid h-52 grid-cols-8 content-start gap-0.5 overflow-y-auto p-2 sm:grid-cols-10">
+            {emojis.map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => insertEmoji(emoji)}
+                className="flex aspect-square items-center justify-center rounded-none text-[26px] transition hover:bg-surface-elevated active:scale-90"
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {tray === "stickers" && (
+        <div className="scrollbar-hide grid h-60 grid-cols-3 content-start gap-x-3 gap-y-4 overflow-y-auto border-t border-border p-4 sm:grid-cols-4">
+          {STICKERS.map((sticker) => (
+            <button
+              key={sticker.id}
+              type="button"
+              onClick={() => sendSticker(sticker.id)}
+              disabled={sending}
+              aria-label={`Send ${sticker.label} sticker`}
+              className="flex items-center justify-center cut-lg p-1 transition hover:scale-105 active:scale-95 disabled:opacity-50"
+            >
+              <StickerArt sticker={sticker} size="sm" />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

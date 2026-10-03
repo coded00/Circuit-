@@ -7,72 +7,131 @@
  * FRIENDS-visibility to a viewer who's actually a friend of the creator
  * (see src/lib/friends.ts) — a TARGETED challenge is invisible to
  * everyone but its target (delivered via notification, BTL-3), not a
- * variant of this board. Every Battle here is still waiting for an
- * opponent, so every card is the same `ChallengeCard` the homepage's Open
- * Challenges carousel renders — see that component's own header comment
- * for what's real vs. deliberately not invented (no rating number, no
- * countdown).
+ * variant of this board.
+ *
+ * Each challenge is an opponent card (the shared ChallengeCard, also used by
+ * the homepage's Open challenges): who is waiting, their win-loss record in
+ * that game, the stake, and Accept. Game filter chips come from the games
+ * actually on the board right now.
  */
 
 import Link from "next/link";
+import { Plus } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
+import { openBattleFilter } from "@/lib/battles";
 import { getFriendIds } from "@/lib/friends";
 import Poller from "@/app/Poller";
+import { Panel, PanelEmpty } from "@/components/ui/Panel";
 import { ChallengeCard } from "@/components/ChallengeCard";
+import { challengeRecords } from "@/lib/standings";
+import { recordKey } from "@/lib/challengeView";
 
-export default async function BattleBoardPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ game?: string }>;
-}) {
+export default async function BattleBoardPage({ searchParams }: { searchParams: Promise<{ game?: string }> }) {
   const { game } = await searchParams;
   const user = await getCurrentUser();
   const friendIds = user ? await getFriendIds(user.id) : [];
 
-  const battles = await prisma.battle.findMany({
+  const allOpen = await prisma.battle.findMany({
     where: {
-      status: "OPEN",
-      OR: [{ visibility: "OPEN" }, ...(friendIds.length ? [{ visibility: "FRIENDS" as const, creatorId: { in: friendIds } }] : [])],
-      ...(game ? { game: { equals: game, mode: "insensitive" } } : {}),
+      AND: [openBattleFilter(), { OR: [{ visibility: "OPEN" }, ...(friendIds.length ? [{ visibility: "FRIENDS" as const, creatorId: { in: friendIds } }] : [])] }],
     },
     orderBy: { createdAt: "desc" },
-    include: { creator: { select: { displayName: true, avatarUrl: true } } },
+    include: { creator: { select: { id: true, displayName: true, handle: true, avatarUrl: true } } },
   });
 
-  return (
-    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-6 py-8 sm:px-8">
-      <Poller />
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Open Challenges</h1>
-        <Link href="/battles/new" className="btn-primary">
-          Open a Challenge
-        </Link>
-      </div>
+  const gameCounts = [...allOpen.reduce((m, b) => m.set(b.game, (m.get(b.game) ?? 0) + 1), new Map<string, number>())].sort(
+    (a, b) => b[1] - a[1]
+  );
+  const activeGame = game ? (gameCounts.find(([g]) => g.toLowerCase() === game.toLowerCase())?.[0] ?? game) : null;
+  const battles = activeGame ? allOpen.filter((b) => b.game.toLowerCase() === activeGame.toLowerCase()) : allOpen;
+  const staked = allOpen.filter((b) => b.stakeAmount > 0).length;
+  const records = await challengeRecords(battles.map((b) => b.game));
 
-      <form className="flex items-center gap-2">
-        <input
-          type="text"
-          name="game"
-          defaultValue={game ?? ""}
-          placeholder="Filter by game"
-          aria-label="Filter by game"
-          className="field-input max-w-xs"
-        />
-        <button type="submit" className="btn-secondary">
-          Filter
-        </button>
-      </form>
+  const chipClass = (active: boolean) =>
+    `flex shrink-0 items-center gap-1.5 cut-xs px-3.5 py-1.5 text-sm font-medium transition ${
+      active ? "bg-foreground text-background" : "bg-surface-elevated text-muted hover:text-foreground"
+    }`;
+
+  return (
+    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-6 sm:px-8 sm:py-10">
+      <Poller />
+
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-1.5">
+          <span className="text-eyebrow text-accent-volt">Challenges</span>
+          <h1 className="font-display text-3xl leading-[0.98] font-bold tracking-tight sm:text-4xl">There&apos;s always another level.</h1>
+          <p className="text-sm text-muted">
+            {allOpen.length === 0 ? (
+              "Nobody's waiting right now. Open one and see who bites."
+            ) : (
+              <>
+                <span className="text-stat text-foreground">{allOpen.length}</span> open
+                {staked > 0 && (
+                  <>
+                    {" · "}
+                    <span className="text-stat text-gold">{staked}</span> with a stake
+                  </>
+                )}
+                {" · first to accept plays"}
+              </>
+            )}
+          </p>
+        </div>
+        <Link href="/battles/new" className="btn-primary self-start sm:self-auto">
+          <Plus size={15} />
+          Create challenge
+        </Link>
+      </header>
+
+      {gameCounts.length > 1 && (
+        <nav aria-label="Filter by game" className="scrollbar-hide -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+          <Link href="/battles" className={chipClass(!activeGame)} aria-current={!activeGame ? "page" : undefined}>
+            All
+            <span className="font-mono text-xs opacity-60">{allOpen.length}</span>
+          </Link>
+          {gameCounts.map(([g, count]) => {
+            const active = activeGame?.toLowerCase() === g.toLowerCase();
+            return (
+              <Link key={g} href={`/battles?game=${encodeURIComponent(g)}`} className={chipClass(active)} aria-current={active ? "page" : undefined}>
+                {g}
+                <span className="font-mono text-xs opacity-60">{count}</span>
+              </Link>
+            );
+          })}
+        </nav>
+      )}
 
       {battles.length === 0 ? (
-        <p className="card text-center text-muted">No open Challenges right now.</p>
+        <Panel title={activeGame ?? "Open now"}>
+          <PanelEmpty>
+            {activeGame ? (
+              <>
+                No open {activeGame} challenges.{" "}
+                <Link href="/battles/new" className="text-accent-blue hover:underline">
+                  Create one →
+                </Link>
+              </>
+            ) : (
+              "No open challenges right now."
+            )}
+          </PanelEmpty>
+        </Panel>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {battles.map((battle) => (
-            <ChallengeCard key={battle.id} battle={battle} />
+        <section aria-label={activeGame ?? "Open challenges"} className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {battles.map((b) => (
+            <ChallengeCard key={b.id} battle={b} record={records.get(recordKey(b.game, b.creator.id)) ?? null} mine={user?.id === b.creator.id} />
           ))}
-        </div>
+        </section>
       )}
+
+      <p className="text-center text-xs text-muted">
+        Want a game right now?{" "}
+        <Link href="/battles/new" className="font-medium text-accent-blue hover:underline">
+          Send a Quick Match
+        </Link>{" "}
+        to every available player at once.
+      </p>
     </div>
   );
 }

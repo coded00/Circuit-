@@ -3,11 +3,15 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { AtSign, Lock } from "lucide-react";
+import { safeNextPath } from "@/lib/safeRedirect";
+import { AuthField, PasswordField } from "@/components/auth/AuthField";
+import { Spinner } from "@/components/Spinner";
 
 export default function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") || "/";
+  const next = safeNextPath(searchParams.get("next"));
 
   const [emailOrPhone, setEmailOrPhone] = useState("");
   const [password, setPassword] = useState("");
@@ -19,11 +23,18 @@ export default function LoginForm() {
     setError(null);
     setSubmitting(true);
 
-    const res = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ emailOrPhone, password }),
-    });
+    let res: Response;
+    try {
+      res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emailOrPhone, password }),
+      });
+    } catch {
+      setError("We couldn't reach Circuit. Check your connection and try again.");
+      setSubmitting(false);
+      return;
+    }
 
     if (!res.ok) {
       const data = await res.json().catch(() => null);
@@ -32,55 +43,51 @@ export default function LoginForm() {
       return;
     }
 
-    router.push(next);
+    // replace, not push: Back from here must not return to the auth form.
+    router.replace(next);
     router.refresh();
   }
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="emailOrPhone" className="field-label">
-          Email or phone
-        </label>
-        <input
-          id="emailOrPhone"
-          type="text"
-          required
-          autoComplete="username"
-          value={emailOrPhone}
-          onChange={(e) => setEmailOrPhone(e.target.value)}
-          className="field-input"
-        />
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <div className="flex items-center justify-between gap-2">
-          <label htmlFor="password" className="field-label">
-            Password
-          </label>
-          <Link href="/forgot-password" className="text-xs font-medium text-accent-blue hover:underline">
+      <AuthField
+        id="emailOrPhone"
+        label="Email or phone"
+        icon={AtSign}
+        type="text"
+        required
+        autoComplete="username"
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
+        inputMode="email"
+        placeholder="you@example.com or 080…"
+        value={emailOrPhone}
+        onChange={(e) => setEmailOrPhone(e.target.value)}
+      />
+      <PasswordField
+        id="password"
+        label="Password"
+        icon={Lock}
+        required
+        autoComplete="current-password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        labelAside={
+          <Link href="/forgot-password" className="-my-2 py-2 pl-3 text-xs font-medium text-muted transition hover:text-foreground">
             Forgot password?
           </Link>
-        </div>
-        <input
-          id="password"
-          type="password"
-          required
-          autoComplete="current-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="field-input"
-        />
-      </div>
-      {error && <p className="field-error">{error}</p>}
-      <button type="submit" disabled={submitting} className="btn-primary w-full">
+        }
+      />
+      {error && (
+        <p className="field-error" role="alert">
+          {error}
+        </p>
+      )}
+      <button type="submit" disabled={submitting} className="btn-primary h-12 w-full text-[15px]">
+        {submitting && <Spinner />}
         {submitting ? "Logging in…" : "Log in"}
       </button>
-      <Link
-        href={`/signup?next=${encodeURIComponent(next)}`}
-        className="text-center text-sm text-muted transition hover:text-foreground"
-      >
-        Need an account? Sign up
-      </Link>
     </form>
   );
 }

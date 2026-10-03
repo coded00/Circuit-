@@ -19,6 +19,7 @@ const STATUS_BY_CODE: Record<MatchError["code"], number> = {
   WINDOW_EXPIRED: 409,
   VOID_UNSUPPORTED: 409,
   TOURNAMENT_CANCELLED: 409,
+  NOTHING_TO_CONFIRM: 409,
 };
 
 export async function POST(

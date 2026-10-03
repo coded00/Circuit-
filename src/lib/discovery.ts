@@ -17,6 +17,7 @@
 import { prisma } from "@/lib/db";
 import { getFriendIds } from "@/lib/friends";
 import { computeStandings } from "@/lib/standings";
+import { reachableUsersWhere } from "@/lib/privacy";
 import type { FriendButtonStatus } from "@/components/FriendButton"; // type-only import, erased at compile time
 
 const DEFAULT_TAKE = 20;
@@ -70,13 +71,13 @@ export async function getDiscoverablePlayers({
   take?: number;
   filters?: DiscoveryFilters;
 }): Promise<{ players: DiscoveryPlayer[]; nextCursor: string | null }> {
-  const viewerFriendIds = await getFriendIds(viewerId);
+  const [viewerFriendIds, reachable] = await Promise.all([getFriendIds(viewerId), reachableUsersWhere(viewerId, "discover")]);
   const { q, region, game } = filters;
   const rawTake = game ? take * GAME_FILTER_OVERFETCH_MULTIPLIER : take;
 
   const rows = await prisma.user.findMany({
     where: {
-      id: { notIn: [...viewerFriendIds, viewerId] },
+      AND: [reachable, { id: { notIn: [...viewerFriendIds, viewerId] } }],
       isSuspended: false,
       ...(q ? { OR: [{ displayName: { contains: q, mode: "insensitive" } }, { handle: { contains: q, mode: "insensitive" } }] } : {}),
       ...(region ? { region: { contains: region, mode: "insensitive" } } : {}),

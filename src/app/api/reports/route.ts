@@ -9,7 +9,19 @@ import { proofStorage } from "@/lib/storage";
 import { notifyStaff } from "@/lib/notifications";
 
 const MAX_EVIDENCE_BYTES = 10 * 1024 * 1024;
-const VALID_REASON_CODES = ["MULTI_ACCOUNTING", "CHEATING", "HARASSMENT", "PAYMENT_FRAUD", "OTHER"];
+const VALID_REASON_CODES = [
+  "HARASSMENT",
+  "HATE",
+  "SPAM",
+  "SCAM",
+  "SEXUAL",
+  "CHEATING",
+  "THREATS",
+  "IMPERSONATION",
+  "MULTI_ACCOUNTING",
+  "PAYMENT_FRAUD",
+  "OTHER",
+];
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();

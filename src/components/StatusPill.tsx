@@ -20,11 +20,14 @@ export function StatusPill({
   children,
   pulse = false,
   size = "sm",
+  solid = false,
 }: {
   tone: StatusTone;
   children: React.ReactNode;
   pulse?: boolean;
   size?: "sm" | "md";
+  /** Full colour fill — for pills laid over images, where a soft tint can't be read. */
+  solid?: boolean;
 }) {
   // Two tone-driven treatments, not per-status flags — any "open" tone
   // (registration open, a battle in progress, ...) means the same real
@@ -36,7 +39,7 @@ export function StatusPill({
   const settle = tone === "complete" ? "motion-scale-in" : "";
 
   return (
-    <span className={`badge ${TONE_CLASS[tone]} ${size === "md" ? "badge-md" : ""} ${glow} ${settle}`}>
+    <span className={`badge ${TONE_CLASS[tone]} ${solid ? "badge-solid" : ""} ${size === "md" ? "badge-md" : ""} ${solid ? "" : glow} ${settle}`}>
       {pulse && (
         <span className="pulse-dot" aria-hidden />
       )}
@@ -108,6 +111,8 @@ export function battleStatusInfo(status: string): StatusInfo {
       return { tone: "open", label: "In progress" };
     case "CANCELLED":
       return { tone: "cancelled", label: "Cancelled" };
+    case "EXPIRED":
+      return { tone: "neutral", label: "Expired" };
     case "COMPLETE":
       return { tone: "complete", label: "Complete" };
     default:

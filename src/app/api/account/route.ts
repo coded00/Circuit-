@@ -10,7 +10,9 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
-import { parseOptionalUrl, parseOptionalEmail } from "@/lib/validation";
+import { parseOptionalEmail, parseOptionalImageUrl } from "@/lib/validation";
+import type { DirectChallengePolicy } from "@prisma/client";
+import { parseDirectPolicy } from "@/lib/privacy";
 
 const MIN_AGE_PLAUSIBLE_YEARS = 130;
 
@@ -37,9 +39,12 @@ export async function PATCH(request: Request) {
     bio?: string | null;
     favoriteGames?: string[];
     email?: string | null;
+    emailVerifiedAt?: Date | null;
     notifyNewContent?: boolean;
     oneSignalPlayerId?: string | null;
     region?: string | null;
+    searchable?: boolean;
+    directChallenges?: DirectChallengePolicy;
   } = {};
 
   if (body.displayName !== undefined) {
@@ -70,7 +75,7 @@ export async function PATCH(request: Request) {
   }
 
   if (body.avatarUrl !== undefined) {
-    const avatarUrlResult = parseOptionalUrl(body.avatarUrl);
+    const avatarUrlResult = parseOptionalImageUrl(body.avatarUrl);
     if (!avatarUrlResult.ok) {
       return NextResponse.json({ error: "Avatar must be a valid http(s) URL." }, { status: 400 });
     }
@@ -122,6 +127,8 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
     }
     data.email = emailResult.email;
+    // A different address hasn't been proven yet.
+    if ((emailResult.email ?? "").toLowerCase() !== (user.email ?? "").toLowerCase()) data.emailVerifiedAt = null;
   }
 
   if (body.notifyNewContent !== undefined) {
@@ -140,6 +147,16 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: `Region must be ${MAX_REGION_LENGTH} characters or fewer.` }, { status: 400 });
     }
     data.region = region || null;
+  }
+
+  if (body.searchable !== undefined) {
+    if (typeof body.searchable !== "boolean") return NextResponse.json({ error: "Searchable must be on or off." }, { status: 400 });
+    data.searchable = body.searchable;
+  }
+  if (body.directChallenges !== undefined) {
+    const policy = parseDirectPolicy(body.directChallenges);
+    if (!policy) return NextResponse.json({ error: "Choose who can challenge you: anyone, friends or nobody." }, { status: 400 });
+    data.directChallenges = policy;
   }
 
   let updated;
@@ -163,5 +180,7 @@ export async function PATCH(request: Request) {
     email: updated.email,
     notifyNewContent: updated.notifyNewContent,
     region: updated.region,
+    searchable: updated.searchable,
+    directChallenges: updated.directChallenges,
   });
 }

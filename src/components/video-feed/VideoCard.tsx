@@ -12,6 +12,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { loginPath } from "@/lib/safeRedirect";
 import { Heart, Bookmark, Share2, Volume2, VolumeX, Play, Trophy, Gamepad2, Check } from "lucide-react";
 import { GameArtTile } from "@/components/GameArtTile";
 import { gamePath, tournamentPath, videoPath, absoluteUrl } from "@/lib/seo";
@@ -105,7 +106,7 @@ export function VideoCard({
 
   function getLoginRedirect() {
     const path = typeof window !== "undefined" ? window.location.pathname + window.location.search : "/ladder";
-    return `/login?next=${encodeURIComponent(path)}`;
+    return loginPath(path);
   }
 
   async function handleLike() {
@@ -202,20 +203,22 @@ export function VideoCard({
           </div>
         )}
 
+        {/* Near-opaque at the bottom: YouTube draws its own caption and
+            counters in the same corner, and they mustn't show through ours. */}
         <div
           aria-hidden
-          className="absolute inset-x-0 bottom-0 h-1/2"
-          style={{ backgroundImage: "linear-gradient(to top, rgba(0,0,0,0.85), transparent)" }}
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-[55%]"
+          style={{ backgroundImage: "linear-gradient(to top, rgba(0,0,0,0.97) 0%, rgba(0,0,0,0.9) 30%, rgba(0,0,0,0.45) 65%, transparent)" }}
         />
 
         {/* Bottom-left: title/description/tags/attribution/discovery links */}
         <div className="absolute right-16 bottom-4 left-4 z-10 flex flex-col gap-2 text-white sm:right-20">
           {video.source === "YOUTUBE" ? (
-            <span className="w-fit rounded-full bg-black/50 px-2.5 py-1 text-[10px] font-semibold tracking-wide uppercase backdrop-blur-sm">
+            <span className="w-fit cut-xs bg-black/50 px-2.5 py-1 text-[11px] font-semibold tracking-wide uppercase backdrop-blur-sm">
               Powered by YouTube{video.sourceAuthor ? ` · ${video.sourceAuthor}` : ""}
             </span>
           ) : (
-            <span className="w-fit rounded-full bg-accent-volt/90 px-2.5 py-1 text-[10px] font-semibold tracking-wide text-accent-volt-foreground uppercase">
+            <span className="w-fit cut-xs bg-accent-volt/90 px-2.5 py-1 text-[11px] font-semibold tracking-wide text-accent-volt-foreground uppercase">
               Circuit
             </span>
           )}
@@ -225,7 +228,7 @@ export function VideoCard({
             {video.game && (
               <Link
                 href={gamePath(video.game)}
-                className="flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-xs font-medium backdrop-blur-sm transition hover:bg-white/25"
+                className="flex items-center gap-1 cut-xs bg-white/15 px-2.5 py-1 text-xs font-medium backdrop-blur-sm transition hover:bg-white/25"
               >
                 <Gamepad2 size={12} />
                 {video.game}
@@ -234,7 +237,7 @@ export function VideoCard({
             {video.tournament && (
               <Link
                 href={tournamentPath(video.tournament)}
-                className="flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-xs font-medium backdrop-blur-sm transition hover:bg-white/25"
+                className="flex items-center gap-1 cut-xs bg-white/15 px-2.5 py-1 text-xs font-medium backdrop-blur-sm transition hover:bg-white/25"
               >
                 <Trophy size={12} />
                 View Tournament

@@ -57,7 +57,7 @@ export function unsplashUrl(baseUrl: string, width: number, quality = 80): strin
  *  reads red, a football title reads green, etc.) — descriptive color
  *  choice only, not any game's actual trademarked brand color/logo. Used
  *  by the win-share-card's edge accent bar. Falls back to the same
- *  deterministic hash-based palette `gameTint` (GameArtTile.tsx) already
+ *  deterministic hash-based palette `gameTint` (gameTint.ts) already
  *  uses for any game outside this curated set, so an unrecognized game
  *  still gets a consistent, non-random accent rather than none at all. */
 export const GAME_ACCENTS: Record<string, string> = {

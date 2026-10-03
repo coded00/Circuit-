@@ -38,23 +38,27 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Trophy, Gamepad2, Swords, Calendar, User as UserIcon, Wallet, Settings } from "lucide-react";
+import { Settings } from "lucide-react";
+import { CalendarIcon, ChatIcon, HomeIcon, PadIcon, PlayerIcon, ShopIcon, SwordsIcon, TrophyIcon } from "@/components/icons/GameIcons";
+import { loginPath, signupPath } from "@/lib/safeRedirect";
 import { SidebarPromoCard } from "./SidebarPromoCard";
 
 type NavUser = { handle: string; displayName: string; isStaff: boolean } | null;
 
-type Item = { href: string; label: string; icon: React.ComponentType<{ size?: number; className?: string }> };
+type Item = { href: string; label: string; icon: React.ComponentType<{ size?: number; className?: string }>; /** Other routes that belong to this item (Feed also covers the video feed). */ also?: string[] };
 
 const PRIMARY: Item[] = [
-  { href: "/", label: "Home", icon: Home },
-  { href: "/compete", label: "Compete", icon: Trophy },
-  { href: "/ladder", label: "Feed", icon: Gamepad2 },
-  { href: "/battles", label: "Challenges", icon: Swords },
-  { href: "/calendar", label: "Calendar", icon: Calendar },
+  { href: "/", label: "Home", icon: HomeIcon },
+  { href: "/compete", label: "Compete", icon: TrophyIcon },
+  { href: "/activity", label: "Feed", icon: PadIcon, also: ["/ladder"] },
+  { href: "/battles", label: "Challenges", icon: SwordsIcon },
+  { href: "/communities", label: "Communities", icon: ChatIcon },
+  { href: "/calendar", label: "Calendar", icon: CalendarIcon },
+  { href: "/marketplace", label: "Marketplace", icon: ShopIcon },
 ];
 
-function isActive(pathname: string, href: string): boolean {
-  return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
+function isActive(pathname: string, href: string, also: string[] = []): boolean {
+  return [href, ...also].some((h) => (h === "/" ? pathname === "/" : pathname === h || pathname.startsWith(`${h}/`)));
 }
 
 /** Row height (46px) + the nav's own gap-1 (4px) — the sliding indicator
@@ -69,7 +73,7 @@ function NavLink({ item, active, badge }: { item: Item; active: boolean; badge?:
       href={item.href}
       aria-current={active ? "page" : undefined}
       title={item.label}
-      className={`relative z-10 flex h-[46px] items-center justify-center gap-3 rounded-[9px] px-2 text-sm font-semibold transition-colors duration-[var(--duration-fast)] lg:justify-start lg:px-4 ${
+      className={`relative z-10 flex h-[46px] items-center justify-center gap-3 rounded-none px-2 text-sm font-semibold transition-colors duration-[var(--duration-fast)] lg:justify-start lg:px-4 ${
         active ? "text-accent-volt-foreground" : "text-muted hover:bg-surface-elevated hover:text-foreground"
       }`}
     >
@@ -80,7 +84,7 @@ function NavLink({ item, active, badge }: { item: Item; active: boolean; badge?:
           {/* Tablet (icon-only): a small dot on the icon itself. Desktop
               (labeled): the full count pill at the end of the row. */}
           <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-live lg:hidden" aria-hidden />
-          <span className="hidden lg:ml-auto lg:flex lg:h-4 lg:min-w-4 lg:items-center lg:justify-center lg:rounded-full lg:bg-live lg:px-1 lg:font-mono lg:text-[10px] lg:font-semibold lg:text-white">
+          <span className="hidden lg:ml-auto lg:flex lg:h-4 lg:min-w-4 lg:items-center lg:justify-center lg:rounded-full lg:bg-live lg:px-1 lg:font-mono lg:text-[11px] lg:font-semibold lg:text-white">
             {badge > 9 ? "9+" : badge}
           </span>
         </>
@@ -94,14 +98,15 @@ export function AppSidebar({ user }: { user: NavUser }) {
 
   const items: Item[] = [
     ...PRIMARY,
-    ...(user ? [{ href: "/wallet", label: "Wallet", icon: Wallet }] : []),
-    ...(user ? [{ href: `/players/${user.handle}`, label: "Profile", icon: UserIcon }] : []),
+    ...(user ? [{ href: `/players/${user.handle}`, label: "Profile", icon: PlayerIcon }] : []),
   ];
-  const activeIndex = items.findIndex((item) => isActive(pathname, item.href));
+  const activeIndex = items.findIndex((item) => isActive(pathname, item.href, item.also));
 
   return (
     <aside
       data-surface="dark"
+      // Pinned during page view transitions (globals.css).
+      style={{ viewTransitionName: "site-sidebar" }}
       className="scrollbar-hide sticky top-0 hidden h-screen w-full flex-col gap-1 overflow-y-auto border-r border-border bg-background px-2 py-6 text-foreground sm:flex lg:px-3"
     >
       <Link href="/" title="Circuit" className="mb-6 flex shrink-0 items-center justify-center px-2 lg:justify-start">
@@ -110,13 +115,15 @@ export function AppSidebar({ user }: { user: NavUser }) {
       </Link>
 
       <nav className="relative flex flex-col gap-1">
-        {activeIndex !== -1 && (
-          <span
-            aria-hidden
-            className="absolute inset-x-0 z-0 h-[46px] rounded-[9px] bg-accent-volt transition-transform duration-[var(--duration-base)] ease-[var(--ease-out)]"
-            style={{ transform: `translateY(${activeIndex * NAV_ROW_STEP}px)` }}
-          />
-        )}
+        {/* Always mounted (faded out when no item is active, e.g. on a tournament page) so it never
+            pops in or out of the nav when a navigation finishes. */}
+        <span
+          aria-hidden
+          className={`absolute inset-x-0 z-0 h-[46px] rounded-none bg-accent-volt transition-[transform,opacity] duration-[var(--duration-base)] ease-[var(--ease-out)] ${
+            activeIndex === -1 ? "opacity-0" : "opacity-100"
+          }`}
+          style={{ transform: `translateY(${Math.max(activeIndex, 0) * NAV_ROW_STEP}px)` }}
+        />
         {items.map((item, i) => (
           <NavLink key={item.href} item={item} active={i === activeIndex} />
         ))}
@@ -130,22 +137,22 @@ export function AppSidebar({ user }: { user: NavUser }) {
         <SidebarPromoCard />
         {!user && (
           <div className="flex flex-col gap-2">
-            <Link href="/login" className="btn-secondary w-full">
+            <Link href={loginPath(pathname)} className="btn-secondary w-full">
               Log in
             </Link>
-            <Link href="/signup" className="btn-primary w-full">
+            <Link href={signupPath(pathname)} className="btn-primary w-full">
               Sign up
             </Link>
           </div>
         )}
         {user ? (
           <div className="flex items-center gap-2 border-t border-border px-1 pt-3">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-elevated text-xs font-semibold text-muted">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center cut-avatar bg-surface-elevated text-xs font-semibold text-muted">
               {user.displayName.slice(0, 1).toUpperCase()}
             </span>
             <div className="flex min-w-0 flex-1 flex-col leading-tight">
               <span className="truncate text-xs font-medium text-foreground">{user.displayName}</span>
-              <span className="truncate text-[10px] text-muted">@{user.handle}</span>
+              <span className="truncate text-[11px] text-muted">@{user.handle}</span>
             </div>
             <Link
               href="/account"
@@ -157,7 +164,7 @@ export function AppSidebar({ user }: { user: NavUser }) {
             </Link>
           </div>
         ) : (
-          <p className="px-1 text-[10px] leading-snug text-muted-strong">
+          <p className="px-1 text-[11px] leading-snug text-muted-strong">
             © 2026 CIRCUIT
             <br />
             Play Connected.

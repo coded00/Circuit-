@@ -7,13 +7,13 @@
 import Link from "next/link";
 import type { Prisma, QuickMatchStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { StatusPill, quickMatchStatusInfo } from "@/components/StatusPill";
+import { quickMatchStatusInfo } from "@/components/StatusPill";
+import { EmptyState, Field, FilterBar, naira, PageHeader, Pagination, StatusBadge, SubNav, toneFor } from "@/components/admin/ui";
+import { RowLink } from "@/components/admin/ui-client";
 
-type SearchParams = { q?: string; status?: string };
+type SearchParams = { q?: string; status?: string; page?: string };
 
-function formatNaira(kobo: number): string {
-  return `₦${(kobo / 100).toLocaleString("en-NG")}`;
-}
+const PAGE_SIZE = 30;
 
 function formatDate(date: Date): string {
   return date.toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" });
@@ -28,44 +28,64 @@ const STATUS_OPTIONS: { value: QuickMatchStatus | ""; label: string }[] = [
 ];
 
 export default async function AdminQuickMatchesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const { q, status } = await searchParams;
+  const { q, status, page: pageParam } = await searchParams;
+  const page = Math.max(1, Number(pageParam) || 1);
 
   const and: Prisma.QuickMatchChallengeWhereInput[] = [];
   if (q?.trim()) and.push({ game: { contains: q.trim(), mode: "insensitive" } });
   if (status) and.push({ status: status as QuickMatchStatus });
   const where: Prisma.QuickMatchChallengeWhereInput = and.length ? { AND: and } : {};
 
-  const challenges = await prisma.quickMatchChallenge.findMany({
+  const [total, battleCount, challenges] = await Promise.all([
+    prisma.quickMatchChallenge.count({ where }),
+    prisma.battle.count(),
+    prisma.quickMatchChallenge.findMany({
     where,
     orderBy: { createdAt: "desc" },
-    take: 50,
+    skip: (page - 1) * PAGE_SIZE,
+    take: PAGE_SIZE,
     include: {
       host: { select: { displayName: true } },
       acceptedBy: { select: { displayName: true } },
       _count: { select: { recipients: true } },
     },
-  });
+  }),
+  ]);
 
   const hasFilters = !!(q || status);
+  const pageHref = (n: number) => {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (status) params.set("status", status);
+    if (n > 1) params.set("page", String(n));
+    const qs = params.toString();
+    return qs ? `/admin/quick-matches?${qs}` : "/admin/quick-matches";
+  };
 
   return (
-    <div className="flex flex-1 flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="font-display text-2xl font-bold tracking-tight">Quick Matches</h1>
-        <p className="text-sm text-muted">{challenges.length.toLocaleString("en-NG")} Quick Matches.</p>
-      </div>
+    <>
+      <PageHeader title="Challenges" description="Player-vs-player matches outside tournaments. Open challenges and Quick Matches." />
+      <SubNav
+        active="quick"
+        items={[
+          { key: "challenges", label: "Challenges", href: "/admin/challenges", count: battleCount },
+          { key: "quick", label: "Quick Matches", href: "/admin/quick-matches", count: total },
+        ]}
+      />
 
-      <form className="card flex flex-wrap items-end gap-3">
-        <div className="flex min-w-[200px] flex-1 flex-col gap-1.5">
-          <label className="field-label" htmlFor="q">
-            Game
-          </label>
+      <FilterBar
+        extra={
+          hasFilters && (
+            <Link href="/admin/quick-matches" className="text-[12px] font-medium text-muted hover:text-foreground">
+              Clear
+            </Link>
+          )
+        }
+      >
+        <Field label="Game" grow htmlFor="q">
           <input id="q" name="q" defaultValue={q ?? ""} placeholder="e.g. Valorant" className="field-input" />
-        </div>
-        <div className="flex min-w-[160px] flex-col gap-1.5">
-          <label className="field-label" htmlFor="status">
-            Status
-          </label>
+        </Field>
+        <Field label="Status" htmlFor="status">
           <select id="status" name="status" defaultValue={status ?? ""} className="field-select">
             {STATUS_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
@@ -73,62 +93,55 @@ export default async function AdminQuickMatchesPage({ searchParams }: { searchPa
               </option>
             ))}
           </select>
-        </div>
-        <button type="submit" className="btn-primary">
-          Apply
-        </button>
-        {hasFilters && (
-          <Link href="/admin/quick-matches" className="text-xs font-medium text-accent-volt hover:underline">
-            Clear filters
-          </Link>
-        )}
-      </form>
+        </Field>
+      </FilterBar>
 
       {challenges.length === 0 ? (
-        <div className="card flex flex-col items-center gap-1 py-16 text-center">
-          <p className="text-sm text-muted">No Quick Matches match those filters.</p>
-        </div>
+        <EmptyState title={hasFilters ? "No Quick Matches match these filters" : "No Quick Matches yet"} description={hasFilters ? "Try a broader search or clear the filters." : undefined} />
       ) : (
-        <div className="table-wrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Game</th>
-                <th>Host</th>
-                <th>Recipients</th>
-                <th>Accepted by</th>
-                <th>Entry</th>
-                <th>Status</th>
-                <th>Created</th>
-              </tr>
-            </thead>
-            <tbody>
-              {challenges.map((c) => {
-                const statusInfo = quickMatchStatusInfo(c.status);
-                return (
-                  <tr key={c.id}>
-                    <td>
-                      <Link href={`/admin/quick-matches/${c.id}`} className="font-medium hover:text-accent-volt">
-                        {c.game}
-                      </Link>
-                    </td>
-                    <td className="text-muted">{c.host.displayName}</td>
-                    <td className="text-muted">{c._count.recipients}</td>
-                    <td className="text-muted">{c.acceptedBy?.displayName ?? "—"}</td>
-                    <td className="font-mono tabular-nums">{c.stakeAmount === 0 ? "Free" : formatNaira(c.stakeAmount)}</td>
-                    <td>
-                      <StatusPill tone={statusInfo.tone} pulse={statusInfo.pulse}>
-                        {statusInfo.label}
-                      </StatusPill>
-                    </td>
-                    <td className="text-muted">{formatDate(c.createdAt)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="flex flex-col gap-3">
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Game</th>
+                  <th>Host</th>
+                  <th className="text-right">Sent to</th>
+                  <th>Accepted by</th>
+                  <th className="text-right">Stake</th>
+                  <th>Status</th>
+                  <th className="text-right">Created</th>
+                </tr>
+              </thead>
+              <tbody>
+                {challenges.map((c) => {
+                  const statusInfo = quickMatchStatusInfo(c.status);
+                  return (
+                    <RowLink key={c.id} href={`/admin/quick-matches/${c.id}`}>
+                      <td>
+                        <Link href={`/admin/quick-matches/${c.id}`} className="font-medium text-foreground">
+                          {c.game}
+                        </Link>
+                      </td>
+                      <td className="text-muted">{c.host.displayName}</td>
+                      <td className="text-right text-muted">{c._count.recipients}</td>
+                      <td className="text-muted">{c.acceptedBy?.displayName ?? "—"}</td>
+                      <td className="text-right">{c.stakeAmount === 0 ? <span className="text-muted">Free</span> : naira(c.stakeAmount)}</td>
+                      <td>
+                        <StatusBadge tone={toneFor(statusInfo.tone)} dot={statusInfo.pulse}>
+                          {statusInfo.label}
+                        </StatusBadge>
+                      </td>
+                      <td className="text-right text-muted">{formatDate(c.createdAt)}</td>
+                    </RowLink>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <Pagination page={page} pageSize={PAGE_SIZE} total={total} href={pageHref} />
         </div>
       )}
-    </div>
+    </>
   );
 }

@@ -1,14 +1,15 @@
 /**
- * Circuit — admin Game catalog edit/enable/delete. Deleting a `Game` row
- * doesn't touch existing `Tournament.game`/`Battle.game` strings — those
- * aren't a foreign key (see the `Game` model's schema comment) — it only
- * removes the name from future creation/edit form options.
+ * Circuit — admin Game catalog edit / enable / publish / delete.
+ * Tournament.game and Battle.game are plain strings, so deleting a game
+ * never breaks anything already created — it only leaves the forms.
+ * Modes and formats cascade with it.
  */
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireStaff } from "@/lib/session";
 import { logAdminAction } from "@/lib/auditLog";
+import { parseGameInput, publishBlocker } from "@/lib/gameCatalog";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const staffAuth = await requireStaff();
@@ -16,7 +17,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const admin = staffAuth.user;
 
   const { id } = await params;
-  const existing = await prisma.game.findUnique({ where: { id } });
+  const existing = await prisma.game.findUnique({
+    where: { id },
+    include: { modes: { include: { formats: true } } },
+  });
   if (!existing) return NextResponse.json({ error: "Game not found." }, { status: 404 });
 
   const body = await request.json().catch(() => null);
@@ -25,17 +29,27 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   const data: Record<string, unknown> = {};
+
+  // Full info edit — any info field present means the whole info block is sent.
   if (typeof body.name === "string") {
-    const name = body.name.trim();
-    if (!name) return NextResponse.json({ error: "Name is required." }, { status: 400 });
-    if (name !== existing.name) {
-      const clash = await prisma.game.findUnique({ where: { name } });
+    const parsed = parseGameInput(body);
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
+    if (parsed.value.name !== existing.name) {
+      const clash = await prisma.game.findUnique({ where: { name: parsed.value.name } });
       if (clash) return NextResponse.json({ error: "A game with that name already exists." }, { status: 409 });
     }
-    data.name = name;
+    Object.assign(data, parsed.value);
   }
-  if (body.iconUrl !== undefined) data.iconUrl = typeof body.iconUrl === "string" ? body.iconUrl.trim() || null : null;
   if (typeof body.enabled === "boolean") data.enabled = body.enabled;
+  if (typeof body.published === "boolean") {
+    if (body.published) {
+      const blocker = publishBlocker(existing.modes);
+      if (blocker) return NextResponse.json({ error: blocker }, { status: 400 });
+      data.publishedAt = existing.publishedAt ?? new Date();
+    } else {
+      data.publishedAt = null;
+    }
+  }
 
   const updated = await prisma.game.update({ where: { id }, data });
 

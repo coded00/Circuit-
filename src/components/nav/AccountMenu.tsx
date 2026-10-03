@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { logout } from "@/lib/logout";
 import { ChevronDown, ShoppingBag, Gift, Trophy, Swords, Shield, Wallet, Compass } from "lucide-react";
 
 type NavUser = { handle: string; displayName: string; avatarUrl: string | null; isStaff: boolean };
@@ -49,7 +49,6 @@ export function AccountMenu({
   disputeCount?: number;
   friendRequestCount?: number;
 }) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -61,10 +60,8 @@ export function AccountMenu({
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
-  async function handleLogout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/");
-    router.refresh();
+  function handleLogout() {
+    void logout("/");
   }
 
   return (
@@ -74,24 +71,22 @@ export function AccountMenu({
         onClick={() => setOpen((v) => !v)}
         aria-label={`Account menu for ${user.displayName}`}
         aria-expanded={open}
-        className="flex items-center gap-2.5 rounded-full py-1 pr-2 pl-1 transition hover:bg-surface-elevated"
+        className="flex h-9 items-center gap-2.5 rounded-none pr-1 pl-0.5 text-white transition hover:bg-white/[0.07] lg:pr-2"
       >
         {user.avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs
-          <img src={user.avatarUrl} alt="" className="h-9 w-9 rounded-full border-2 border-accent-blue/40 object-cover" />
+          <img src={user.avatarUrl} alt="" referrerPolicy="no-referrer" className="h-8 w-8 cut-avatar object-cover" />
         ) : (
-          <div className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-accent-blue/40 bg-surface text-sm font-semibold text-muted">
+          <div className="font-display flex h-8 w-8 items-center justify-center cut-avatar bg-accent-volt text-sm font-bold text-accent-volt-foreground">
             {user.displayName.slice(0, 1).toUpperCase()}
           </div>
         )}
+        {/* Real identity only — the old decorative "Level 24" wasn't data. */}
         <span className="hidden flex-col items-start lg:flex">
-          <span className="max-w-24 truncate text-sm leading-tight font-medium">{user.displayName}</span>
-          {/* Static illustrative value — Circuit has no Level/XP system;
-              per explicit product decision this spec's "Level 24" ships
-              as decorative UI, not data. */}
-          <span className="text-[10px] leading-tight text-muted-strong">Level 24</span>
+          <span className="max-w-28 truncate text-sm leading-tight font-semibold">{user.displayName}</span>
+          <span className="max-w-28 truncate font-mono text-[11px] leading-tight text-white/45">@{user.handle}</span>
         </span>
-        <ChevronDown size={14} className="hidden text-muted sm:block" />
+        <ChevronDown size={14} className="hidden text-white/40 lg:block" />
       </button>
 
       {open && (
@@ -110,6 +105,9 @@ export function AccountMenu({
           </Link>
           <Link href="/account" onClick={() => setOpen(false)} className="block px-4 py-2 text-sm hover:bg-surface-elevated">
             Account settings
+          </Link>
+          <Link href="/help" onClick={() => setOpen(false)} className="block px-4 py-2 text-sm hover:bg-surface-elevated">
+            Help
           </Link>
 
           <div className="my-1 border-t border-border" />
@@ -144,10 +142,10 @@ export function AccountMenu({
             <>
               <div className="my-1 border-t border-border" />
               <span className="text-eyebrow block px-4 py-1">Staff</span>
-              <MenuLink href="/staff/disputes" icon={Shield} onClick={() => setOpen(false)}>
+              <MenuLink href="/admin/disputes" icon={Shield} onClick={() => setOpen(false)}>
                 Disputes queue
               </MenuLink>
-              <MenuLink href="/staff/reports" icon={Shield} onClick={() => setOpen(false)}>
+              <MenuLink href="/admin/reports" icon={Shield} onClick={() => setOpen(false)}>
                 Reports
               </MenuLink>
             </>

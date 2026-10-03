@@ -9,22 +9,32 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { StatusPill, registrationStatusInfo, matchStatusInfo, battleStatusInfo } from "@/components/StatusPill";
+import { ArrowUpRight } from "lucide-react";
+import { matchStatusInfo, battleStatusInfo } from "@/components/StatusPill";
+import { Avatar, EmptyState, KeyValue, naira, PageHeader, Panel, RegistrationBadge, Section, StatStrip, StatusBadge, toneFor } from "@/components/admin/ui";
 import { SuspendControl } from "@/components/admin/SuspendControl";
-
-function formatNaira(kobo: number): string {
-  return `₦${(kobo / 100).toLocaleString("en-NG")}`;
-}
 
 function formatDate(date: Date): string {
   return date.toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" });
 }
 
-function walletTypeLabel(type: string): string {
-  if (type === "FUND") return "Deposit";
-  if (type === "WITHDRAWAL") return "Withdrawal";
-  return "Entry fee";
-}
+const WALLET_TYPE: Record<string, { label: string; credit: boolean }> = {
+  FUND: { label: "Deposit", credit: true },
+  WITHDRAWAL: { label: "Withdrawal", credit: false },
+  ENTRY_FEE_DEBIT: { label: "Entry fee", credit: false },
+  ENTRY_FEE_REFUND: { label: "Entry fee refund", credit: true },
+  STAKE_DEBIT: { label: "Challenge stake", credit: false },
+  MARKETPLACE_DEBIT: { label: "Marketplace purchase", credit: false },
+  MARKETPLACE_REFUND: { label: "Marketplace refund", credit: true },
+  STAKE_CREDIT: { label: "Challenge winnings", credit: true },
+  ORGANIZER_REVENUE_CREDIT: { label: "Organizer revenue", credit: true },
+};
+
+const TX_STATUS: Record<string, { tone: "success" | "attention" | "danger"; label: string }> = {
+  COMPLETE: { tone: "success", label: "Complete" },
+  PENDING: { tone: "attention", label: "Processing" },
+  FAILED: { tone: "danger", label: "Failed" },
+};
 
 export default async function AdminUserDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -61,161 +71,163 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
 
   const totalMatches = user._count.matchesAsPlayerA + user._count.matchesAsPlayerB;
 
+  const row = "flex items-center gap-3 border-b border-border px-4 py-2.5 text-[13px] last:border-b-0 sm:px-5";
+
   return (
-    <div className="flex flex-1 flex-col gap-6">
-      <Link href="/admin/users" className="w-fit text-sm font-medium text-muted transition hover:text-foreground">
-        ← All users
-      </Link>
-
-      <div className="card flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-4">
-          {user.avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs
-            <img src={user.avatarUrl} alt="" className="h-14 w-14 rounded-full object-cover" />
-          ) : (
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-surface-elevated text-lg font-semibold text-muted">
-              {user.displayName.slice(0, 1).toUpperCase()}
-            </div>
-          )}
-          <div className="flex flex-col gap-0.5">
-            <div className="flex items-center gap-2">
-              <span className="font-display text-lg font-bold">{user.displayName}</span>
-              <span className={`badge ${user.isSuspended ? "badge-cancelled" : "badge-open"}`}>
-                {user.isSuspended ? "Suspended" : "Active"}
-              </span>
-            </div>
-            <span className="text-sm text-muted">
-              @{user.handle} · {user.emailOrPhone}
+    <>
+      <PageHeader
+        back={{ href: "/admin/users", label: "Users" }}
+        title={
+          <span className="flex items-center gap-3">
+            <Avatar name={user.displayName} src={user.avatarUrl} size={36} />
+            {user.displayName}
+          </span>
+        }
+        meta={
+          <>
+            <StatusBadge tone={user.isSuspended ? "danger" : "success"} dot>
+              {user.isSuspended ? "Suspended" : "Active"}
+            </StatusBadge>
+            {user.deletionRequestedAt && <StatusBadge tone="attention">Deletion requested</StatusBadge>}
+            {user.adminRole && <StatusBadge tone="info">{user.adminRole === "SUPER_ADMIN" ? "Super admin" : "Moderator"}</StatusBadge>}
+            <span>
+              @{user.handle} · {user.emailOrPhone} · Joined {formatDate(user.createdAt)}
             </span>
-            <span className="text-xs text-muted-strong">Joined {formatDate(user.createdAt)}</span>
-          </div>
-        </div>
-        <SuspendControl userId={user.id} isSuspended={user.isSuspended} suspensionReason={user.suspensionReason} />
-      </div>
+          </>
+        }
+        actions={
+          <>
+            <Link href={`/players/${user.handle}`} target="_blank" className="btn-ghost">
+              Public profile <ArrowUpRight size={14} />
+            </Link>
+            <SuspendControl userId={user.id} isSuspended={user.isSuspended} suspensionReason={null} />
+          </>
+        }
+      />
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div className="widget flex flex-col gap-1">
-          <span className="text-eyebrow">Matches</span>
-          <span className="text-stat text-2xl">{totalMatches}</span>
-        </div>
-        <div className="widget flex flex-col gap-1">
-          <span className="text-eyebrow">Wins</span>
-          <span className="text-stat text-2xl">{user._count.matchesWon}</span>
-        </div>
-        <div className="widget flex flex-col gap-1">
-          <span className="text-eyebrow">Competitions</span>
-          <span className="text-stat text-2xl">{user._count.registrations}</span>
-        </div>
-        <div className="widget flex flex-col gap-1">
-          <span className="text-eyebrow">Wallet balance</span>
-          <span className="text-stat text-2xl">{formatNaira(user.walletBalance)}</span>
-        </div>
-      </div>
+      <StatStrip
+        stats={[
+          { label: "Matches", value: totalMatches, hint: `${user._count.matchesWon} won` },
+          { label: "Competitions entered", value: user._count.registrations },
+          { label: "Challenges created", value: user._count.battlesCreated },
+          { label: "Wallet balance", value: naira(user.walletBalance) },
+        ]}
+      />
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <div className="card flex flex-col gap-3">
-          <h2 className="text-card-title">Competitions</h2>
+      <Panel>
+        <KeyValue
+          items={[
+            { label: "Email", value: user.emailVerifiedAt ? `Verified ${formatDate(user.emailVerifiedAt)}` : "Not verified" },
+            { label: "Payout account", value: user.payoutMethodRef ? "Linked" : "Not linked" },
+            { label: "Age verified", value: user.ageVerified ? "Yes" : "No" },
+            { label: "Region", value: user.region ?? "—" },
+            { label: "Deletion requested", value: user.deletionRequestedAt ? formatDate(user.deletionRequestedAt) : "—" },
+            { label: "Suspension reason", value: user.isSuspended ? (user.suspensionReason ?? "—") : "—" },
+          ]}
+        />
+      </Panel>
+
+      <div className="grid grid-cols-1 gap-8 xl:grid-cols-2">
+        <Section title="Competitions">
           {registrations.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted">No competitions joined yet.</p>
+            <EmptyState title="No competitions entered" />
           ) : (
-            <div className="flex flex-col">
-              {registrations.map((r, i) => {
-                const status = registrationStatusInfo(r.status);
-                return (
-                  <Link
-                    key={r.id}
-                    href={`/admin/competitions/${r.tournament.id}`}
-                    className={`flex items-center justify-between gap-3 py-2.5 text-sm hover:text-accent-volt ${i > 0 ? "border-t border-border" : ""}`}
-                  >
-                    <span className="min-w-0 flex-1 truncate">{r.tournament.name}</span>
-                    <StatusPill tone={status.tone}>{status.label}</StatusPill>
-                    <span className="w-20 shrink-0 text-right text-xs text-muted-strong">{formatDate(r.createdAt)}</span>
-                  </Link>
-                );
-              })}
-            </div>
+            <Panel padded={false}>
+              {registrations.map((r) => (
+                <Link key={r.id} href={`/admin/competitions/${r.tournament.id}`} className={`${row} transition-colors hover:bg-surface-elevated`}>
+                  <span className="min-w-0 flex-1 truncate text-foreground">
+                    {r.tournament.name} <span className="text-muted">· {r.tournament.game}</span>
+                  </span>
+                  <RegistrationBadge status={r.status} />
+                  <span className="w-[88px] shrink-0 text-right text-[12px] text-muted">{formatDate(r.createdAt)}</span>
+                </Link>
+              ))}
+            </Panel>
           )}
-        </div>
+        </Section>
 
-        <div className="card flex flex-col gap-3">
-          <h2 className="text-card-title">Matches</h2>
+        <Section title="Matches">
           {matches.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted">No matches yet.</p>
+            <EmptyState title="No matches yet" />
           ) : (
-            <div className="flex flex-col">
-              {matches.map((m, i) => {
-                const isPlayerA = m.playerAId === id;
-                const opponent = isPlayerA ? m.playerB.displayName : m.playerA.displayName;
+            <Panel padded={false}>
+              {matches.map((m) => {
+                const opponent = m.playerAId === id ? m.playerB.displayName : m.playerA.displayName;
                 const status = matchStatusInfo(m.status);
                 const outcome = m.winnerId ? (m.winnerId === id ? "Won" : "Lost") : null;
                 return (
-                  <div key={m.id} className={`flex items-center justify-between gap-3 py-2.5 text-sm ${i > 0 ? "border-t border-border" : ""}`}>
-                    <span className="min-w-0 flex-1 truncate">
-                      vs {opponent}
-                      <span className="ml-1.5 text-xs text-muted">{m.tournament?.name ?? m.battle?.game}</span>
+                  <Link key={m.id} href={`/admin/matches/${m.id}`} className={`${row} transition-colors hover:bg-surface-elevated`}>
+                    <span className="min-w-0 flex-1 truncate text-foreground">
+                      vs {opponent} <span className="text-muted">· {m.tournament?.name ?? m.battle?.game}</span>
                     </span>
                     {outcome ? (
-                      <span className={`badge ${outcome === "Won" ? "badge-complete" : "badge-cancelled"}`}>{outcome}</span>
+                      <StatusBadge tone={outcome === "Won" ? "success" : "neutral"}>{outcome}</StatusBadge>
                     ) : (
-                      <StatusPill tone={status.tone} pulse={status.pulse}>{status.label}</StatusPill>
+                      <StatusBadge tone={toneFor(status.tone)} dot={status.pulse}>
+                        {status.label}
+                      </StatusBadge>
                     )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        <div className="card flex flex-col gap-3">
-          <h2 className="text-card-title">Challenges Created</h2>
-          {battles.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted">No challenges created yet.</p>
-          ) : (
-            <div className="flex flex-col">
-              {battles.map((b, i) => {
-                const status = battleStatusInfo(b.status);
-                return (
-                  <Link
-                    key={b.id}
-                    href={`/admin/challenges/${b.id}`}
-                    className={`flex items-center justify-between gap-3 py-2.5 text-sm hover:text-accent-volt ${i > 0 ? "border-t border-border" : ""}`}
-                  >
-                    <span className="min-w-0 flex-1 truncate">{b.game}</span>
-                    <StatusPill tone={status.tone} pulse={status.pulse}>
-                      {status.label}
-                    </StatusPill>
-                    <span className="w-20 shrink-0 text-right text-xs text-muted-strong">{formatDate(b.createdAt)}</span>
                   </Link>
                 );
               })}
-            </div>
+            </Panel>
           )}
-        </div>
+        </Section>
 
-        <div className="card flex flex-col gap-3">
-          <h2 className="text-card-title">Wallet Transactions</h2>
-          {walletTx.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted">No wallet activity yet.</p>
+        <Section title="Challenges created">
+          {battles.length === 0 ? (
+            <EmptyState title="No challenges created" />
           ) : (
-            <div className="flex flex-col">
-              {walletTx.map((t, i) => (
-                <div key={t.id} className={`flex items-center justify-between gap-3 py-2.5 text-sm ${i > 0 ? "border-t border-border" : ""}`}>
-                  <span className="min-w-0 flex-1 truncate">{walletTypeLabel(t.type)}</span>
-                  <span className="font-mono tabular-nums">{formatNaira(t.amount)}</span>
-                  <span
-                    className={`badge ${
-                      t.status === "COMPLETE" ? "badge-complete" : t.status === "FAILED" ? "badge-cancelled" : "badge-attention"
-                    }`}
-                  >
-                    {t.status}
-                  </span>
-                  <span className="w-20 shrink-0 text-right text-xs text-muted-strong">{formatDate(t.createdAt)}</span>
-                </div>
-              ))}
-            </div>
+            <Panel padded={false}>
+              {battles.map((b) => {
+                const status = battleStatusInfo(b.status);
+                return (
+                  <Link key={b.id} href={`/admin/challenges/${b.id}`} className={`${row} transition-colors hover:bg-surface-elevated`}>
+                    <span className="min-w-0 flex-1 truncate text-foreground">{b.game}</span>
+                    <StatusBadge tone={toneFor(status.tone)} dot={status.pulse}>
+                      {status.label}
+                    </StatusBadge>
+                    <span className="w-[88px] shrink-0 text-right text-[12px] text-muted">{formatDate(b.createdAt)}</span>
+                  </Link>
+                );
+              })}
+            </Panel>
           )}
-        </div>
+        </Section>
+
+        <Section
+          title="Wallet activity"
+          actions={
+            walletTx.length > 0 && (
+              <Link href={`/admin/finance?q=${encodeURIComponent(user.handle)}`} className="text-[12px] font-medium text-muted hover:text-foreground">
+                All transactions →
+              </Link>
+            )
+          }
+        >
+          {walletTx.length === 0 ? (
+            <EmptyState title="No wallet activity" />
+          ) : (
+            <Panel padded={false}>
+              {walletTx.map((t) => {
+                const kind = WALLET_TYPE[t.type] ?? { label: t.type, credit: false };
+                const st = TX_STATUS[t.status] ?? { tone: "attention" as const, label: t.status };
+                return (
+                  <div key={t.id} className={row}>
+                    <span className="min-w-0 flex-1 truncate text-foreground">{kind.label}</span>
+                    <StatusBadge tone={st.tone}>{st.label}</StatusBadge>
+                    <span className={`w-[92px] shrink-0 text-right tabular-nums ${kind.credit ? "text-success" : "text-foreground"}`}>
+                      {kind.credit ? "+" : "−"}
+                      {naira(t.amount)}
+                    </span>
+                    <span className="w-[88px] shrink-0 text-right text-[12px] text-muted">{formatDate(t.createdAt)}</span>
+                  </div>
+                );
+              })}
+            </Panel>
+          )}
+        </Section>
       </div>
-    </div>
+    </>
   );
 }

@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useConfirmDialog } from "@/components/ConfirmDialogProvider";
+import { useToast } from "@/components/ToastProvider";
 
 export default function CancelBattleButton({ battleId }: { battleId: string }) {
   const router = useRouter();
+  const toast = useToast();
   const confirmDialog = useConfirmDialog();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -15,7 +17,14 @@ export default function CancelBattleButton({ battleId }: { battleId: string }) {
     setSubmitting(true);
     setError(null);
 
-    const res = await fetch(`/api/battles/${battleId}/cancel`, { method: "POST" });
+    let res: Response;
+    try {
+      res = await fetch(`/api/battles/${battleId}/cancel`, { method: "POST" });
+    } catch {
+      setError("We couldn't reach Circuit. Check your connection and try again.");
+      setSubmitting(false);
+      return;
+    }
     if (!res.ok) {
       const data = await res.json().catch(() => null);
       setError(data?.error ?? "Something went wrong. Please try again.");
@@ -23,6 +32,7 @@ export default function CancelBattleButton({ battleId }: { battleId: string }) {
       return;
     }
 
+    toast({ title: "Challenge cancelled", message: "Any stake is back in your wallet." });
     router.refresh();
   }
 

@@ -17,7 +17,7 @@ export default function CalendarError({ error, reset }: { error: Error & { diges
         <AlertTriangle size={22} />
       </div>
       <h1 className="state-title">Couldn&apos;t load the calendar</h1>
-      <p className="state-description">Events failed to load — try again.</p>
+      <p className="state-description">Events failed to load. Try again.</p>
       <button type="button" onClick={reset} className="btn-primary">
         Try again
       </button>

@@ -7,6 +7,8 @@
 
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { loginPath } from "@/lib/safeRedirect";
+import { requestPath } from "@/lib/requestPath";
 import { getCurrentUser } from "@/lib/session";
 
 // Private, per-user organizer tooling — nothing under here is real public
@@ -16,8 +18,8 @@ export const metadata: Metadata = { robots: { index: false, follow: false } };
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
   if (!user) {
-    redirect("/login?next=/dashboard");
+    redirect(loginPath(await requestPath("/dashboard")));
   }
 
-  return <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-6 py-10">{children}</div>;
+  return <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-4 py-6 sm:px-8 sm:py-10">{children}</div>;
 }

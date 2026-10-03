@@ -18,7 +18,16 @@
 
 import { prisma } from "@/lib/db";
 
+// Every page that lists tournaments calls this, so on a busy site it would be a
+// database write per page view. Once every 20 seconds per server is plenty: a
+// tournament opening a few seconds late is invisible, a pool of connections
+// stuck behind these writes is not.
+let lastOpenSweep = 0;
+
 export async function openDueTournaments(): Promise<void> {
+  const now = Date.now();
+  if (now - lastOpenSweep < 20_000) return;
+  lastOpenSweep = now;
   await prisma.tournament.updateMany({
     where: { status: "DRAFT", registrationOpenAt: { lte: new Date() } },
     data: { status: "OPEN" },

@@ -1,50 +1,41 @@
-import Link from "next/link";
-import { Swords } from "lucide-react";
-import { AutoScrollRow } from "@/components/AutoScrollRow";
-import { ChallengeCard } from "@/components/ChallengeCard";
-
 /**
- * Circuit — "Open Challenges" homepage section. Real `Battle` data (the
- * existing `/battles` feature, now user-facing as "Challenges") — the
- * exact same `ChallengeCard` the full `/battles` board renders, at
- * carousel scale. See that component's own header comment for what's real
- * vs. deliberately not invented (no rating number, no countdown).
+ * Circuit — homepage "Open challenges": the newest few open Battles as the
+ * same opponent cards as the /battles board (ChallengeCard).
  */
 
-type Battle = {
-  id: string;
-  game: string;
-  format: string;
-  visibility: string;
-  stakeAmount: number;
-  creator: { displayName: string; avatarUrl: string | null };
-};
+import Link from "next/link";
+import { ChallengeCard, type ChallengeCardData } from "@/components/ChallengeCard";
+import { recordKey } from "@/lib/challengeView";
 
-export function OpenChallenges({ battles }: { battles: Battle[] }) {
+export function OpenChallenges({
+  battles,
+  records,
+  total,
+  viewerId,
+}: {
+  battles: (ChallengeCardData & { creatorId: string })[];
+  /** Win-loss records keyed by recordKey(game, userId). */
+  records: Map<string, { wins: number; losses: number }>;
+  /** How many open challenges there are in all, so "View all" can say how many more wait there. */
+  total: number;
+  viewerId?: string | null;
+}) {
   if (battles.length === 0) return null;
-  const items = battles.map((b) => (
-    <div key={b.id} className="h-full w-60">
-      <ChallengeCard battle={b} />
-    </div>
-  ));
-
   return (
     <section className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex flex-col gap-0.5">
-          <h2 className="text-section-heading flex items-center gap-2">
-            <Swords size={17} className="text-accent-orange" />
-            Open Challenges
-          </h2>
-          <p className="text-metadata">Take on another player, right now.</p>
-        </div>
-        <Link href="/battles" className="text-xs font-medium text-accent-orange hover:underline">
-          View All →
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="font-display text-xl font-bold tracking-tight">
+          Open challenges <span className="font-mono text-xs font-normal text-muted tabular-nums">{total}</span>
+        </h2>
+        <Link href="/battles" className="-my-2.5 py-2.5 pl-3 text-xs font-medium text-accent-blue hover:underline">
+          View all{total > battles.length ? ` (${total})` : ""}
         </Link>
       </div>
-      <div className="border-b border-border" />
-
-      <AutoScrollRow items={items} ariaLabel="Open Challenges" />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        {battles.map((b) => (
+          <ChallengeCard key={b.id} battle={b} record={records.get(recordKey(b.game, b.creatorId)) ?? null} mine={viewerId === b.creatorId} />
+        ))}
+      </div>
     </section>
   );
 }

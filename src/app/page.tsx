@@ -2,7 +2,7 @@
  * Circuit — homepage (MVP rework spec sections 11-17). "Light to
  * discover, dark to compete": a dark cinematic hero, then a light
  * curated feed — Featured Competitions, Explore by Game, Upcoming
- * Competitions, Open Challenges, and (logged in) Your Circuit. The
+ * Competitions, and Open Challenges. The
  * exhaustive, filterable tournament browse experience lives on
  * `/compete` now; this page shows a curated slice of each, all real
  * data, no fabrication — including the sidebar's `GamerNews` widget,
@@ -13,8 +13,6 @@
 
 import { Suspense } from "react";
 import Link from "next/link";
-import { Trophy, Crown } from "lucide-react";
-import { CountUp } from "@/components/CountUp";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { CircuitHero } from "@/components/CircuitHero";
@@ -26,90 +24,58 @@ import { GamerNews } from "@/components/GamerNews";
 import { YourCircuit } from "@/components/YourCircuit";
 import { CommunitiesCard } from "@/components/CommunitiesCard";
 import { getJoinedCommunities } from "@/lib/community";
-import { GAME_ACTIVITY } from "@/lib/circuitActivity";
-import { formatNotification } from "@/lib/notification-format";
-import { globalStandings } from "@/lib/standings";
+import { publishedGames } from "@/lib/gameCatalogQueries";
+import { challengeRecords, globalStandings } from "@/lib/standings";
 import { getFriendIds } from "@/lib/friends";
 import { getActiveAnnouncement } from "@/lib/announcements";
 import { openDueTournaments } from "@/lib/tournaments";
+import { getFeaturedTournaments, getUpcomingTournaments } from "@/lib/homeTournaments";
+import { openBattleFilter } from "@/lib/battles";
 import { AnnouncementBanner } from "@/components/AnnouncementBanner";
+import { Panel, PanelEmpty, PanelRows, panelRowClass } from "@/components/ui/Panel";
+import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
 import { buildMetadata } from "@/lib/seo";
 
 export const metadata = buildMetadata({
   title: "Gaming Tournaments & Esports Competitions in Nigeria",
   description:
-    "Compete in real gaming tournaments and esports competitions on Circuit — register for Call of Duty, eFootball, PUBG Mobile and more, climb the leaderboard, win real prizes, and join a real gaming community.",
+    "Compete in real gaming tournaments and esports competitions on Circuit. Register for Call of Duty, eFootball, PUBG Mobile and more, climb the leaderboard, win real prizes, and join a real gaming community.",
   path: "/",
 });
 
-const RANK_COLORS = ["#eab308", "#9ca3af", "#b45309"]; // gold, silver, bronze — same as ladder/page.tsx
 
-const relativeTimeFormat = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
-// Same shape as notifications/page.tsx's own local formatRelative — no
-// shared lib for this one-line helper, matching that page's convention.
-function formatRelative(date: Date): string {
-  const diffMin = Math.round((date.getTime() - Date.now()) / 60000);
-  if (Math.abs(diffMin) < 60) return relativeTimeFormat.format(diffMin, "minute");
-  const diffHour = Math.round(diffMin / 60);
-  if (Math.abs(diffHour) < 24) return relativeTimeFormat.format(diffHour, "hour");
-  return relativeTimeFormat.format(Math.round(diffHour / 24), "day");
+/** Shown while the page's data loads: the hero and a row of cards, same footprint as the real thing. */
+function HomeSkeleton() {
+  return (
+    <div className="flex w-full flex-1 flex-col gap-8 px-4 py-6 sm:px-8 sm:py-10" aria-busy="true" aria-label="Loading">
+      <div className="skeleton h-[340px] w-full cut-lg" />
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_var(--right-rail-width)]">
+        <div className="flex flex-col gap-4">
+          <div className="skeleton h-6 w-48" />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-3">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="skeleton h-64 w-full cut-lg" />
+            ))}
+          </div>
+        </div>
+        <div className="flex flex-col gap-6">
+          <div className="skeleton h-40 w-full cut-lg" />
+          <div className="skeleton h-56 w-full cut-lg" />
+        </div>
+      </div>
+    </div>
+  );
 }
 
-// Same convention as UpcomingCompetitions.tsx/FeaturedCompetitions.tsx's
-// own local formatShortDate.
-function formatShortDate(date: Date): string {
-  return date.toLocaleDateString("en-NG", { month: "short", day: "numeric" });
+export default function Home({ searchParams }: { searchParams: Promise<{ leaderboard?: string }> }) {
+  return (
+    <Suspense fallback={<HomeSkeleton />}>
+      <HomeContent searchParams={searchParams} />
+    </Suspense>
+  );
 }
 
-const cardSelect = {
-  id: true,
-  name: true,
-  game: true,
-  status: true,
-  format: true,
-  teamSize: true,
-  entryFee: true,
-  participantCap: true,
-  streamUrl: true,
-  registrationOpenAt: true,
-  posterUrl: true,
-  startAt: true,
-  prizeAmount: true,
-  prizeText: true,
-  _count: { select: { registrations: { where: { status: "CONFIRMED" as const } } } },
-} as const;
-
-/**
- * Real prize pools first (what "Featured" is supposed to mean), then
- * top up with other real OPEN/LIVE tournaments by soonest start date —
- * otherwise this row shows just one card whenever the dev/early-traffic
- * data happens to have only one prize-backed tournament, which reads as
- * broken rather than "not much on Circuit yet." Every card is still a
- * real tournament; nothing here is invented.
- */
-async function getFeaturedTournaments(limit: number) {
-  const prized = await prisma.tournament.findMany({
-    where: { status: { in: ["OPEN", "LIVE"] }, prizeAmount: { not: null } },
-    orderBy: { prizeAmount: "desc" },
-    take: limit,
-    select: cardSelect,
-  });
-  if (prized.length >= limit) return prized;
-
-  const filler = await prisma.tournament.findMany({
-    where: { status: { in: ["OPEN", "LIVE"] }, id: { notIn: prized.map((t) => t.id) } },
-    orderBy: { startAt: "asc" },
-    take: limit - prized.length,
-    select: cardSelect,
-  });
-  return [...prized, ...filler];
-}
-
-export default async function Home({
-  searchParams,
-}: {
-  searchParams: Promise<{ leaderboard?: string }>;
-}) {
+async function HomeContent({ searchParams }: { searchParams: Promise<{ leaderboard?: string }> }) {
   const { leaderboard: leaderboardScope } = await searchParams;
   await openDueTournaments();
   const user = await getCurrentUser();
@@ -122,108 +88,57 @@ export default async function Home({
     gameCounts,
     openBattles,
     leaderboard,
-    upcomingMatches,
-    registeredCompetitions,
-    activeChallenges,
-    recentActivity,
     homepageBanners,
     activeAnnouncement,
     joinedCommunities,
+    openTournamentStats,
+    openChallengeCount,
   ] = await Promise.all([
     getFeaturedTournaments(3),
-    // "Upcoming" includes DRAFT on purpose (unlike Featured, which stays
-    // OPEN/LIVE-only) — DRAFT here just means "hasn't reached its own
-    // registrationOpenAt yet," not "not real." A tournament announced for
-    // next week should read as upcoming today, not disappear until the
-    // exact moment registration opens. The tournament page itself already
-    // gates the actual Register button on the real date regardless of
-    // status, so this can't let anyone register early.
-    prisma.tournament.findMany({
-      where: { status: { in: ["DRAFT", "OPEN", "LIVE"] } },
-      orderBy: { startAt: "asc" },
-      take: 3,
-      select: cardSelect,
-    }),
-    // One query for every open/live tournament's game, then matched against
-    // each GAME_ACTIVITY name in memory — not 5 concurrent `count()` calls
-    // (one per game), which was needlessly competing for connections
-    // against the rest of this same Promise.all on every page load.
-    prisma.tournament
-      .findMany({ where: { status: { in: ["OPEN", "LIVE"] } }, select: { game: true } })
-      .then((tournaments) =>
-        GAME_ACTIVITY.map((g) => ({
-          name: g.name,
-          activeCompetitions: tournaments.filter((t) => t.game.toLowerCase().includes(g.name.toLowerCase())).length,
-        })),
-      ),
+    getUpcomingTournaments(6),
+    // The published game catalog (Admin → Games), each with its real count
+    // of open/live tournaments — games with something happening first.
+    Promise.all([publishedGames(), prisma.tournament.groupBy({ by: ["game"], where: { status: { in: ["OPEN", "LIVE"] } }, _count: { _all: true } })]).then(
+      ([games, counts]) =>
+        games
+          .map((g) => ({ name: g.name, iconUrl: g.iconUrl, activeCompetitions: counts.find((c) => c.game === g.name)?._count._all ?? 0 }))
+          .sort((a, b) => b.activeCompetitions - a.activeCompetitions || a.name.localeCompare(b.name)),
+    ),
     prisma.battle.findMany({
       where: {
-        status: "OPEN",
-        OR: [{ visibility: "OPEN" }, ...(friendIds.length ? [{ visibility: "FRIENDS" as const, creatorId: { in: friendIds } }] : [])],
+        AND: [
+          openBattleFilter(),
+          { OR: [{ visibility: "OPEN" }, ...(friendIds.length ? [{ visibility: "FRIENDS" as const, creatorId: { in: friendIds } }] : [])] },
+        ],
       },
       orderBy: { createdAt: "desc" },
       take: 6,
       include: {
-        creator: { select: { displayName: true, avatarUrl: true } },
-        targetUser: { select: { displayName: true } },
+        creator: { select: { displayName: true, handle: true, avatarUrl: true } },
       },
     }),
     globalStandings(),
-    user
-      ? prisma.match.findMany({
-          where: { OR: [{ playerAId: user.id }, { playerBId: user.id }], status: "UPCOMING" },
-          orderBy: { createdAt: "desc" },
-          take: 3,
-          include: {
-            tournament: { select: { name: true, game: true } },
-            battle: { select: { game: true, format: true } },
-            playerA: { select: { displayName: true } },
-            playerB: { select: { displayName: true } },
-          },
-        })
-      : Promise.resolve([]),
-    user
-      ? prisma.registration.findMany({
-          where: { userId: user.id, status: "CONFIRMED" },
-          orderBy: { createdAt: "desc" },
-          take: 3,
-          include: {
-            tournament: {
-              select: {
-                id: true,
-                name: true,
-                game: true,
-                startAt: true,
-                prizeAmount: true,
-                entryFee: true,
-                participantCap: true,
-                _count: { select: { registrations: { where: { status: "CONFIRMED" } } } },
-              },
-            },
-          },
-        })
-      : Promise.resolve([]),
-    user
-      ? prisma.battle.findMany({
-          where: { OR: [{ creatorId: user.id }, { targetUserId: user.id }], status: { in: ["OPEN", "ACCEPTED"] } },
-          orderBy: { createdAt: "desc" },
-          take: 3,
-          include: { targetUser: { select: { displayName: true } } },
-        })
-      : Promise.resolve([]),
-    user
-      ? prisma.notification.findMany({
-          where: { userId: user.id },
-          orderBy: { createdAt: "desc" },
-          take: 3,
-        })
-      : Promise.resolve([]),
     prisma.homepageBanner.findMany({
       where: { enabled: true, OR: [{ publishAt: null }, { publishAt: { lte: new Date() } }] },
       orderBy: { order: "asc" },
     }),
     getActiveAnnouncement(),
     user ? getJoinedCommunities(user.id) : Promise.resolve([]),
+    // Hero's live numbers. "Open tournaments" = registration open (the same
+    // number /compete calls "open for registration"); prize money is the
+    // pool across everything open or live.
+    Promise.all([
+      prisma.tournament.count({ where: { status: "OPEN" } }),
+      prisma.tournament.aggregate({ where: { status: { in: ["OPEN", "LIVE"] } }, _sum: { prizeAmount: true } }),
+    ]),
+    prisma.battle.count({
+      where: {
+        AND: [
+          openBattleFilter(),
+          { OR: [{ visibility: "OPEN" }, ...(friendIds.length ? [{ visibility: "FRIENDS" as const, creatorId: { in: friendIds } }] : [])] },
+        ],
+      },
+    }),
   ]);
 
   const scopedLeaderboard = friendLeaderboardActive
@@ -231,145 +146,107 @@ export default async function Home({
     : leaderboard;
   const topLeaderboard = scopedLeaderboard.slice(0, 5);
   const openChallengesPreview = openBattles.slice(0, 3);
+  const challengeRecordsByKey = await challengeRecords(openChallengesPreview.map((b) => b.game));
 
   return (
-    <div className="flex w-full flex-1 flex-col gap-8 p-6 sm:p-8">
+    <div className="flex w-full flex-1 flex-col gap-8 px-4 py-6 sm:px-8 sm:py-10">
       {activeAnnouncement && <AnnouncementBanner title={activeAnnouncement.title} body={activeAnnouncement.body} />}
 
-      <CircuitHero tournaments={featuredTournaments} banners={homepageBanners} />
+      <CircuitHero
+        tournaments={featuredTournaments}
+        banners={homepageBanners}
+        stats={{
+          openTournaments: openTournamentStats[0],
+          openChallenges: openChallengeCount,
+          prizeMoney: openTournamentStats[1]._sum.prizeAmount ?? 0,
+        }}
+      />
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_var(--right-rail-width)]">
         <div className="flex min-w-0 flex-col gap-8">
+          {featuredTournaments.length === 0 && upcomingTournaments.length === 0 && (
+            <div className="card state-block">
+              <h2 className="state-title">No battles on the board. Not for long.</h2>
+              <p className="state-description">Nothing is open or announced right now. Start one, or challenge a player to a 1v1 while you wait.</p>
+              <div className="flex flex-wrap justify-center gap-2">
+                <Link href="/tournaments/new" className="btn-primary">
+                  Create a tournament
+                </Link>
+                <Link href="/battles" className="btn-secondary">
+                  Challenge a player
+                </Link>
+              </div>
+            </div>
+          )}
+
           <FeaturedCompetitions tournaments={featuredTournaments} />
 
           <ExploreTheCircuit games={gameCounts} />
 
-          <OpenChallenges battles={openChallengesPreview} />
+          <div className="cv-auto">
+            <OpenChallenges battles={openChallengesPreview} records={challengeRecordsByKey} total={openChallengeCount} viewerId={user?.id} />
+          </div>
 
-          <UpcomingCompetitions tournaments={upcomingTournaments} />
-
-          {user && (
-            <YourCircuit
-              viewerHandle={user.handle}
-              upcomingMatches={upcomingMatches.map((m) => ({
-                id: m.id,
-                matchCode: m.matchCode,
-                opponent: (m.playerAId === user.id ? m.playerB : m.playerA).displayName,
-                game: m.tournament?.game ?? m.battle?.game ?? null,
-                context: m.tournament ? m.tournament.name : m.battle ? (m.battle.format === "BEST_OF_3" ? "Best of 3" : "Single match") : null,
-              }))}
-              registeredCompetitions={registeredCompetitions.map((r) => ({
-                id: r.id,
-                tournamentId: r.tournament.id,
-                name: r.tournament.name,
-                game: r.tournament.game,
-                startsOn: formatShortDate(r.tournament.startAt),
-                prizeAmount: r.tournament.prizeAmount,
-                entryFee: r.tournament.entryFee,
-                registered: r.tournament._count.registrations,
-                participantCap: r.tournament.participantCap,
-              }))}
-              activeChallenges={activeChallenges.map((c) => ({
-                id: c.id,
-                game: c.game,
-                statusLabel:
-                  c.status === "ACCEPTED"
-                    ? "Accepted — ready to play"
-                    : c.targetUser
-                      ? `Waiting for ${c.targetUser.displayName}`
-                      : "Waiting for a challenger",
-                stakeAmount: c.stakeAmount,
-              }))}
-              recentActivity={recentActivity.map((n) => ({
-                id: n.id,
-                ...formatNotification(n.type, n.payload),
-                time: formatRelative(n.createdAt),
-                flagged: n.type.startsWith("DISPUTE") || n.type === "RESULT_DISPUTED",
-              }))}
-            />
-          )}
+          <div className="cv-auto">
+            <UpcomingCompetitions tournaments={upcomingTournaments} />
+          </div>
         </div>
 
         <div className="flex min-w-0 flex-col gap-6">
           {user && <CommunitiesCard communities={joinedCommunities} />}
 
           {(topLeaderboard.length > 0 || friendLeaderboardActive) && (
-            <div className="card flex flex-col gap-3">
-              <div className="flex items-center justify-between gap-2">
-                <h2 className="text-card-title flex items-center gap-2">
-                  <Trophy size={15} className="text-gold" />
-                  Leaderboard
-                </h2>
-                <Link href="/leaderboard" className="text-xs font-medium text-accent-blue hover:underline">
-                  View All →
+            <Panel
+              title="Leaderboard"
+              action={
+                <Link href="/leaderboard" className="-my-2.5 py-2.5 pl-3 text-xs font-medium text-accent-blue hover:underline">
+                  View all
                 </Link>
-              </div>
-              <div className="border-b border-border" />
-              <div className="tabs">
-                <Link href="/" className={`tab ${!friendLeaderboardActive ? "tab-active" : ""}`}>
+              }
+            >
+              <div className="flex gap-1.5 border-t border-border px-5 py-3">
+                <Link
+                  href="/"
+                  className={`cut-xs px-3 py-1 text-xs font-medium transition ${!friendLeaderboardActive ? "bg-foreground text-background" : "bg-surface-elevated text-muted hover:text-foreground"}`}
+                >
                   Global
                 </Link>
                 {user ? (
-                  <Link href="/?leaderboard=friends" className={`tab ${friendLeaderboardActive ? "tab-active" : ""}`}>
+                  <Link
+                    href="/?leaderboard=friends"
+                    className={`cut-xs px-3 py-1 text-xs font-medium transition ${friendLeaderboardActive ? "bg-foreground text-background" : "bg-surface-elevated text-muted hover:text-foreground"}`}
+                  >
                     Friends
                   </Link>
                 ) : (
-                  <span className="tab tab-disabled" title="Log in to see your friends' ranking">
+                  <span title="Log in to see your friends' ranking" className="cursor-not-allowed cut-xs bg-surface-elevated px-3 py-1 text-xs font-medium text-muted/50">
                     Friends
                   </span>
                 )}
-                <span className="tab tab-disabled" title="Coming soon">
-                  This Month
-                </span>
               </div>
               {friendLeaderboardActive && topLeaderboard.length === 0 ? (
-                <p className="motion-fade-in py-4 text-center text-sm text-muted">
-                  None of your friends have a completed Challenge yet.
-                </p>
+                <PanelEmpty>None of your friends have a completed Challenge yet.</PanelEmpty>
               ) : (
-              <div className="flex flex-col gap-1">
-                {topLeaderboard.map((s, i) => {
-                  const medal = RANK_COLORS[i];
-                  const isFirst = i === 0;
-                  return (
-                    <Link
-                      key={s.userId}
-                      href={`/players/${s.handle}`}
-                      style={{ "--i": i } as React.CSSProperties}
-                      className={`rank-row flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm transition hover:translate-x-0.5 hover:bg-surface-elevated ${
-                        isFirst ? "rank-first" : ""
-                      }`}
-                    >
-                      <span className="flex min-w-0 items-center gap-2">
-                        <span className="w-3.5 shrink-0 text-center font-mono text-[11px] text-muted">{i + 1}</span>
-                        <span className="relative shrink-0">
-                          <span
-                            className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
-                              medal ? "text-black" : "border border-border bg-surface-elevated text-muted"
-                            }`}
-                            style={medal ? { backgroundColor: medal } : undefined}
-                          >
-                            {s.displayName.slice(0, 1).toUpperCase()}
-                          </span>
-                          {isFirst && (
-                            <Crown
-                              size={12}
-                              aria-hidden
-                              className="crown-bounce absolute -top-2 left-1/2 -translate-x-1/2 text-gold"
-                            />
-                          )}
-                        </span>
-                        <span className="truncate">{s.displayName}</span>
+                <PanelRows>
+                  {topLeaderboard.map((s, i) => (
+                    <Link key={s.userId} href={`/players/${s.handle}`} className={`${panelRowClass} py-2.5`}>
+                      <span
+                        className={`w-5 shrink-0 text-center font-mono text-xs font-semibold tabular-nums ${i === 0 ? "text-gold" : i < 3 ? "text-foreground" : "text-muted"}`}
+                      >
+                        {i + 1}
                       </span>
-                      <span className="text-stat shrink-0 text-xs text-accent-blue">
-                        <CountUp value={s.wins} />
+                      <span className={i === 0 ? "cut-avatar bg-gold p-[2px]" : ""}>
+                        <PlayerAvatar person={s} size="sm" />
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium">{s.displayName}</span>
+                      <span className="text-stat shrink-0 text-xs text-muted">
+                        <span className="text-foreground">{s.wins}</span>W
                       </span>
                     </Link>
-                  );
-                })}
-              </div>
+                  ))}
+                </PanelRows>
               )}
-            </div>
+            </Panel>
           )}
 
           <Suspense
@@ -379,7 +256,7 @@ export default async function Home({
                 <div className="flex flex-col gap-3">
                   {[0, 1, 2].map((i) => (
                     <div key={i} className="flex items-start gap-3">
-                      <div className="skeleton h-14 w-14 shrink-0 rounded-[8px]" />
+                      <div className="skeleton h-14 w-14 shrink-0 cut-avatar" />
                       <div className="flex flex-1 flex-col gap-1.5 pt-1">
                         <div className="skeleton h-3 w-20" />
                         <div className="skeleton h-4 w-full" />
@@ -393,6 +270,8 @@ export default async function Home({
           >
             <GamerNews />
           </Suspense>
+
+          {user && <YourCircuit user={user} />}
         </div>
       </div>
     </div>

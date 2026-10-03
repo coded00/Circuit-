@@ -19,6 +19,9 @@ import { parseOptionalUrl } from "@/lib/validation";
 import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
 import { isRateLimited, recordAttempt } from "@/lib/rateLimit";
 import { captureException } from "@/lib/observability";
+import { parseExpiryHours } from "@/lib/battles";
+import { canSendDirectChallenge } from "@/lib/privacy";
+import { emailVerificationRequired } from "@/lib/emailGate";
 
 const VALID_FORMATS = ["SINGLE", "BEST_OF_3"];
 const VALID_VISIBILITIES = ["OPEN", "TARGETED", "FRIENDS"];
@@ -90,6 +93,10 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
+  const expiryHours = parseExpiryHours(body?.expiresInHours);
+  if (expiryHours === null) {
+    return NextResponse.json({ error: "Choose how long the challenge stays open: 24 hours, 3 days or 7 days." }, { status: 400 });
+  }
   const streamUrlResult = parseOptionalUrl(body?.streamUrl);
   if (!streamUrlResult.ok) {
     return NextResponse.json({ error: "Stream link must be a valid http(s) URL." }, { status: 400 });
@@ -110,12 +117,16 @@ export async function POST(request: Request) {
     if (target.id === user.id) {
       return NextResponse.json({ error: "You can't challenge yourself." }, { status: 400 });
     }
+    const direct = await canSendDirectChallenge(user.id, target);
+    if (!direct.ok) return NextResponse.json({ error: direct.reason }, { status: 403 });
     targetUserId = target.id;
   }
 
   if (stakeAmount > 0) {
     // ACC-3: staking real money is cash-touching, same age gate as paid
     // tournament registration (TRU-5).
+    const unverified = emailVerificationRequired(user);
+    if (unverified) return unverified;
     try {
       assertAgeGate(user.dateOfBirth);
     } catch (err) {
@@ -155,6 +166,7 @@ export async function POST(request: Request) {
           targetUserId,
           streamUrl: streamUrlResult.url,
           stakeAmount,
+          expiresAt: new Date(Date.now() + expiryHours * 60 * 60 * 1000),
         },
       });
 

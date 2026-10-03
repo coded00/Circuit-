@@ -80,10 +80,11 @@ export async function generateMetadata({ params }: { params: Promise<{ handle: s
   if (!organiser) return buildMetadata({ title: "Organiser not found", description: "", path: organiserPath(handle), noindex: true });
 
   return buildMetadata({
-    title: `${organiser.displayName} — Tournament Organiser`,
+    title: `${organiser.displayName} | Tournament Organiser`,
     description: `${organiser.displayName} has organized ${organiser.tournaments.length} tournament${organiser.tournaments.length === 1 ? "" : "s"} on Circuit, hosting ${organiser.totalPlayersHosted} player${organiser.totalPlayersHosted === 1 ? "" : "s"}. Real Nigeria-first esports competitions.`,
     path: organiserPath(organiser.handle),
-    image: organiser.avatarUrl ?? undefined,
+    // Uploaded avatars are site-relative (/api/images/...); structured data needs an absolute URL.
+    image: organiser.avatarUrl ? (organiser.avatarUrl.startsWith("/") ? absoluteUrl(organiser.avatarUrl) : organiser.avatarUrl) : undefined,
   });
 }
 
@@ -97,19 +98,20 @@ export default async function OrganiserPage({ params }: { params: Promise<{ hand
     "@type": "Person",
     name: organiser.displayName,
     url: absoluteUrl(organiserPath(organiser.handle)),
-    image: organiser.avatarUrl ?? undefined,
+    // Uploaded avatars are site-relative (/api/images/...); structured data needs an absolute URL.
+    image: organiser.avatarUrl ? (organiser.avatarUrl.startsWith("/") ? absoluteUrl(organiser.avatarUrl) : organiser.avatarUrl) : undefined,
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-6 sm:p-8">
+    <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-6 sm:px-8 sm:py-10">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }} />
 
       <div className="card flex flex-col items-center gap-3 py-8 text-center sm:flex-row sm:items-center sm:gap-5 sm:py-6 sm:text-left">
         {organiser.avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URL
-          <img src={organiser.avatarUrl} alt="" className="h-16 w-16 shrink-0 rounded-full border-2 border-border object-cover" />
+          <img src={organiser.avatarUrl} alt="" className="h-16 w-16 shrink-0 cut-avatar border-2 border-border object-cover" />
         ) : (
-          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-2 border-border bg-surface-elevated text-xl font-semibold text-muted">
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center cut-avatar border-2 border-border bg-surface-elevated text-xl font-semibold text-muted">
             {organiser.displayName.slice(0, 1).toUpperCase()}
           </div>
         )}
@@ -144,7 +146,7 @@ export default async function OrganiserPage({ params }: { params: Promise<{ hand
             const status = tournamentStatusInfo(t.status);
             return (
               <Link key={t.id} href={tournamentPath(t)} className="card-row flex items-center gap-3 p-3">
-                <GameArtTile game={t.game} className="h-10 w-10 shrink-0 rounded-[8px]" hideLabel />
+                <GameArtTile thumb game={t.game} className="h-10 w-10 shrink-0 cut-avatar" hideLabel />
                 <div className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-sm font-medium">{t.name}</span>
                   <span className="text-metadata flex items-center gap-1 truncate">

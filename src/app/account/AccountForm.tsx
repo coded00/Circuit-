@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { ImageUploadField } from "@/components/ImageUploadField";
 
 type Bank = {
   name: string;
@@ -9,6 +10,7 @@ type Bank = {
   slug: string;
 };
 
+const BANK_VALUE_SEPARATOR = "::";
 const MAX_FAVORITE_GAMES = 6;
 const MAX_BIO_LENGTH = 160;
 const MAX_REGION_LENGTH = 60;
@@ -37,6 +39,7 @@ export default function AccountForm({
   const router = useRouter();
   const [displayName, setDisplayName] = useState(initialDisplayName);
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl);
+  const [avatarBlocked, setAvatarBlocked] = useState(false);
   const [payoutMethodRef, setPayoutMethodRef] = useState(initialPayoutMethodRef);
   const [dateOfBirth, setDateOfBirth] = useState(initialDateOfBirth);
   const [bio, setBio] = useState(initialBio);
@@ -66,7 +69,15 @@ export default function AccountForm({
         if (res.ok) {
           const data = await res.json();
           if (active && Array.isArray(data.banks)) {
-            setBanks(data.banks);
+            const seen = new Set<string>();
+            setBanks(
+              (data.banks as Bank[]).filter((b) => {
+                const key = `${b.code}${BANK_VALUE_SEPARATOR}${b.name}`;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+              })
+            );
           }
         }
       } catch (err) {
@@ -91,7 +102,7 @@ export default function AccountForm({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          bankCode: selectedBank,
+          bankCode: selectedBank.split(BANK_VALUE_SEPARATOR)[0],
           accountNumber,
         }),
       });
@@ -163,19 +174,14 @@ export default function AccountForm({
         />
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="avatarUrl" className="field-label">
-          Avatar URL (optional)
-        </label>
-        <input
-          id="avatarUrl"
-          type="url"
-          placeholder="https://…"
-          value={avatarUrl}
-          onChange={(e) => setAvatarUrl(e.target.value)}
-          className="field-input"
-        />
-      </div>
+      <ImageUploadField
+        label="Profile photo (optional)"
+        purpose="avatar"
+        value={avatarUrl}
+        onChange={setAvatarUrl}
+        onValidityChange={setAvatarBlocked}
+        hint="Shown on your profile, in chat and on brackets. A square photo works best."
+      />
 
       <div className="flex flex-col gap-1.5">
         <label htmlFor="bio" className="field-label">
@@ -230,7 +236,7 @@ export default function AccountForm({
           onChange={(e) => setFavoriteGames(e.target.value)}
           className="field-input"
         />
-        <span className="field-hint">Comma-separated, up to {MAX_FAVORITE_GAMES} games — shown on your public profile.</span>
+        <span className="field-hint">Comma-separated, up to {MAX_FAVORITE_GAMES} games. Shown on your public profile.</span>
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -265,7 +271,7 @@ export default function AccountForm({
         </span>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-lg border border-border bg-card/50 p-4">
+      <div className="flex flex-col gap-3 border-t border-border pt-5 sm:border sm:bg-card/50 sm:p-4">
         <div className="flex items-center justify-between">
           <div>
             <label className="text-sm font-semibold text-foreground">
@@ -276,7 +282,7 @@ export default function AccountForm({
             </p>
           </div>
           {payoutMethodRef && (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-success/15 px-2.5 py-0.5 text-xs font-medium text-success border border-success/30">
+            <span className="inline-flex items-center gap-1.5 cut-xs bg-success/15 px-2.5 py-0.5 text-xs font-medium text-success border border-success/30">
               <span className="h-1.5 w-1.5 rounded-full bg-success" />
               Active
             </span>
@@ -325,7 +331,8 @@ export default function AccountForm({
                 >
                   <option value="">{loadingBanks ? "Loading banks…" : "— Choose Bank —"}</option>
                   {banks.map((b) => (
-                    <option key={b.code} value={b.code}>
+                    // Paystack lists some different banks under one code, so the code alone isn't a unique key.
+                    <option key={`${b.code}${BANK_VALUE_SEPARATOR}${b.name}`} value={`${b.code}${BANK_VALUE_SEPARATOR}${b.name}`}>
                       {b.name}
                     </option>
                   ))}
@@ -367,7 +374,7 @@ export default function AccountForm({
               type="button"
               disabled={resolvingAccount || !selectedBank || accountNumber.length !== 10}
               onClick={handleResolveAndLink}
-              className="btn-secondary self-start text-xs py-1.5 px-3"
+              className="btn-secondary self-start !px-3 !py-2 text-xs"
             >
               {resolvingAccount ? "Verifying with Paystack…" : "Verify & Link Bank Account"}
             </button>
@@ -378,7 +385,7 @@ export default function AccountForm({
       {error && <p className="field-error">{error}</p>}
       {success && <p className="text-sm text-success">Saved.</p>}
 
-      <button type="submit" disabled={submitting} className="btn-primary self-start">
+      <button type="submit" disabled={submitting || avatarBlocked} className="btn-primary self-start">
         {submitting ? "Saving…" : "Save changes"}
       </button>
     </form>

@@ -43,7 +43,7 @@ function getRefSecret(): string {
   const secret = process.env.JWT_SECRET;
   if (!secret) {
     throw new Error(
-      "JWT_SECRET is not set — it's also used to sign proof storage references. Set it in .env."
+      "JWT_SECRET is not set. It's also used to sign proof storage references. Set it in .env."
     );
   }
   return secret;
@@ -240,6 +240,15 @@ function createProofStorage(): ProofStorage {
 }
 
 export const proofStorage: ProofStorage = createProofStorage();
+
+/** The storage key a reference was stored under — verifies the
+ *  reference's signature first (throws if malformed or tampered). Lets a
+ *  caller restrict which stored files a given route may serve, e.g. the
+ *  public image route only ever serving `public-*` uploads, never match
+ *  proof, report evidence or chat images stored through this same class. */
+export function storageKeyOf(ref: string): string {
+  return decodeRef(ref).matchId;
+}
 
 /**
  * The access rule NFR-4 actually cares about. Call this in the route

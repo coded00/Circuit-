@@ -123,7 +123,7 @@ export function AutoScrollRow({
       )}
     </div>
     {showDots && count > 1 && (
-      <div className="flex items-center justify-center gap-1.5" role="tablist" aria-label={`${ariaLabel} pages`}>
+      <div className="flex items-center justify-center" role="tablist" aria-label={`${ariaLabel} pages`}>
         {items.map((_, i) => (
           <button
             key={i}
@@ -132,8 +132,10 @@ export function AutoScrollRow({
             aria-selected={i === index}
             aria-label={`Go to item ${i + 1}`}
             onClick={() => goTo(i)}
-            className={`h-1.5 rounded-full transition-all ${i === index ? "w-5 bg-accent-volt" : "w-1.5 bg-border-strong"}`}
-          />
+            className="flex h-8 items-center justify-center px-1.5"
+          >
+            <span className={`block h-1.5 rounded-full transition-all ${i === index ? "w-5 bg-accent-volt" : "w-1.5 bg-border-strong"}`} />
+          </button>
         ))}
       </div>
     )}

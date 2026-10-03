@@ -45,17 +45,17 @@ import { getFriendIds } from "@/lib/friends";
 import { GameArtTile } from "@/components/GameArtTile";
 import { CountUp } from "@/components/CountUp";
 
-const RANK_COLORS = ["#eab308", "#9ca3af", "#b45309"]; // gold, silver, bronze — same as homepage leaderboard
+const RANK_COLORS = ["#eab308", "#9ca3af", "#b45309"]; // gold, silver, bronze
 
 function Avatar({ avatarUrl, name, size, ringClass }: { avatarUrl: string | null; name: string; size: number; ringClass: string }) {
   const px = `${size}px`;
   return avatarUrl ? (
     // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs
-    <img src={avatarUrl} alt="" style={{ height: px, width: px }} className={`rounded-full border-2 object-cover ${ringClass}`} />
+    <img src={avatarUrl} alt="" style={{ height: px, width: px }} className={`cut-avatar border-2 object-cover ${ringClass}`} />
   ) : (
     <div
       style={{ height: px, width: px }}
-      className={`flex items-center justify-center rounded-full border-2 bg-surface-elevated text-lg font-semibold text-muted ${ringClass}`}
+      className={`flex items-center justify-center cut-avatar border-2 bg-surface-elevated text-lg font-semibold text-muted ${ringClass}`}
     >
       {name.slice(0, 1).toUpperCase()}
     </div>
@@ -85,19 +85,23 @@ function StatTile({
   changePct: number | null;
 }) {
   return (
-    <div className="widget flex items-center gap-3">
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-surface-elevated text-accent-blue">
+    // Phones: three compact tiles in a row (no icon); sm+: icon beside the number.
+    <div className="widget flex min-w-0 items-center gap-3 !p-3 sm:!p-4">
+      <span className="hidden h-11 w-11 shrink-0 items-center justify-center cut-avatar bg-surface-elevated text-accent-blue sm:flex">
         {icon}
       </span>
-      <div className="flex flex-col gap-0.5">
-        <div className="flex items-baseline gap-2">
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <div className="flex flex-wrap items-baseline gap-x-2">
           {/* Not CountUp here — these can run into the thousands and
               CountUp's rAF write doesn't preserve toLocaleString's comma
               grouping, which would regress the real number's readability. */}
-          <span className="text-stat text-2xl motion-fade-in">{value.toLocaleString()}</span>
+          <span className="text-stat text-xl motion-fade-in sm:text-2xl">{value.toLocaleString()}</span>
           <ChangeBadge pct={changePct} />
         </div>
-        <span className="text-metadata">{label} · vs start of month</span>
+        <span className="text-metadata leading-tight">
+          {label}
+          <span className="hidden sm:inline"> · vs start of month</span>
+        </span>
       </div>
     </div>
   );
@@ -109,7 +113,7 @@ function PodiumStat({ label, value, animate }: { label: string; value: string | 
       <span className="text-sm font-bold text-foreground">
         {animate && typeof value === "number" ? <CountUp value={value} /> : value}
       </span>
-      <span className="text-[10px] tracking-wide text-muted uppercase">{label}</span>
+      <span className="text-[11px] tracking-wide text-muted uppercase">{label}</span>
     </div>
   );
 }
@@ -202,8 +206,8 @@ export default async function LeaderboardPage({
   const rest = standings.slice(3);
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-6 py-8 sm:px-8 sm:py-10">
-      <div data-surface="dark" className="relative overflow-hidden rounded-[var(--radius-hero)] border border-border bg-surface p-8 sm:p-10">
+    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-6 sm:px-8 sm:py-10">
+      <div data-surface="dark" className="relative overflow-hidden cut-lg [--cut-line:var(--border)] border border-border bg-surface p-6 sm:p-10">
         {games[0] && <GameArtTile game={games[0].game} className="opacity-[0.14]" fill hideLabel imgWidth={1200} />}
         <div
           aria-hidden
@@ -211,20 +215,21 @@ export default async function LeaderboardPage({
           style={{ backgroundImage: "linear-gradient(100deg, var(--surface) 35%, transparent)" }}
         />
         <div className="relative z-10 flex flex-col gap-2">
-          <h1 className="font-display text-4xl leading-none font-bold tracking-tight uppercase sm:text-5xl">Leaderboard</h1>
+          <span className="text-eyebrow text-accent-volt">Leaderboard</span>
+          <h1 className="font-display text-4xl leading-none font-bold tracking-tight sm:text-5xl">Where names get made.</h1>
           <p className="text-sm text-muted">Ranked by real wins, across every Challenge played on Circuit.</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatTile icon={<Users size={18} />} label="Total registered" value={totalUsersNow} changePct={pctChange(totalUsersNow, totalUsersLastMonth)} />
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        <StatTile icon={<Users size={18} />} label="Registered" value={totalUsersNow} changePct={pctChange(totalUsersNow, totalUsersLastMonth)} />
         <StatTile
           icon={<Gamepad2 size={18} />}
-          label="Total participated"
+          label="Participated"
           value={participatedNow}
           changePct={pctChange(participatedNow, participatedLastMonth)}
         />
-        <StatTile icon={<Swords size={18} />} label="Matches played" value={matchesNow} changePct={pctChange(matchesNow, matchesLastMonth)} />
+        <StatTile icon={<Swords size={18} />} label="Matches" value={matchesNow} changePct={pctChange(matchesNow, matchesLastMonth)} />
       </div>
 
       {podium.length > 0 && (
@@ -236,7 +241,7 @@ export default async function LeaderboardPage({
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="tabs">
+        <div className="tabs w-full sm:w-auto">
           <Link
             href={`/leaderboard${game ? `?game=${encodeURIComponent(game)}` : ""}`}
             className={`tab ${!isMonth && !isFriends ? "tab-active" : ""}`}
@@ -263,9 +268,9 @@ export default async function LeaderboardPage({
           )}
         </div>
 
-        <form method="get" className="flex items-center gap-2">
+        <form method="get" className="flex w-full items-center gap-2 sm:w-auto">
           {isMonth && <input type="hidden" name="scope" value="month" />}
-          <select name="game" defaultValue={game ?? ""} className="field-select w-40">
+          <select name="game" defaultValue={game ?? ""} className="field-select min-w-0 flex-1 sm:w-40 sm:flex-none">
             <option value="">All Games</option>
             {games.map((g) => (
               <option key={g.game} value={g.game}>
