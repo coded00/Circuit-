@@ -25,9 +25,12 @@ test.describe("register → pay → escrow hold (wallet pay)", () => {
     await loginViaUI(page, user.emailOrPhone!);
 
     await page.goto(`/tournaments/${tournament.id}/register`);
+    // The form defaults to the Circuit username; the in-game name box only exists once that option is picked.
+    await page.getByLabel(/Use my in-game name/i).check();
     await page.locator("#inGameId").fill("TEST-IGN-1");
     await page.getByLabel(/Pay from Wallet balance/i).check();
-    await page.getByRole("button", { name: "Register", exact: true }).click();
+    await page.getByLabel(/read the rules and agree/i).check();
+    await page.getByRole("button", { name: "Pay from wallet and register", exact: true }).click();
 
     // A cold-compile first hit on the registrations API route plus the
     // ~1.1s MatchFoundHud animation can together take well past a short

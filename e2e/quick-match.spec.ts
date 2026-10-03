@@ -14,8 +14,14 @@ import { createE2EUser, loginViaUI } from "./helpers";
  * proves the same guarantee holds through the real API routes and UI.
  */
 test.describe("Quick Match: first accept wins (end to end)", () => {
+  // The Challenge form only offers published games, and a fresh database has none.
+  test.beforeEach(async () => {
+    await prisma.game.upsert({ where: { name: "Test Game" }, update: { enabled: true, publishedAt: new Date() }, create: { name: "Test Game", enabled: true, publishedAt: new Date() } });
+  });
+
   test.afterEach(async () => {
     await cleanupAll();
+    await prisma.game.deleteMany({ where: { name: "Test Game" } });
   });
 
   test("host challenges eligible players; exactly one recipient's accept succeeds", async ({ browser }) => {
@@ -63,7 +69,7 @@ test.describe("Quick Match: first accept wins (end to end)", () => {
     await Promise.all([pageA.goto(`/quick-match/${challengeId}`), pageB.goto(`/quick-match/${challengeId}`)]);
 
     async function attemptAccept(page: typeof pageA) {
-      const acceptButton = page.getByRole("button", { name: "Accept", exact: true });
+      const acceptButton = page.getByRole("button", { name: "Accept battle", exact: true });
       const [response] = await Promise.all([
         page.waitForResponse(
           (res) => res.url().includes(`/api/quick-match/${challengeId}/accept`) && res.request().method() === "POST",

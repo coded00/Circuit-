@@ -49,14 +49,14 @@ test.describe("result-submit → auto-complete → payout-eligible (staked Battl
 
     async function submitResult(page: typeof pageA, winner: { displayName: string; handle: string }) {
       await page.goto(`/matches/${match.id}`);
-      // The OptionCard button's accessible name is its title (displayName)
-      // plus its description (@handle) concatenated — matching on
-      // displayName alone (non-exact) also catches the header's "Account
-      // menu for <displayName>" button, so match the full combined name.
-      await page.getByRole("button", { name: `${winner.displayName} @${winner.handle}`, exact: true }).click();
+      // The winner button's accessible name is the avatar's initial, the
+      // displayName and the @handle run together. Matching "<displayName>
+      // @<handle>" as a substring is unique: the header's "Account menu for
+      // <displayName>" button has no @handle.
+      await page.getByRole("button", { name: `${winner.displayName} @${winner.handle}` }).click();
       await page.locator("#score").fill("3-1");
       await page.locator("#proof").setInputFiles(PROOF_FILE);
-      await page.getByLabel(/I confirm the match code/i).check();
+      await page.getByLabel(/match code .* is visible in my proof/i).check();
       const [response] = await Promise.all([
         page.waitForResponse(
           (res) => res.url().includes(`/api/matches/${match.id}/results`) && res.request().method() === "POST",
@@ -72,7 +72,17 @@ test.describe("result-submit → auto-complete → payout-eligible (staked Battl
     }
 
     await submitResult(pageA, playerA);
-    await submitResult(pageB, playerA);
+    // Player B now sees A's report and confirms it (the product no longer
+    // asks the second player to file a matching report of their own).
+    await pageB.goto(`/matches/${match.id}`);
+    const [confirmResponse] = await Promise.all([
+      pageB.waitForResponse(
+        (res) => res.url().includes(`/api/matches/${match.id}/confirm`) && res.request().method() === "POST",
+        { timeout: 30_000 }
+      ),
+      pageB.getByRole("button", { name: "Confirm result" }).click(),
+    ]);
+    expect(confirmResponse.ok()).toBe(true);
 
     await contextA.close();
     await contextB.close();
