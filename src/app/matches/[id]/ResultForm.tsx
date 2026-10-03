@@ -103,7 +103,7 @@ export default function ResultForm({
                   setError(null);
                 }}
                 aria-pressed={selected}
-                className={`relative flex flex-col items-center gap-2 rounded-[12px] border px-3 py-4 text-center transition duration-[var(--duration-fast)] active:scale-[0.98] ${
+                className={`relative flex flex-col items-center gap-2 cut-sm [--cut-line:var(--border)] border px-3 py-4 text-center transition duration-[var(--duration-fast)] active:scale-[0.98] ${
                   selected ? "border-accent-volt bg-accent-volt-soft" : "border-border hover:border-border-strong hover:bg-surface-elevated"
                 }`}
               >
@@ -128,7 +128,7 @@ export default function ResultForm({
                 setError(null);
               }}
               aria-pressed={winnerId === "DRAW"}
-              className={`relative col-span-2 flex flex-col items-center justify-center gap-1 rounded-[12px] border px-3 py-4 text-center transition duration-[var(--duration-fast)] active:scale-[0.98] sm:col-span-1 ${
+              className={`relative col-span-2 flex flex-col items-center justify-center gap-1 cut-sm [--cut-line:var(--border)] border px-3 py-4 text-center transition duration-[var(--duration-fast)] active:scale-[0.98] sm:col-span-1 ${
                 winnerId === "DRAW" ? "border-accent-volt bg-accent-volt-soft" : "border-border hover:border-border-strong hover:bg-surface-elevated"
               }`}
             >
@@ -179,11 +179,11 @@ export default function ResultForm({
         <span className="field-label">Proof</span>
         <label
           htmlFor="proof"
-          className={`flex cursor-pointer items-center gap-3 rounded-[12px] border border-dashed px-4 py-4 transition hover:bg-surface-elevated ${
+          className={`flex cursor-pointer items-center gap-3 cut-sm [--cut-line:var(--border)] border border-dashed px-4 py-4 transition hover:bg-surface-elevated ${
             fileName ? "border-success/50" : "border-border-strong"
           }`}
         >
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-surface-elevated text-muted">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center cut-avatar bg-surface-elevated text-muted">
             <ImageUp size={18} />
           </span>
           <span className="flex min-w-0 flex-col">

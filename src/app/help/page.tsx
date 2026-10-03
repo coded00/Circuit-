@@ -57,7 +57,7 @@ export default function HelpPage() {
   return (
     <div className="mx-auto flex w-full max-w-[760px] flex-col gap-8 px-5 py-10 sm:px-8">
       <header className="flex flex-col gap-2">
-        <span className="inline-flex h-11 w-11 items-center justify-center rounded-[12px] bg-accent-volt text-accent-volt-foreground">
+        <span className="inline-flex h-11 w-11 items-center justify-center cut-sm bg-accent-volt text-accent-volt-foreground">
           <LifeBuoy size={22} aria-hidden />
         </span>
         <h1 className="font-display text-4xl leading-none font-bold tracking-tight uppercase">Help</h1>
@@ -66,7 +66,7 @@ export default function HelpPage() {
 
       {GROUPS.map((g) => (
         <section key={g.title} className="flex flex-col gap-3">
-          <h2 className="font-display text-lg font-bold tracking-tight uppercase">{g.title}</h2>
+          <h2 className="font-display text-lg font-bold tracking-tight">{g.title}</h2>
           <div className="card divide-y divide-border overflow-hidden p-0">
             {g.items.map((item) => (
               <details key={item.q} className="group">
@@ -82,7 +82,7 @@ export default function HelpPage() {
       ))}
 
       <section className="card flex flex-col items-start gap-3">
-        <h2 className="font-display text-lg font-bold tracking-tight uppercase">Still stuck?</h2>
+        <h2 className="font-display text-lg font-bold tracking-tight">Still stuck?</h2>
         <p className="text-sm text-muted">
           {contact
             ? "Message the Circuit team and tell us the tournament or match you're asking about."

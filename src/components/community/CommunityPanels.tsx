@@ -136,7 +136,7 @@ export function ThreadPanel({
     >
       <div ref={scrollRef} className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pt-4 pb-6">
         {info?.starter && (
-          <div className="rounded-[12px] border border-border bg-surface-elevated/40 px-3 py-2.5 text-sm">
+          <div className="cut-sm [--cut-line:var(--border)] border border-border bg-surface-elevated/40 px-3 py-2.5 text-sm">
             <p className="mb-0.5 text-xs text-muted">
               Started from <span className="font-semibold text-foreground">{info.starter.author.displayName}</span> · {formatTime(info.starter.createdAt)} in #{info.channelName}
             </p>
@@ -231,7 +231,7 @@ export function MembersPanel({ communityId, onClose }: { communityId: string; on
 
   const row = (m: PresenceMember) => (
     <li key={m.id}>
-      <Link href={`/players/${m.handle}`} className="flex items-center gap-3 rounded-[10px] px-2 py-1.5 transition hover:bg-surface-elevated">
+      <Link href={`/players/${m.handle}`} className="flex items-center gap-3 rounded-none px-2 py-1.5 transition hover:bg-surface-elevated">
         <Avatar author={m} online={m.online} />
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="flex items-center gap-1.5 truncate text-sm font-semibold">
@@ -304,7 +304,7 @@ export function PinsPanel({ channelId, channelName, onJump, onClose }: { channel
           <ul className="flex flex-col gap-2">
             {rows.map((p) => (
               <li key={p.id}>
-                <button type="button" onClick={() => onJump(p.id)} className="flex w-full items-start gap-2.5 rounded-[12px] border border-border bg-surface p-3 text-left transition hover:border-border-hover">
+                <button type="button" onClick={() => onJump(p.id)} className="flex w-full items-start gap-2.5 cut-sm [--cut-line:var(--border)] border border-border bg-surface p-3 text-left transition hover:border-border-hover">
                   <Avatar author={p.author} />
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="text-xs text-muted">
@@ -342,7 +342,7 @@ function highlight(text: string, q: string) {
     <>
       {start > 0 && "…"}
       {text.slice(start, i)}
-      <mark className="rounded-[3px] bg-accent-volt/40 text-foreground">{text.slice(i, i + q.length)}</mark>
+      <mark className="rounded-none bg-accent-volt/40 text-foreground">{text.slice(i, i + q.length)}</mark>
       {text.slice(i + q.length, i + q.length + 120)}
     </>
   );
@@ -402,7 +402,7 @@ export function SearchPanel({
                 <button
                   type="button"
                   onClick={() => onOpen({ messageId: r.id, channelId: r.channel.id, threadId: r.threadId })}
-                  className="flex w-full flex-col gap-1 rounded-[12px] border border-border bg-surface p-3 text-left transition hover:border-border-hover"
+                  className="flex w-full flex-col gap-1 cut-sm [--cut-line:var(--border)] border border-border bg-surface p-3 text-left transition hover:border-border-hover"
                 >
                   <span className="text-xs text-muted">
                     <span className="font-semibold text-foreground">{r.author.displayName}</span> · #{r.channel.name}

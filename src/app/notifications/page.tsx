@@ -87,8 +87,8 @@ export default async function NotificationsPage({ searchParams }: { searchParams
       </nav>
 
       {items.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-[15px] border border-dashed border-border-strong px-8 py-16 text-center">
-          <span className="flex h-11 w-11 items-center justify-center rounded-[12px] bg-surface-elevated text-muted">
+        <div className="flex flex-col items-center gap-3 cut-lg [--cut-line:var(--border)] border border-dashed border-border-strong px-8 py-16 text-center">
+          <span className="flex h-11 w-11 items-center justify-center cut-sm bg-surface-elevated text-muted">
             <BellOff size={20} />
           </span>
           <div className="flex flex-col gap-1">
@@ -99,7 +99,7 @@ export default async function NotificationsPage({ searchParams }: { searchParams
           </div>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-[15px] border border-border bg-surface pb-2">
+        <div className="overflow-hidden cut-lg [--cut-line:var(--border)] border border-border bg-surface pb-2">
           {groups.map((group) => (
             <section key={group.label}>
               <NotificationGroupLabel>{group.label}</NotificationGroupLabel>

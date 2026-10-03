@@ -47,7 +47,7 @@ export function FilterMenu({ label, options, active, align = "start" }: { label:
         <ul
           role="listbox"
           aria-label={label}
-          className={`absolute top-full z-30 mt-2 min-w-44 rounded-[12px] border border-border bg-surface p-1 shadow-lg ${align === "end" ? "right-0" : "left-0"}`}
+          className={`absolute top-full z-30 mt-2 min-w-44 cut-sm [--cut-line:var(--border)] border border-border bg-surface p-1 shadow-lg ${align === "end" ? "right-0" : "left-0"}`}
         >
           {options.map((o) => {
             const on = o.value === active;
@@ -56,7 +56,7 @@ export function FilterMenu({ label, options, active, align = "start" }: { label:
                 <Link
                   href={o.href}
                   onClick={() => setOpen(false)}
-                  className={`flex items-center justify-between gap-6 rounded-[8px] px-3 py-2 text-sm transition hover:bg-surface-elevated ${on ? "font-semibold" : "text-muted hover:text-foreground"}`}
+                  className={`flex items-center justify-between gap-6 rounded-none px-3 py-2 text-sm transition hover:bg-surface-elevated ${on ? "font-semibold" : "text-muted hover:text-foreground"}`}
                 >
                   {o.label}
                   {on && <Check size={14} aria-hidden />}

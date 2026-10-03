@@ -73,7 +73,7 @@ export default function ResetPasswordForm() {
 
   if (done) {
     return (
-      <div className="flex items-start gap-3 rounded-[12px] border border-success/25 bg-success/[0.08] p-4">
+      <div className="flex items-start gap-3 cut-sm border border-success/25 bg-success/[0.08] p-4">
         <CheckCircle2 size={20} className="mt-0.5 shrink-0 text-success" />
         <p className="text-sm leading-relaxed">Password updated. Taking you to log in…</p>
       </div>

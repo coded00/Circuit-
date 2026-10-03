@@ -62,7 +62,7 @@ export function MatchFoundHud({ onComplete }: { onComplete: () => void }) {
           <span className="font-mono text-sm font-semibold tracking-widest text-foreground uppercase tabular-nums">
             Loading {progress}%
           </span>
-          <div className="h-1 w-full overflow-hidden rounded-full bg-surface-elevated">
+          <div className="h-1 w-full overflow-hidden rounded-none bg-surface-elevated">
             <div className="h-full bg-accent-volt transition-[width] duration-100 ease-linear" style={{ width: `${progress}%` }} />
           </div>
         </div>

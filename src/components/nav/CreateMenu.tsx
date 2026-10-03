@@ -29,7 +29,7 @@ export function CreateMenu() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex h-9 items-center gap-1.5 rounded-[9px] px-3 text-sm font-semibold text-white transition hover:bg-white/[0.07]"
+        className="inline-flex h-9 items-center gap-1.5 rounded-none px-3 text-sm font-semibold text-white transition hover:bg-white/[0.07]"
       >
         <Plus size={16} className="text-accent-volt" />
         Create

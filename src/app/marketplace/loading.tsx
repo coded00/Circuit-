@@ -7,15 +7,15 @@ export default function MarketplaceLoading() {
         <div className="skeleton h-4 w-72" />
       </div>
       <div className="skeleton h-11 w-full" />
-      <div className="skeleton h-[22rem] w-full rounded-[var(--radius-lg)]" />
+      <div className="skeleton h-[22rem] w-full cut-lg" />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="skeleton h-28 w-full rounded-[var(--radius-lg)]" />
+          <div key={i} className="skeleton h-28 w-full cut-lg" />
         ))}
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="skeleton h-64 w-full rounded-[var(--radius-lg)]" />
+          <div key={i} className="skeleton h-64 w-full cut-lg" />
         ))}
       </div>
     </div>

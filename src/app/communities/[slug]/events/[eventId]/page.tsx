@@ -119,7 +119,7 @@ export default async function CommunityEventPage({ params }: Params) {
         {isMod && !event.cancelledAt && !over && <CancelEventButton eventId={event.id} />}
       </div>
 
-      {event.description && <p className="rounded-[14px] border border-border bg-surface px-4 py-3 text-[15px] leading-relaxed whitespace-pre-line">{event.description}</p>}
+      {event.description && <p className="cut-sm [--cut-line:var(--border)] border border-border bg-surface px-4 py-3 text-[15px] leading-relaxed whitespace-pre-line">{event.description}</p>}
 
       <section className="flex flex-col gap-3">
         <h2 className="flex items-center gap-2 font-display text-lg font-bold tracking-tight">

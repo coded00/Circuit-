@@ -92,7 +92,7 @@ export function BracketCanvas({ children }: { children: ReactNode }) {
   return (
     <div
       ref={viewportRef}
-      className={`relative h-[min(75vh,52rem)] min-h-[24rem] w-full overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface-elevated/40 select-none ${
+      className={`relative h-[min(75vh,52rem)] min-h-[24rem] w-full overflow-hidden cut-lg [--cut-line:var(--border)] border border-border bg-surface-elevated/40 select-none ${
         isDragging ? "cursor-grabbing" : "cursor-grab"
       }`}
       onPointerDown={startDrag}
@@ -100,7 +100,7 @@ export function BracketCanvas({ children }: { children: ReactNode }) {
       onPointerUp={endDrag}
       onPointerCancel={endDrag}
     >
-      <div className="absolute top-3 right-3 z-20 flex items-center gap-1 rounded-lg border border-border bg-surface px-1.5 py-1 shadow-lg">
+      <div className="absolute top-3 right-3 z-20 flex items-center gap-1 rounded-none border border-border bg-surface px-1.5 py-1 shadow-lg">
         <button type="button" onClick={() => changeZoom(1 / 1.25)} className="btn-ghost !p-1.5" aria-label="Zoom out" title="Zoom out">
           <ZoomOut size={16} />
         </button>

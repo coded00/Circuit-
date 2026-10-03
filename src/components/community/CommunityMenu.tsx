@@ -74,7 +74,7 @@ export function CommunityMenu({ communityId, communityName, canInvite, aboutHref
         </button>
       </div>
       {open && (
-        <div className="absolute top-full right-0 z-30 mt-1.5 w-52 overflow-hidden rounded-[12px] border border-border bg-surface py-1" style={{ boxShadow: "var(--shadow-float)" }}>
+        <div className="absolute top-full right-0 z-30 mt-1.5 w-52 overflow-hidden cut-sm [--cut-line:var(--border)] border border-border bg-surface py-1" style={{ boxShadow: "var(--shadow-float)" }}>
           {canInvite && (
             <button type="button" className={item} onClick={() => (setOpen(false), setInviting(true))}>
               <UserPlus size={15} /> Invite people
@@ -181,7 +181,7 @@ export function InviteDialog({ open, onClose, communityId, communityName }: { op
         </div>
         {url ? (
           <>
-            <div className="flex items-center gap-2 rounded-[12px] border border-border bg-surface-elevated/40 p-1.5 pl-3.5">
+            <div className="flex items-center gap-2 cut-sm [--cut-line:var(--border)] border border-border bg-surface-elevated/40 p-1.5 pl-3.5">
               <span className="min-w-0 flex-1 truncate font-mono text-sm">{url.replace(/^https?:\/\//, "")}</span>
               <button type="button" onClick={copy} className="btn-primary h-9 gap-1.5 px-3.5 text-sm">
                 {copied ? <Check size={15} /> : <Copy size={15} />} {copied ? "Copied" : "Copy"}

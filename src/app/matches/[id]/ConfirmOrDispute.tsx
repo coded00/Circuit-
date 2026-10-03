@@ -77,7 +77,7 @@ export default function ConfirmOrDispute({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1 rounded-[12px] border border-border bg-surface-elevated p-4">
+      <div className="flex flex-col gap-1 cut-sm [--cut-line:var(--border)] border border-border bg-surface-elevated p-4">
         <span className="text-eyebrow text-muted">{opponentName} reported</span>
         <span className="font-display text-2xl leading-tight font-bold tracking-tight uppercase">{claim.claimText}</span>
         <span className="text-stat text-lg">{claim.score}</span>

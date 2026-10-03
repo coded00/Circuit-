@@ -240,7 +240,7 @@ export default function BattleForm({
 
       {/* Review: what you're about to publish, including what happens to any stake. */}
       {visibility !== "QUICK_MATCH" && (
-        <div className="flex flex-col gap-1 rounded-[12px] border border-border bg-surface-elevated p-3.5 text-[13px]">
+        <div className="flex flex-col gap-1 cut-sm [--cut-line:var(--border)] border border-border bg-surface-elevated p-3.5 text-[13px]">
           <span className="text-[11px] font-semibold tracking-wide uppercase">Review</span>
           <span>
             {game} · {format === "BEST_OF_3" ? "Best of 3" : "Single match"} ·{" "}

@@ -10,6 +10,7 @@ import { MobileTabBar } from "@/components/nav/MobileTabBar";
 import { AppShell } from "@/components/AppShell";
 import { ConfirmDialogProvider } from "@/components/ConfirmDialogProvider";
 import { ToastProvider } from "@/components/ToastProvider";
+import { FeedbackProvider } from "@/components/FeedbackProvider";
 import { OneSignalInit } from "@/components/OneSignalInit";
 import { PresenceHeartbeat } from "@/components/PresenceHeartbeat";
 import { BackForwardRefresh } from "@/components/BackForwardRefresh";
@@ -149,6 +150,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <GameImageProvider images={gameImages}>
         <ConfirmDialogProvider>
         <ToastProvider>
+          <FeedbackProvider />
           <AppShell
             sidebar={<AppSidebar user={navUser} />}
             topBar={<TopBar user={user} disputeCount={disputeCount} />}

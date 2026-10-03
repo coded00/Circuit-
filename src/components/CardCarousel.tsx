@@ -74,7 +74,7 @@ export function CardCarousel({ children, label }: { children: React.ReactNode; l
         // `relative` makes each card's offsetLeft relative to this row.
         // py-1/-my-1 leaves room for the cards' hover lift, which an
         // overflow-x container would otherwise clip at the top.
-        className="scrollbar-hide relative -my-1 flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain py-1 focus-visible:outline-none lg:my-0 lg:grid lg:snap-none lg:grid-cols-3 lg:overflow-visible lg:py-0"
+        className="scrollbar-hide relative -my-1 flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain py-1 lg:my-0 lg:grid lg:snap-none lg:grid-cols-3 lg:overflow-visible lg:py-0"
       >
         {items.map((child, i) => (
           <div

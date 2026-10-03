@@ -16,7 +16,7 @@ export function PlayerDiscoveryCard({ player }: { player: DiscoveryPlayer }) {
   const winRate = played > 0 ? Math.round((player.wins / played) * 100) : null;
 
   return (
-    <div className="group flex h-full flex-col overflow-hidden rounded-[16px] border border-border bg-surface transition duration-[var(--duration-base)] hover:-translate-y-0.5 hover:border-border-hover">
+    <div className="group flex h-full flex-col overflow-hidden cut-lg [--cut-line:var(--border)] border border-border bg-surface transition duration-[var(--duration-base)] hover:-translate-y-0.5 hover:border-border-hover">
       <Link href={`/players/${player.handle}`} className="relative block h-24 w-full overflow-hidden" tabIndex={-1} aria-hidden>
         {player.primaryGame ? (
           <GameArtTile game={player.primaryGame} className="h-full w-full transition-transform duration-[var(--duration-moderate)] group-hover:scale-[1.04]" hideLabel />
@@ -25,7 +25,7 @@ export function PlayerDiscoveryCard({ player }: { player: DiscoveryPlayer }) {
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
         {player.primaryGame && (
-          <span className="absolute right-2.5 bottom-2 max-w-[60%] truncate rounded-[6px] bg-black/55 px-1.5 py-0.5 font-mono text-[10px] font-semibold tracking-[0.08em] text-white uppercase backdrop-blur-sm">
+          <span className="absolute right-2.5 bottom-2 max-w-[60%] truncate rounded-none bg-black/55 px-1.5 py-0.5 font-mono text-[10px] font-semibold tracking-[0.08em] text-white uppercase backdrop-blur-sm">
             {player.primaryGame}
           </span>
         )}
@@ -35,9 +35,9 @@ export function PlayerDiscoveryCard({ player }: { player: DiscoveryPlayer }) {
         <Link href={`/players/${player.handle}`} className="relative z-10 -mt-8 flex flex-col items-start gap-2">
           {player.avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs
-            <img src={player.avatarUrl} alt="" referrerPolicy="no-referrer" className="h-16 w-16 shrink-0 rounded-[14px] border-[3px] border-surface object-cover" />
+            <img src={player.avatarUrl} alt="" referrerPolicy="no-referrer" className="h-16 w-16 shrink-0 cut-sm [--cut-line:var(--border)] border-[3px] border-surface object-cover" />
           ) : (
-            <span className="font-display flex h-16 w-16 shrink-0 items-center justify-center rounded-[14px] border-[3px] border-surface bg-[#111318] text-2xl font-bold text-accent-volt dark:bg-surface-elevated">
+            <span className="font-display flex h-16 w-16 shrink-0 items-center justify-center cut-sm [--cut-line:var(--border)] border-[3px] border-surface bg-[#111318] text-2xl font-bold text-accent-volt dark:bg-surface-elevated">
               {player.displayName.slice(0, 1).toUpperCase()}
             </span>
           )}
@@ -64,7 +64,7 @@ export function PlayerDiscoveryCard({ player }: { player: DiscoveryPlayer }) {
               </div>
             </>
           ) : (
-            <span className="rounded-[6px] bg-accent-volt-soft px-2 py-0.5 font-mono text-[10px] font-bold tracking-[0.12em] text-foreground uppercase">New player</span>
+            <span className="rounded-none bg-accent-volt-soft px-2 py-0.5 font-mono text-[10px] font-bold tracking-[0.12em] text-foreground uppercase">New player</span>
           )}
           {player.mutualFriends > 0 && (
             <span className="ml-auto flex items-center gap-1 text-xs text-muted">

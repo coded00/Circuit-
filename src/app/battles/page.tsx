@@ -60,7 +60,7 @@ export default async function BattleBoardPage({ searchParams }: { searchParams: 
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex flex-col gap-1.5">
           <span className="text-eyebrow text-accent-volt">Challenges</span>
-          <h1 className="font-display text-3xl leading-[0.98] font-bold tracking-tight uppercase sm:text-4xl">There&apos;s always another level.</h1>
+          <h1 className="font-display text-3xl leading-[0.98] font-bold tracking-tight sm:text-4xl">There&apos;s always another level.</h1>
           <p className="text-sm text-muted">
             {allOpen.length === 0 ? (
               "Nobody's waiting right now. Open one and see who bites."

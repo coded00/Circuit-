@@ -48,8 +48,8 @@ export function CommunityTeams({
       {teams.length > 0 ? (
         <div className="grid gap-2 sm:grid-cols-2">
           {teams.map((t) => (
-            <div key={t.id} className="flex items-center gap-3 rounded-[14px] border border-border bg-surface p-3">
-              <span className="font-display flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-accent-volt text-xs font-bold text-accent-volt-foreground">
+            <div key={t.id} className="flex items-center gap-3 cut-sm [--cut-line:var(--border)] border border-border bg-surface p-3">
+              <span className="font-display flex h-10 w-10 shrink-0 items-center justify-center cut-avatar bg-accent-volt text-xs font-bold text-accent-volt-foreground">
                 {(t.tag || t.name).replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase()}
               </span>
               <Link href={`/teams/${t.id}`} className="flex min-w-0 flex-1 flex-col hover:underline">
@@ -64,7 +64,7 @@ export function CommunityTeams({
                   disabled={busy}
                   onClick={() => call(`/api/communities/${communityId}/teams/${t.id}`, "DELETE")}
                   aria-label={`Remove ${t.name}`}
-                  className="flex h-8 w-8 items-center justify-center rounded-[8px] text-muted hover:bg-surface-elevated hover:text-foreground"
+                  className="flex h-8 w-8 items-center justify-center cut-avatar text-muted hover:bg-surface-elevated hover:text-foreground"
                 >
                   <X size={15} />
                 </button>

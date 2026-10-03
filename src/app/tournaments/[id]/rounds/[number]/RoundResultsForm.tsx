@@ -96,7 +96,7 @@ export function RoundResultsForm({
   return (
     <form onSubmit={save} className="flex flex-col gap-5">
       {openFlags > 0 && (
-        <p className="rounded-[10px] border border-dashed border-border-strong px-4 py-3 text-sm">
+        <p className="rounded-none border border-dashed border-border-strong px-4 py-3 text-sm">
           {openFlags} flag{openFlags === 1 ? " is" : "s are"} waiting on this round. After correcting, resolve {openFlags === 1 ? "it" : "them"} on the Rounds tab.
         </p>
       )}

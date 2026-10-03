@@ -63,7 +63,7 @@ export function selectedParts(catalog: PickerGame[], value: CompetitionValue) {
 }
 
 const chip = (on: boolean, locked: boolean) =>
-  `flex min-h-10 items-center gap-2 rounded-[10px] border px-3.5 py-2 text-left text-sm transition ${
+  `flex min-h-10 items-center gap-2 rounded-none border px-3.5 py-2 text-left text-sm transition ${
     locked
       ? "cursor-not-allowed border-dashed border-border text-muted-strong"
       : on
@@ -108,7 +108,7 @@ export function CompetitionPicker({
 
   if (catalog.length === 0) {
     return (
-      <p className="rounded-[10px] border border-dashed border-border px-4 py-3 text-sm text-muted">
+      <p className="rounded-none border border-dashed border-border px-4 py-3 text-sm text-muted">
         No games are published yet — an admin needs to publish one in Admin → Games before tournaments can be created.
       </p>
     );
@@ -219,7 +219,7 @@ export function CompetitionPicker({
       )}
 
       {format && value.structure === "LEAGUE" && (
-        <div className="flex flex-col gap-3 rounded-[12px] border border-border bg-surface-elevated/40 p-3.5">
+        <div className="flex flex-col gap-3 cut-sm [--cut-line:var(--border)] border border-border bg-surface-elevated/40 p-3.5">
           <span className="flex items-center gap-1.5 text-sm font-semibold">
             League settings
             <InfoTip text="In a league everyone plays everyone and earns points for each result. The most points when every match is played wins. These can't be changed once players register." />
@@ -293,7 +293,7 @@ export function CompetitionPicker({
       )}
 
       {format && mode?.style === "LOBBY" && (
-        <div className="grid grid-cols-1 gap-3 rounded-[12px] border border-border bg-surface-elevated/40 p-3.5 sm:grid-cols-[8rem_1fr]">
+        <div className="grid grid-cols-1 gap-3 cut-sm [--cut-line:var(--border)] border border-border bg-surface-elevated/40 p-3.5 sm:grid-cols-[8rem_1fr]">
           <div className="flex flex-col gap-1.5">
             <label htmlFor="lobbyRounds" className="field-label">
               {value.lobbyGroups ? "Group rounds" : "Rounds"}

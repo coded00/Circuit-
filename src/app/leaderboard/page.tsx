@@ -87,7 +87,7 @@ function StatTile({
   return (
     // Phones: three compact tiles in a row (no icon); sm+: icon beside the number.
     <div className="widget flex min-w-0 items-center gap-3 !p-3 sm:!p-4">
-      <span className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-surface-elevated text-accent-blue sm:flex">
+      <span className="hidden h-11 w-11 shrink-0 items-center justify-center cut-avatar bg-surface-elevated text-accent-blue sm:flex">
         {icon}
       </span>
       <div className="flex min-w-0 flex-col gap-0.5">
@@ -207,7 +207,7 @@ export default async function LeaderboardPage({
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-6 sm:px-8 sm:py-10">
-      <div data-surface="dark" className="relative overflow-hidden rounded-[var(--radius-hero)] border border-border bg-surface p-6 sm:p-10">
+      <div data-surface="dark" className="relative overflow-hidden cut-lg [--cut-line:var(--border)] border border-border bg-surface p-6 sm:p-10">
         {games[0] && <GameArtTile game={games[0].game} className="opacity-[0.14]" fill hideLabel imgWidth={1200} />}
         <div
           aria-hidden

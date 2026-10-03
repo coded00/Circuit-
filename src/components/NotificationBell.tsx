@@ -13,6 +13,7 @@
  * notifications/NotificationItem.tsx, shared with /notifications.
  */
 
+import { feedback } from "@/lib/feedback";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
@@ -67,7 +68,7 @@ function NotificationInbox({
               type="button"
               onClick={onMarkAll}
               disabled={markingAll}
-              className="flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground disabled:opacity-50"
+              className="flex items-center gap-1 rounded-none px-1.5 py-1 text-xs font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground disabled:opacity-50"
             >
               <CheckCheck size={14} />
               {markingAll ? "Marking…" : "Mark all read"}
@@ -96,7 +97,7 @@ function NotificationInbox({
       <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto pb-2">
         {visible.length === 0 ? (
           <div className="flex flex-col items-center gap-3 px-8 py-14 text-center">
-            <span className="flex h-11 w-11 items-center justify-center rounded-[12px] bg-surface-elevated text-muted">
+            <span className="flex h-11 w-11 items-center justify-center cut-sm bg-surface-elevated text-muted">
               <BellOff size={20} />
             </span>
             <div className="flex flex-col gap-1">
@@ -141,6 +142,7 @@ export function NotificationBell({
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
   const [unreadCount, setUnreadCount] = useState(initialUnreadCount);
+  const lastUnread = useRef(initialUnreadCount);
   const [markingAll, setMarkingAll] = useState(false);
   const isDesktop = useIsDesktop();
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -161,6 +163,9 @@ export function NotificationBell({
         const data = await res.json();
         if (cancelled) return;
         setNotifications(data.notifications);
+        // A new notification since the last look: a short chime and buzz.
+        if (data.unreadCount > lastUnread.current) feedback("alert");
+        lastUnread.current = data.unreadCount;
         setUnreadCount(data.unreadCount);
       } catch {
         // Ignored — the next interval tick retries.
@@ -231,9 +236,9 @@ export function NotificationBell({
         aria-expanded={open}
         className={`${buttonClassName} relative ${open ? "bg-surface-elevated text-foreground" : ""}`}
       >
-        <Bell size={18} />
+        <Bell size={20} className={unreadCount > 0 ? "translate-y-0.5 -translate-x-0.5" : undefined} />
         {unreadCount > 0 && (
-          <span className="absolute top-1.5 right-1.5 flex h-[17px] min-w-[17px] items-center justify-center cut-xs bg-live px-1 font-mono text-[10px] leading-none font-bold text-white ring-2 ring-background">
+          <span className="absolute top-0 right-0 flex h-4 min-w-4 items-center justify-center cut-xs bg-live px-1 font-mono text-[9px] leading-none font-bold text-white">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
@@ -245,7 +250,7 @@ export function NotificationBell({
             <motion.div
               role="dialog"
               aria-label="Notifications"
-              className="absolute top-full right-0 z-40 mt-2 flex max-h-[min(560px,calc(100vh-88px))] w-[400px] max-w-[calc(100vw-2rem)] origin-top-right flex-col overflow-hidden rounded-[14px] border border-border bg-surface"
+              className="absolute top-full right-0 z-40 mt-2 flex max-h-[min(560px,calc(100vh-88px))] w-[400px] max-w-[calc(100vw-2rem)] origin-top-right flex-col overflow-hidden cut-sm [--cut-line:var(--border)] border border-border bg-surface"
               style={{ boxShadow: "var(--shadow-float)" }}
               initial={{ opacity: 0, y: -6, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}

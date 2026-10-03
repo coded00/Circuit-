@@ -60,7 +60,7 @@ export function PrizeSplitField({
                 setText(p.split.join(", "));
                 onChange(p.split.length === 1 ? [] : p.split);
               }}
-              className={`min-h-9 rounded-[10px] border px-3 py-1.5 text-sm transition ${
+              className={`min-h-9 rounded-none border px-3 py-1.5 text-sm transition ${
                 tooMany
                   ? "cursor-not-allowed border-dashed border-border text-muted-strong"
                   : on
@@ -77,7 +77,7 @@ export function PrizeSplitField({
           role="radio"
           aria-checked={custom}
           onClick={() => setCustom(true)}
-          className={`min-h-9 rounded-[10px] border px-3 py-1.5 text-sm transition ${custom ? "border-foreground bg-foreground font-semibold text-background" : "border-border bg-surface hover:border-border-hover"}`}
+          className={`min-h-9 rounded-none border px-3 py-1.5 text-sm transition ${custom ? "border-foreground bg-foreground font-semibold text-background" : "border-border bg-surface hover:border-border-hover"}`}
         >
           Custom
         </button>

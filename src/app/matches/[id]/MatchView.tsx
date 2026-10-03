@@ -172,11 +172,11 @@ function PlayerSide({
 
 function HeadToHead({ data }: { data: MatchViewData }) {
   return (
-    <section className={`relative isolate overflow-hidden rounded-[var(--radius-hero)] border bg-surface ${data.statusPill.pulse ? "live-glow border-live/60" : "border-border"}`}>
+    <section className={`relative isolate overflow-hidden cut-lg border bg-surface ${data.statusPill.pulse ? "live-glow border-live/60" : "border-border"}`}>
       {data.game && <ArenaBackdrop game={data.game} art={0.36} />}
       <div className="flex items-center justify-between gap-3 px-5 pt-5 sm:px-7">
         <div className="flex min-w-0 items-center gap-2.5">
-          {data.game && <GameArtTile thumb game={data.game} className="h-8 w-8 shrink-0 rounded-[8px]" hideLabel imgWidth={80} />}
+          {data.game && <GameArtTile thumb game={data.game} className="h-8 w-8 shrink-0 cut-avatar" hideLabel imgWidth={80} />}
           <div className="flex min-w-0 flex-col">
             <span className="truncate text-sm font-semibold">{data.tournament?.name ?? data.game ?? "Match"}</span>
             <span className="truncate text-xs text-muted">
@@ -302,7 +302,7 @@ function NextStep({ data }: { data: MatchViewData }) {
     }
     if (me && winner?.id === me.id) {
       return (
-        <section className="celebrate-fade flex flex-col gap-4 rounded-[var(--radius-lg)] border border-gold/30 bg-gold/10 p-5 sm:flex-row sm:items-center sm:justify-between">
+        <section className="celebrate-fade flex flex-col gap-4 cut-lg border border-gold/30 bg-gold/10 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <Trophy size={28} className="trophy-pop shrink-0 text-gold" aria-hidden />
             <div className="flex flex-col">
@@ -352,7 +352,7 @@ function NextStep({ data }: { data: MatchViewData }) {
           {data.reports.length > 0 && (
             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
               {data.reports.map((r) => (
-                <div key={r.name} className="flex flex-col gap-0.5 rounded-[12px] border border-border bg-surface-elevated p-3.5">
+                <div key={r.name} className="flex flex-col gap-0.5 cut-sm [--cut-line:var(--border)] border border-border bg-surface-elevated p-3.5">
                   <span className="text-eyebrow text-muted">{r.name} reported</span>
                   <span className="text-sm font-semibold">{r.claimText}</span>
                   <span className="text-stat text-sm">{r.score}</span>

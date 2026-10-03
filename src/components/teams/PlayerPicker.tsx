@@ -88,7 +88,7 @@ export function PlayerPicker({
         />
       </div>
       {open && q.length >= 2 && (
-        <ul id={listId} role="listbox" className="absolute z-20 mt-1.5 max-h-72 w-full overflow-auto rounded-[12px] border border-border bg-surface-elevated p-1 shadow-lg">
+        <ul id={listId} role="listbox" className="absolute z-20 mt-1.5 max-h-72 w-full overflow-auto cut-sm [--cut-line:var(--border)] border border-border bg-surface-elevated p-1 shadow-lg">
           {loading && visible.length === 0 && <li className="px-3 py-2 text-xs text-muted">Searching…</li>}
           {!loading && visible.length === 0 && <li className="px-3 py-2 text-xs text-muted">No players found for “{q}”.</li>}
           {visible.map((p) => {
@@ -99,7 +99,7 @@ export function PlayerPicker({
                   type="button"
                   disabled={unavailable}
                   onClick={() => choose(p)}
-                  className="flex w-full items-center gap-3 rounded-[8px] px-3 py-2 text-left text-sm transition enabled:hover:bg-surface disabled:opacity-50"
+                  className="flex w-full items-center gap-3 rounded-none px-3 py-2 text-left text-sm transition enabled:hover:bg-surface disabled:opacity-50"
                 >
                   <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden cut-avatar bg-surface text-xs font-semibold">
                     {/* eslint-disable-next-line @next/next/no-img-element */}

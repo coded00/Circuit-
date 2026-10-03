@@ -30,9 +30,9 @@ export async function GamerNews() {
           <a key={item.link} href={item.link} target="_blank" rel="noreferrer" className={`${panelRowClass} items-start py-3`}>
             {item.image ? (
               // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host article images
-              <img src={item.image} alt="" className="h-14 w-14 shrink-0 rounded-[8px] object-cover" />
+              <img src={item.image} alt="" className="h-14 w-14 shrink-0 cut-avatar object-cover" />
             ) : (
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[8px] bg-surface-elevated text-muted">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center cut-avatar bg-surface-elevated text-muted">
                 <Newspaper size={18} />
               </div>
             )}

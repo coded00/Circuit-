@@ -66,7 +66,7 @@ export function Modal({
         </button>
 
         <div className="flex items-start gap-3.5 sm:pr-8">
-          <span className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] ${iconClassName}`}>
+          <span className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center cut-sm ${iconClassName}`}>
             <Icon size={20} strokeWidth={2.25} />
           </span>
           <div className="flex min-w-0 flex-col gap-1">

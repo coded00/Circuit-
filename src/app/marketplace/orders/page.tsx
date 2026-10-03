@@ -64,7 +64,7 @@ export default async function MyOrdersPage() {
                 </a>
               )}
               {o.fulfilmentNote && (
-                <div className="rounded-[12px] border border-border bg-surface-elevated p-3 text-sm whitespace-pre-wrap">{o.fulfilmentNote}</div>
+                <div className="cut-sm [--cut-line:var(--border)] border border-border bg-surface-elevated p-3 text-sm whitespace-pre-wrap">{o.fulfilmentNote}</div>
               )}
             </li>
           ))}

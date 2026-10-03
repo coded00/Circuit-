@@ -54,7 +54,7 @@ export default async function PlayerGamePage({ params }: { params: Promise<Param
         <ArrowLeft size={15} /> {player.displayName}
       </Link>
 
-      <header data-surface="dark" className="relative isolate overflow-hidden rounded-[var(--radius-hero)] border border-border">
+      <header data-surface="dark" className="relative isolate overflow-hidden cut-lg [--cut-line:var(--border)] border border-border">
         <ArenaBackdrop game={game} art={0.6} fade="right" />
         <div className="flex flex-col gap-1.5 p-6 sm:p-9">
           <span className="text-eyebrow text-accent-volt">@{player.handle}</span>

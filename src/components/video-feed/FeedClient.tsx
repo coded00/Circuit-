@@ -234,7 +234,7 @@ export function FeedClient({
           <FeedSkeleton />
         ) : error ? (
           <div className="flex h-full w-full flex-col items-center justify-center gap-3 px-6 text-center text-white">
-            <span className="font-display text-lg font-bold tracking-tight uppercase">Feed Interrupted</span>
+            <span className="font-display text-lg font-bold tracking-tight">Feed interrupted</span>
             <p className="text-sm text-white/70">We couldn&apos;t load the latest drops.</p>
             <button type="button" onClick={() => loadFeed(tab, game, true)} className="btn-primary mt-2 flex items-center gap-2">
               <RefreshCw size={14} />
@@ -245,17 +245,17 @@ export function FeedClient({
           <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-6 text-center text-white">
             {tab === "following" && !currentUserId ? (
               <>
-                <span className="font-display text-lg font-bold tracking-tight uppercase">Log In To See This</span>
+                <span className="font-display text-lg font-bold tracking-tight">Log in to see this</span>
                 <p className="text-sm text-white/70">Following shows drops for your favorite games. Sign in to set them.</p>
               </>
             ) : tab === "following" ? (
               <>
-                <span className="font-display text-lg font-bold tracking-tight uppercase">No Favorite Games Yet</span>
+                <span className="font-display text-lg font-bold tracking-tight">No favorite games yet</span>
                 <p className="text-sm text-white/70">Add favorite games on your profile to see them here.</p>
               </>
             ) : (
               <>
-                <span className="font-display text-lg font-bold tracking-tight uppercase">No Drops Yet</span>
+                <span className="font-display text-lg font-bold tracking-tight">No drops yet</span>
                 <p className="text-sm text-white/70">New gaming content is loading into Circuit. Check back soon.</p>
               </>
             )}
@@ -276,7 +276,7 @@ export function FeedClient({
             ))}
             {!nextCursor && (
               <div className="flex h-full w-full shrink-0 snap-start flex-col items-center justify-center gap-2 px-6 text-center text-white">
-                <span className="font-display text-lg font-bold tracking-tight uppercase">You&apos;ve Reached The End</span>
+                <span className="font-display text-lg font-bold tracking-tight">You&apos;ve reached the end</span>
                 <p className="text-sm text-white/70">Check back soon for new drops.</p>
               </div>
             )}

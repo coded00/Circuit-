@@ -28,7 +28,7 @@ export default async function NewCommunityPage() {
         <ArrowLeft size={15} /> Communities
       </Link>
       <header className="flex flex-col gap-2">
-        <h1 className="font-display text-[28px] leading-[0.95] font-bold tracking-tight uppercase sm:text-[36px]">Start a community</h1>
+        <h1 className="font-display text-[28px] leading-[0.95] font-bold tracking-tight sm:text-[36px]">Start a community</h1>
         <p className="text-[15px] text-muted">For your campus, your city, your crew or your game. You&apos;ll be the owner. You can add moderators later.</p>
       </header>
       {!user.emailVerifiedAt && !user.isStaff ? (
@@ -37,7 +37,7 @@ export default async function NewCommunityPage() {
           reason="Communities can only be created by verified accounts. It keeps spam and fake communities out. Verify your email to continue."
         />
       ) : owned >= MAX_OWNED_COMMUNITIES ? (
-        <p className="rounded-[14px] border border-border bg-surface px-4 py-4 text-sm text-muted">
+        <p className="cut-sm [--cut-line:var(--border)] border border-border bg-surface px-4 py-4 text-sm text-muted">
           You already own {owned} communities — the most one account can run. Close one or hand it to someone else to start another.
         </p>
       ) : (

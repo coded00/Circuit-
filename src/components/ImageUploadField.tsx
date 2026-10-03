@@ -179,8 +179,8 @@ export function ImageUploadField({
     purpose === "avatar"
       ? "h-20 w-20 rounded-full"
       : purpose === "game-icon" || purpose === "community-icon"
-        ? "h-20 w-20 rounded-[16px]"
-        : "h-32 w-full rounded-[10px]";
+        ? "h-20 w-20 cut-lg"
+        : "h-32 w-full rounded-none";
 
   return (
     <div className="relative flex flex-col gap-1.5">
@@ -240,7 +240,7 @@ export function ImageUploadField({
                 const file = e.dataTransfer.files?.[0];
                 if (file) upload(file);
               }}
-              className={`flex flex-col items-center justify-center gap-1.5 rounded-[10px] border border-dashed px-4 py-6 text-sm transition ${
+              className={`flex flex-col items-center justify-center gap-1.5 rounded-none border border-dashed px-4 py-6 text-sm transition ${
                 dragging ? "border-accent-blue bg-accent-blue-soft" : "border-border-strong hover:bg-surface-elevated"
               }`}
             >

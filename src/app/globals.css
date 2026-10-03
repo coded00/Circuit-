@@ -373,7 +373,7 @@ body {
  */
 @layer components {
   .card {
-    @apply rounded-[15px] border border-border bg-surface p-5 transition duration-[var(--duration-base)] ease-[var(--ease-standard)];
+    @apply rounded-none border border-border bg-surface p-5 transition duration-[var(--duration-base)] ease-[var(--ease-standard)];
   }
 
   /* Level 2 Interactive: hover lift (unchanged from before) plus real
@@ -385,18 +385,17 @@ body {
   }
 
   .card-row {
-    @apply rounded-[11px] border border-border bg-surface text-sm transition duration-[var(--duration-base)] ease-[var(--ease-standard)]
-      hover:border-border-hover hover:bg-surface-elevated active:scale-[0.99] active:duration-[var(--duration-instant)]
-      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
+    @apply rounded-none border border-border bg-surface text-sm transition duration-[var(--duration-base)] ease-[var(--ease-standard)]
+      hover:border-border-hover hover:bg-surface-elevated active:scale-[0.99] active:duration-[var(--duration-instant)] ;
   }
 
   .card-media {
-    @apply overflow-hidden rounded-[11px] border border-border bg-surface transition duration-[var(--duration-base)] ease-[var(--ease-standard)]
+    @apply overflow-hidden rounded-none border border-border bg-surface transition duration-[var(--duration-base)] ease-[var(--ease-standard)]
       hover:border-border-hover;
   }
 
   .widget {
-    @apply rounded-[15px] border border-border bg-surface p-4;
+    @apply rounded-none border border-border bg-surface p-4;
   }
 
   .surface-elevated {
@@ -521,32 +520,28 @@ body {
     @apply inline-flex items-center justify-center gap-1.5 rounded-none bg-accent-volt px-5 py-2.5
       text-sm font-semibold text-accent-volt-foreground shadow-sm transition duration-[var(--duration-base)] ease-[var(--ease-standard)]
       hover:brightness-105 active:brightness-95 active:duration-[var(--duration-instant)]
-      disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100
-      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-volt/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
+      disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 ;
   }
 
   .btn-secondary {
     @apply inline-flex items-center justify-center gap-1.5 rounded-none border border-border-strong
       bg-transparent px-5 py-2.5 text-sm font-medium text-foreground transition duration-[var(--duration-base)] ease-[var(--ease-standard)]
       hover:bg-surface-elevated active:duration-[var(--duration-instant)]
-      disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100
-      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
+      disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 ;
   }
 
   .btn-ghost {
     @apply inline-flex items-center justify-center gap-1.5 rounded-none bg-surface-elevated px-5 py-2.5
       text-sm font-medium text-muted transition duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:text-foreground
       active:duration-[var(--duration-instant)]
-      disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100
-      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
+      disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 ;
   }
 
   .btn-danger {
     @apply inline-flex items-center justify-center gap-1.5 rounded-none border border-danger/40
       px-5 py-2.5 text-sm font-medium text-danger transition duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:bg-danger/10
       active:duration-[var(--duration-instant)]
-      disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100
-      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
+      disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 ;
   }
 
   /* "Go Live" — streaming is out of MVP scope; this class stays defined
@@ -567,8 +562,7 @@ body {
        toggle, admin top bar, share triggers) in one place. */
     @apply inline-flex h-11 w-11 items-center justify-center rounded-none text-muted transition duration-[var(--duration-base)] ease-[var(--ease-standard)]
       hover:bg-surface-elevated hover:text-foreground active:scale-90 active:duration-[var(--duration-instant)]
-      disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100
-      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
+      disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 ;
   }
 
   /* Game-button elevation: a solid lip along the bottom edge (an inset
@@ -654,7 +648,7 @@ body {
      Consolidates what AccountMenu/CreateMenu/NotificationBell/SearchInput
      each independently hand-rolled slightly differently. */
   .dropdown-panel {
-    @apply rounded-[11px] border border-border bg-surface;
+    @apply rounded-none border border-border bg-surface;
     /* However a caller anchors this panel (right-0, left-0, ...), it can
        never be wider than the viewport itself minus a small margin — a
        fixed-width panel anchored to a trigger that isn't near the true
@@ -686,9 +680,9 @@ body {
   }
 
   .field-input {
-    @apply w-full rounded-[var(--radius-control)] border border-border bg-surface-elevated px-3.5 py-2.5 text-sm
+    @apply w-full rounded-none border border-border bg-surface-elevated px-3.5 py-2.5 text-sm
       outline-none transition duration-[var(--duration-fast)] ease-[var(--ease-standard)] placeholder:text-muted-strong
-      focus:border-accent-blue focus:ring-2 focus:ring-accent-blue-soft
+      focus:border-accent-volt focus:shadow-[inset_0_0_0_1px_var(--accent-volt)]
       disabled:cursor-not-allowed disabled:opacity-50;
   }
 
@@ -699,9 +693,9 @@ body {
      CSS custom properties as a color keyword) restores it consistently,
      app-wide, one fix instead of a per-caller icon overlay. */
   .field-select {
-    @apply w-full appearance-none rounded-[var(--radius-control)] border border-border bg-surface-elevated bg-no-repeat px-3.5 py-2.5 pr-9
+    @apply w-full appearance-none rounded-none border border-border bg-surface-elevated bg-no-repeat px-3.5 py-2.5 pr-9
       text-sm outline-none transition duration-[var(--duration-fast)] ease-[var(--ease-standard)]
-      focus:border-accent-blue focus:ring-2 focus:ring-accent-blue-soft
+      focus:border-accent-volt focus:shadow-[inset_0_0_0_1px_var(--accent-volt)]
       disabled:cursor-not-allowed disabled:opacity-50;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23888f99' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 7.5L10 12.5L15 7.5'/%3E%3C/svg%3E");
     background-position: right 0.75rem center;
@@ -709,9 +703,9 @@ body {
   }
 
   .field-textarea {
-    @apply w-full resize-y rounded-[var(--radius-control)] border border-border bg-surface-elevated px-3.5 py-2.5 text-sm
+    @apply w-full resize-y rounded-none border border-border bg-surface-elevated px-3.5 py-2.5 text-sm
       outline-none transition duration-[var(--duration-fast)] ease-[var(--ease-standard)] placeholder:text-muted-strong
-      focus:border-accent-blue focus:ring-2 focus:ring-accent-blue-soft
+      focus:border-accent-volt focus:shadow-[inset_0_0_0_1px_var(--accent-volt)]
       disabled:cursor-not-allowed disabled:opacity-50;
   }
 }
@@ -799,8 +793,7 @@ body {
   }
   .tab {
     @apply border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted transition duration-[var(--duration-fast)] ease-[var(--ease-standard)]
-      hover:text-foreground active:opacity-70
-      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
+      hover:text-foreground active:opacity-70 ;
   }
   .tab-active {
     @apply border-accent-volt text-foreground;
@@ -810,7 +803,7 @@ body {
   }
 
   .table-wrap {
-    @apply overflow-x-auto rounded-[11px] border border-border;
+    @apply overflow-x-auto rounded-none border border-border;
   }
   .table {
     @apply w-full border-collapse text-sm;
@@ -830,7 +823,7 @@ body {
   }
 
   .alert {
-    @apply flex items-start gap-3 rounded-[11px] border p-4 text-sm;
+    @apply flex items-start gap-3 rounded-none border p-4 text-sm;
   }
   .alert-info {
     @apply border-info/30 bg-info/10 text-info;
@@ -860,7 +853,7 @@ body {
     @apply text-sm text-muted;
   }
   .skeleton {
-    @apply animate-pulse rounded-lg bg-surface-elevated;
+    @apply animate-pulse rounded-none bg-surface-elevated;
   }
 }
 
@@ -1363,8 +1356,7 @@ body {
     @apply inline-flex items-center justify-center gap-1.5 rounded-none bg-danger px-5 py-2.5
       text-sm font-semibold text-white transition duration-[var(--duration-base)] ease-[var(--ease-standard)]
       hover:bg-danger-strong active:duration-[var(--duration-instant)]
-      disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100
-      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
+      disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 ;
   }
 }
 
@@ -1947,4 +1939,199 @@ html:not([data-nav-morph])::view-transition-new(.tournament-morph) {
   background:
     radial-gradient(55% 85% at 20% 58%, rgba(193, 244, 0, 0.2), transparent 70%),
     radial-gradient(55% 85% at 82% 58%, rgba(129, 140, 248, 0.28), transparent 70%);
+}
+
+
+/*
+ * ============================================================================
+ * The Circuit shape — panels, fields, menus, alerts, tables and skeletons get
+ * the sliced bottom-right corner buttons already have. clip-path does the cut;
+ * a one-pixel diagonal gradient redraws the outline along it (works on inputs,
+ * which can't have pseudo-elements). --cut is the size of the slice and
+ * --cut-line the outline colour. Inset shadows and outlines survive the clip;
+ * outer shadows and rings don't, so focus is drawn inside (see below).
+ * ============================================================================
+ */
+@layer components {
+  .card,
+  .card-row,
+  .card-media,
+  .widget,
+  .dropdown-panel,
+  .alert,
+  .table-wrap,
+  .field-input,
+  .field-select,
+  .field-textarea,
+  .skeleton {
+    --cut-line: var(--border);
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%);
+    background-repeat: no-repeat;
+    background-position: right bottom;
+    background-size: var(--cut) var(--cut);
+    background-image: linear-gradient(to bottom right, transparent calc(50% - 1px), var(--cut-line) calc(50% - 1px), var(--cut-line) 50%, transparent 50%);
+  }
+  .card,
+  .alert {
+    --cut: 18px;
+  }
+  .widget {
+    --cut: 14px;
+  }
+  .card-row,
+  .card-media,
+  .dropdown-panel,
+  .table-wrap,
+  .field-textarea {
+    --cut: 12px;
+  }
+  .field-input,
+  .field-select,
+  .skeleton {
+    --cut: 10px;
+  }
+  .alert-info {
+    --cut-line: color-mix(in srgb, var(--info) 30%, transparent);
+  }
+  .alert-success {
+    --cut-line: color-mix(in srgb, var(--success) 30%, transparent);
+  }
+  .alert-warning {
+    --cut-line: color-mix(in srgb, var(--warning) 30%, transparent);
+  }
+  .alert-danger {
+    --cut-line: color-mix(in srgb, var(--danger) 30%, transparent);
+  }
+  .field-input:focus,
+  .field-select:focus,
+  .field-textarea:focus {
+    --cut-line: var(--accent-volt);
+  }
+  /* The select keeps its chevron; the cut outline rides along as a second image. */
+  .field-select {
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23888f99' stroke-width='2' stroke-linecap='square' stroke-linejoin='miter'%3E%3Cpath d='M5 7.5L10 12.5L15 7.5'/%3E%3C/svg%3E"),
+      linear-gradient(to bottom right, transparent calc(50% - 1px), var(--cut-line) calc(50% - 1px), var(--cut-line) 50%, transparent 50%);
+    background-position:
+      right 0.75rem center,
+      right bottom;
+    background-size:
+      16px 16px,
+      var(--cut) var(--cut);
+  }
+}
+
+/*
+ * Focus. Rings are box-shadows and get clipped by the sliced corner, so focus is
+ * an outline drawn inside the shape: lime on dark surfaces, dark on lime buttons.
+ */
+:focus-visible {
+  outline: 2px solid var(--accent-volt);
+  outline-offset: 2px;
+}
+.btn-primary:focus-visible,
+.btn-secondary:focus-visible,
+.btn-ghost:focus-visible,
+.btn-danger:focus-visible,
+.btn-danger-solid:focus-visible,
+.btn-golive:focus-visible,
+.btn-icon:focus-visible,
+.badge:focus-visible,
+.cut-xs:focus-visible,
+.cut-sm:focus-visible,
+.cut-lg:focus-visible,
+.cut-avatar:focus-visible,
+.card:focus-visible,
+.card-row:focus-visible,
+.card-media:focus-visible,
+.widget:focus-visible,
+.field-input:focus-visible,
+.field-select:focus-visible,
+.field-textarea:focus-visible {
+  outline-offset: -4px;
+}
+.btn-primary:focus-visible,
+.btn-danger-solid:focus-visible {
+  outline-color: var(--accent-volt-foreground);
+}
+.btn-danger-solid:focus-visible {
+  outline-color: #fff;
+}
+.field-input:focus-visible,
+.field-select:focus-visible,
+.field-textarea:focus-visible {
+  outline-offset: -3px;
+}
+
+/* Scrollbars: thin, square, lime on hover. */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-volt);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Icons: mitred and square-ended, so the line icons read as angular and match the cut corners. */
+svg.lucide {
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+}
+
+/* Admin stays a calm, flat operator tool: rounded 8px, no sliced corners or raised lips. */
+[data-admin] .btn-primary,
+[data-admin] .btn-secondary,
+[data-admin] .btn-ghost,
+[data-admin] .btn-danger,
+[data-admin] .btn-danger-solid,
+[data-admin] .btn-golive,
+[data-admin] .btn-icon,
+[data-admin] .badge,
+[data-admin] .card,
+[data-admin] .card-row,
+[data-admin] .card-media,
+[data-admin] .widget,
+[data-admin] .dropdown-panel,
+[data-admin] .alert,
+[data-admin] .table-wrap,
+[data-admin] .field-input,
+[data-admin] .field-select,
+[data-admin] .field-textarea,
+[data-admin] .skeleton {
+  clip-path: none;
+  background-image: none;
+  border-radius: 8px;
+  --lip: transparent;
+  --lip-top: transparent;
+}
+[data-admin] .field-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23888f99' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 7.5L10 12.5L15 7.5'/%3E%3C/svg%3E");
+  background-position: right 0.75rem center;
+  background-size: 16px 16px;
+}
+[data-admin] .btn-primary::before,
+[data-admin] .btn-secondary::before,
+[data-admin] .btn-ghost::before,
+[data-admin] .btn-danger::before,
+[data-admin] .btn-danger-solid::before,
+[data-admin] .btn-golive::before,
+[data-admin] .btn-icon::before,
+[data-admin] .badge::before {
+  display: none;
 }

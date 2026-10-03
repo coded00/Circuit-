@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatListingPrice } from "@/lib/marketplace";
 import { loginPath } from "@/lib/safeRedirect";
+import { feedback } from "@/lib/feedback";
 
 /** Buy now from the wallet: confirm the price and balance, ask for the buyer's details if the listing needs them. */
 export function BuyPanel({
@@ -55,6 +56,7 @@ export function BuyPanel({
       setStep("fill");
       return;
     }
+    feedback("purchase");
     router.push(`/marketplace/orders/${data.id}?placed=1`);
     router.refresh();
   }

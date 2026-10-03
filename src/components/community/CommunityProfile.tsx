@@ -60,7 +60,7 @@ export function CommunityProfile({
 }: Props) {
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col pb-10">
-      <div className="relative h-40 w-full overflow-hidden sm:mt-6 sm:h-56 sm:rounded-[20px]">
+      <div className="relative h-40 w-full overflow-hidden sm:mt-6 sm:h-56 sm:cut-lg">
         {c.bannerUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- uploaded or external banner
           <img src={c.bannerUrl} alt="" className="h-full w-full object-cover" />
@@ -87,7 +87,7 @@ export function CommunityProfile({
               <h1 className="flex flex-wrap items-center gap-2 font-display text-2xl leading-tight font-bold tracking-tight sm:text-3xl">
                 {c.name}
                 {c.kind !== "PLAYER" && <BadgeCheck size={22} className="text-accent-volt" aria-label="Official" />}
-                {c.tag && <span className="rounded-[6px] border border-border px-1.5 py-0.5 font-mono text-xs font-semibold text-muted">{c.tag}</span>}
+                {c.tag && <span className="rounded-none border border-border px-1.5 py-0.5 font-mono text-xs font-semibold text-muted">{c.tag}</span>}
               </h1>
               <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-muted">
                 {c.kind === "GAME_HUB" && <span>Official game hub</span>}
@@ -132,8 +132,8 @@ export function CommunityProfile({
                 {events.length === 0 && communityEvents.length === 0 && <p className="text-sm text-muted">Nothing scheduled yet.</p>}
                 <div className="flex flex-col gap-2">
                   {communityEvents.map((e) => (
-                    <Link key={e.id} href={e.href} className="card-row flex items-center gap-3 rounded-[14px] border border-border bg-surface p-3">
-                      <span className="flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-[10px] bg-accent-volt text-accent-volt-foreground">
+                    <Link key={e.id} href={e.href} className="card-row flex items-center gap-3 cut-sm [--cut-line:var(--border)] border border-border bg-surface p-3">
+                      <span className="flex h-10 w-10 shrink-0 flex-col items-center justify-center cut-avatar bg-accent-volt text-accent-volt-foreground">
                         <span className="font-mono text-[9px] leading-none font-semibold uppercase">{e.startsAt.toLocaleDateString("en-NG", { month: "short", timeZone: "Africa/Lagos" })}</span>
                         <span className="font-display text-base leading-none font-bold">{e.startsAt.toLocaleDateString("en-NG", { day: "numeric", timeZone: "Africa/Lagos" })}</span>
                       </span>
@@ -148,8 +148,8 @@ export function CommunityProfile({
                     </Link>
                   ))}
                   {events.map((e) => (
-                    <Link key={e.id} href={`/tournaments/${e.id}`} className="card-row flex items-center gap-3 rounded-[14px] border border-border bg-surface p-3">
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-surface-elevated text-muted">
+                    <Link key={e.id} href={`/tournaments/${e.id}`} className="card-row flex items-center gap-3 cut-sm [--cut-line:var(--border)] border border-border bg-surface p-3">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center cut-avatar bg-surface-elevated text-muted">
                         <CalendarDays size={17} />
                       </span>
                       <span className="flex min-w-0 flex-1 flex-col">
@@ -175,13 +175,13 @@ export function CommunityProfile({
                 <h2 className="flex items-center gap-2 font-display text-lg font-bold tracking-tight">
                   <ScrollText size={17} /> Rules
                 </h2>
-                <div className="rounded-[14px] border border-border bg-surface px-4 py-3 text-[14px] leading-relaxed whitespace-pre-line text-muted">{c.rules}</div>
+                <div className="cut-sm [--cut-line:var(--border)] border border-border bg-surface px-4 py-3 text-[14px] leading-relaxed whitespace-pre-line text-muted">{c.rules}</div>
               </section>
             )}
           </div>
 
           <aside className="flex flex-col gap-5">
-            <section className="flex flex-col gap-2 rounded-[16px] border border-border bg-surface p-4">
+            <section className="flex flex-col gap-2 cut-lg [--cut-line:var(--border)] border border-border bg-surface p-4">
               <h2 className="text-eyebrow">Channels</h2>
               <ul className="flex flex-col gap-1">
                 {channels.map((ch) => (
@@ -193,7 +193,7 @@ export function CommunityProfile({
               </ul>
             </section>
             {moderators.length > 0 && (
-              <section className="flex flex-col gap-2.5 rounded-[16px] border border-border bg-surface p-4">
+              <section className="flex flex-col gap-2.5 cut-lg [--cut-line:var(--border)] border border-border bg-surface p-4">
                 <h2 className="text-eyebrow">Run by</h2>
                 <ul className="flex flex-col gap-2">
                   {moderators.map((m) => (
@@ -227,7 +227,7 @@ export function CommunityProfile({
 
 function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
-    <div className="flex flex-col gap-1 rounded-[12px] border border-border bg-surface px-3 py-2.5">
+    <div className="flex flex-col gap-1 cut-sm [--cut-line:var(--border)] border border-border bg-surface px-3 py-2.5">
       <dd className="font-display text-xl font-bold tabular-nums">{value}</dd>
       <dt className="flex items-center gap-1 text-[11px] leading-tight text-muted">
         {icon} {label}

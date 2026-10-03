@@ -76,9 +76,9 @@ export function SearchInput({ className = "" }: { className?: string }) {
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => setOpen(true)}
           placeholder="Search players, tournaments, games, communities"
-          className="h-10 w-full min-w-0 truncate rounded-[10px] border border-white/[0.07] bg-white/[0.04] pr-12 pl-9 text-sm text-foreground outline-none transition placeholder:text-white/35 hover:border-white/[0.14] focus:border-accent-volt/50 focus:bg-white/[0.06]"
+          className="h-10 w-full min-w-0 truncate rounded-none border border-white/[0.07] bg-white/[0.04] pr-12 pl-9 text-sm text-foreground outline-none transition placeholder:text-white/35 hover:border-white/[0.14] focus:border-accent-volt/50 focus:bg-white/[0.06]"
         />
-        <kbd className="pointer-events-none absolute top-1/2 right-3 hidden -translate-y-1/2 items-center gap-0.5 rounded-md border border-border-strong bg-surface-elevated px-1.5 py-0.5 font-mono text-[10px] text-muted sm:flex">
+        <kbd className="pointer-events-none absolute top-1/2 right-3 hidden -translate-y-1/2 items-center gap-0.5 rounded-none border border-border-strong bg-surface-elevated px-1.5 py-0.5 font-mono text-[10px] text-muted sm:flex">
           ⌘K
         </kbd>
       </div>

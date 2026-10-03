@@ -54,7 +54,7 @@ export function AppealQueue({ appeals }: { appeals: AppealRow[] }) {
             )}
           </div>
           <p className="text-xs text-muted">Suspended for: {(a.community?.suspensionReason ?? a.user.suspensionReason) || "no reason recorded"}</p>
-          <blockquote className="rounded-[10px] border-l-2 border-border-strong bg-surface-elevated/50 px-3 py-2 text-sm whitespace-pre-line">{a.message}</blockquote>
+          <blockquote className="rounded-none border-l-2 border-border-strong bg-surface-elevated/50 px-3 py-2 text-sm whitespace-pre-line">{a.message}</blockquote>
           <textarea
             value={responses[a.id] ?? ""}
             onChange={(e) => setResponses((r) => ({ ...r, [a.id]: e.target.value }))}

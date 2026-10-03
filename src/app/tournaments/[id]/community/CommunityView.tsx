@@ -299,7 +299,7 @@ export function CommunityView({
                   key={channel.id}
                   type="button"
                   onClick={() => openChannel(channel.id)}
-                  className={`flex items-center gap-1.5 rounded-[8px] border-l-2 px-2.5 py-1.5 text-left text-sm font-medium transition ${
+                  className={`flex items-center gap-1.5 rounded-none border-l-2 px-2.5 py-1.5 text-left text-sm font-medium transition ${
                     active ? "border-accent-blue bg-surface-elevated text-foreground" : "border-transparent text-muted hover:bg-surface-elevated/60 hover:text-foreground"
                   }`}
                 >
@@ -316,7 +316,7 @@ export function CommunityView({
               <div className="flex items-center justify-between px-3 pt-3 pb-1">
                 <span className="text-eyebrow">Threads</span>
                 {!muted && (!activeChannel?.modOnly || isModerator) && (
-                  <button type="button" onClick={() => setNewThread({ fromMessage: null })} aria-label="New thread" title="New thread" className="rounded-[6px] p-0.5 text-muted hover:bg-surface-elevated hover:text-foreground">
+                  <button type="button" onClick={() => setNewThread({ fromMessage: null })} aria-label="New thread" title="New thread" className="rounded-none p-0.5 text-muted hover:bg-surface-elevated hover:text-foreground">
                     <Plus size={14} />
                   </button>
                 )}
@@ -333,7 +333,7 @@ export function CommunityView({
                         setPanel({ type: "thread", id: t.id });
                         setSidebarOpen(false);
                       }}
-                      className={`flex items-start gap-2 rounded-[8px] px-2.5 py-1.5 text-left text-sm transition ${
+                      className={`flex items-start gap-2 rounded-none px-2.5 py-1.5 text-left text-sm transition ${
                         panel?.type === "thread" && panel.id === t.id ? "bg-surface-elevated text-foreground" : "text-muted hover:bg-surface-elevated/60 hover:text-foreground"
                       }`}
                     >
@@ -359,7 +359,7 @@ export function CommunityView({
               <span className="text-eyebrow px-3 pt-3 pb-1">Events</span>
               <div className="flex flex-col gap-0.5 p-2 pt-0">
                 {events.map((event) => (
-                  <Link key={event.id} href={event.href} className="flex items-start gap-2 rounded-[8px] px-2.5 py-1.5 text-sm text-muted transition hover:bg-surface-elevated/60 hover:text-foreground">
+                  <Link key={event.id} href={event.href} className="flex items-start gap-2 rounded-none px-2.5 py-1.5 text-sm text-muted transition hover:bg-surface-elevated/60 hover:text-foreground">
                     <CalendarDays size={14} className="mt-0.5 shrink-0" />
                     <span className="flex min-w-0 flex-col">
                       <span className="truncate font-medium">{event.name}</span>
@@ -486,7 +486,7 @@ export function CommunityView({
         <div className="flex flex-col gap-3 px-5 pb-5 sm:pt-5">
           <p className="font-mono text-[10px] font-semibold tracking-[0.16em] text-muted uppercase">New thread in #{activeChannel?.name}</p>
           {newThread?.fromMessage && (
-            <p className="line-clamp-2 rounded-[10px] border-l-2 border-border-strong bg-surface-elevated/50 px-3 py-2 text-sm text-muted">
+            <p className="line-clamp-2 rounded-none border-l-2 border-border-strong bg-surface-elevated/50 px-3 py-2 text-sm text-muted">
               <span className="font-semibold text-foreground">{newThread.fromMessage.author.displayName}:</span> {newThread.fromMessage.content || "📷 Image"}
             </p>
           )}

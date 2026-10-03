@@ -45,7 +45,7 @@ export function RsvpButtons({
   }
 
   const btn = (on: boolean) =>
-    `flex h-11 flex-1 items-center justify-center gap-1.5 rounded-[12px] border text-sm font-semibold transition sm:flex-none sm:px-5 ${
+    `flex h-11 flex-1 items-center justify-center gap-1.5 cut-sm [--cut-line:var(--border)] border text-sm font-semibold transition sm:flex-none sm:px-5 ${
       on ? "border-accent-volt bg-accent-volt text-accent-volt-foreground" : "border-border bg-surface hover:border-border-hover"
     }`;
 

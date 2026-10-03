@@ -84,7 +84,7 @@ export function CircuitHero({
   return (
     <div
       data-surface="dark"
-      className="flex w-full flex-col overflow-hidden rounded-[var(--radius-hero)] border border-border bg-surface"
+      className="flex w-full flex-col overflow-hidden cut-lg [--cut-line:var(--border)] border border-border bg-surface"
     >
       <div className="relative flex h-[280px] w-full overflow-hidden sm:h-[320px] lg:h-[340px]">
         {/* eslint-disable-next-line @next/next/no-img-element -- external CDN hero photo, or an admin-pasted banner URL */}
@@ -176,7 +176,7 @@ export function CircuitHero({
             </>
           ) : (
             <>
-              <h1 className="text-hero line-clamp-3">
+              <h1 className="text-hero line-clamp-3 normal-case">
                 This is where
                 <br />
                 <span className="text-accent-volt">your name takes shape.</span>

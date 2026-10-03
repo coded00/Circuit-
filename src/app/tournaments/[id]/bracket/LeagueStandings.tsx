@@ -109,7 +109,7 @@ export function LeagueStandings({
   const fixtures = (
     <div className="flex flex-col gap-5">
       {isOrganizer && overdueCount > 0 && (
-        <p className="rounded-[10px] border border-warning/40 bg-warning/10 px-4 py-3 text-sm">
+        <p className="rounded-none border border-warning/40 bg-warning/10 px-4 py-3 text-sm">
           <strong>{overdueCount} fixture{overdueCount === 1 ? " is" : "s are"} past {overdueCount === 1 ? "its" : "their"} matchday deadline.</strong> Give the players a nudge, or settle them below so the table can finish.
         </p>
       )}
@@ -195,9 +195,9 @@ export function LeagueStandings({
 
   return (
     <div className="flex w-full flex-1 flex-col gap-6">
-      <header data-surface="dark" className="flex flex-col gap-4 rounded-[var(--radius-hero)] border border-border bg-surface p-5 sm:flex-row sm:items-center sm:justify-between sm:p-7">
+      <header data-surface="dark" className="flex flex-col gap-4 cut-lg [--cut-line:var(--border)] border border-border bg-surface p-5 sm:flex-row sm:items-center sm:justify-between sm:p-7">
         <div className="flex min-w-0 items-center gap-4">
-          <GameArtTile game={tournament.game} posterUrl={tournament.posterUrl} className="hidden h-16 w-24 shrink-0 rounded-[10px] sm:block" hideLabel imgWidth={240} />
+          <GameArtTile game={tournament.game} posterUrl={tournament.posterUrl} className="hidden h-16 w-24 shrink-0 cut-avatar sm:block" hideLabel imgWidth={240} />
           <div className="flex min-w-0 flex-col gap-1.5">
             <Link href={backHref} className="inline-flex w-fit items-center gap-1.5 text-sm font-medium text-muted transition hover:text-foreground">
               <ArrowLeft size={15} />

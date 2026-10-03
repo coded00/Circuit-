@@ -56,7 +56,7 @@ function withMentions(text: string, mentions: MessageContent["mentions"], viewer
         key={m.start}
         href={`/players/${m.user.handle}`}
         title={m.user.displayName}
-        className={`rounded-[5px] px-1 py-px font-semibold whitespace-nowrap transition-colors ${
+        className={`rounded-none px-1 py-px font-semibold whitespace-nowrap transition-colors ${
           isViewer
             ? "bg-accent-volt/30 text-foreground hover:bg-accent-volt/45"
             : "bg-accent-blue-soft text-accent-blue hover:bg-accent-blue/20 dark:text-blue-300"
@@ -107,7 +107,7 @@ function Lightbox({ src, onClose }: { src: string; onClose: () => void }) {
         <X size={20} />
       </button>
       {/* eslint-disable-next-line @next/next/no-img-element -- access-checked API route, not an optimisable static asset */}
-      <img src={src} alt="" className="max-h-full max-w-full rounded-lg object-contain" />
+      <img src={src} alt="" className="max-h-full max-w-full rounded-none object-contain" />
     </div>,
     document.body
   );
@@ -128,7 +128,7 @@ function ImageBody({ message, viewerId }: { message: MessageContent; viewerId?: 
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Open image"
-        className={`block max-w-full overflow-hidden rounded-[12px] border border-border ${loaded ? "" : "skeleton"}`}
+        className={`block max-w-full overflow-hidden cut-sm [--cut-line:var(--border)] border border-border ${loaded ? "" : "skeleton"}`}
         style={{ width: `min(100%, ${width}px)`, aspectRatio: `${w} / ${h}` }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- access-checked API route, not an optimisable static asset */}

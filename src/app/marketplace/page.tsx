@@ -50,7 +50,7 @@ export default async function MarketplacePage({ searchParams }: { searchParams: 
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex flex-col gap-1.5">
           <span className="text-eyebrow text-accent-volt">Marketplace</span>
-          <h1 className="font-display text-3xl leading-[0.98] font-bold tracking-tight uppercase sm:text-4xl">Equip yourself for what&apos;s coming.</h1>
+          <h1 className="font-display text-3xl leading-[0.98] font-bold tracking-tight sm:text-4xl">Equip yourself for what&apos;s coming.</h1>
           <p className="text-sm text-muted">
             <span className="text-stat text-foreground">{home.total}</span> on sale · paid from your wallet, delivered by Circuit
           </p>

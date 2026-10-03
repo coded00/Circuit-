@@ -178,9 +178,9 @@ function MatchRow({ match }: { match: MatchSummary }) {
     >
       <span aria-hidden className={`h-9 w-1 shrink-0 rounded-full ${style.bar}`} />
       {match.game ? (
-        <GameArtTile thumb game={match.game} className="h-10 w-10 shrink-0 rounded-[8px]" hideLabel imgWidth={120} />
+        <GameArtTile thumb game={match.game} className="h-10 w-10 shrink-0 cut-avatar" hideLabel imgWidth={120} />
       ) : (
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] bg-surface-elevated text-muted">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center cut-avatar bg-surface-elevated text-muted">
           <Trophy size={16} />
         </span>
       )}
@@ -199,7 +199,7 @@ function MatchRow({ match }: { match: MatchSummary }) {
 
 function WinRateBar({ value }: { value: number | null }) {
   return (
-    <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-elevated" aria-hidden>
+    <div className="h-1.5 w-full overflow-hidden rounded-none bg-surface-elevated" aria-hidden>
       <div className="h-full rounded-full bg-accent-blue" style={{ width: `${value ?? 0}%` }} />
     </div>
   );
@@ -210,7 +210,7 @@ function GameRows({ games, handle }: { games: ProfileData["gameStats"]; handle: 
     <div className="divide-y divide-border border-t border-border">
       {games.map((g) => (
         <Link key={g.game} href={`/players/${handle}/games/${slugify(g.game)}`} className="flex items-center gap-3 px-5 py-3 transition hover:bg-surface-elevated/60">
-          <GameArtTile thumb game={g.game} className="h-10 w-10 shrink-0 rounded-[8px]" hideLabel imgWidth={120} />
+          <GameArtTile thumb game={g.game} className="h-10 w-10 shrink-0 cut-avatar" hideLabel imgWidth={120} />
           <div className="flex min-w-0 flex-1 flex-col gap-1.5">
             <div className="flex items-baseline justify-between gap-2">
               <span className="truncate text-sm font-medium">{g.game}</span>
@@ -277,7 +277,7 @@ function ProfileHeader({ data }: { data: ProfileData }) {
   ];
 
   return (
-    <header data-surface="dark" className="overflow-hidden rounded-[var(--radius-hero)] border border-border">
+    <header data-surface="dark" className="overflow-hidden cut-lg [--cut-line:var(--border)] border border-border">
       <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-end sm:justify-between sm:p-7">
         {/* Grid, not nested flex: on phones the bio/details drop below the
             avatar+name row and use the full width; from sm up they sit in
@@ -305,7 +305,7 @@ function ProfileHeader({ data }: { data: ProfileData }) {
                 <Link
                   href={player.communityTag.href}
                   title={player.communityTag.name}
-                  className="shrink-0 rounded-[6px] border border-border bg-surface/60 px-1.5 py-0.5 font-mono text-[11px] font-semibold tracking-wide transition hover:border-border-hover"
+                  className="shrink-0 rounded-none border border-border bg-surface/60 px-1.5 py-0.5 font-mono text-[11px] font-semibold tracking-wide transition hover:border-border-hover"
                 >
                   {player.communityTag.tag}
                 </Link>
@@ -391,7 +391,7 @@ function Overview({ data }: { data: ProfileData }) {
                     href={item.href}
                     className="group flex items-center gap-3 px-5 py-3 transition-colors duration-[var(--duration-fast)] hover:bg-surface-elevated/60"
                   >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] bg-surface-elevated text-muted">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center cut-avatar bg-surface-elevated text-muted">
                       <Icon size={16} />
                     </span>
                     <div className="flex min-w-0 flex-1 flex-col">
@@ -472,7 +472,7 @@ function Overview({ data }: { data: ProfileData }) {
                     )}
                   </div>
                   {!a.unlocked && a.progress ? (
-                    <div className="h-1 w-full overflow-hidden rounded-full bg-surface-elevated" aria-hidden>
+                    <div className="h-1 w-full overflow-hidden rounded-none bg-surface-elevated" aria-hidden>
                       <div
                         className="h-full rounded-full bg-accent-blue"
                         style={{ width: `${Math.min(100, (a.progress.current / a.progress.target) * 100)}%` }}
@@ -623,7 +623,7 @@ function TournamentsTab({ data }: { data: ProfileData }) {
                 href={`/tournaments/${r.tournamentId}`}
                 className="group flex items-center gap-3 px-5 py-3 transition-colors duration-[var(--duration-fast)] hover:bg-surface-elevated/60"
               >
-                <GameArtTile thumb game={r.game} className="h-10 w-10 shrink-0 rounded-[8px]" hideLabel imgWidth={120} />
+                <GameArtTile thumb game={r.game} className="h-10 w-10 shrink-0 cut-avatar" hideLabel imgWidth={120} />
                 <div className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-sm font-medium">{r.name}</span>
                   <span className="text-metadata truncate">
@@ -737,7 +737,7 @@ function TeamsTab({ data, viewerId }: { data: ProfileData; viewerId: string }) {
                 href={`/teams/${t.id}`}
                 className="group flex items-center gap-3 px-5 py-3 transition-colors duration-[var(--duration-fast)] hover:bg-surface-elevated/60"
               >
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] bg-surface-elevated font-mono text-xs font-bold text-muted uppercase">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center cut-avatar bg-surface-elevated font-mono text-xs font-bold text-muted uppercase">
                   {(t.tag ?? t.name).slice(0, 3)}
                 </span>
                 <div className="flex min-w-0 flex-1 flex-col">
@@ -758,7 +758,7 @@ function TeamsTab({ data, viewerId }: { data: ProfileData; viewerId: string }) {
 function WalletTab({ wallet }: { wallet: NonNullable<ProfileData["wallet"]> }) {
   return (
     <div className="flex flex-col gap-6">
-      <section data-surface="dark" className="overflow-hidden rounded-[var(--radius-hero)] border border-border">
+      <section data-surface="dark" className="overflow-hidden cut-lg [--cut-line:var(--border)] border border-border">
         <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-end sm:justify-between sm:p-7">
           <div className="flex flex-col gap-1">
             <span className="text-eyebrow text-muted">Available balance</span>

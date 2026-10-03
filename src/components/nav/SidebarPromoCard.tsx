@@ -13,7 +13,7 @@ export function SidebarPromoCard() {
   return (
     <div
       data-surface="dark"
-      className="relative flex flex-col gap-2.5 overflow-hidden rounded-[15px] border border-border p-4"
+      className="relative flex flex-col gap-2.5 overflow-hidden cut-lg [--cut-line:var(--border)] border border-border p-4"
       style={{ backgroundImage: "linear-gradient(160deg, #181c22, #101318 70%, #0b0d11)" }}
     >
       <Gamepad2 size={72} className="absolute -right-3 -bottom-3 text-foreground/5" aria-hidden />

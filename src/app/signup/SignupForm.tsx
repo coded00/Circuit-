@@ -349,7 +349,7 @@ export default function SignupForm({ games, countries }: { games: GameOption[]; 
           <span className="flex h-11 w-11 items-center justify-center rounded-full bg-accent-volt text-accent-volt-foreground">
             <Check size={22} />
           </span>
-          <p className="font-display text-2xl leading-none font-bold tracking-tight uppercase">You&apos;re in</p>
+          <p className="font-display text-2xl leading-none font-bold tracking-tight">You&apos;re in</p>
         </div>
         <p className="text-sm text-muted">{partial}</p>
         <button type="button" onClick={enter} className="btn-primary h-12 text-[15px]">
@@ -438,7 +438,7 @@ export default function SignupForm({ games, countries }: { games: GameOption[]; 
             <div className="flex flex-col gap-2">
               <PasswordField id="password" label="Password" icon={Lock} autoComplete="new-password" value={values.password} onChange={set("password")} hint={errors.password} hintTone="error" />
               <div className="flex items-center gap-2.5" aria-hidden>
-                <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
+                <div className="h-1 flex-1 overflow-hidden rounded-none bg-white/[0.06]">
                   <div
                     className={`h-full rounded-full transition-[width,background-color] duration-300 ${passwordProgress >= 1 ? "bg-accent-volt" : "bg-white/30"}`}
                     style={{ width: `${passwordProgress * 100}%` }}
@@ -534,7 +534,7 @@ export default function SignupForm({ games, countries }: { games: GameOption[]; 
                   value={values.country}
                   onChange={set("country")}
                   autoComplete="country"
-                  className="h-12 w-full appearance-none rounded-[11px] border border-white/[0.08] bg-white/[0.04] pr-4 pl-11 text-[15px] text-foreground outline-none transition hover:border-white/[0.14] focus:border-accent-volt/70 focus:bg-white/[0.06] focus:ring-4 focus:ring-accent-volt/10"
+                  className="h-12 w-full appearance-none cut-sm [--cut-line:rgb(255_255_255/0.08)] border border-white/[0.08] bg-white/[0.04] pr-4 pl-11 text-[15px] text-foreground outline-none transition hover:border-white/[0.14] focus:border-accent-volt/70 focus:bg-white/[0.06] focus:ring-4 focus:ring-accent-volt/10"
                 >
                   {countries.map((c) => (
                     <option key={c.code} value={c.code} className="bg-[#191c21] text-white">
@@ -591,12 +591,12 @@ export default function SignupForm({ games, countries }: { games: GameOption[]; 
                   onChange={(e) => setGameQuery(e.target.value)}
                   placeholder="Search games"
                   aria-label="Search games"
-                  className="h-11 w-full rounded-[11px] border border-white/[0.08] bg-white/[0.04] pr-4 pl-10 text-[14px] text-foreground outline-none placeholder:text-muted-strong focus:border-accent-volt/70"
+                  className="h-11 w-full cut-sm [--cut-line:rgb(255_255_255/0.08)] border border-white/[0.08] bg-white/[0.04] pr-4 pl-10 text-[14px] text-foreground outline-none placeholder:text-muted-strong focus:border-accent-volt/70"
                 />
               </div>
             )}
             {games.length === 0 ? (
-              <p className="rounded-[11px] border border-white/[0.08] p-4 text-sm text-muted">No games are listed yet. You can pick yours after signing up.</p>
+              <p className="cut-sm [--cut-line:rgb(255_255_255/0.08)] border border-white/[0.08] p-4 text-sm text-muted">No games are listed yet. You can pick yours after signing up.</p>
             ) : visibleGames.length === 0 ? (
               <p className="text-sm text-muted">No games match &ldquo;{gameQuery}&rdquo;.</p>
             ) : (
@@ -616,7 +616,7 @@ export default function SignupForm({ games, countries }: { games: GameOption[]; 
                           return n;
                         })
                       }
-                      className={`group relative aspect-[4/3] overflow-hidden rounded-[12px] border-2 text-left transition active:scale-[0.97] ${
+                      className={`group relative aspect-[4/3] overflow-hidden cut-sm [--cut-line:var(--border)] border-2 text-left transition active:scale-[0.97] ${
                         on ? "border-accent-volt shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent-volt)_14%,transparent)]" : "border-white/[0.08] hover:border-white/25"
                       }`}
                     >
@@ -644,7 +644,7 @@ export default function SignupForm({ games, countries }: { games: GameOption[]; 
 
         {step === 3 && (
           <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-4 rounded-[14px] border border-white/[0.08] bg-white/[0.03] p-4">
+            <div className="flex items-center gap-4 cut-sm [--cut-line:rgb(255_255_255/0.08)] border border-white/[0.08] bg-white/[0.03] p-4">
               <Avatar src={avatar?.previewUrl ?? null} name={values.name || values.handle} size={72} />
               <div className="flex min-w-0 flex-col">
                 <span className="truncate font-display text-xl leading-tight font-bold tracking-tight uppercase">{values.name || "Your name"}</span>
@@ -679,7 +679,7 @@ export default function SignupForm({ games, countries }: { games: GameOption[]; 
                 value={values.bio}
                 onChange={set("bio")}
                 placeholder="Main, favourite mode, what you're here to win…"
-                className="w-full resize-none rounded-[11px] border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-[15px] text-foreground outline-none transition placeholder:text-muted-strong hover:border-white/[0.14] focus:border-accent-volt/70 focus:bg-white/[0.06] focus:ring-4 focus:ring-accent-volt/10"
+                className="w-full resize-none cut-sm [--cut-line:rgb(255_255_255/0.08)] border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-[15px] text-foreground outline-none transition placeholder:text-muted-strong hover:border-white/[0.14] focus:border-accent-volt/70 focus:bg-white/[0.06] focus:ring-4 focus:ring-accent-volt/10"
               />
               <p className={`text-right font-mono text-[11px] tabular-nums ${errors.bio ? "text-danger" : "text-muted-strong"}`}>
                 {values.bio.length}/{MAX_BIO}
@@ -691,7 +691,7 @@ export default function SignupForm({ games, countries }: { games: GameOption[]; 
         {step === 4 && (
           <div className="flex flex-col gap-4">
             <p className="text-sm text-muted">Check your details. Anything here can be changed later from your profile.</p>
-            <div className="flex items-center gap-4 rounded-[14px] border border-white/[0.08] bg-white/[0.03] p-4">
+            <div className="flex items-center gap-4 cut-sm [--cut-line:rgb(255_255_255/0.08)] border border-white/[0.08] bg-white/[0.03] p-4">
               <Avatar src={avatar?.previewUrl ?? null} name={values.name || values.handle} size={64} />
               <div className="flex min-w-0 flex-col">
                 <span className="truncate font-display text-xl leading-tight font-bold tracking-tight uppercase">{values.name}</span>
@@ -703,7 +703,7 @@ export default function SignupForm({ games, countries }: { games: GameOption[]; 
                 )}
               </div>
             </div>
-            <dl className="flex flex-col divide-y divide-white/[0.06] rounded-[14px] border border-white/[0.08] text-sm">
+            <dl className="flex flex-col divide-y divide-white/[0.06] cut-sm [--cut-line:rgb(255_255_255/0.08)] border border-white/[0.08] text-sm">
               {[
                 ["Email", values.email.trim()],
                 ["Phone", phoneNormalized ? formatNigerianPhone(phoneNormalized) : "Not added"],
@@ -734,7 +734,7 @@ export default function SignupForm({ games, countries }: { games: GameOption[]; 
             onClick={goBack}
             disabled={submitting}
             aria-label="Back"
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[var(--radius-control)] border border-white/[0.1] text-muted transition hover:border-white/[0.2] hover:text-foreground active:scale-95"
+            className="flex h-12 w-12 shrink-0 items-center justify-center cut-sm [--cut-line:rgb(255_255_255/0.1)] border border-white/[0.1] text-muted transition hover:border-white/[0.2] hover:text-foreground active:scale-95"
           >
             <ArrowLeft size={18} />
           </button>

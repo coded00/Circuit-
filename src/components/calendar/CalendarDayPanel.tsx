@@ -33,9 +33,9 @@ export function AgendaEventBody({ event }: { event: CalendarEvent }) {
     return (
       <Link
         href={eventHref(event)!}
-        className="group flex min-w-0 flex-1 items-start gap-3 rounded-[12px] border border-border bg-surface p-3 transition duration-[var(--duration-base)] hover:border-border-hover hover:bg-surface-elevated/50"
+        className="group flex min-w-0 flex-1 items-start gap-3 cut-sm [--cut-line:var(--border)] border border-border bg-surface p-3 transition duration-[var(--duration-base)] hover:border-border-hover hover:bg-surface-elevated/50"
       >
-        <GameArtTile thumb game={event.game} className="h-10 w-10 shrink-0 rounded-[9px]" hideLabel imgWidth={100} />
+        <GameArtTile thumb game={event.game} className="h-10 w-10 shrink-0 cut-avatar" hideLabel imgWidth={100} />
         <span className="flex min-w-0 flex-1 flex-col gap-1.5">
           <span className="flex items-start justify-between gap-2">
             <span className="flex min-w-0 flex-col">
@@ -80,9 +80,9 @@ export function AgendaEventBody({ event }: { event: CalendarEvent }) {
     return (
       <Link
         href={eventHref(event)!}
-        className="group flex min-w-0 flex-1 items-center gap-3 rounded-[12px] border border-border bg-surface p-3 transition duration-[var(--duration-base)] hover:border-border-hover hover:bg-surface-elevated/50"
+        className="group flex min-w-0 flex-1 items-center gap-3 cut-sm [--cut-line:var(--border)] border border-border bg-surface p-3 transition duration-[var(--duration-base)] hover:border-border-hover hover:bg-surface-elevated/50"
       >
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[9px] bg-surface-elevated text-foreground">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center cut-avatar bg-surface-elevated text-foreground">
           <Swords size={17} />
         </span>
         <span className="flex min-w-0 flex-1 flex-col">
@@ -102,9 +102,9 @@ export function AgendaEventBody({ event }: { event: CalendarEvent }) {
     return (
       <Link
         href={href}
-        className="group flex min-w-0 flex-1 items-center gap-3 rounded-[12px] border border-border bg-surface p-3 transition duration-[var(--duration-base)] hover:border-border-hover hover:bg-surface-elevated/50"
+        className="group flex min-w-0 flex-1 items-center gap-3 cut-sm [--cut-line:var(--border)] border border-border bg-surface p-3 transition duration-[var(--duration-base)] hover:border-border-hover hover:bg-surface-elevated/50"
       >
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[9px] bg-surface-elevated text-foreground">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center cut-avatar bg-surface-elevated text-foreground">
           <Icon size={17} />
         </span>
         <span className="flex min-w-0 flex-1 flex-col">
@@ -116,8 +116,8 @@ export function AgendaEventBody({ event }: { event: CalendarEvent }) {
     );
   }
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-3 rounded-[12px] border border-dashed border-border-strong p-3">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[9px] bg-surface-elevated text-foreground">
+    <div className="flex min-w-0 flex-1 items-center gap-3 cut-sm [--cut-line:var(--border)] border border-dashed border-border-strong p-3">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center cut-avatar bg-surface-elevated text-foreground">
         <Icon size={17} />
       </span>
       <span className="flex min-w-0 flex-col">
@@ -161,13 +161,13 @@ export function CalendarDayPanel({
   nextUp: { event: CalendarEvent; href: string } | null;
 }) {
   return (
-    <aside className="flex flex-col gap-4 rounded-[14px] border border-border bg-surface p-4 sm:p-5 xl:max-h-[calc(100vh-92px)]">
+    <aside className="flex flex-col gap-4 cut-sm [--cut-line:var(--border)] border border-border bg-surface p-4 sm:p-5 xl:max-h-[calc(100vh-92px)]">
       <header className="flex shrink-0 items-center gap-3.5">
         <span className="font-display text-[40px] leading-none font-bold tracking-tight tabular-nums">{date.getDate()}</span>
         <span className="flex flex-col">
           <span className="text-sm font-semibold">
             {date.toLocaleDateString("en-NG", { weekday: "long" })}
-            {isToday && <span className="ml-2 rounded-[4px] bg-accent-volt px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-[0.12em] text-accent-volt-foreground uppercase align-middle">Today</span>}
+            {isToday && <span className="ml-2 rounded-none bg-accent-volt px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-[0.12em] text-accent-volt-foreground uppercase align-middle">Today</span>}
           </span>
           <span className="text-xs text-muted">{date.toLocaleDateString("en-NG", { month: "long", year: "numeric" })}</span>
         </span>
@@ -183,7 +183,7 @@ export function CalendarDayPanel({
             <Link
               href={nextUp.href}
               scroll={false}
-              className="group flex items-center gap-3 rounded-[12px] bg-surface-elevated/70 p-3 transition hover:bg-surface-elevated"
+              className="group flex items-center gap-3 cut-sm bg-surface-elevated/70 p-3 transition hover:bg-surface-elevated"
             >
               <span
                 className="cal-dot h-2 w-2 shrink-0 rounded-full"

@@ -44,7 +44,7 @@ export function PickYourGames({ games, preselected }: { games: GameOption[]; pre
   }
 
   return (
-    <section className="relative overflow-hidden rounded-[18px] border border-border bg-surface p-5 sm:p-6">
+    <section className="relative overflow-hidden cut-lg [--cut-line:var(--border)] border border-border bg-surface p-5 sm:p-6">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(70%_120%_at_100%_0%,color-mix(in_srgb,var(--accent-volt)_14%,transparent),transparent_60%)]"

@@ -37,7 +37,7 @@ export function GoogleButton({ href, label = "Continue with Google" }: { href: s
       href={href}
       onClick={() => setRedirecting(true)}
       aria-busy={redirecting}
-      className={`relative flex h-12 w-full items-center justify-center gap-3 rounded-[var(--radius-control)] bg-white text-[15px] font-semibold text-[#1f1f1f] shadow-sm transition duration-[var(--duration-base)] hover:bg-white/90 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)] ${
+      className={`relative flex h-12 w-full items-center justify-center gap-3 cut-sm bg-white text-[15px] font-semibold text-[#1f1f1f] shadow-sm transition duration-[var(--duration-base)] hover:bg-white/90 active:scale-[0.99] ${
         redirecting ? "pointer-events-none opacity-80" : ""
       }`}
     >

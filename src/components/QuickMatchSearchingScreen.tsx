@@ -111,7 +111,7 @@ export function QuickMatchSearchingScreen({ challengeId, initial }: { challengeI
     <div className="card flex flex-col items-center gap-5 p-8 text-center">
       <Spinner />
       <p className="text-card-title font-semibold">Searching for an opponent…</p>
-      <div className="flex w-full flex-col gap-1 rounded-[10px] border border-border bg-surface-elevated p-3 text-sm">
+      <div className="flex w-full flex-col gap-1 rounded-none border border-border bg-surface-elevated p-3 text-sm">
         <div className="flex justify-between">
           <span className="text-muted">Game</span>
           <span className="font-medium">{status.game}</span>

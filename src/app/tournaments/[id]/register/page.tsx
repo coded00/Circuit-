@@ -120,7 +120,7 @@ export default async function RegisterPage({
           )}
         </dl>
         {paid && (
-          <div className="flex flex-col gap-1.5 rounded-[var(--radius-md)] bg-surface-elevated p-3.5">
+          <div className="flex flex-col gap-1.5 cut-sm bg-surface-elevated p-3.5">
             <span className="text-[11px] font-semibold tracking-wide uppercase">Refund conditions</span>
             <ul className="ml-4 list-disc space-y-1 text-[13px] leading-relaxed text-muted">
               {refundConditions(tournament).map((line) => (

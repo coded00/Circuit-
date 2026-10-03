@@ -17,7 +17,7 @@ export function CalendarListView({
 }) {
   if (groups.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-1 rounded-[14px] border border-dashed border-border-strong px-6 py-16 text-center">
+      <div className="flex flex-col items-center gap-1 cut-sm [--cut-line:var(--border)] border border-dashed border-border-strong px-6 py-16 text-center">
         <p className="text-sm font-semibold">Nothing scheduled this month</p>
         <p className="text-xs text-muted">Try another month, or clear the filters above.</p>
       </div>
@@ -25,7 +25,7 @@ export function CalendarListView({
   }
 
   return (
-    <div className="overflow-hidden rounded-[14px] border border-border bg-surface">
+    <div className="overflow-hidden cut-sm [--cut-line:var(--border)] border border-border bg-surface">
       {groups.map((group, i) => {
         const isToday = group.key === todayKey;
         return (

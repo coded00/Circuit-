@@ -109,7 +109,7 @@ function SlotPips({ registered, cap }: { registered: number; cap: number }) {
   return (
     <span className="flex items-center gap-[3px]" aria-hidden>
       {Array.from({ length: cap }, (_, i) => (
-        <span key={i} className={`h-3 w-1.5 rounded-[2px] ${i < registered ? "bg-foreground" : "bg-border-strong/60"}`} />
+        <span key={i} className={`h-3 w-1.5 cut-avatar ${i < registered ? "bg-foreground" : "bg-border-strong/60"}`} />
       ))}
     </span>
   );
@@ -140,7 +140,7 @@ function Featured({ t }: { t: Row }) {
   const closes = timeUntil(t.registrationCloseAt);
   const spots = spotsLabel(t.registered, t.participantCap);
   return (
-    <section data-surface="dark" className={`relative isolate overflow-hidden rounded-[var(--radius-hero)] border bg-background ${live ? "live-glow border-live/60" : "border-border"}`}>
+    <section data-surface="dark" className={`relative isolate overflow-hidden cut-lg border bg-background ${live ? "live-glow border-live/60" : "border-border"}`}>
       <ViewTransition name={tournamentArtName(t.id)} share="tournament-morph" default="none">
         <GameArtTile game={t.game} posterUrl={t.posterUrl} className="-z-20" hideLabel fill imgWidth={1200} />
       </ViewTransition>
@@ -211,7 +211,7 @@ function CompetitionRow({ t }: { t: Row }) {
       </div>
 
       <ViewTransition name={tournamentArtName(t.id)} share="tournament-morph" default="none">
-        <GameArtTile thumb game={t.game} posterUrl={t.posterUrl} className={`hidden h-12 w-12 shrink-0 rounded-[10px] sm:block ${finished ? "ended-art" : ""}`} hideLabel imgWidth={160} />
+        <GameArtTile thumb game={t.game} posterUrl={t.posterUrl} className={`hidden h-12 w-12 shrink-0 cut-avatar sm:block ${finished ? "ended-art" : ""}`} hideLabel imgWidth={160} />
       </ViewTransition>
 
       <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -394,7 +394,7 @@ export default async function CompetePage({ searchParams }: { searchParams: Prom
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex flex-col gap-1.5">
           <span className="text-eyebrow text-accent-volt">Compete</span>
-          <h1 className="font-display text-3xl leading-[0.98] font-bold tracking-tight uppercase sm:text-4xl">Your next rivalry starts here.</h1>
+          <h1 className="font-display text-3xl leading-[0.98] font-bold tracking-tight sm:text-4xl">Your next rivalry starts here.</h1>
           <p className="text-sm text-muted">
             {liveCount > 0 && (
               <>

@@ -100,7 +100,7 @@ export default async function OrderReceiptPage({ params, searchParams }: { param
       {order.fulfilmentNote && order.fulfilmentNote !== "Your download is ready." && (
         <section className="flex flex-col gap-2">
           <h2 className="text-eyebrow text-muted">{cancelled ? "Why it was cancelled" : "From Circuit"}</h2>
-          <div className="rounded-[12px] border border-border bg-surface-elevated p-3.5 text-sm whitespace-pre-wrap">{order.fulfilmentNote}</div>
+          <div className="cut-sm [--cut-line:var(--border)] border border-border bg-surface-elevated p-3.5 text-sm whitespace-pre-wrap">{order.fulfilmentNote}</div>
         </section>
       )}
 

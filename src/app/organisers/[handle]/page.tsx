@@ -146,7 +146,7 @@ export default async function OrganiserPage({ params }: { params: Promise<{ hand
             const status = tournamentStatusInfo(t.status);
             return (
               <Link key={t.id} href={tournamentPath(t)} className="card-row flex items-center gap-3 p-3">
-                <GameArtTile thumb game={t.game} className="h-10 w-10 shrink-0 rounded-[8px]" hideLabel />
+                <GameArtTile thumb game={t.game} className="h-10 w-10 shrink-0 cut-avatar" hideLabel />
                 <div className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-sm font-medium">{t.name}</span>
                   <span className="text-metadata flex items-center gap-1 truncate">

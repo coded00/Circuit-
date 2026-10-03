@@ -96,7 +96,7 @@ export function QuickMatchIncomingListener() {
     <DialogOverlay open={open} onClose={() => {}} label="Battle request" maxWidth={400} dismissible={false}>
       {unavailable ? (
         <div className="flex items-start gap-3.5 px-5 pt-2 pb-6 sm:px-6 sm:pt-6">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] bg-surface-elevated text-muted">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center cut-sm bg-surface-elevated text-muted">
             <Clock size={20} />
           </span>
           <div className="flex flex-col gap-1">

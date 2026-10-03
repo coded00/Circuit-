@@ -9,7 +9,7 @@ export function ListingRow({ title, hint, listings, href }: { title: string; hin
     <section className="flex flex-col gap-3" aria-label={title}>
       <div className="flex items-end justify-between gap-3">
         <div className="flex flex-col gap-0.5">
-          <h2 className="font-display text-xl font-bold tracking-tight uppercase sm:text-2xl">{title}</h2>
+          <h2 className="font-display text-xl font-bold tracking-tight sm:text-2xl">{title}</h2>
           {hint && <p className="text-xs text-muted">{hint}</p>}
         </div>
         {href && (

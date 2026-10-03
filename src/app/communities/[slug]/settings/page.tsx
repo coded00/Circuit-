@@ -111,7 +111,7 @@ export default async function CommunitySettingsPage({ params, searchParams }: { 
             {community.kind === "PLAYER" && community.enabled && <CloseCommunity communityId={community.id} name={name} />}
           </div>
         ) : (
-          <p className="rounded-[14px] border border-border bg-surface px-4 py-4 text-sm text-muted">Only the owner can change the community&apos;s details. As a moderator you can manage channels, members and invites.</p>
+          <p className="cut-sm [--cut-line:var(--border)] border border-border bg-surface px-4 py-4 text-sm text-muted">Only the owner can change the community&apos;s details. As a moderator you can manage channels, members and invites.</p>
         ))}
 
       {tab === "channels" && (

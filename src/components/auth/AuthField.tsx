@@ -41,7 +41,7 @@ export function AuthField({
         <input
           {...input}
           id={id}
-          className={`h-12 w-full rounded-[11px] border border-white/[0.08] bg-white/[0.04] pl-11 text-[15px] text-foreground outline-none transition placeholder:text-muted-strong hover:border-white/[0.14] focus:border-accent-volt/70 focus:bg-white/[0.06] focus:ring-4 focus:ring-accent-volt/10 ${
+          className={`h-12 w-full cut-sm [--cut-line:rgb(255_255_255/0.08)] border border-white/[0.08] bg-white/[0.04] pl-11 text-[15px] text-foreground outline-none transition placeholder:text-muted-strong hover:border-white/[0.14] focus:border-accent-volt/70 focus:bg-white/[0.06] focus:ring-4 focus:ring-accent-volt/10 ${
             trailing ? "pr-12" : "pr-4"
           }`}
         />
@@ -68,7 +68,7 @@ export function PasswordField(props: Omit<React.ComponentProps<typeof AuthField>
           onClick={() => setShown((v) => !v)}
           aria-label={shown ? "Hide password" : "Show password"}
           aria-pressed={shown}
-          className="flex h-9 w-9 items-center justify-center rounded-[8px] text-muted transition hover:bg-white/[0.06] hover:text-foreground"
+          className="flex h-9 w-9 items-center justify-center cut-avatar text-muted transition hover:bg-white/[0.06] hover:text-foreground"
         >
           {shown ? <EyeOff size={17} /> : <Eye size={17} />}
         </button>

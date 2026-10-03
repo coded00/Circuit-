@@ -60,7 +60,7 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Pro
           <span className="h-px w-6 bg-accent-volt" aria-hidden />
           Discover
         </span>
-        <h1 className="font-display text-[32px] leading-[0.95] font-bold tracking-tight uppercase sm:text-[44px]">
+        <h1 className="font-display text-[32px] leading-[0.95] font-bold tracking-tight sm:text-[44px]">
           {onTeams ? "Find your squad" : "Find your people"}
         </h1>
         <p className="max-w-xl text-[15px] text-muted">
@@ -71,7 +71,7 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Pro
       </header>
 
       <div className="flex flex-col gap-3">
-        <nav aria-label="Discover players or teams" className="grid w-full grid-cols-2 rounded-[12px] border border-border bg-surface p-1 sm:w-fit">
+        <nav aria-label="Discover players or teams" className="grid w-full grid-cols-2 cut-sm [--cut-line:var(--border)] border border-border bg-surface p-1 sm:w-fit">
           {[
             { href: "/discover", label: "Players", count: playerCount, on: !onTeams },
             { href: "/discover?tab=teams", label: "Teams", count: teamCount, on: onTeams },
@@ -80,7 +80,7 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Pro
               key={t.label}
               href={t.href}
               aria-current={t.on ? "page" : undefined}
-              className={`flex items-center justify-center gap-2 rounded-[9px] px-5 py-2 text-sm font-semibold transition ${
+              className={`flex items-center justify-center gap-2 rounded-none px-5 py-2 text-sm font-semibold transition ${
                 t.on ? "bg-foreground text-background" : "text-muted hover:text-foreground"
               }`}
             >
@@ -100,7 +100,7 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Pro
               name="q"
               defaultValue={q ?? ""}
               placeholder={onTeams ? "Search teams by name" : "Search by name or @handle"}
-              className="h-12 w-full rounded-[12px] border border-border bg-surface pr-4 pl-11 text-[15px] outline-none transition placeholder:text-muted-strong focus:border-border-strong"
+              className="h-12 w-full cut-sm [--cut-line:var(--border)] border border-border bg-surface pr-4 pl-11 text-[15px] outline-none transition placeholder:text-muted-strong focus:border-border-strong"
             />
           </label>
           <div className="grid grid-cols-[1fr_1fr_auto] gap-2 lg:flex">
@@ -109,7 +109,7 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Pro
                 name="game"
                 defaultValue={game ?? ""}
                 aria-label="Game"
-                className="field-select h-12 min-w-0 rounded-[12px] border-border bg-surface lg:w-44"
+                className="field-select h-12 min-w-0 cut-sm [--cut-line:var(--border)] border-border bg-surface lg:w-44"
               >
                 <option value="">Any game</option>
                 {games.map((g) => (
@@ -124,7 +124,7 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Pro
                 defaultValue={game ?? ""}
                 placeholder="Game"
                 aria-label="Game"
-                className="h-12 min-w-0 rounded-[12px] border border-border bg-surface px-4 text-sm outline-none focus:border-border-strong lg:w-40"
+                className="h-12 min-w-0 cut-sm [--cut-line:var(--border)] border border-border bg-surface px-4 text-sm outline-none focus:border-border-strong lg:w-40"
               />
             )}
             <label className="relative flex min-w-0 items-center">
@@ -134,10 +134,10 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Pro
                 name="region"
                 defaultValue={region ?? ""}
                 placeholder="City or state"
-                className="h-12 w-full min-w-0 rounded-[12px] border border-border bg-surface pr-3 pl-9 text-sm outline-none placeholder:text-muted-strong focus:border-border-strong lg:w-40"
+                className="h-12 w-full min-w-0 cut-sm [--cut-line:var(--border)] border border-border bg-surface pr-3 pl-9 text-sm outline-none placeholder:text-muted-strong focus:border-border-strong lg:w-40"
               />
             </label>
-            <button type="submit" aria-label="Search" className="btn-primary h-12 w-12 rounded-[12px] p-0 lg:w-auto lg:px-5">
+            <button type="submit" aria-label="Search" className="btn-primary h-12 w-12 cut-sm p-0 lg:w-auto lg:px-5">
               <Search size={17} />
               <span className="hidden lg:inline">Search</span>
             </button>
@@ -174,8 +174,8 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Pro
 
 function EmptyState({ title, body, action }: { title: string; body: string; action?: { href: string; label: string } }) {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-[16px] border border-dashed border-border-strong px-6 py-14 text-center">
-      <span className="flex h-12 w-12 items-center justify-center rounded-[14px] bg-surface-elevated text-muted">
+    <div className="flex flex-col items-center gap-3 cut-lg [--cut-line:var(--border)] border border-dashed border-border-strong px-6 py-14 text-center">
+      <span className="flex h-12 w-12 items-center justify-center cut-sm bg-surface-elevated text-muted">
         <Users size={22} />
       </span>
       <div className="flex max-w-sm flex-col gap-1">

@@ -14,7 +14,7 @@ export function CommunityCard({ community: c }: { community: CommunityCardData }
   return (
     <Link
       href={c.href}
-      className="group flex h-full flex-col overflow-hidden rounded-[16px] border border-border bg-surface transition duration-[var(--duration-base)] hover:-translate-y-0.5 hover:border-border-hover"
+      className="group flex h-full flex-col overflow-hidden cut-lg [--cut-line:var(--border)] border border-border bg-surface transition duration-[var(--duration-base)] hover:-translate-y-0.5 hover:border-border-hover"
     >
       <div className="relative h-24 w-full overflow-hidden">
         {c.bannerUrl ? (

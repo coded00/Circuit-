@@ -320,7 +320,7 @@ export default function TournamentForm({
         </div>
       )}
 
-      <label className="flex items-start gap-2.5 rounded-[10px] border border-border bg-surface-elevated px-3.5 py-3">
+      <label className="flex items-start gap-2.5 rounded-none border border-border bg-surface-elevated px-3.5 py-3">
         <input
           type="checkbox"
           checked={enableCommunity}

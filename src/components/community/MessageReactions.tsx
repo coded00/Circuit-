@@ -107,7 +107,7 @@ export function ReactionPicker({
             type="button"
             onClick={() => onPick(emoji)}
             aria-pressed={reacted.has(emoji)}
-            className={`flex aspect-square items-center justify-center rounded-lg transition active:scale-90 ${compact ? "text-[20px]" : "text-[24px]"} ${
+            className={`flex aspect-square items-center justify-center rounded-none transition active:scale-90 ${compact ? "text-[20px]" : "text-[24px]"} ${
               reacted.has(emoji) ? "bg-accent-volt/25" : "hover:bg-surface-elevated"
             }`}
           >

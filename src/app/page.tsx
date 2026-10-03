@@ -48,19 +48,19 @@ export const metadata = buildMetadata({
 function HomeSkeleton() {
   return (
     <div className="flex w-full flex-1 flex-col gap-8 px-4 py-6 sm:px-8 sm:py-10" aria-busy="true" aria-label="Loading">
-      <div className="skeleton h-[340px] w-full rounded-[var(--radius-hero)]" />
+      <div className="skeleton h-[340px] w-full cut-lg" />
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_var(--right-rail-width)]">
         <div className="flex flex-col gap-4">
           <div className="skeleton h-6 w-48" />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-3">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="skeleton h-64 w-full rounded-[var(--radius-lg)]" />
+              <div key={i} className="skeleton h-64 w-full cut-lg" />
             ))}
           </div>
         </div>
         <div className="flex flex-col gap-6">
-          <div className="skeleton h-40 w-full rounded-[var(--radius-lg)]" />
-          <div className="skeleton h-56 w-full rounded-[var(--radius-lg)]" />
+          <div className="skeleton h-40 w-full cut-lg" />
+          <div className="skeleton h-56 w-full cut-lg" />
         </div>
       </div>
     </div>
@@ -252,7 +252,7 @@ async function HomeContent({ searchParams }: { searchParams: Promise<{ leaderboa
                 <div className="flex flex-col gap-3">
                   {[0, 1, 2].map((i) => (
                     <div key={i} className="flex items-start gap-3">
-                      <div className="skeleton h-14 w-14 shrink-0 rounded-[8px]" />
+                      <div className="skeleton h-14 w-14 shrink-0 cut-avatar" />
                       <div className="flex flex-1 flex-col gap-1.5 pt-1">
                         <div className="skeleton h-3 w-20" />
                         <div className="skeleton h-4 w-full" />

@@ -85,7 +85,7 @@ export function ChallengeCard({ battle: b, record, mine = false }: { battle: Cha
     <div className="@container h-full">
       <Link
         href={`/battles/${b.id}`}
-        className="group relative isolate flex h-full min-h-[18.5rem] flex-col justify-between gap-5 overflow-hidden cut-lg [--cut-line:var(--border)] border border-border bg-black p-4 text-white transition duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:-translate-y-0.5 hover:border-accent-volt/60 hover:shadow-[0_0_44px_-14px_var(--accent-volt)] focus-visible:ring-2 focus-visible:ring-accent-volt focus-visible:outline-none active:translate-y-0 active:scale-[0.99] @min-[420px]:p-5"
+        className="group relative isolate flex h-full min-h-[18.5rem] flex-col justify-between gap-5 overflow-hidden cut-lg [--cut-line:var(--border)] border border-border bg-black p-4 text-white transition duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:-translate-y-0.5 hover:border-accent-volt/60 hover:shadow-[0_0_44px_-14px_var(--accent-volt)] active:translate-y-0 active:scale-[0.99] @min-[420px]:p-5"
       >
         {/* The scene: the game's art, its colour as light, a warm and a cool spot, and a dark fade for the text. */}
         <div aria-hidden className="absolute inset-0 -z-10 transition-transform duration-[var(--duration-reveal)] ease-[var(--ease-standard)] group-hover:scale-[1.07]">
@@ -158,7 +158,7 @@ export function ChallengeCard({ battle: b, record, mine = false }: { battle: Cha
         </div>
 
         {/* The bill: what's on the line, and how to take it. */}
-        <div className="flex items-center justify-between gap-3 rounded-[12px] border border-white/10 bg-black/60 px-3.5 py-2.5">
+        <div className="flex items-center justify-between gap-3 cut-sm [--cut-line:rgb(255_255_255/0.1)] border border-white/10 bg-black/60 px-3.5 py-2.5">
           <div className="flex min-w-0 flex-col gap-0.5" title={staked ? "Both players put in the same stake. The winner takes the whole pot." : undefined}>
             {staked ? (
               <>

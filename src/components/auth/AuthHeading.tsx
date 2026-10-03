@@ -9,7 +9,7 @@ export function AuthHeading({ eyebrow, title, sub }: { eyebrow: string; title: s
         <span className="h-px w-6 bg-accent-volt" aria-hidden />
         {eyebrow}
       </span>
-      <h1 className="font-display text-[34px] leading-[0.95] font-bold tracking-tight uppercase sm:text-[42px]">{title}</h1>
+      <h1 className="font-display text-[34px] leading-[0.95] font-bold tracking-tight sm:text-[42px]">{title}</h1>
       {sub && <p className="text-[15px] leading-relaxed text-muted">{sub}</p>}
     </div>
   );

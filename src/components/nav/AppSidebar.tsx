@@ -38,7 +38,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Trophy, Gamepad2, Swords, Calendar, MessagesSquare, User as UserIcon, Store, Settings } from "lucide-react";
+import { Settings } from "lucide-react";
+import { CalendarIcon, ChatIcon, HomeIcon, PadIcon, PlayerIcon, ShopIcon, SwordsIcon, TrophyIcon } from "@/components/icons/GameIcons";
 import { loginPath, signupPath } from "@/lib/safeRedirect";
 import { SidebarPromoCard } from "./SidebarPromoCard";
 
@@ -47,13 +48,13 @@ type NavUser = { handle: string; displayName: string; isStaff: boolean } | null;
 type Item = { href: string; label: string; icon: React.ComponentType<{ size?: number; className?: string }>; /** Other routes that belong to this item (Feed also covers the video feed). */ also?: string[] };
 
 const PRIMARY: Item[] = [
-  { href: "/", label: "Home", icon: Home },
-  { href: "/compete", label: "Compete", icon: Trophy },
-  { href: "/activity", label: "Feed", icon: Gamepad2, also: ["/ladder"] },
-  { href: "/battles", label: "Challenges", icon: Swords },
-  { href: "/communities", label: "Communities", icon: MessagesSquare },
-  { href: "/calendar", label: "Calendar", icon: Calendar },
-  { href: "/marketplace", label: "Marketplace", icon: Store },
+  { href: "/", label: "Home", icon: HomeIcon },
+  { href: "/compete", label: "Compete", icon: TrophyIcon },
+  { href: "/activity", label: "Feed", icon: PadIcon, also: ["/ladder"] },
+  { href: "/battles", label: "Challenges", icon: SwordsIcon },
+  { href: "/communities", label: "Communities", icon: ChatIcon },
+  { href: "/calendar", label: "Calendar", icon: CalendarIcon },
+  { href: "/marketplace", label: "Marketplace", icon: ShopIcon },
 ];
 
 function isActive(pathname: string, href: string, also: string[] = []): boolean {
@@ -72,7 +73,7 @@ function NavLink({ item, active, badge }: { item: Item; active: boolean; badge?:
       href={item.href}
       aria-current={active ? "page" : undefined}
       title={item.label}
-      className={`relative z-10 flex h-[46px] items-center justify-center gap-3 rounded-[9px] px-2 text-sm font-semibold transition-colors duration-[var(--duration-fast)] lg:justify-start lg:px-4 ${
+      className={`relative z-10 flex h-[46px] items-center justify-center gap-3 rounded-none px-2 text-sm font-semibold transition-colors duration-[var(--duration-fast)] lg:justify-start lg:px-4 ${
         active ? "text-accent-volt-foreground" : "text-muted hover:bg-surface-elevated hover:text-foreground"
       }`}
     >
@@ -97,7 +98,7 @@ export function AppSidebar({ user }: { user: NavUser }) {
 
   const items: Item[] = [
     ...PRIMARY,
-    ...(user ? [{ href: `/players/${user.handle}`, label: "Profile", icon: UserIcon }] : []),
+    ...(user ? [{ href: `/players/${user.handle}`, label: "Profile", icon: PlayerIcon }] : []),
   ];
   const activeIndex = items.findIndex((item) => isActive(pathname, item.href, item.also));
 
@@ -118,7 +119,7 @@ export function AppSidebar({ user }: { user: NavUser }) {
             pops in or out of the nav when a navigation finishes. */}
         <span
           aria-hidden
-          className={`absolute inset-x-0 z-0 h-[46px] rounded-[9px] bg-accent-volt transition-[transform,opacity] duration-[var(--duration-base)] ease-[var(--ease-out)] ${
+          className={`absolute inset-x-0 z-0 h-[46px] rounded-none bg-accent-volt transition-[transform,opacity] duration-[var(--duration-base)] ease-[var(--ease-out)] ${
             activeIndex === -1 ? "opacity-0" : "opacity-100"
           }`}
           style={{ transform: `translateY(${Math.max(activeIndex, 0) * NAV_ROW_STEP}px)` }}

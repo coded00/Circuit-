@@ -324,7 +324,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1;
 
   const chipBase =
-    "flex shrink-0 items-center gap-2 rounded-[9px] border px-3 py-[7px] text-[13px] font-medium transition-colors duration-[var(--duration-fast)]";
+    "flex shrink-0 items-center gap-2 rounded-none border px-3 py-[7px] text-[13px] font-medium transition-colors duration-[var(--duration-fast)]";
   const chipIdle = "border-border bg-surface text-muted hover:border-border-hover hover:text-foreground";
   const chipActive = "border-foreground bg-foreground text-background";
 
@@ -343,7 +343,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
                 href={href({ y: String(prevMonth.year), m: String(prevMonth.month) })}
                 scroll={false}
                 aria-label="Previous month"
-                className="flex h-9 w-9 items-center justify-center rounded-[9px] border border-border bg-surface text-muted transition hover:border-border-hover hover:text-foreground"
+                className="flex h-9 w-9 items-center justify-center cut-avatar border border-border bg-surface text-muted transition hover:border-border-hover hover:text-foreground"
               >
                 <ChevronLeft size={16} />
               </Link>
@@ -351,7 +351,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
                 href={href({ y: String(nextMonth.year), m: String(nextMonth.month) })}
                 scroll={false}
                 aria-label="Next month"
-                className="flex h-9 w-9 items-center justify-center rounded-[9px] border border-border bg-surface text-muted transition hover:border-border-hover hover:text-foreground"
+                className="flex h-9 w-9 items-center justify-center cut-avatar border border-border bg-surface text-muted transition hover:border-border-hover hover:text-foreground"
               >
                 <ChevronRight size={16} />
               </Link>
@@ -359,7 +359,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
                 <Link
                   href={href({ y: String(now.getFullYear()), m: String(now.getMonth() + 1), day: todayKey })}
                   scroll={false}
-                  className="ml-1 flex h-9 items-center rounded-[9px] border border-border bg-surface px-3 text-[13px] font-semibold transition hover:border-border-hover"
+                  className="ml-1 flex h-9 items-center rounded-none border border-border bg-surface px-3 text-[13px] font-semibold transition hover:border-border-hover"
                 >
                   Today
                 </Link>
@@ -376,7 +376,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="flex flex-1 items-center rounded-[10px] border border-border bg-surface p-[3px] lg:flex-none" role="tablist" aria-label="View">
+          <div className="flex flex-1 items-center rounded-none border border-border bg-surface p-[3px] lg:flex-none" role="tablist" aria-label="View">
             {(["month", "week", "list"] as const).map((v) => (
               <Link
                 key={v}
@@ -384,7 +384,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
                 scroll={false}
                 role="tab"
                 aria-selected={view === v}
-                className={`flex-1 rounded-[7px] px-3.5 py-1.5 text-center text-[13px] font-semibold capitalize transition lg:flex-none ${
+                className={`flex-1 rounded-none px-3.5 py-1.5 text-center text-[13px] font-semibold capitalize transition lg:flex-none ${
                   view === v ? "bg-foreground text-background" : "text-muted hover:text-foreground"
                 }`}
               >
@@ -425,7 +425,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
             >
               <span
                 aria-hidden
-                className="cal-dot h-2 w-2 rounded-[3px] ring-1 ring-black/5"
+                className="cal-dot h-2 w-2 cut-avatar ring-1 ring-black/5"
                 style={{ "--ev": meta.color } as React.CSSProperties}
               />
               {meta.plural}

@@ -59,7 +59,7 @@ export default function PrivacyForm({ initialSearchable, initialPolicy }: { init
         </div>
         <div className="flex flex-col gap-2">
           {POLICY_OPTIONS.map((o) => (
-            <label key={o.value} className={`flex cursor-pointer items-start gap-3 rounded-[12px] border p-3.5 transition ${policy === o.value ? "border-accent-volt bg-accent-volt-soft" : "border-border hover:border-border-strong"}`}>
+            <label key={o.value} className={`flex cursor-pointer items-start gap-3 cut-sm border p-3.5 transition ${policy === o.value ? "border-accent-volt bg-accent-volt-soft" : "border-border hover:border-border-strong"}`}>
               <input
                 type="radio"
                 name="directChallenges"

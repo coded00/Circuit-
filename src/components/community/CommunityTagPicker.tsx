@@ -57,7 +57,7 @@ export function CommunityTagPicker({ options, current }: { options: Option[]; cu
                 value === o.id ? "border-foreground bg-foreground text-background" : "border-border hover:border-border-hover"
               }`}
             >
-              <span className="rounded-[5px] border border-current/30 px-1 font-mono text-[11px]">{o.tag}</span>
+              <span className="rounded-none border border-current/30 px-1 font-mono text-[11px]">{o.tag}</span>
               {o.name}
             </button>
           ))}

@@ -80,9 +80,9 @@ export function QuickMatchChallengeCard({
   }
 
   return (
-    <div className={`flex flex-col overflow-hidden ${framed ? "rounded-[15px] border border-border bg-surface" : ""}`}>
+    <div className={`flex flex-col overflow-hidden ${framed ? "cut-lg [--cut-line:var(--border)] border border-border bg-surface" : ""}`}>
       <div data-surface="dark" className="relative flex items-center gap-3.5 px-5 pt-5 pb-4">
-        <span className="font-display flex h-12 w-12 shrink-0 items-center justify-center rounded-[12px] bg-accent-volt text-lg font-bold text-accent-volt-foreground">
+        <span className="font-display flex h-12 w-12 shrink-0 items-center justify-center cut-sm bg-accent-volt text-lg font-bold text-accent-volt-foreground">
           {challenge.hostDisplayName.slice(0, 1).toUpperCase()}
         </span>
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">

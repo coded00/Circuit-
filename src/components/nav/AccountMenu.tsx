@@ -71,13 +71,13 @@ export function AccountMenu({
         onClick={() => setOpen((v) => !v)}
         aria-label={`Account menu for ${user.displayName}`}
         aria-expanded={open}
-        className="flex h-9 items-center gap-2.5 rounded-[9px] pr-1 pl-0.5 text-white transition hover:bg-white/[0.07] lg:pr-2"
+        className="flex h-9 items-center gap-2.5 rounded-none pr-1 pl-0.5 text-white transition hover:bg-white/[0.07] lg:pr-2"
       >
         {user.avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs
-          <img src={user.avatarUrl} alt="" referrerPolicy="no-referrer" className="h-8 w-8 rounded-[8px] object-cover" />
+          <img src={user.avatarUrl} alt="" referrerPolicy="no-referrer" className="h-8 w-8 cut-avatar object-cover" />
         ) : (
-          <div className="font-display flex h-8 w-8 items-center justify-center rounded-[8px] bg-accent-volt text-sm font-bold text-accent-volt-foreground">
+          <div className="font-display flex h-8 w-8 items-center justify-center cut-avatar bg-accent-volt text-sm font-bold text-accent-volt-foreground">
             {user.displayName.slice(0, 1).toUpperCase()}
           </div>
         )}

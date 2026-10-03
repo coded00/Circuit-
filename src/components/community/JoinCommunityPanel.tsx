@@ -76,18 +76,18 @@ export function JoinCommunityPanel({ communityId, name, joinPolicy, rules, appli
   }
 
   if (banned) {
-    return <p className={`rounded-[12px] border border-border bg-surface px-4 py-3 text-sm text-muted ${className}`}>You can&apos;t join this community.</p>;
+    return <p className={`cut-sm [--cut-line:var(--border)] border border-border bg-surface px-4 py-3 text-sm text-muted ${className}`}>You can&apos;t join this community.</p>;
   }
   if (!inviteCode && joinPolicy === "INVITE") {
     return (
-      <p className={`flex items-center gap-2 rounded-[12px] border border-border bg-surface px-4 py-3 text-sm text-muted ${className}`}>
+      <p className={`flex items-center gap-2 cut-sm [--cut-line:var(--border)] border border-border bg-surface px-4 py-3 text-sm text-muted ${className}`}>
         <Lock size={15} className="shrink-0" /> Invite only — ask a member for a link.
       </p>
     );
   }
   if (pending || applied) {
     return (
-      <p className={`flex items-center gap-2 rounded-[12px] border border-border bg-surface px-4 py-3 text-sm ${className}`}>
+      <p className={`flex items-center gap-2 cut-sm [--cut-line:var(--border)] border border-border bg-surface px-4 py-3 text-sm ${className}`}>
         <Clock size={15} className="shrink-0 text-muted" /> Application sent — you&apos;ll get a notification when a moderator reviews it.
       </p>
     );
@@ -120,7 +120,7 @@ export function JoinCommunityPanel({ communityId, name, joinPolicy, rules, appli
               <span className="flex items-center gap-1.5 text-sm font-semibold">
                 <ScrollText size={15} /> Community rules
               </span>
-              <div className="max-h-56 overflow-y-auto rounded-[12px] border border-border bg-surface-elevated/40 px-4 py-3 text-[13.5px] leading-relaxed whitespace-pre-line text-muted">
+              <div className="max-h-56 overflow-y-auto cut-sm [--cut-line:var(--border)] border border-border bg-surface-elevated/40 px-4 py-3 text-[13.5px] leading-relaxed whitespace-pre-line text-muted">
                 {rules}
               </div>
               <label className="flex cursor-pointer items-start gap-2.5 text-sm">

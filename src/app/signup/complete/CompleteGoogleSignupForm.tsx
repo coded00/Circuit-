@@ -73,7 +73,7 @@ export default function CompleteGoogleSignupForm({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <div className="flex items-center gap-3 rounded-[12px] border border-white/[0.08] bg-white/[0.03] p-3">
+      <div className="flex items-center gap-3 cut-sm [--cut-line:rgb(255_255_255/0.08)] border border-white/[0.08] bg-white/[0.03] p-3">
         {googlePicture && useGooglePhoto ? (
           // eslint-disable-next-line @next/next/no-img-element -- Google-hosted profile photo
           <img src={googlePicture} alt="" referrerPolicy="no-referrer" className="h-11 w-11 shrink-0 cut-avatar object-cover" />

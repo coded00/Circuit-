@@ -122,7 +122,7 @@ export function WelcomeFlow({
         <section className="flex flex-col gap-4">
           <div>
             <p className="font-mono text-[11px] font-semibold tracking-[0.16em] text-white/50 uppercase">Welcome, {displayName}</p>
-            <h1 className="font-display text-3xl leading-[1] font-bold tracking-tight uppercase">What do you play?</h1>
+            <h1 className="font-display text-3xl leading-[1] font-bold tracking-tight">What do you play?</h1>
             <p className="mt-2 text-sm text-white/60">We&apos;ll put you in each game&apos;s official community.</p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -139,7 +139,7 @@ export function WelcomeFlow({
       {step === 1 && (
         <section className="flex flex-col gap-4">
           <div>
-            <h1 className="font-display text-3xl leading-[1] font-bold tracking-tight uppercase">Where are you?</h1>
+            <h1 className="font-display text-3xl leading-[1] font-bold tracking-tight">Where are you?</h1>
             <p className="mt-2 text-sm text-white/60">Find players and meetups near you.</p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -169,7 +169,7 @@ export function WelcomeFlow({
               }}
               placeholder="Type your city or state"
               maxLength={60}
-              className="h-11 rounded-[12px] border border-white/[0.12] bg-white/[0.04] px-4 text-[15px] text-white outline-none placeholder:text-white/35 focus:border-white/30"
+              className="h-11 cut-sm [--cut-line:rgb(255_255_255/0.12)] border border-white/[0.12] bg-white/[0.04] px-4 text-[15px] text-white outline-none placeholder:text-white/35 focus:border-white/30"
             />
           </label>
         </section>
@@ -178,7 +178,7 @@ export function WelcomeFlow({
       {step === 2 && (
         <section className="flex flex-col gap-4">
           <div>
-            <h1 className="font-display text-3xl leading-[1] font-bold tracking-tight uppercase">What are you into?</h1>
+            <h1 className="font-display text-3xl leading-[1] font-bold tracking-tight">What are you into?</h1>
             <p className="mt-2 text-sm text-white/60">Pick any. You can join more later.</p>
           </div>
           <div className="flex flex-col gap-2">
@@ -188,11 +188,11 @@ export function WelcomeFlow({
                 type="button"
                 onClick={() => setInterestIds((s) => toggle(s, i.id))}
                 aria-pressed={interestIds.has(i.id)}
-                className={`flex items-start gap-3 rounded-[14px] border p-3.5 text-left transition ${
+                className={`flex items-start gap-3 cut-sm [--cut-line:var(--border)] border p-3.5 text-left transition ${
                   interestIds.has(i.id) ? "border-accent-volt bg-accent-volt/10" : "border-white/[0.12] bg-white/[0.03] hover:border-white/25"
                 }`}
               >
-                <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] border ${interestIds.has(i.id) ? "border-accent-volt bg-accent-volt text-accent-volt-foreground" : "border-white/25"}`}>
+                <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center cut-avatar border ${interestIds.has(i.id) ? "border-accent-volt bg-accent-volt text-accent-volt-foreground" : "border-white/25"}`}>
                   {interestIds.has(i.id) && <Check size={13} />}
                 </span>
                 <span className="flex flex-col">
@@ -208,7 +208,7 @@ export function WelcomeFlow({
       {step === 3 && groups && (
         <section className="flex flex-col gap-5">
           <div>
-            <h1 className="font-display text-3xl leading-[1] font-bold tracking-tight uppercase">You&apos;re in</h1>
+            <h1 className="font-display text-3xl leading-[1] font-bold tracking-tight">You&apos;re in</h1>
             <p className="mt-2 text-sm text-white/60">We added you to Circuit Global and the official communities you picked. A few more you might like:</p>
           </div>
           {groups.length === 0 ? (
@@ -218,7 +218,7 @@ export function WelcomeFlow({
               <div key={g.reason} className="flex flex-col gap-2">
                 <p className="font-mono text-[11px] font-semibold tracking-[0.14em] text-white/50 uppercase">{g.reason}</p>
                 {g.items.map((r) => (
-                  <div key={r.id} className="flex items-center gap-3 rounded-[14px] border border-white/[0.1] bg-white/[0.03] p-3">
+                  <div key={r.id} className="flex items-center gap-3 cut-sm [--cut-line:rgb(255_255_255/0.1)] border border-white/[0.1] bg-white/[0.03] p-3">
                     <CommunityAvatar name={r.name} iconUrl={r.iconUrl} tag={r.tag} size="md" />
                     <span className="flex min-w-0 flex-1 flex-col">
                       <span className="truncate text-sm font-semibold">{r.name}</span>

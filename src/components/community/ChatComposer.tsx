@@ -277,7 +277,7 @@ export function ChatComposer({
         <div
           role="listbox"
           aria-label="Mention someone"
-          className="absolute inset-x-2 bottom-full z-20 mb-1.5 overflow-hidden rounded-[14px] border border-border bg-surface py-1"
+          className="absolute inset-x-2 bottom-full z-20 mb-1.5 overflow-hidden cut-sm [--cut-line:var(--border)] border border-border bg-surface py-1"
           style={{ boxShadow: "var(--shadow-float)" }}
         >
           <p className="px-3 pt-1.5 pb-1 font-mono text-[10px] font-semibold tracking-[0.14em] text-muted uppercase">
@@ -313,7 +313,7 @@ export function ChatComposer({
       )}
       {(image || preparing) && (
         <div className="flex items-center gap-3 px-3 pt-3">
-          <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-[10px] border border-border bg-surface-elevated">
+          <div className="relative h-20 w-20 shrink-0 overflow-hidden cut-avatar border border-border bg-surface-elevated">
             {image ? (
               // eslint-disable-next-line @next/next/no-img-element -- local object URL preview
               <img src={image.previewUrl} alt="Selected image" className="h-full w-full object-cover" />
@@ -359,7 +359,7 @@ export function ChatComposer({
           }}
         />
 
-        <div className="flex min-w-0 flex-1 items-end rounded-[22px] border border-border bg-surface-elevated/60 pr-1 transition focus-within:border-border-strong">
+        <div className="flex min-w-0 flex-1 items-end cut-lg [--cut-line:var(--border)] border border-border bg-surface-elevated/60 pr-1 transition focus-within:border-border-strong">
           <textarea
             ref={textareaRef}
             value={draft}
@@ -444,7 +444,7 @@ export function ChatComposer({
                 key={emoji}
                 type="button"
                 onClick={() => insertEmoji(emoji)}
-                className="flex aspect-square items-center justify-center rounded-lg text-[26px] transition hover:bg-surface-elevated active:scale-90"
+                className="flex aspect-square items-center justify-center rounded-none text-[26px] transition hover:bg-surface-elevated active:scale-90"
               >
                 {emoji}
               </button>
@@ -462,7 +462,7 @@ export function ChatComposer({
               onClick={() => sendSticker(sticker.id)}
               disabled={sending}
               aria-label={`Send ${sticker.label} sticker`}
-              className="flex items-center justify-center rounded-xl p-1 transition hover:scale-105 active:scale-95 disabled:opacity-50"
+              className="flex items-center justify-center cut-lg p-1 transition hover:scale-105 active:scale-95 disabled:opacity-50"
             >
               <StickerArt sticker={sticker} size="sm" />
             </button>

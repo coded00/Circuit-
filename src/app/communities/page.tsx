@@ -88,7 +88,7 @@ export default async function CommunitiesPage({ searchParams }: { searchParams: 
             <span className="h-px w-6 bg-accent-volt" aria-hidden />
             Communities
           </span>
-          <h1 className="font-display text-[32px] leading-[0.95] font-bold tracking-tight uppercase sm:text-[44px]">Find the ones worth facing.</h1>
+          <h1 className="font-display text-[32px] leading-[0.95] font-bold tracking-tight sm:text-[44px]">Find the ones worth facing.</h1>
           <p className="max-w-xl text-[15px] text-muted">Official game hubs, campus crews and city squads. Join the conversation, or start your own.</p>
         </div>
         <Link href={createHref} className="btn-primary h-11 shrink-0 gap-1.5 px-5">
@@ -101,9 +101,9 @@ export default async function CommunitiesPage({ searchParams }: { searchParams: 
       {user && !user.onboardedAt && !hasFilters && (
         <Link
           href="/welcome?next=%2Fcommunities"
-          className="flex items-center gap-3 rounded-[16px] border border-border bg-surface p-4 transition hover:border-border-hover"
+          className="flex items-center gap-3 cut-lg [--cut-line:var(--border)] border border-border bg-surface p-4 transition hover:border-border-hover"
         >
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-accent-volt text-accent-volt-foreground">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center cut-sm bg-accent-volt text-accent-volt-foreground">
             <Compass size={18} />
           </span>
           <span className="flex min-w-0 flex-1 flex-col">
@@ -149,11 +149,11 @@ export default async function CommunitiesPage({ searchParams }: { searchParams: 
               name="q"
               defaultValue={q ?? ""}
               placeholder="Search by name, topic or tag"
-              className="h-12 w-full rounded-[12px] border border-border bg-surface pr-4 pl-11 text-[15px] outline-none transition placeholder:text-muted-strong focus:border-border-strong"
+              className="h-12 w-full cut-sm [--cut-line:var(--border)] border border-border bg-surface pr-4 pl-11 text-[15px] outline-none transition placeholder:text-muted-strong focus:border-border-strong"
             />
           </label>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:flex">
-            <select name="game" defaultValue={game ?? ""} aria-label="Game" className="field-select h-12 min-w-0 rounded-[12px] border-border bg-surface lg:w-40">
+            <select name="game" defaultValue={game ?? ""} aria-label="Game" className="field-select h-12 min-w-0 cut-sm [--cut-line:var(--border)] border-border bg-surface lg:w-40">
               <option value="">Any game</option>
               {games.map((g) => (
                 <option key={g.id} value={g.name}>
@@ -168,10 +168,10 @@ export default async function CommunitiesPage({ searchParams }: { searchParams: 
                 name="region"
                 defaultValue={region ?? ""}
                 placeholder="City or state"
-                className="h-12 w-full min-w-0 rounded-[12px] border border-border bg-surface pr-3 pl-9 text-sm outline-none placeholder:text-muted-strong focus:border-border-strong lg:w-36"
+                className="h-12 w-full min-w-0 cut-sm [--cut-line:var(--border)] border border-border bg-surface pr-3 pl-9 text-sm outline-none placeholder:text-muted-strong focus:border-border-strong lg:w-36"
               />
             </label>
-            <select name="sort" defaultValue={params.sort ?? ""} aria-label="Sort" className="field-select h-12 min-w-0 rounded-[12px] border-border bg-surface lg:w-36">
+            <select name="sort" defaultValue={params.sort ?? ""} aria-label="Sort" className="field-select h-12 min-w-0 cut-sm [--cut-line:var(--border)] border-border bg-surface lg:w-36">
               <option value="">Most active</option>
               {SORTS.slice(1).map((s) => (
                 <option key={s.value} value={s.value}>
@@ -179,7 +179,7 @@ export default async function CommunitiesPage({ searchParams }: { searchParams: 
                 </option>
               ))}
             </select>
-            <button type="submit" className="btn-primary h-12 gap-1.5 rounded-[12px] sm:px-5">
+            <button type="submit" className="btn-primary h-12 gap-1.5 cut-sm sm:px-5">
               <Search size={17} />
               Search
             </button>
@@ -296,7 +296,7 @@ function YourCommunities({ communities }: { communities: JoinedCommunity[] }) {
           <Link
             key={c.id}
             href={c.href}
-            className="flex w-[220px] shrink-0 items-center gap-3 rounded-[14px] border border-border bg-surface p-2.5 transition hover:border-border-hover sm:w-[250px]"
+            className="flex w-[220px] shrink-0 items-center gap-3 cut-sm [--cut-line:var(--border)] border border-border bg-surface p-2.5 transition hover:border-border-hover sm:w-[250px]"
           >
             <CommunityAvatar name={c.title} iconUrl={c.iconUrl} tag={c.tag} size="md" />
             <span className="flex min-w-0 flex-1 flex-col">
@@ -317,8 +317,8 @@ function YourCommunities({ communities }: { communities: JoinedCommunity[] }) {
 
 function EmptyState({ title, body, action }: { title: string; body: string; action?: { href: string; label: string } }) {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-[16px] border border-dashed border-border-strong px-6 py-14 text-center">
-      <span className="flex h-12 w-12 items-center justify-center rounded-[14px] bg-surface-elevated text-muted">
+    <div className="flex flex-col items-center gap-3 cut-lg [--cut-line:var(--border)] border border-dashed border-border-strong px-6 py-14 text-center">
+      <span className="flex h-12 w-12 items-center justify-center cut-sm bg-surface-elevated text-muted">
         <Compass size={22} />
       </span>
       <div className="flex max-w-sm flex-col gap-1">

@@ -23,7 +23,7 @@ export function CopyCode({ code, label = "Copy code" }: { code: string; label?: 
       type="button"
       onClick={copy}
       aria-label={copied ? "Copied" : `${label}: ${code}`}
-      className="group inline-flex items-center gap-2 rounded-[8px] font-mono text-xl font-bold tracking-[0.18em] text-foreground transition hover:text-accent-volt focus-visible:ring-2 focus-visible:ring-accent-volt/60 focus-visible:outline-none"
+      className="group inline-flex items-center gap-2 rounded-none font-mono text-xl font-bold tracking-[0.18em] text-foreground transition hover:text-accent-volt"
     >
       {code}
       {copied ? (

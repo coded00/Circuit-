@@ -310,7 +310,7 @@ export default async function TournamentPage({ params, searchParams }: { params:
           <Panel title="Game & host">
             <PanelRows>
               <Link href={gamePath(tournament.game)} className={panelRowClass}>
-                <GameArtTile thumb game={tournament.game} className="h-11 w-11 shrink-0 rounded-[10px]" hideLabel imgWidth={120} />
+                <GameArtTile thumb game={tournament.game} className="h-11 w-11 shrink-0 cut-avatar" hideLabel imgWidth={120} />
                 <div className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-sm font-medium">{tournament.game}</span>
                   <span className="text-metadata">More {tournament.game} tournaments</span>
@@ -472,7 +472,7 @@ export default async function TournamentPage({ params, searchParams }: { params:
                 <span className="text-stat text-4xl leading-none text-gold">{formatNaira(tournament.prizeAmount)}</span>
                 {tournament.prizeText && <p className="mt-1 text-sm text-muted">{tournament.prizeText}</p>}
                 {tournament.prizeSplit.length > 0 && (
-                  <ul className="mt-2 flex flex-col divide-y divide-border rounded-[10px] border border-border">
+                  <ul className="mt-2 flex flex-col divide-y divide-border rounded-none border border-border">
                     {(prizeResults.length
                       ? prizeResults.map((x) => ({
                           key: x.share.userId,
@@ -591,7 +591,7 @@ export default async function TournamentPage({ params, searchParams }: { params:
           while someone else registers with this page open. */}
       <Poller />
 
-      <header data-surface="dark" className={`overflow-hidden rounded-[var(--radius-hero)] border bg-surface ${tournament.status === "LIVE" ? "live-glow border-live/60" : "border-border"}`}>
+      <header data-surface="dark" className={`overflow-hidden cut-lg border bg-surface ${tournament.status === "LIVE" ? "live-glow border-live/60" : "border-border"}`}>
         <div className="relative aspect-[5/3] w-full sm:aspect-[16/6]">
           {/* Same name as the card/row art it was opened from — morphs between them. */}
           <ViewTransition name={tournamentArtName(tournament.id)} share="tournament-morph" default="none">
@@ -672,7 +672,7 @@ export default async function TournamentPage({ params, searchParams }: { params:
       </header>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_300px] min-[1140px]:lg:grid-cols-[minmax(0,1fr)_340px]">
-        <SectionTabs tabs={tabs} initialTab={requestedTab} label="Tournament sections" idPrefix="tournament" />
+        <SectionTabs tabs={tabs} initialTab={requestedTab} label="Tournament sections" idPrefix="tournament" bleed={false} />
 
         <aside className="order-first flex h-fit flex-col gap-4 lg:sticky lg:top-[76px] lg:order-none">
           <Panel title="Registration">
@@ -706,7 +706,7 @@ export default async function TournamentPage({ params, searchParams }: { params:
                   {cancellable && <CancelButton tournamentId={tournament.id} />}
                 </div>
               ) : myRegistration?.status === "CONFIRMED" ? (
-                <div className="flex flex-col gap-3 rounded-[var(--radius-md)] bg-success/10 p-3">
+                <div className="flex flex-col gap-3 cut-sm bg-success/10 p-3">
                   <p className="flex items-center gap-2 text-sm font-medium text-success">
                     <Check size={15} strokeWidth={3} />
                     You&apos;re in
@@ -746,11 +746,11 @@ export default async function TournamentPage({ params, searchParams }: { params:
                   </p>
                 </div>
               ) : now >= tournament.registrationOpenAt && now < tournament.registrationCloseAt && registrantCount >= tournament.participantCap ? (
-                <p className="rounded-[var(--radius-md)] bg-accent-orange-soft p-3 text-sm font-medium text-accent-orange">
+                <p className="cut-sm bg-accent-orange-soft p-3 text-sm font-medium text-accent-orange">
                   Registration is full.
                 </p>
               ) : (
-                <p className="rounded-[var(--radius-md)] bg-surface-elevated p-3 text-sm text-muted">
+                <p className="cut-sm bg-surface-elevated p-3 text-sm text-muted">
                   {now < tournament.registrationOpenAt ? `Registration opens ${formatDate(tournament.registrationOpenAt)}.` : "Registration is closed."}
                 </p>
               )}

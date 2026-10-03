@@ -51,7 +51,7 @@ export function AwardResultButton({ matchId, playerA, playerB, drawAllowed }: { 
   ];
 
   return (
-    <div className="flex w-full flex-col gap-2 rounded-[10px] border border-border bg-surface-elevated p-3" onClick={(e) => e.preventDefault()}>
+    <div className="flex w-full flex-col gap-2 rounded-none border border-border bg-surface-elevated p-3" onClick={(e) => e.preventDefault()}>
       <span className="text-xs font-semibold">Settle this unplayed fixture</span>
       <div className="flex flex-wrap gap-2">
         {options.map((o) => (

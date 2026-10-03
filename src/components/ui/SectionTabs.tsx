@@ -25,12 +25,15 @@ export function SectionTabs({
   initialTab,
   label = "Sections",
   idPrefix = "section",
+  bleed = true,
 }: {
   tabs: SectionTab[];
   initialTab?: string;
   label?: string;
   /** Prefix for tab/panel element ids — keep unique per page. */
   idPrefix?: string;
+  /** The sticky tab strip extends into the page gutters so scrolled content never shows beside it. Turn off when another column sits next to the tabs, or the strip would cover it. */
+  bleed?: boolean;
 }) {
   const [active, setActive] = useState(() => (tabs.some((t) => t.key === initialTab) ? initialTab! : tabs[0].key));
   const rootRef = useRef<HTMLDivElement>(null);
@@ -63,7 +66,7 @@ export function SectionTabs({
   return (
     <SelectTabContext.Provider value={select}>
       <div ref={rootRef} className="section-tabs flex min-w-0 flex-col gap-6">
-        <div className="sticky top-[60px] z-20 -mx-4 bg-background/90 px-4 backdrop-blur-md sm:-mx-8 sm:px-8">
+        <div className={`sticky top-[60px] z-20 bg-background/90 backdrop-blur-md ${bleed ? "-mx-4 px-4 sm:-mx-8 sm:px-8" : ""}`}>
           <div role="tablist" aria-label={label} className="tabs scrollbar-hide overflow-x-auto">
             {tabs.map((t) => (
               <button

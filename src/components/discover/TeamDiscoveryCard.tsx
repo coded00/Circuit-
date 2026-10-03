@@ -14,7 +14,7 @@ export function TeamDiscoveryCard({ team, viewerId }: { team: DiscoveryTeam; vie
   const crest = (team.tag || team.name).replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase() || "?";
 
   return (
-    <div className="group flex h-full flex-col overflow-hidden rounded-[16px] border border-border bg-surface transition duration-[var(--duration-base)] hover:-translate-y-0.5 hover:border-border-hover">
+    <div className="group flex h-full flex-col overflow-hidden cut-lg [--cut-line:var(--border)] border border-border bg-surface transition duration-[var(--duration-base)] hover:-translate-y-0.5 hover:border-border-hover">
       <Link href={`/teams/${team.id}`} className="relative block h-24 w-full overflow-hidden" tabIndex={-1} aria-hidden>
         {team.game ? (
           <GameArtTile game={team.game} className="h-full w-full transition-transform duration-[var(--duration-moderate)] group-hover:scale-[1.04]" hideLabel />
@@ -23,7 +23,7 @@ export function TeamDiscoveryCard({ team, viewerId }: { team: DiscoveryTeam; vie
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
         {team.game && (
-          <span className="absolute right-2.5 bottom-2 max-w-[60%] truncate rounded-[6px] bg-black/55 px-1.5 py-0.5 font-mono text-[10px] font-semibold tracking-[0.08em] text-white uppercase backdrop-blur-sm">
+          <span className="absolute right-2.5 bottom-2 max-w-[60%] truncate rounded-none bg-black/55 px-1.5 py-0.5 font-mono text-[10px] font-semibold tracking-[0.08em] text-white uppercase backdrop-blur-sm">
             {team.game}
           </span>
         )}
@@ -31,7 +31,7 @@ export function TeamDiscoveryCard({ team, viewerId }: { team: DiscoveryTeam; vie
 
       <div className="flex flex-1 flex-col gap-3 px-4 pb-4">
         <Link href={`/teams/${team.id}`} className="relative z-10 -mt-8 flex flex-col items-start gap-2">
-          <span className="font-display flex h-16 w-16 shrink-0 items-center justify-center rounded-[14px] border-[3px] border-surface bg-accent-volt text-lg font-bold tracking-tight text-accent-volt-foreground">
+          <span className="font-display flex h-16 w-16 shrink-0 items-center justify-center cut-sm [--cut-line:var(--border)] border-[3px] border-surface bg-accent-volt text-lg font-bold tracking-tight text-accent-volt-foreground">
             {crest}
           </span>
           <span className="flex w-full min-w-0 flex-col">

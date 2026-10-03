@@ -316,7 +316,7 @@ export default async function BattlePage({
 
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-4">
-              <GameArtTile thumb game={battle.game} hideLabel className="h-16 w-16 shrink-0 rounded-[var(--radius-md)]" />
+              <GameArtTile thumb game={battle.game} hideLabel className="h-16 w-16 shrink-0 cut-sm" />
               <div className="flex flex-col gap-1.5">
                 <h1 className="font-display text-3xl leading-none font-bold tracking-tight uppercase sm:text-4xl">
                   {battle.game}
@@ -336,7 +336,7 @@ export default async function BattlePage({
             </div>
           </div>
 
-          <div className={`relative isolate overflow-hidden rounded-[var(--radius-hero)] border bg-surface p-6 sm:p-10 ${status.pulse && battle.status === "ACCEPTED" ? "live-glow border-live/60" : "border-border"}`}>
+          <div className={`relative isolate overflow-hidden cut-lg border bg-surface p-6 sm:p-10 ${status.pulse && battle.status === "ACCEPTED" ? "live-glow border-live/60" : "border-border"}`}>
             <ArenaBackdrop game={battle.game} art={0.4} />
 
             <div className="relative z-10 flex flex-col items-center gap-6">
@@ -376,7 +376,7 @@ export default async function BattlePage({
                   {opponentStanding ? (
                     <StatsRow standing={opponentStanding} />
                   ) : (
-                    <p className="max-w-[160px] rounded-[10px] bg-surface-elevated px-3 py-2 text-center text-xs text-muted">
+                    <p className="max-w-[160px] rounded-none bg-surface-elevated px-3 py-2 text-center text-xs text-muted">
                       {viewerIsInvitee ? "Your stats could show here." : "Stats will show here once matched."}
                     </p>
                   )}

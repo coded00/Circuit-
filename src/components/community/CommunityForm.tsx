@@ -167,7 +167,7 @@ export function CommunityForm({
           <label htmlFor="c-slug" className="field-label">
             Link
           </label>
-          <div className="flex items-center rounded-[10px] border border-border bg-surface focus-within:border-border-strong">
+          <div className="flex items-center rounded-none border border-border bg-surface focus-within:border-border-strong">
             <span className="pl-3 font-mono text-sm text-muted-strong">circuit/communities/</span>
             <input
               id="c-slug"

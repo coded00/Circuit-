@@ -193,7 +193,7 @@ export default function EditForm({
       ) : (
         <div className="flex flex-col gap-1.5">
           <span className="field-label">Game &amp; format</span>
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-[10px] border border-border bg-surface-elevated px-3.5 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-none border border-border bg-surface-elevated px-3.5 py-3">
             <span className="text-sm">
               <span className="font-semibold">{tournament.game}</span> · {tournament.teamSize} · {getStructure(tournament.format)?.label ?? tournament.format}
             </span>
@@ -390,7 +390,7 @@ export default function EditForm({
         bounds={POSTER_BOUNDS}
       />
 
-      <label className="flex items-start gap-2.5 rounded-[10px] border border-border bg-surface-elevated px-3.5 py-3">
+      <label className="flex items-start gap-2.5 rounded-none border border-border bg-surface-elevated px-3.5 py-3">
         <input
           type="checkbox"
           checked={communityEnabled}

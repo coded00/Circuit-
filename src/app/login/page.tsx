@@ -30,7 +30,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         </Suspense>
         <AuthHeading eyebrow="Log in" title="The arena's waiting." sub="Your tournaments, challenges and wallet are right where you left them." />
         {sessionExpired && (
-          <p role="status" className="rounded-[11px] border border-warning/30 bg-warning/[0.12] px-3.5 py-3 text-sm leading-relaxed text-foreground">
+          <p role="status" className="cut-sm border border-warning/30 bg-warning/[0.12] px-3.5 py-3 text-sm leading-relaxed text-foreground">
             Your session expired. Log in again to pick up where you left off.
           </p>
         )}

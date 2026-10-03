@@ -51,7 +51,7 @@ import { GuestAuthLink } from "./GuestAuthLink";
  */
 /** One segment of the HUD strip — shared sizing so every control matches. */
 const HUD_BUTTON =
-  "flex h-9 w-9 items-center justify-center rounded-[9px] text-white/70 transition hover:bg-white/[0.07] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-volt/60";
+  "flex h-9 w-9 items-center justify-center cut-avatar text-white/70 transition hover:bg-white/[0.07] hover:text-white";
 
 function HudDivider() {
   return <span aria-hidden className="mx-0.5 h-5 w-px shrink-0 bg-white/[0.08]" />;
@@ -87,7 +87,7 @@ export async function TopBar({ user, disputeCount = 0 }: { user: User | null; di
           <div className="ml-auto flex shrink-0 items-center gap-2">
             <MobileSearchToggle />
             {user ? (
-              <div className="flex items-center rounded-[12px] border border-white/[0.08] bg-white/[0.03] p-1">
+              <div className="flex items-center cut-sm [--cut-line:rgb(255_255_255/0.08)] border border-white/[0.08] bg-white/[0.03] p-1">
                 <WalletBalanceChip balance={user.walletBalance} />
                 <HudDivider />
                 <NotificationBell initialUnreadCount={unreadCount} buttonClassName={HUD_BUTTON} />
@@ -108,13 +108,13 @@ export async function TopBar({ user, disputeCount = 0 }: { user: User | null; di
                 />
               </div>
             ) : (
-              <div className="flex items-center gap-1 rounded-[12px] border border-white/[0.08] bg-white/[0.03] p-1">
-                <GuestAuthLink mode="login" className="rounded-[9px] px-3 py-2 text-sm font-semibold text-white/80 transition hover:bg-white/[0.07] hover:text-white">
+              <div className="flex items-center gap-1 cut-sm [--cut-line:rgb(255_255_255/0.08)] border border-white/[0.08] bg-white/[0.03] p-1">
+                <GuestAuthLink mode="login" className="rounded-none px-3 py-2 text-sm font-semibold text-white/80 transition hover:bg-white/[0.07] hover:text-white">
                   Log in
                 </GuestAuthLink>
                 <GuestAuthLink
                   mode="signup"
-                  className="flex h-9 items-center rounded-[9px] bg-accent-volt px-3.5 text-sm font-semibold text-accent-volt-foreground transition hover:brightness-95"
+                  className="flex h-9 items-center rounded-none bg-accent-volt px-3.5 text-sm font-semibold text-accent-volt-foreground transition hover:brightness-95"
                 >
                   Sign up
                 </GuestAuthLink>

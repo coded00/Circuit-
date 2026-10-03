@@ -45,7 +45,7 @@ export function InfoTip({ text, label = "More info", align = "start" }: { text: 
         <span
           role="tooltip"
           id={id}
-          className={`absolute top-full z-30 mt-1.5 w-56 rounded-[10px] border border-border bg-surface-elevated px-3 py-2 text-xs font-normal normal-case leading-snug tracking-normal text-foreground shadow-lg ${
+          className={`absolute top-full z-30 mt-1.5 w-56 rounded-none border border-border bg-surface-elevated px-3 py-2 text-xs font-normal normal-case leading-snug tracking-normal text-foreground shadow-lg ${
             align === "end" ? "right-0" : "left-0"
           }`}
         >

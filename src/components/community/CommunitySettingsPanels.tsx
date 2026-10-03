@@ -43,7 +43,7 @@ function useAction() {
   return { busy, error, run, setError };
 }
 
-const rowBtn = "flex h-8 w-8 items-center justify-center rounded-[8px] text-muted transition hover:bg-surface-elevated hover:text-foreground disabled:opacity-40";
+const rowBtn = "flex h-8 w-8 items-center justify-center cut-avatar text-muted transition hover:bg-surface-elevated hover:text-foreground disabled:opacity-40";
 
 // ---------------------------------------------------------------------------
 
@@ -68,7 +68,7 @@ export function ChannelManager({ communityId, channels }: { communityId: string;
 
   return (
     <div className="flex flex-col gap-4">
-      <ul className="flex flex-col divide-y divide-border rounded-[14px] border border-border bg-surface">
+      <ul className="flex flex-col divide-y divide-border cut-sm [--cut-line:var(--border)] border border-border bg-surface">
         {channels.map((c, i) => (
           <li key={c.id} className="flex items-center gap-2 px-3 py-2">
             <Hash size={15} className="shrink-0 text-muted" />
@@ -137,7 +137,7 @@ export function ChannelManager({ communityId, channels }: { communityId: string;
         ))}
       </ul>
       <form onSubmit={add} className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="flex min-w-0 flex-1 items-center rounded-[10px] border border-border bg-surface focus-within:border-border-strong">
+        <div className="flex min-w-0 flex-1 items-center rounded-none border border-border bg-surface focus-within:border-border-strong">
           <Hash size={15} className="ml-3 text-muted" />
           <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="new-channel" maxLength={24} className="h-11 min-w-0 flex-1 bg-transparent px-2 text-sm outline-none" aria-label="New channel name" />
         </div>
@@ -200,7 +200,7 @@ export function MemberManager({
   return (
     <div className="flex flex-col gap-4">
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search members" className="field-input h-11" aria-label="Search members" />
-      <ul className="flex flex-col divide-y divide-border rounded-[14px] border border-border bg-surface">
+      <ul className="flex flex-col divide-y divide-border cut-sm [--cut-line:var(--border)] border border-border bg-surface">
         {shown.map((m) => (
           <li key={m.userId} className="flex items-center gap-3 px-3 py-2.5">
             <Avatar name={m.displayName} url={m.avatarUrl} />
@@ -252,7 +252,7 @@ export function MemberManager({
                     disabled={busy !== null}
                     value=""
                     onChange={(e) => e.target.value && run(`mute-${m.userId}`, `/api/communities/${communityId}/members/${m.userId}`, "PATCH", { muteHours: Number(e.target.value) })}
-                    className="field-select h-8 w-auto rounded-[8px] py-0 pr-7 pl-2.5 text-xs"
+                    className="field-select h-8 w-auto rounded-none py-0 pr-7 pl-2.5 text-xs"
                   >
                     <option value="">Mute…</option>
                     <option value="1">1 hour</option>
@@ -277,7 +277,7 @@ export function MemberManager({
       {bans.length > 0 && (
         <section className="flex flex-col gap-2">
           <h3 className="text-eyebrow">Banned</h3>
-          <ul className="flex flex-col divide-y divide-border rounded-[14px] border border-border bg-surface">
+          <ul className="flex flex-col divide-y divide-border cut-sm [--cut-line:var(--border)] border border-border bg-surface">
             {bans.map((b) => (
               <li key={b.userId} className="flex items-center gap-3 px-3 py-2.5">
                 <span className="flex min-w-0 flex-1 flex-col">
@@ -312,9 +312,9 @@ export function InviteManager({ communityId, communityName, invites, origin }: {
         <Plus size={15} /> New invite link
       </button>
       {invites.length === 0 ? (
-        <p className="rounded-[14px] border border-dashed border-border-strong px-4 py-8 text-center text-sm text-muted">No active invite links.</p>
+        <p className="cut-sm [--cut-line:var(--border)] border border-dashed border-border-strong px-4 py-8 text-center text-sm text-muted">No active invite links.</p>
       ) : (
-        <ul className="flex flex-col divide-y divide-border rounded-[14px] border border-border bg-surface">
+        <ul className="flex flex-col divide-y divide-border cut-sm [--cut-line:var(--border)] border border-border bg-surface">
           {invites.map((inv) => (
             <li key={inv.id} className="flex items-center gap-3 px-3 py-2.5">
               <span className="flex min-w-0 flex-1 flex-col">
@@ -365,12 +365,12 @@ type Application = { id: string; answer: string; createdAt: string; user: { hand
 export function ApplicationQueue({ communityId, applications, question }: { communityId: string; applications: Application[]; question: string | null }) {
   const { busy, error, run } = useAction();
   if (applications.length === 0) {
-    return <p className="rounded-[14px] border border-dashed border-border-strong px-4 py-8 text-center text-sm text-muted">No applications waiting.</p>;
+    return <p className="cut-sm [--cut-line:var(--border)] border border-dashed border-border-strong px-4 py-8 text-center text-sm text-muted">No applications waiting.</p>;
   }
   return (
     <div className="flex flex-col gap-3">
       {applications.map((a) => (
-        <div key={a.id} className="flex flex-col gap-3 rounded-[14px] border border-border bg-surface p-4">
+        <div key={a.id} className="flex flex-col gap-3 cut-sm [--cut-line:var(--border)] border border-border bg-surface p-4">
           <div className="flex items-center gap-3">
             <Avatar name={a.user.displayName} url={a.user.avatarUrl} />
             <Link href={`/players/${a.user.handle}`} className="flex min-w-0 flex-1 flex-col hover:underline">
@@ -379,7 +379,7 @@ export function ApplicationQueue({ communityId, applications, question }: { comm
             </Link>
           </div>
           {a.answer && (
-            <div className="rounded-[10px] bg-surface-elevated/50 px-3 py-2 text-sm">
+            <div className="rounded-none bg-surface-elevated/50 px-3 py-2 text-sm">
               {question && <p className="mb-1 text-xs text-muted">{question}</p>}
               {a.answer}
             </div>
@@ -406,7 +406,7 @@ export function CloseCommunity({ communityId, name }: { communityId: string; nam
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   return (
-    <section className="flex flex-col gap-3 rounded-[14px] border border-danger/30 p-4">
+    <section className="flex flex-col gap-3 cut-sm border border-danger/30 p-4">
       <div>
         <h3 className="text-sm font-semibold">Close community</h3>
         <p className="text-[13px] text-muted">Everyone loses access and it disappears from discovery. This can&apos;t be undone from here.</p>
@@ -460,7 +460,7 @@ const REASON_LABEL: Record<string, string> = {
 export function ReportQueue({ reports, staff = false, communityLinks = false }: { reports: (ReportRow & { community?: { name: string; href: string } })[]; staff?: boolean; communityLinks?: boolean }) {
   const { busy, error, run } = useAction();
   if (reports.length === 0) {
-    return <p className="rounded-[14px] border border-dashed border-border-strong px-4 py-8 text-center text-sm text-muted">Nothing reported. 🎉</p>;
+    return <p className="cut-sm [--cut-line:var(--border)] border border-dashed border-border-strong px-4 py-8 text-center text-sm text-muted">Nothing reported. 🎉</p>;
   }
   const act = (id: string, action: string) => run(`${action}-${id}`, `/api/communities/reports/${id}`, "PATCH", { action });
   return (
@@ -468,7 +468,7 @@ export function ReportQueue({ reports, staff = false, communityLinks = false }: 
       {reports.map((r) => {
         const canAct = staff || r.status === "OPEN";
         return (
-          <div key={r.id} className="flex flex-col gap-3 rounded-[14px] border border-border bg-surface p-4">
+          <div key={r.id} className="flex flex-col gap-3 cut-sm [--cut-line:var(--border)] border border-border bg-surface p-4">
             <div className="flex flex-wrap items-center gap-2">
               <span className="badge badge-attention">{REASON_LABEL[r.reason] ?? r.reason}</span>
               <span className="text-xs text-muted">
@@ -490,7 +490,7 @@ export function ReportQueue({ reports, staff = false, communityLinks = false }: 
               {r.status === "ESCALATED" && !staff && <span className="badge badge-neutral ml-auto">With Circuit staff</span>}
             </div>
             {r.messageContent && (
-              <blockquote className={`rounded-[10px] border-l-2 border-border-strong bg-surface-elevated/50 px-3 py-2 text-sm ${r.messageRemoved ? "text-muted line-through" : ""}`}>
+              <blockquote className={`rounded-none border-l-2 border-border-strong bg-surface-elevated/50 px-3 py-2 text-sm ${r.messageRemoved ? "text-muted line-through" : ""}`}>
                 {r.messageContent}
               </blockquote>
             )}

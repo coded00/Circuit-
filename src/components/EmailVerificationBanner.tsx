@@ -19,8 +19,8 @@ export function EmailVerificationBanner({ email, reason }: { email: string; reas
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-[14px] border border-border bg-surface p-4 sm:flex-row sm:items-center">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-accent-volt/20 text-foreground">
+    <div className="flex flex-col gap-3 cut-sm [--cut-line:var(--border)] border border-border bg-surface p-4 sm:flex-row sm:items-center">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center cut-avatar bg-accent-volt/20 text-foreground">
         <MailCheck size={18} />
       </span>
       <div className="flex min-w-0 flex-1 flex-col">

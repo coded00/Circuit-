@@ -38,7 +38,7 @@ export function ShareCardPageBody({
         <p className="text-sm text-muted">{subheading}</p>
       </div>
       {/* eslint-disable-next-line @next/next/no-img-element -- a generated PNG endpoint, not a static asset next/image can optimize */}
-      <img src={imageUrl} alt={shareTitle} className="w-full rounded-[16px] border border-border" />
+      <img src={imageUrl} alt={shareTitle} className="w-full cut-lg [--cut-line:var(--border)] border border-border" />
       <div className="flex flex-wrap items-center gap-3">
         <ShareButton title={shareTitle} url={pageUrl} />
         <a href={imageUrl} download className="btn-secondary">

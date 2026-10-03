@@ -215,7 +215,7 @@ export function LobbyStandings({
           <section key={round.number} className="card flex flex-col gap-3 p-4 sm:p-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2.5">
-                <h3 className="font-display text-lg font-bold tracking-tight uppercase">{round.label}</h3>
+                <h3 className="font-display text-lg font-bold tracking-tight">{round.label}</h3>
                 <StatusPill tone={round.status === "POSTED" ? "complete" : live ? "live" : "neutral"}>
                   {round.status === "POSTED" ? "Results posted" : live ? "Waiting for results" : "Not started"}
                 </StatusPill>
@@ -251,7 +251,7 @@ export function LobbyStandings({
             )}
 
             {round.status === "POSTED" && (
-              <ol className="flex flex-col divide-y divide-border rounded-[10px] border border-border">
+              <ol className="flex flex-col divide-y divide-border rounded-none border border-border">
                 {results.map((r) => {
                   const entry = entryById.get(r.registrationId);
                   if (!entry) return null;
@@ -278,7 +278,7 @@ export function LobbyStandings({
               const unanswered = flag.status === "OPEN" && now.getTime() - flag.createdAt.getTime() >= FLAG_ANSWER_HOURS * 3600e3;
               const canEscalate = live && flag.user.id === viewer?.id && !flag.escalatedAt && (flag.status === "DISMISSED" || unanswered);
               return (
-                <div key={flag.id} className="flex flex-col gap-2 rounded-[10px] border border-dashed border-border-strong p-3">
+                <div key={flag.id} className="flex flex-col gap-2 rounded-none border border-dashed border-border-strong p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-xs text-muted">
                       Flag from <span className="font-semibold text-foreground">{flag.user.displayName}</span> ·{" "}
@@ -315,12 +315,12 @@ export function LobbyStandings({
         <h3 className="text-eyebrow text-muted">Points</h3>
         <div className="flex flex-wrap gap-2">
           {view.table.placementPoints.map((pts, i) => (
-            <span key={i} className="flex flex-col items-center rounded-[10px] border border-border px-3 py-1.5">
+            <span key={i} className="flex flex-col items-center rounded-none border border-border px-3 py-1.5">
               <span className="font-mono text-[11px] text-muted">{ordinal(i + 1)}</span>
               <span className="font-mono text-sm font-bold">{pts}</span>
             </span>
           ))}
-          <span className="flex flex-col items-center rounded-[10px] border border-accent-blue/40 px-3 py-1.5">
+          <span className="flex flex-col items-center rounded-none border border-accent-blue/40 px-3 py-1.5">
             <span className="font-mono text-[11px] text-muted">Per kill</span>
             <span className="font-mono text-sm font-bold">{view.table.killPoints}</span>
           </span>
@@ -332,7 +332,7 @@ export function LobbyStandings({
       </section>
       {tournament.rulesText && (
         <section className="widget flex flex-col gap-2">
-          <h3 className="text-xs font-semibold tracking-wide text-muted uppercase">Rules</h3>
+          <h3 className="text-xs font-semibold tracking-wide text-muted">Rules</h3>
           <p className="text-sm whitespace-pre-wrap text-muted">{tournament.rulesText}</p>
         </section>
       )}
@@ -350,9 +350,9 @@ export function LobbyStandings({
 
   return (
     <div className="flex w-full flex-1 flex-col gap-6">
-      <header data-surface="dark" className="flex flex-col gap-4 rounded-[var(--radius-hero)] border border-border bg-surface p-5 sm:flex-row sm:items-center sm:justify-between sm:p-7">
+      <header data-surface="dark" className="flex flex-col gap-4 cut-lg [--cut-line:var(--border)] border border-border bg-surface p-5 sm:flex-row sm:items-center sm:justify-between sm:p-7">
         <div className="flex min-w-0 items-center gap-4">
-          <GameArtTile game={tournament.game} posterUrl={tournament.posterUrl} className="hidden h-16 w-24 shrink-0 rounded-[10px] sm:block" hideLabel imgWidth={240} />
+          <GameArtTile game={tournament.game} posterUrl={tournament.posterUrl} className="hidden h-16 w-24 shrink-0 cut-avatar sm:block" hideLabel imgWidth={240} />
           <div className="flex min-w-0 flex-col gap-1.5">
             <Link href={backHref} className="inline-flex w-fit items-center gap-1.5 text-sm font-medium text-muted transition hover:text-foreground">
               <ArrowLeft size={15} />

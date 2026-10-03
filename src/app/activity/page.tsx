@@ -71,7 +71,7 @@ export default async function ActivityPage() {
       <header className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
           <span className="text-eyebrow text-accent-volt">Feed</span>
-          <h1 className="font-display text-3xl leading-[0.98] font-bold tracking-tight uppercase sm:text-4xl">The competition never stands still.</h1>
+          <h1 className="font-display text-3xl leading-[0.98] font-bold tracking-tight sm:text-4xl">The competition never stands still.</h1>
         </div>
         <div role="tablist" aria-label="Feed" className="tabs">
           <Link role="tab" aria-selected href="/activity" className="tab tab-active py-3">

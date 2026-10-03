@@ -64,14 +64,14 @@ export function SignInMethods({
       </div>
 
       {status?.text && (
-        <p role="status" className={`rounded-[10px] border px-3.5 py-2.5 text-sm ${status.tone === "ok" ? "border-success/30 bg-success/10" : "border-danger/30 bg-danger/10"}`}>
+        <p role="status" className={`rounded-none border px-3.5 py-2.5 text-sm ${status.tone === "ok" ? "border-success/30 bg-success/10" : "border-danger/30 bg-danger/10"}`}>
           {status.text}
         </p>
       )}
 
-      <ul className="flex flex-col divide-y divide-border rounded-[12px] border border-border">
+      <ul className="flex flex-col divide-y divide-border cut-sm [--cut-line:var(--border)] border border-border">
         <li className="flex items-center gap-3 p-3.5">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-surface-elevated text-muted">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center cut-avatar bg-surface-elevated text-muted">
             <KeyRound size={17} />
           </span>
           <div className="flex min-w-0 flex-1 flex-col">
@@ -80,7 +80,7 @@ export function SignInMethods({
           </div>
         </li>
         <li className="flex items-center gap-3 p-3.5">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-surface-elevated">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center cut-avatar bg-surface-elevated">
             <GoogleMark size={18} />
           </span>
           <div className="flex min-w-0 flex-1 flex-col">

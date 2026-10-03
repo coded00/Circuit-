@@ -70,7 +70,7 @@ function PickerPopover({ anchor, onClose, children }: { anchor: DOMRect; onClose
       ref={ref}
       role="dialog"
       aria-label="Add reaction"
-      className="fixed z-50 overflow-hidden rounded-[14px] border border-border bg-surface pt-3"
+      className="fixed z-50 overflow-hidden cut-sm [--cut-line:var(--border)] border border-border bg-surface pt-3"
       style={{ top, left, width: POPOVER_WIDTH, boxShadow: "var(--shadow-float)" }}
     >
       {children}
@@ -174,7 +174,7 @@ export function MessageRow({
           e.stopPropagation();
         }
       }}
-      className={`group/msg relative -mx-2 flex items-start gap-2.5 rounded-[10px] px-2 py-0.5 transition-colors [@media(hover:hover)]:hover:bg-surface-elevated/50 ${
+      className={`group/msg relative -mx-2 flex items-start gap-2.5 rounded-none px-2 py-0.5 transition-colors [@media(hover:hover)]:hover:bg-surface-elevated/50 ${
         mentionsViewer ? "bg-accent-volt/10 shadow-[inset_2px_0_0_var(--accent-volt)] dark:bg-accent-volt/[0.05]" : ""
       } ${highlighted ? "message-flash" : ""}`}
     >
@@ -208,7 +208,7 @@ export function MessageRow({
           <button
             type="button"
             onClick={() => message.thread && onOpenThread?.(message.thread.id)}
-            className="mt-1 flex max-w-full items-center gap-2 rounded-[10px] border border-border bg-surface px-2.5 py-1.5 text-left text-[13px] transition hover:border-border-hover"
+            className="mt-1 flex max-w-full items-center gap-2 rounded-none border border-border bg-surface px-2.5 py-1.5 text-left text-[13px] transition hover:border-border-hover"
           >
             <MessagesSquare size={14} className="shrink-0 text-muted" />
             <span className="truncate font-semibold">{message.thread.title}</span>
@@ -224,7 +224,7 @@ export function MessageRow({
           corner, lifted half above it so it never covers the text line. */}
       <div
         ref={toolbarRef}
-        className={`absolute -top-3.5 right-2 z-10 hidden items-center gap-0.5 rounded-[10px] border border-border bg-surface p-0.5 shadow-sm [@media(hover:hover)]:group-hover/msg:flex ${
+        className={`absolute -top-3.5 right-2 z-10 hidden items-center gap-0.5 rounded-none border border-border bg-surface p-0.5 shadow-sm [@media(hover:hover)]:group-hover/msg:flex ${
           picker ? "[@media(hover:hover)]:flex" : ""
         }`}
       >
@@ -235,7 +235,7 @@ export function MessageRow({
             onClick={() => onReact(message.id, emoji, !reacted.has(emoji))}
             aria-label={`React ${emoji}`}
             aria-pressed={reacted.has(emoji)}
-            className={`flex h-7 w-7 items-center justify-center rounded-[7px] text-[16px] transition hover:bg-surface-elevated active:scale-90 ${
+            className={`flex h-7 w-7 items-center justify-center cut-avatar text-[16px] transition hover:bg-surface-elevated active:scale-90 ${
               reacted.has(emoji) ? "bg-accent-volt/25" : ""
             }`}
           >
@@ -246,17 +246,17 @@ export function MessageRow({
           type="button"
           onClick={openPicker}
           aria-label="More reactions"
-          className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted transition hover:bg-surface-elevated hover:text-foreground"
+          className="flex h-7 w-7 items-center justify-center cut-avatar text-muted transition hover:bg-surface-elevated hover:text-foreground"
         >
           <SmilePlus size={16} />
         </button>
         {onReply && (
-          <button type="button" onClick={onReply} aria-label="Reply" className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted transition hover:bg-surface-elevated hover:text-foreground">
+          <button type="button" onClick={onReply} aria-label="Reply" className="flex h-7 w-7 items-center justify-center cut-avatar text-muted transition hover:bg-surface-elevated hover:text-foreground">
             <CornerUpLeft size={15} />
           </button>
         )}
         {onStartThread && (
-          <button type="button" onClick={onStartThread} aria-label="Start thread" className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted transition hover:bg-surface-elevated hover:text-foreground">
+          <button type="button" onClick={onStartThread} aria-label="Start thread" className="flex h-7 w-7 items-center justify-center cut-avatar text-muted transition hover:bg-surface-elevated hover:text-foreground">
             <MessagesSquare size={15} />
           </button>
         )}
@@ -265,7 +265,7 @@ export function MessageRow({
             type="button"
             onClick={onTogglePin}
             aria-label={message.pinned ? "Unpin message" : "Pin message"}
-            className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted transition hover:bg-surface-elevated hover:text-foreground"
+            className="flex h-7 w-7 items-center justify-center cut-avatar text-muted transition hover:bg-surface-elevated hover:text-foreground"
           >
             {message.pinned ? <PinOff size={15} /> : <Pin size={15} />}
           </button>
@@ -275,7 +275,7 @@ export function MessageRow({
             type="button"
             onClick={() => setReporting(true)}
             aria-label="Report message"
-            className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted transition hover:bg-surface-elevated hover:text-foreground"
+            className="flex h-7 w-7 items-center justify-center cut-avatar text-muted transition hover:bg-surface-elevated hover:text-foreground"
           >
             <Flag size={14} />
           </button>
@@ -285,7 +285,7 @@ export function MessageRow({
             type="button"
             onClick={() => onDelete(message.id)}
             aria-label="Remove message"
-            className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted transition hover:bg-danger/10 hover:text-danger"
+            className="flex h-7 w-7 items-center justify-center cut-avatar text-muted transition hover:bg-danger/10 hover:text-danger"
           >
             <Trash2 size={15} />
           </button>
@@ -303,17 +303,17 @@ export function MessageRow({
         {(onReply || onStartThread || onTogglePin) && (
           <div className="grid grid-cols-3 gap-2 border-t border-border px-4 pt-2">
             {onReply && (
-              <button type="button" onClick={() => (setPicker(null), onReply())} className="flex h-11 items-center justify-center gap-1.5 rounded-[10px] text-sm font-semibold hover:bg-surface-elevated">
+              <button type="button" onClick={() => (setPicker(null), onReply())} className="flex h-11 items-center justify-center gap-1.5 rounded-none text-sm font-semibold hover:bg-surface-elevated">
                 <CornerUpLeft size={15} /> Reply
               </button>
             )}
             {onStartThread && (
-              <button type="button" onClick={() => (setPicker(null), onStartThread())} className="flex h-11 items-center justify-center gap-1.5 rounded-[10px] text-sm font-semibold hover:bg-surface-elevated">
+              <button type="button" onClick={() => (setPicker(null), onStartThread())} className="flex h-11 items-center justify-center gap-1.5 rounded-none text-sm font-semibold hover:bg-surface-elevated">
                 <MessagesSquare size={15} /> Thread
               </button>
             )}
             {onTogglePin && (
-              <button type="button" onClick={() => (setPicker(null), onTogglePin())} className="flex h-11 items-center justify-center gap-1.5 rounded-[10px] text-sm font-semibold hover:bg-surface-elevated">
+              <button type="button" onClick={() => (setPicker(null), onTogglePin())} className="flex h-11 items-center justify-center gap-1.5 rounded-none text-sm font-semibold hover:bg-surface-elevated">
                 {message.pinned ? <PinOff size={15} /> : <Pin size={15} />} {message.pinned ? "Unpin" : "Pin"}
               </button>
             )}
@@ -327,7 +327,7 @@ export function MessageRow({
                 setPicker(null);
                 setReporting(true);
               }}
-              className="flex h-11 w-full items-center justify-center gap-2 rounded-[10px] text-sm font-semibold transition hover:bg-surface-elevated"
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-none text-sm font-semibold transition hover:bg-surface-elevated"
             >
               <Flag size={16} /> Report message
             </button>
@@ -341,7 +341,7 @@ export function MessageRow({
                 setPicker(null);
                 onDelete(message.id);
               }}
-              className="flex h-11 w-full items-center justify-center gap-2 rounded-[10px] text-sm font-semibold text-danger transition hover:bg-danger/10"
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-none text-sm font-semibold text-danger transition hover:bg-danger/10"
             >
               <Trash2 size={16} /> Remove message
             </button>

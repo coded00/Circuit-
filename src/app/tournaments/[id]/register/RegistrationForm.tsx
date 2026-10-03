@@ -131,11 +131,11 @@ export default function RegistrationForm({
           {team ? "Your name in the tournament (captain)" : "Name to play under"}
           <InfoTip text="This is the name other players and the organizer will see in the bracket and on your match page. Names have to be unique inside a tournament, so if yours is taken you'll need another." />
         </span>
-        <label className="flex items-center gap-2 rounded-[10px] border border-border p-3 text-sm">
+        <label className="flex items-center gap-2 rounded-none border border-border p-3 text-sm">
           <input type="radio" name="nameChoice" checked={nameChoice === "username"} onChange={() => setNameChoice("username")} />
           Use my Circuit username <span className="font-mono text-muted">@{username}</span>
         </label>
-        <label className="flex flex-col gap-2 rounded-[10px] border border-border p-3 text-sm">
+        <label className="flex flex-col gap-2 rounded-none border border-border p-3 text-sm">
           <span className="flex items-center gap-2">
             <input type="radio" name="nameChoice" checked={nameChoice === "custom"} onChange={() => setNameChoice("custom")} />
             Use my in-game name
@@ -173,9 +173,9 @@ export default function RegistrationForm({
         <div className="flex flex-col gap-2">
           <span className="field-label">Tournament rules</span>
           {rulesText ? (
-            <div className="max-h-44 overflow-y-auto rounded-[10px] border border-border bg-surface-elevated p-3 text-[13px] leading-relaxed whitespace-pre-wrap">{rulesText}</div>
+            <div className="max-h-44 overflow-y-auto rounded-none border border-border bg-surface-elevated p-3 text-[13px] leading-relaxed whitespace-pre-wrap">{rulesText}</div>
           ) : (
-            <p className="rounded-[10px] border border-border p-3 text-[13px] text-muted">The organizer hasn&apos;t posted extra rules. Play fair and report results honestly.</p>
+            <p className="rounded-none border border-border p-3 text-[13px] text-muted">The organizer hasn&apos;t posted extra rules. Play fair and report results honestly.</p>
           )}
           <label className="flex items-start gap-2.5 text-sm">
             <input type="checkbox" checked={rulesAccepted} onChange={(e) => setRulesAccepted(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0" />
@@ -187,12 +187,12 @@ export default function RegistrationForm({
       {entryFee > 0 && (
         <div className="flex flex-col gap-1.5">
           <span className="field-label">How would you like to pay?</span>
-          <label className="flex items-center gap-2 rounded-[10px] border border-border p-3 text-sm">
+          <label className="flex items-center gap-2 rounded-none border border-border p-3 text-sm">
             <input type="radio" name="payMethod" checked={!payFromWallet} onChange={() => setPayFromWallet(false)} />
             Pay by card (Paystack)
           </label>
           <label
-            className={`flex items-center justify-between gap-2 rounded-[10px] border border-border p-3 text-sm ${
+            className={`flex items-center justify-between gap-2 rounded-none border border-border p-3 text-sm ${
               canPayFromWallet ? "" : "cursor-not-allowed opacity-50"
             }`}
           >

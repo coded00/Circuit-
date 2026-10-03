@@ -80,7 +80,7 @@ export function NotificationItem({ notification: n, onClick }: { notification: N
     >
       {unread && <span aria-hidden className="absolute top-3 bottom-3 left-0 w-[3px] rounded-r-full bg-accent-volt" />}
       <span
-        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] ${
+        className={`flex h-9 w-9 shrink-0 items-center justify-center cut-avatar ${
           unread ? "bg-[#111318] text-accent-volt dark:bg-accent-volt-soft" : "bg-surface-elevated text-muted"
         }`}
       >

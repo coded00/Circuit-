@@ -18,6 +18,7 @@ import BlockedList from "./BlockedList";
 import ChangePasswordForm from "./ChangePasswordForm";
 import SignOutButton from "./SignOutButton";
 import DeleteAccountCard from "./DeleteAccountCard";
+import PreferencesForm from "./PreferencesForm";
 
 // Private, per-user settings — never real public content.
 export const metadata: Metadata = { robots: { index: false, follow: false } };
@@ -88,6 +89,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
       ),
     },
     { key: "privacy", label: "Privacy", content: <PrivacyForm initialSearchable={user.searchable} initialPolicy={user.directChallenges} /> },
+    { key: "preferences", label: "Preferences", content: <PreferencesForm /> },
     { key: "blocked", label: "Blocked", count: blocked.length, content: <BlockedList blocked={blocked} /> },
     { key: "account", label: "Account", content: <DeleteAccountCard requestedAt={user.deletionRequestedAt?.toISOString() ?? null} /> },
   ];

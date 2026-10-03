@@ -112,7 +112,7 @@ export function DialogOverlay({
             aria-modal="true"
             aria-label={label}
             data-surface={isAdminSurface ? "dark" : undefined}
-            className="overlay-panel relative flex max-h-[88vh] w-full flex-col overflow-hidden rounded-t-[20px] sm:max-h-[80vh] sm:rounded-[16px]"
+            className="overlay-panel relative flex max-h-[88vh] w-full flex-col overflow-hidden cut-lg [--cut-line:var(--border)] sm:max-h-[80vh]"
             style={isDesktop ? { maxWidth } : undefined}
             initial={isDesktop ? { opacity: 0, y: 12, scale: 0.98 } : { y: "100%" }}
             animate={isDesktop ? { opacity: 1, y: 0, scale: 1 } : { y: 0 }}
@@ -133,7 +133,7 @@ export function DialogOverlay({
                 onPointerDown={(e) => dragControls.start(e)}
                 className="flex shrink-0 touch-none justify-center pt-2.5 pb-1.5 sm:hidden"
               >
-                <span className="h-1 w-9 rounded-full bg-border-strong" />
+                <span className="h-1 w-9 rounded-none bg-border-strong" />
               </div>
             )}
             {children}

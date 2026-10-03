@@ -46,7 +46,7 @@ export default async function StartPage() {
           </Link>
           <Link
             href="/login"
-            className="flex h-12 w-full items-center justify-center rounded-[var(--radius-control)] border border-white/[0.12] text-[15px] font-semibold transition hover:border-white/25 hover:bg-white/[0.04] active:scale-[0.99]"
+            className="flex h-12 w-full items-center justify-center cut-sm [--cut-line:rgb(255_255_255/0.12)] border border-white/[0.12] text-[15px] font-semibold transition hover:border-white/25 hover:bg-white/[0.04] active:scale-[0.99]"
           >
             Log in
           </Link>

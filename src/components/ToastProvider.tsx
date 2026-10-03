@@ -11,6 +11,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { AlertCircle, Check, Info, X } from "lucide-react";
+import { feedback } from "@/lib/feedback";
 
 type Tone = "success" | "error" | "info";
 type ToastInput = { title: string; message?: string; tone?: Tone };
@@ -48,6 +49,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const toast = useCallback(
     (input: ToastInput) => {
       const id = nextId.current++;
+      if (input.tone !== "info") feedback(input.tone === "error" ? "error" : "success");
       setToasts((list) => [...list.slice(-(MAX_VISIBLE - 1)), { ...input, id, tone: input.tone ?? "success" }]);
       timers.current.set(id, setTimeout(() => dismiss(id), VISIBLE_MS));
     },
@@ -72,15 +74,15 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         {toasts.map((t) => {
           const { Icon, chip } = TONE[t.tone];
           return (
-            <div key={t.id} role={t.tone === "error" ? "alert" : "status"} className="toast-in pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-[14px] border border-border-strong bg-surface p-3.5 shadow-lg">
-              <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${chip}`}>
+            <div key={t.id} role={t.tone === "error" ? "alert" : "status"} className="toast-in pointer-events-auto flex w-full max-w-sm items-start gap-3 cut-sm border border-border-strong bg-surface p-3.5 [--cut-line:var(--border-strong)]">
+              <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center cut-avatar ${chip}`}>
                 <Icon size={15} strokeWidth={2.5} aria-hidden />
               </span>
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="text-sm font-semibold">{t.title}</span>
                 {t.message && <span className="text-[13px] leading-snug text-muted">{t.message}</span>}
               </div>
-              <button type="button" onClick={() => dismiss(t.id)} aria-label="Dismiss" className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-muted transition hover:text-foreground">
+              <button type="button" onClick={() => dismiss(t.id)} aria-label="Dismiss" className="flex h-6 w-6 shrink-0 items-center justify-center text-muted transition hover:text-foreground">
                 <X size={14} />
               </button>
             </div>

@@ -271,7 +271,7 @@ export default function AccountForm({
         </span>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-lg border border-border bg-card/50 p-4">
+      <div className="flex flex-col gap-3 rounded-none border border-border bg-card/50 p-4">
         <div className="flex items-center justify-between">
           <div>
             <label className="text-sm font-semibold text-foreground">

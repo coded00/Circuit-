@@ -115,7 +115,7 @@ export function TournamentCard({
           <span className="line-clamp-2 font-display text-lg leading-[1.05] font-bold tracking-tight uppercase sm:text-xl">{t.name}</span>
         </div>
 
-        <dl className="grid grid-cols-[1fr_1fr_0.8fr] gap-2 rounded-[12px] border border-white/10 bg-black/60 p-2.5">
+        <dl className="grid grid-cols-[1fr_1fr_0.8fr] gap-2 cut-sm [--cut-line:rgb(255_255_255/0.1)] border border-white/10 bg-black/60 p-2.5">
           <div className="flex min-w-0 flex-col gap-0.5">
             <dt className="text-[10px] font-medium tracking-wide text-white/60 uppercase">{t.prizeAmount ? "Prize" : "Entry"}</dt>
             <dd className={`text-stat truncate text-sm ${t.prizeAmount ? "text-gold" : t.entryFee === 0 ? "text-success" : ""}`}>
@@ -136,7 +136,7 @@ export function TournamentCard({
           </div>
         </dl>
 
-        <div className="h-1 w-full overflow-hidden rounded-full bg-white/15" aria-hidden>
+        <div className="h-1 w-full overflow-hidden rounded-none bg-white/15" aria-hidden>
           <div
             className={`h-full rounded-full transition-[width] duration-[var(--duration-reveal)] ${spotsLeft <= 0 || nearlyFull ? "bg-accent-orange" : "bg-accent-volt"}`}
             style={{ width: `${fill}%` }}

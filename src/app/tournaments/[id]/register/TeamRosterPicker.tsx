@@ -58,7 +58,7 @@ export function TeamRosterPicker({
 
   if (options.length === 0) {
     return (
-      <div className="flex flex-col gap-3 rounded-[12px] border border-dashed border-border-strong p-4">
+      <div className="flex flex-col gap-3 cut-sm [--cut-line:var(--border)] border border-dashed border-border-strong p-4">
         <span className="flex items-center gap-2 text-sm font-semibold">
           <Users size={16} /> This is a team tournament
         </span>
@@ -101,7 +101,7 @@ export function TeamRosterPicker({
                 aria-checked={on}
                 disabled={!!t.blocked}
                 onClick={() => pickTeam(t.id)}
-                className={`flex flex-col items-start rounded-[10px] border px-3.5 py-2.5 text-left text-sm transition ${
+                className={`flex flex-col items-start rounded-none border px-3.5 py-2.5 text-left text-sm transition ${
                   t.blocked
                     ? "cursor-not-allowed border-dashed border-border text-muted-strong"
                     : on
@@ -138,7 +138,7 @@ export function TeamRosterPicker({
               </Link>
             </p>
           )}
-          <ul className="flex flex-col divide-y divide-border rounded-[12px] border border-border">
+          <ul className="flex flex-col divide-y divide-border cut-sm [--cut-line:var(--border)] border border-border">
             {team.members.map((m) => {
               const on = m.userId in value.members;
               const locked = m.isCaptain || !!m.busyWith;
@@ -200,7 +200,7 @@ export function TeamRosterPicker({
             })}
           </ul>
           {hasPrize && (
-            <div className="flex flex-col gap-1 rounded-[10px] bg-surface-elevated/60 px-3 py-2 text-xs">
+            <div className="flex flex-col gap-1 rounded-none bg-surface-elevated/60 px-3 py-2 text-xs">
               <div className="flex items-center justify-between gap-2">
                 <span className="flex items-center gap-1.5 font-semibold">
                   How the prize is shared

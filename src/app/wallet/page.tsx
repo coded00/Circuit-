@@ -99,7 +99,7 @@ export default async function WalletPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-4 py-6 sm:px-8 sm:py-10">
-      <section data-surface="dark" className="overflow-hidden rounded-[var(--radius-hero)] border border-border">
+      <section data-surface="dark" className="overflow-hidden cut-lg [--cut-line:var(--border)] border border-border">
         <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-end sm:justify-between sm:p-7">
           <div className="flex flex-col gap-2">
             <span className="text-eyebrow text-muted">Available balance</span>
@@ -139,7 +139,7 @@ export default async function WalletPage() {
       {needsEmailVerification(user) && accountEmail(user) && <EmailVerificationBanner email={accountEmail(user)!} reason={`Confirm ${accountEmail(user)} is yours to withdraw, claim prizes and enter paid tournaments.`} />}
 
       {!user.payoutMethodRef && (
-        <div className="flex items-center gap-3 rounded-[var(--radius-lg)] border border-dashed border-border-strong px-4 py-3">
+        <div className="flex items-center gap-3 cut-lg [--cut-line:var(--border)] border border-dashed border-border-strong px-4 py-3">
           <Landmark size={18} className="shrink-0 text-muted" />
           <p className="min-w-0 flex-1 text-sm text-muted">Add a payout account to withdraw and receive tournament prizes.</p>
           <Link href="/account" className="shrink-0 text-sm font-medium text-accent-blue hover:underline">

@@ -180,7 +180,7 @@ function CopyField({ label, value }: { label: string; value: string }) {
             /* clipboard blocked — the value is still visible to copy by hand */
           }
         }}
-        className="flex h-10 items-center justify-between gap-2 rounded-[10px] border border-border bg-surface px-3 text-left font-mono text-sm font-semibold transition hover:border-border-hover"
+        className="flex h-10 items-center justify-between gap-2 rounded-none border border-border bg-surface px-3 text-left font-mono text-sm font-semibold transition hover:border-border-hover"
         aria-label={`Copy ${label.toLowerCase()}`}
       >
         <span className="truncate select-all">{value}</span>
@@ -194,13 +194,13 @@ function CopyField({ label, value }: { label: string; value: string }) {
 export function RoomDetailsCard({ roundLabel, roomCode, roomPassword }: { roundLabel: string; roomCode: string | null; roomPassword: string | null }) {
   if (!roomCode) {
     return (
-      <p className="flex items-center gap-2 rounded-[10px] border border-dashed border-border px-3 py-2.5 text-xs text-muted">
+      <p className="flex items-center gap-2 rounded-none border border-dashed border-border px-3 py-2.5 text-xs text-muted">
         <KeyRound size={14} /> Room details for {roundLabel.replace(/^Round/, "round")} aren&apos;t posted yet — you&apos;ll get a notification.
       </p>
     );
   }
   return (
-    <div className="flex flex-col gap-2 rounded-[12px] border border-accent-volt/40 bg-accent-volt/5 p-3">
+    <div className="flex flex-col gap-2 cut-sm border border-accent-volt/40 bg-accent-volt/5 p-3">
       <span className="flex items-center gap-2 text-xs font-semibold">
         <KeyRound size={14} /> {roundLabel} room — only players in this lobby can see this
       </span>
@@ -258,7 +258,7 @@ export function RoomDetailsForm({
   }
   return (
     <form
-      className="flex flex-col gap-2 rounded-[12px] border border-border p-3"
+      className="flex flex-col gap-2 cut-sm [--cut-line:var(--border)] border border-border p-3"
       onSubmit={(e) => {
         e.preventDefault();
         save({ roomCode: code, roomPassword: password });

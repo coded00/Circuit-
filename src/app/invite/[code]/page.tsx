@@ -61,7 +61,7 @@ export default async function InvitePage({ params }: Params) {
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-6 px-4 py-10">
-      <div className="relative w-full overflow-hidden rounded-[22px] border border-border bg-surface">
+      <div className="relative w-full overflow-hidden cut-lg [--cut-line:var(--border)] border border-border bg-surface">
         <div className="relative h-28 w-full overflow-hidden">
           {community.bannerUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- uploaded or external banner
