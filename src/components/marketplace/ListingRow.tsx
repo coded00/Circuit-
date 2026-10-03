@@ -6,7 +6,7 @@ import { ListingCard, type ListingCardData } from "./ListingCard";
 export function ListingRow({ title, hint, listings, href }: { title: string; hint?: string; listings: ListingCardData[]; href?: string }) {
   if (listings.length === 0) return null;
   return (
-    <section className="flex flex-col gap-3" aria-label={title}>
+    <section className="cv-auto flex flex-col gap-3" aria-label={title}>
       <div className="flex items-end justify-between gap-3">
         <div className="flex flex-col gap-0.5">
           <h2 className="font-display text-xl font-bold tracking-tight sm:text-2xl">{title}</h2>

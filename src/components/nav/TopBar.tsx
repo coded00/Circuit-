@@ -86,8 +86,9 @@ export async function TopBar({ user, disputeCount = 0 }: { user: User | null; di
 
           <div className="ml-auto flex shrink-0 items-center gap-2">
             <MobileSearchToggle />
+            {/* The signed-in strip has no clip-path: the notification, create and account menus open out of it, and a cut corner would clip them. */}
             {user ? (
-              <div className="flex items-center cut-sm [--cut-line:rgb(255_255_255/0.08)] border border-white/[0.08] bg-white/[0.03] p-1">
+              <div className="flex items-center border border-white/[0.08] bg-white/[0.03] p-1">
                 <WalletBalanceChip balance={user.walletBalance} />
                 <HudDivider />
                 <NotificationBell initialUnreadCount={unreadCount} buttonClassName={HUD_BUTTON} />

@@ -14,11 +14,11 @@
  */
 
 import { feedback } from "@/lib/feedback";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, Bell, BellOff, CheckCheck } from "lucide-react";
-import { DialogOverlay, useIsDesktop } from "@/components/ui/Overlay";
+import { ArrowRight, Bell, BellOff, CheckCheck, X } from "lucide-react";
 import {
   NotificationGroupLabel,
   NotificationItem,
@@ -26,7 +26,7 @@ import {
   type NotificationRow,
 } from "@/components/notifications/NotificationItem";
 
-const POLL_INTERVAL_MS = 5000;
+const POLL_INTERVAL_MS = 15_000;
 const PREVIEW_TAKE = 5;
 const PANEL_TAKE = 30;
 
@@ -63,17 +63,22 @@ function NotificationInbox({
               </span>
             )}
           </h2>
-          {unreadCount > 0 && (
-            <button
-              type="button"
-              onClick={onMarkAll}
-              disabled={markingAll}
-              className="flex items-center gap-1 rounded-none px-1.5 py-1 text-xs font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground disabled:opacity-50"
-            >
-              <CheckCheck size={14} />
-              {markingAll ? "Marking…" : "Mark all read"}
+          <div className="flex items-center gap-1">
+            {unreadCount > 0 && (
+              <button
+                type="button"
+                onClick={onMarkAll}
+                disabled={markingAll}
+                className="flex items-center gap-1 rounded-none px-1.5 py-1 text-xs font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground disabled:opacity-50"
+              >
+                <CheckCheck size={14} />
+                {markingAll ? "Marking…" : "Mark all read"}
+              </button>
+            )}
+            <button type="button" onClick={onClose} aria-label="Close notifications" className="btn-icon h-9 w-9">
+              <X size={18} className="text-muted" />
             </button>
-          )}
+          </div>
         </div>
         <div className="-mb-px flex gap-4" role="tablist">
           {(["all", "unread"] as const).map((f) => (
@@ -144,14 +149,20 @@ export function NotificationBell({
   const [unreadCount, setUnreadCount] = useState(initialUnreadCount);
   const lastUnread = useRef(initialUnreadCount);
   const [markingAll, setMarkingAll] = useState(false);
-  const isDesktop = useIsDesktop();
-  const wrapperRef = useRef<HTMLDivElement>(null);
+  // The panel is portaled to <body> so nothing in the header can clip it; that needs the client.
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
 
   useEffect(() => {
     let cancelled = false;
     const take = open ? PANEL_TAKE : PREVIEW_TAKE;
 
     async function poll() {
+      // A hidden tab has nobody to notify; it catches up the moment it is visible again.
+      if (document.visibilityState !== "visible") return;
       // A transient network blip (offline, a dev-server restart, the tab
       // waking from sleep) shouldn't crash this background poll — any
       // unguarded fetch failure becomes an unhandled rejection, which
@@ -179,23 +190,20 @@ export function NotificationBell({
     };
   }, [open]);
 
-  // Desktop popover: click-outside and Escape close it. (The phone sheet
-  // gets both from DialogOverlay.)
+  // While the panel is open: Escape closes it, and the page behind it doesn't scroll.
   useEffect(() => {
-    if (!open || !isDesktop) return;
-    function onPointerDown(event: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) setOpen(false);
-    }
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") setOpen(false);
     }
-    document.addEventListener("mousedown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
     return () => {
-      document.removeEventListener("mousedown", onPointerDown);
+      document.body.style.overflow = previousOverflow;
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [open, isDesktop]);
+  }, [open]);
 
   async function markRead(id: string) {
     setUnreadCount((count) => Math.max(0, count - 1));
@@ -228,7 +236,7 @@ export function NotificationBell({
   );
 
   return (
-    <div ref={wrapperRef} className="relative">
+    <>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -244,28 +252,41 @@ export function NotificationBell({
         )}
       </button>
 
-      {isDesktop ? (
-        <AnimatePresence>
-          {open && (
-            <motion.div
-              role="dialog"
-              aria-label="Notifications"
-              className="absolute top-full right-0 z-40 mt-2 flex max-h-[min(560px,calc(100vh-88px))] w-[400px] max-w-[calc(100vw-2rem)] origin-top-right flex-col overflow-hidden cut-sm [--cut-line:var(--border)] border border-border bg-surface"
-              style={{ boxShadow: "var(--shadow-float)" }}
-              initial={{ opacity: 0, y: -6, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -4, scale: 0.98 }}
-              transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
-            >
-              {inbox}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      ) : (
-        <DialogOverlay open={open} onClose={() => setOpen(false)} label="Notifications">
-          <div className="flex h-[78vh] flex-col">{inbox}</div>
-        </DialogOverlay>
-      )}
-    </div>
+      {/* Slides in from the right over a dimmed page, on every screen size. */}
+      {mounted &&
+        createPortal(
+          <AnimatePresence>
+            {open && (
+              <>
+                <motion.div
+                  key="notifications-backdrop"
+                  className="fixed inset-0 z-40 bg-black/60"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                  onClick={() => setOpen(false)}
+                />
+                <motion.div
+                  key="notifications-panel"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-label="Notifications"
+                  data-surface="dark"
+                  className="fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l border-border bg-surface text-foreground sm:w-[420px]"
+                  style={{ boxShadow: "-16px 0 40px rgba(0, 0, 0, 0.45)", paddingBottom: "env(safe-area-inset-bottom)" }}
+                  initial={{ x: "100%" }}
+                  animate={{ x: 0 }}
+                  exit={{ x: "100%" }}
+                  transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                >
+                  {inbox}
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>,
+          document.body,
+        )}
+    </>
   );
 }

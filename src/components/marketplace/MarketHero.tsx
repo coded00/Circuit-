@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { sized } from "@/lib/imageUrl";
 import { ArenaGlow } from "@/components/ArenaBackdrop";
 import { categoryLabel, formatListingPrice } from "@/lib/marketplace";
 import { CategoryIcon } from "./categoryIcon";
@@ -31,7 +32,7 @@ export function MarketHero({ picks, total }: { picks: HeroListing[]; total: numb
       >
         {main.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- staff-uploaded or pasted image, arbitrary host and size
-          <img src={main.imageUrl} alt="" className="absolute inset-0 -z-10 h-full w-full object-cover transition-transform duration-[var(--duration-reveal)] ease-[var(--ease-standard)] group-hover:scale-[1.04]" />
+          <img src={sized(main.imageUrl, 900) ?? main.imageUrl} alt="" className="absolute inset-0 -z-10 h-full w-full object-cover transition-transform duration-[var(--duration-reveal)] ease-[var(--ease-standard)] group-hover:scale-[1.04]" />
         ) : (
           <div aria-hidden className="absolute inset-0 -z-10 flex items-center justify-center bg-surface-elevated text-white/10">
             <CategoryIcon category={main.category} size={160} />

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { LayoutGrid } from "lucide-react";
+import { sized } from "@/lib/imageUrl";
 import { GameArtTile } from "@/components/GameArtTile";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 
@@ -22,7 +23,7 @@ function GameTile({ name, iconUrl, activeCompetitions }: GameCount) {
       <div className="relative aspect-square w-full overflow-hidden bg-surface-elevated">
         {iconUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- admin-uploaded game logo, arbitrary host and size
-          <img src={iconUrl} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-[var(--duration-reveal)] group-hover:scale-[1.05]" />
+          <img src={sized(iconUrl, 112) ?? iconUrl} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-[var(--duration-reveal)] group-hover:scale-[1.05]" />
         ) : (
           <GameArtTile thumb game={name} hideLabel fill className="h-full w-full" />
         )}

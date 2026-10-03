@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import type { Metadata } from "next";
 import { Inter, Barlow_Condensed, Geist_Mono } from "next/font/google";
 import { MotionConfig } from "framer-motion";
@@ -84,6 +85,11 @@ const WEBSITE_JSON_LD = {
   url: SITE_URL,
 };
 
+// Both are read on every page view but change only when an admin edits them, so
+// a short shared cache keeps them from taking two database connections per request.
+const cachedPlatformSetting = unstable_cache(() => prisma.platformSetting.findUnique({ where: { id: "singleton" } }), ["platform-setting"], { revalidate: 15, tags: ["platform-setting"] });
+const cachedGameImageMap = unstable_cache(() => gameImageMap(), ["game-image-map"], { revalidate: 60, tags: ["games"] });
+
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const user = await getCurrentUser();
   const [disputeCount, platformSetting, gameImages] = await Promise.all([
@@ -95,8 +101,8 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           },
         })
       : 0,
-    prisma.platformSetting.findUnique({ where: { id: "singleton" } }),
-    gameImageMap(),
+    cachedPlatformSetting(),
+    cachedGameImageMap(),
   ]);
   const navUser = user ? { handle: user.handle, displayName: user.displayName, isStaff: user.isStaff } : null;
 

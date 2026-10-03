@@ -86,7 +86,7 @@ export function MobileTabBar({ user }: { user: NavUser }) {
   return (
     <>
       {inDashboard && (
-        <nav className="scrollbar-hide fixed inset-x-0 bottom-[calc(3.5rem_+_env(safe-area-inset-bottom))] z-10 flex gap-1 overflow-x-auto border-t border-border bg-background/95 px-2 py-1.5 backdrop-blur-md sm:hidden">
+        <nav className="scrollbar-hide fixed inset-x-0 bottom-[calc(3.5rem_+_env(safe-area-inset-bottom))] z-10 flex gap-1 overflow-x-auto border-t border-border bg-background px-2 py-1.5 sm:hidden">
           {DASHBOARD_ITEMS.map((item) => {
             const active = item.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(item.href);
             return (
@@ -104,7 +104,7 @@ export function MobileTabBar({ user }: { user: NavUser }) {
       )}
 
       <nav
-        className="fixed inset-x-0 bottom-0 z-10 flex border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md sm:hidden"
+        className="fixed inset-x-0 bottom-0 z-10 flex border-t border-border bg-background pb-[env(safe-area-inset-bottom)] sm:hidden"
         // Pinned during page view transitions (globals.css).
         style={{ viewTransitionName: "site-tabbar" }}
       >

@@ -13,6 +13,7 @@
  */
 
 import { realGameImage, unsplashUrl } from "@/lib/gameImagery";
+import { sized } from "@/lib/imageUrl";
 import { useGameImage } from "@/components/GameImageProvider";
 import { gameTint } from "@/lib/gameTint";
 
@@ -54,7 +55,7 @@ export function GameArtTile({
 }) {
   const catalogImage = useGameImage(game, thumb ? "icon" : "cover");
   const stockPhoto = realGameImage(game);
-  const imageSrc = posterUrl || catalogImage || (stockPhoto ? unsplashUrl(stockPhoto, imgWidth) : null);
+  const imageSrc = sized(posterUrl || catalogImage, imgWidth) || (stockPhoto ? unsplashUrl(stockPhoto, imgWidth) : null);
   const tint = gameTint(game);
 
   return (
@@ -72,6 +73,9 @@ export function GameArtTile({
           src={imageSrc}
           alt=""
           aria-hidden
+          // Big hero art is the first thing painted, so it loads straight away; everything else waits until it is near the screen.
+          loading={imgWidth >= 1200 ? "eager" : "lazy"}
+          decoding="async"
           className="absolute inset-0 h-full w-full object-cover"
         />
       )}

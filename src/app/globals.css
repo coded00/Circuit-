@@ -2135,3 +2135,41 @@ svg.lucide {
 [data-admin] .badge::before {
   display: none;
 }
+
+
+/*
+ * Feel: no 300ms tap delay or grey tap flash on touch, scroll chaining kept inside
+ * menus, sheets and carousels, and heavy off-screen sections left unrendered until
+ * they are near the viewport.
+ */
+html {
+  -webkit-tap-highlight-color: transparent;
+  scroll-padding-top: 5rem;
+  text-rendering: optimizeLegibility;
+}
+a,
+button,
+summary,
+label,
+select,
+input,
+textarea,
+[role="button"],
+[role="tab"],
+[role="switch"] {
+  touch-action: manipulation;
+}
+.scrollbar-hide,
+.dropdown-panel,
+.overlay-panel,
+[role="listbox"] {
+  overscroll-behavior: contain;
+}
+.scrollbar-hide {
+  -webkit-overflow-scrolling: touch;
+}
+/* Below-the-fold sections: skip layout and paint until they near the screen. */
+.cv-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 480px;
+}

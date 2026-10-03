@@ -183,9 +183,13 @@ async function HomeContent({ searchParams }: { searchParams: Promise<{ leaderboa
 
           <ExploreTheCircuit games={gameCounts} />
 
-          <OpenChallenges battles={openChallengesPreview} records={challengeRecordsByKey} total={openChallengeCount} viewerId={user?.id} />
+          <div className="cv-auto">
+            <OpenChallenges battles={openChallengesPreview} records={challengeRecordsByKey} total={openChallengeCount} viewerId={user?.id} />
+          </div>
 
-          <UpcomingCompetitions tournaments={upcomingTournaments} />
+          <div className="cv-auto">
+            <UpcomingCompetitions tournaments={upcomingTournaments} />
+          </div>
         </div>
 
         <div className="flex min-w-0 flex-col gap-6">

@@ -4,6 +4,7 @@ import { ChevronLeft } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { blockedBetween } from "@/lib/blocks";
+import { sized } from "@/lib/imageUrl";
 import { categoryLabel, formatListingPrice, relatedListings } from "@/lib/marketplace";
 import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
 import { CategoryIcon } from "@/components/marketplace/categoryIcon";
@@ -71,7 +72,7 @@ export default async function ListingPage({ params }: { params: Promise<{ id: st
         <div className="cut-lg relative aspect-[4/3] w-full overflow-hidden bg-surface-elevated">
           {listing.imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- seller-uploaded or pasted image, arbitrary host and size
-            <img src={listing.imageUrl} alt="" className={`h-full w-full object-cover ${soldOut ? "opacity-60" : ""}`} />
+            <img src={sized(listing.imageUrl, 700) ?? listing.imageUrl} alt="" className={`h-full w-full object-cover ${soldOut ? "opacity-60" : ""}`} />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-muted/40">
               <CategoryIcon category={listing.category} size={88} />

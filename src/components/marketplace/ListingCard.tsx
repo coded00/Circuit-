@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ListingCategory } from "@prisma/client";
+import { sized } from "@/lib/imageUrl";
 import { categoryLabel, formatListingPrice, isNewListing } from "@/lib/marketplace";
 import { CategoryIcon } from "./categoryIcon";
 
@@ -25,7 +26,7 @@ export function ListingCard({ listing: l }: { listing: ListingCardData }) {
       <div className={`relative aspect-[4/3] w-full overflow-hidden bg-surface-elevated ${l.stock === 0 ? "opacity-60" : ""}`}>
         {l.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- seller-uploaded or pasted image, arbitrary host and size
-          <img src={l.imageUrl} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-[var(--duration-reveal)] group-hover:scale-[1.04]" />
+          <img src={sized(l.imageUrl, 400) ?? l.imageUrl} alt="" decoding="async" loading="lazy" className="h-full w-full object-cover transition-transform duration-[var(--duration-reveal)] group-hover:scale-[1.04]" />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-muted/50">
             <CategoryIcon category={l.category} size={44} />

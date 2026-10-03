@@ -17,7 +17,7 @@ export function StickyBuyBar({ title, price }: { title: string; price: string })
   return (
     <div
       aria-hidden={!show}
-      className={`fixed inset-x-0 bottom-[4.25rem] z-30 flex items-center justify-between gap-3 border-t border-border bg-background/95 px-4 py-3 backdrop-blur transition duration-[var(--duration-base)] md:hidden ${
+      className={`fixed inset-x-0 bottom-[4.25rem] z-30 flex items-center justify-between gap-3 border-t border-border bg-background px-4 py-3 transition duration-[var(--duration-base)] md:hidden ${
         show ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-full opacity-0"
       }`}
     >
