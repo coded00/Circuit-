@@ -15,7 +15,7 @@ describe("parsePrizeSplit", () => {
     expect(parsePrizeSplit("  ", 3)).toEqual({ ok: true, value: [] });
   });
   it("rejects bad splits", () => {
-    expect(parsePrizeSplit([50, 30], 3)).toMatchObject({ ok: false, error: "The shares add up to 80% — they need to make 100%." });
+    expect(parsePrizeSplit([50, 30], 3)).toMatchObject({ ok: false, error: "The shares add up to 80%. They need to make 100%." });
     expect(parsePrizeSplit([30, 70], 3).ok).toBe(false);
     expect(parsePrizeSplit([40, 30, 20, 10], 3)).toMatchObject({ ok: false, error: "This tournament can pay at most 3 places." });
     expect(parsePrizeSplit([50.5, 49.5], 3).ok).toBe(false);
