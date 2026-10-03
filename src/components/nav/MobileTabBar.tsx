@@ -20,7 +20,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { usePathname } from "next/navigation";
 import { logout } from "@/lib/logout";
 import { loginPath, signupPath } from "@/lib/safeRedirect";
@@ -66,10 +65,10 @@ function TabLink({
     <Link
       href={href}
       aria-current={active ? "page" : undefined}
-      className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs transition-colors duration-[var(--duration-fast)] ${active ? "text-foreground" : "text-muted"}`}
+      className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 px-0.5 py-2.5 text-[10px] leading-none font-medium transition-colors duration-[var(--duration-fast)] ${active ? "text-foreground" : "text-muted"}`}
     >
-      <Icon size={18} className={active ? "text-accent-volt" : undefined} />
-      {label}
+      <Icon size={20} className={active ? "text-accent-volt" : undefined} />
+      <span className="max-w-full truncate">{label}</span>
     </Link>
   );
 }
@@ -96,7 +95,7 @@ export function MobileTabBar({ user }: { user: NavUser }) {
                 key={item.href}
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors duration-[var(--duration-fast)] ${active ? "bg-accent-volt-soft text-foreground" : "text-muted"}`}
+                className={`shrink-0 cut-xs px-3 py-1.5 text-xs font-medium transition-colors duration-[var(--duration-fast)] ${active ? "bg-accent-volt-soft text-foreground" : "text-muted"}`}
               >
                 {item.label}
               </Link>
@@ -122,10 +121,10 @@ export function MobileTabBar({ user }: { user: NavUser }) {
         <button
           type="button"
           onClick={() => setMenuOpen(true)}
-          className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs transition-colors duration-[var(--duration-fast)] ${onProfile ? "text-foreground" : "text-muted"}`}
+          className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 px-0.5 py-2.5 text-[10px] leading-none font-medium transition-colors duration-[var(--duration-fast)] ${onProfile ? "text-foreground" : "text-muted"}`}
         >
-          <UserIcon size={18} className={onProfile ? "text-accent-volt" : undefined} />
-          Profile
+          <UserIcon size={20} className={onProfile ? "text-accent-volt" : undefined} />
+          <span className="max-w-full truncate">Profile</span>
         </button>
       </nav>
 
@@ -176,7 +175,6 @@ export function MobileTabBar({ user }: { user: NavUser }) {
             <Link href="/calendar" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
               <Calendar size={18} /> Calendar
             </Link>
-            <ThemeToggle variant="row" />
             {user && (
               <>
                 <Link href="/notifications" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm">

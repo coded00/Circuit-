@@ -187,7 +187,7 @@ export async function POST(
       currency: "NGN",
       destinationRef: user.payoutMethodRef,
       reference,
-      reason: `Prize payout — ${tournament.name}`,
+      reason: `Prize payout, ${tournament.name}`,
     });
 
     // PENDING waits for the transfer webhook (src/lib/payments/transfers.ts).
@@ -222,7 +222,7 @@ export async function POST(
     captureException(err, { route: "tournaments/[id]/payout", userId: user.id, tournamentId: tournament.id, escrowTransactionId: txnId, amount: prizeAmount, provider: provider.name });
     await prisma.escrowTransaction.updateMany({ where: { id: txnId, status: "PENDING" }, data: { status: "FAILED" } });
     return NextResponse.json(
-      { error: "We couldn't send your prize right now. Nothing has been taken — your prize is still yours to claim, so please try again later." },
+      { error: "We couldn't send your prize right now. Nothing has been taken. Your prize is still yours to claim, so please try again later." },
       { status: 502 }
     );
   }

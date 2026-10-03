@@ -18,14 +18,22 @@ export function loadGameTree(id: string) {
 }
 
 /** Lowercased game name → the image a game tile should show (cover first, then icon). */
-export async function gameImageMap(): Promise<Record<string, string>> {
+export type GameImages = { cover: Record<string, string>; icon: Record<string, string> };
+
+/** Each game's two uploads, by lower-cased name. Wide spots (banners, cards) want the cover and fall back to the icon; small thumbnails want the icon and fall back to the cover. */
+export async function gameImageMap(): Promise<GameImages> {
   const games = await prisma.game.findMany({
     where: { OR: [{ coverUrl: { not: null } }, { iconUrl: { not: null } }] },
     select: { name: true, coverUrl: true, iconUrl: true },
   });
-  const map: Record<string, string> = {};
-  for (const g of games) map[g.name.trim().toLowerCase()] = (g.coverUrl ?? g.iconUrl)!;
-  return map;
+  const cover: Record<string, string> = {};
+  const icon: Record<string, string> = {};
+  for (const g of games) {
+    const key = g.name.trim().toLowerCase();
+    cover[key] = (g.coverUrl ?? g.iconUrl)!;
+    icon[key] = (g.iconUrl ?? g.coverUrl)!;
+  }
+  return { cover, icon };
 }
 
 /** Games players can see and pick: enabled and published in Admin → Games. */
@@ -33,6 +41,6 @@ export async function publishedGames() {
   return prisma.game.findMany({
     where: { enabled: true, publishedAt: { not: null } },
     orderBy: { name: "asc" },
-    select: { id: true, name: true },
+    select: { id: true, name: true, iconUrl: true },
   });
 }

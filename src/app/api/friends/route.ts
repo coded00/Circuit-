@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { notify } from "@/lib/notifications";
+import { blockedBetween } from "@/lib/blocks";
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
@@ -26,6 +27,9 @@ export async function POST(request: Request) {
   }
   if (target.id === user.id) {
     return NextResponse.json({ error: "You can't friend yourself." }, { status: 400 });
+  }
+  if (await blockedBetween(user.id, target.id)) {
+    return NextResponse.json({ error: "You can't send this player a friend request." }, { status: 403 });
   }
 
   const existing = await prisma.friendship.findFirst({

@@ -12,7 +12,7 @@ import { verifyEmailToken, type VerifyResult } from "@/lib/emailVerification";
 export const metadata: Metadata = { title: "Verify email", robots: { index: false, follow: false } };
 
 const COPY: Record<VerifyResult, { title: string; body: string; ok: boolean }> = {
-  verified: { title: "Email verified", body: "Thanks — your account is verified. You can now create communities, enter paid tournaments, stake in challenges and withdraw.", ok: true },
+  verified: { title: "Email verified", body: "Thanks. Your account is verified. You can now create communities, enter paid tournaments, stake in challenges and withdraw.", ok: true },
   already: { title: "Already verified", body: "This email was already verified. You're all set.", ok: true },
   expired: { title: "This link has expired", body: "Links last 24 hours. Send a new one from Account settings.", ok: false },
   changed: { title: "This link is for an old email", body: "Your account's email has changed since this was sent. Send a new link from Account settings.", ok: false },

@@ -1,53 +1,62 @@
 import Link from "next/link";
-import { LayoutGrid, ArrowRight } from "lucide-react";
+import { LayoutGrid } from "lucide-react";
 import { GameArtTile } from "@/components/GameArtTile";
-import { AutoScrollRow } from "@/components/AutoScrollRow";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 
 /**
  * Circuit — homepage "Games" row: the published game catalog (Admin →
- * Games), each with its real number of open tournaments, cover art from
- * the catalog (GameArtTile). A tile opens that game's tournaments on
- * /compete; the last tile goes to its official community hubs. Hidden
- * when nothing is published yet.
+ * Games), each with its real number of open tournaments. Each tile shows the
+ * game's square logo (the small image uploaded for it); a game with no logo
+ * falls back to its cover art. A tile opens that game's tournaments on
+ * /compete; the last tile goes to the official community hubs. Hidden when
+ * nothing is published yet.
  */
 
-export type GameCount = { name: string; activeCompetitions: number };
+export type GameCount = { name: string; iconUrl: string | null; activeCompetitions: number };
 
-function GameTile({ name, activeCompetitions }: GameCount) {
+const TILE = "group cut-sm flex w-24 shrink-0 flex-col overflow-hidden border border-border bg-surface transition duration-[var(--duration-base)] ease-[var(--ease-standard)] [--cut-line:var(--border)] hover:-translate-y-0.5 hover:border-border-hover active:translate-y-0 active:scale-[0.99]";
+
+function GameTile({ name, iconUrl, activeCompetitions }: GameCount) {
   return (
-    <Link href={`/compete?game=${encodeURIComponent(name)}`} className="card-media relative block h-[105px] w-[170px]">
-      {/* GameArtTile's own label sits flush at the bottom (bottom-2) —
-          stack this above it (bottom-6) rather than on the same row. */}
-      <GameArtTile game={name} className="h-full w-full" />
-      <span className="absolute right-3 bottom-6 left-3 z-10 truncate text-[10px] font-medium text-white/70">
-        {activeCompetitions === 0 ? "No open tournaments" : `${activeCompetitions} open`}
-      </span>
+    <Link href={`/compete?game=${encodeURIComponent(name)}`} className={TILE}>
+      <div className="relative aspect-square w-full overflow-hidden bg-surface-elevated">
+        {iconUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- admin-uploaded game logo, arbitrary host and size
+          <img src={iconUrl} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-[var(--duration-reveal)] group-hover:scale-[1.05]" />
+        ) : (
+          <GameArtTile thumb game={name} hideLabel fill className="h-full w-full" />
+        )}
+      </div>
+      <div className="flex min-w-0 flex-col gap-0.5 px-2.5 py-2">
+        <span className="truncate font-display text-sm leading-none font-bold tracking-tight uppercase">{name}</span>
+        <span className={`truncate text-[11px] ${activeCompetitions > 0 ? "text-accent-volt" : "text-muted"}`}>
+          {activeCompetitions === 0 ? "No open tournaments" : `${activeCompetitions} open`}
+        </span>
+      </div>
     </Link>
   );
 }
 
 export function ExploreTheCircuit({ games }: { games: GameCount[] }) {
   if (games.length === 0) return null;
-  const items = [
-    ...games.map((g) => <GameTile key={g.name} {...g} />),
-    <Link
-      key="view-all"
-      href="/communities"
-      className="card-media flex h-[105px] w-[170px] flex-col items-center justify-center gap-1 text-muted transition hover:text-foreground"
-    >
-      <LayoutGrid size={20} />
-      <span className="text-sm font-semibold text-foreground">Game hubs</span>
-      <span className="flex items-center gap-1 text-xs font-medium text-accent-blue">
-        Find your game&apos;s community <ArrowRight size={11} />
-      </span>
-    </Link>,
-  ];
 
   return (
     <section className="flex flex-col gap-4">
       <SectionHeader title="Games" href="/compete" linkLabel="All tournaments" />
-      <AutoScrollRow items={items} ariaLabel="Explore by game" />
+      <div data-stagger className="flex flex-wrap gap-3">
+        {games.slice(0, 11).map((g) => (
+          <GameTile key={g.name} {...g} />
+        ))}
+        <Link href="/communities" className={TILE}>
+          <div className="flex aspect-square w-full items-center justify-center bg-surface-elevated text-muted transition group-hover:text-accent-volt">
+            <LayoutGrid size={32} aria-hidden />
+          </div>
+          <div className="flex min-w-0 flex-col gap-0.5 px-2.5 py-2">
+            <span className="truncate font-display text-sm leading-none font-bold tracking-tight uppercase">Game hubs</span>
+            <span className="truncate text-[11px] text-accent-blue">Find your community</span>
+          </div>
+        </Link>
+      </div>
     </section>
   );
 }

@@ -27,8 +27,8 @@ import { AuthField, PasswordField } from "@/components/auth/AuthField";
 import { GameArtTile } from "@/components/GameArtTile";
 import { Modal } from "@/components/Modal";
 import { Spinner } from "@/components/Spinner";
+import { MIN_PASSWORD_LENGTH as MIN_PASSWORD } from "@/lib/passwordRules";
 
-const MIN_PASSWORD = 8;
 const MIN_AGE = 13;
 const MAX_NAME = 40;
 const MAX_BIO = 160;
@@ -79,9 +79,9 @@ type HandleStatus = { state: "idle" | "checking" | "available" | "taken" | "inva
 function Avatar({ src, name, size = 64 }: { src: string | null; name: string; size?: number }) {
   return src ? (
     // eslint-disable-next-line @next/next/no-img-element -- local blob preview
-    <img src={src} alt="" width={size} height={size} className="rounded-full object-cover" style={{ width: size, height: size }} />
+    <img src={src} alt="" width={size} height={size} className="cut-avatar object-cover" style={{ width: size, height: size }} />
   ) : (
-    <span className="flex items-center justify-center rounded-full bg-white/[0.08] font-display text-xl font-bold uppercase" style={{ width: size, height: size }} aria-hidden>
+    <span className="flex items-center justify-center cut-avatar bg-white/[0.08] font-display text-xl font-bold uppercase" style={{ width: size, height: size }} aria-hidden>
       {name.trim().slice(0, 1) || "?"}
     </span>
   );
@@ -203,7 +203,7 @@ export default function SignupForm({ games, countries }: { games: GameOption[]; 
         return age < MIN_AGE ? `You need to be at least ${MIN_AGE} to join Circuit.` : undefined;
       }
       case "phone":
-        return !v.phone.trim() || normalizeNigerianPhone(v.phone) ? undefined : "Enter a Nigerian mobile number, e.g. 0803 123 4567 — or leave it blank.";
+        return !v.phone.trim() || normalizeNigerianPhone(v.phone) ? undefined : "Enter a Nigerian mobile number, e.g. 0803 123 4567. Or leave it blank.";
       case "bio":
         return v.bio.length > MAX_BIO ? `Keep your bio to ${MAX_BIO} characters or fewer.` : undefined;
     }
@@ -519,7 +519,7 @@ export default function SignupForm({ games, countries }: { games: GameOption[]; 
                   ? `@${values.handle} is yours`
                   : handleStatus.state === "taken" || handleStatus.state === "invalid"
                     ? handleStatus.message
-                    : "Your public @name — what opponents see. 3–20 letters, numbers or underscores.")
+                    : "Your public @name. What opponents see. 3–20 letters, numbers or underscores.")
               }
               hintTone={errors.handle || handleStatus.state === "taken" || handleStatus.state === "invalid" ? "error" : handleStatus.state === "available" ? "ok" : "muted"}
             />
@@ -637,7 +637,7 @@ export default function SignupForm({ games, countries }: { games: GameOption[]; 
               </div>
             )}
             <p className="text-xs text-muted-strong tabular-nums" aria-live="polite">
-              {gameIds.size === 0 ? "None selected — you can skip this." : `${gameIds.size} selected`}
+              {gameIds.size === 0 ? "None selected. You can skip this." : `${gameIds.size} selected`}
             </p>
           </div>
         )}

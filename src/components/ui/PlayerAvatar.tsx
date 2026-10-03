@@ -20,10 +20,10 @@ export function PlayerAvatar({
   const box = SIZES[size];
   return person.avatarUrl ? (
     // eslint-disable-next-line @next/next/no-img-element -- uploaded or external avatar URL
-    <img src={person.avatarUrl} alt="" className={`${box} shrink-0 rounded-full object-cover ${className}`} />
+    <img src={person.avatarUrl} alt="" className={`${box} shrink-0 cut-avatar object-cover ${className}`} />
   ) : (
     <span
-      className={`${box} flex shrink-0 items-center justify-center rounded-full bg-surface-elevated font-display font-bold text-muted uppercase ${className}`}
+      className={`${box} flex shrink-0 items-center justify-center cut-avatar bg-surface-elevated font-display font-bold text-muted uppercase ${className}`}
     >
       {person.displayName.slice(0, 1)}
     </span>

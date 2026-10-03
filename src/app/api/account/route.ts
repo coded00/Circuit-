@@ -11,6 +11,8 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { parseOptionalEmail, parseOptionalImageUrl } from "@/lib/validation";
+import type { DirectChallengePolicy } from "@prisma/client";
+import { parseDirectPolicy } from "@/lib/privacy";
 
 const MIN_AGE_PLAUSIBLE_YEARS = 130;
 
@@ -41,6 +43,8 @@ export async function PATCH(request: Request) {
     notifyNewContent?: boolean;
     oneSignalPlayerId?: string | null;
     region?: string | null;
+    searchable?: boolean;
+    directChallenges?: DirectChallengePolicy;
   } = {};
 
   if (body.displayName !== undefined) {
@@ -145,6 +149,16 @@ export async function PATCH(request: Request) {
     data.region = region || null;
   }
 
+  if (body.searchable !== undefined) {
+    if (typeof body.searchable !== "boolean") return NextResponse.json({ error: "Searchable must be on or off." }, { status: 400 });
+    data.searchable = body.searchable;
+  }
+  if (body.directChallenges !== undefined) {
+    const policy = parseDirectPolicy(body.directChallenges);
+    if (!policy) return NextResponse.json({ error: "Choose who can challenge you: anyone, friends or nobody." }, { status: 400 });
+    data.directChallenges = policy;
+  }
+
   let updated;
   try {
     updated = await prisma.user.update({ where: { id: user.id }, data });
@@ -166,5 +180,7 @@ export async function PATCH(request: Request) {
     email: updated.email,
     notifyNewContent: updated.notifyNewContent,
     region: updated.region,
+    searchable: updated.searchable,
+    directChallenges: updated.directChallenges,
   });
 }

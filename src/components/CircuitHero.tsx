@@ -177,16 +177,14 @@ export function CircuitHero({
           ) : (
             <>
               <h1 className="text-hero line-clamp-3">
-                Compete on the games
+                This is where
                 <br />
-                <span className="text-accent-volt">you already play</span>
+                <span className="text-accent-volt">your name takes shape.</span>
               </h1>
-              <p className="max-w-[440px] text-sm text-muted sm:text-base">
-                Tournaments with real prize pools and 1v1 challenges — CODM, EA FC, PUBG Mobile and more.
-              </p>
+              <p className="max-w-[440px] text-sm text-muted sm:text-base">Enter the competition. Find your rivals. Build your legacy, one match at a time.</p>
               <div className="flex flex-wrap gap-2 pt-1">
                 <Link href="/compete" className="btn-primary">
-                  Find a tournament
+                  Enter Circuit
                 </Link>
                 <Link href="/battles" className="btn-secondary">
                   Challenge a player

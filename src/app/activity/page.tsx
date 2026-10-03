@@ -69,7 +69,10 @@ export default async function ActivityPage() {
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-5 px-4 py-6 sm:px-8 sm:py-10">
       <header className="flex flex-col gap-4">
-        <h1 className="font-display text-3xl leading-none font-bold tracking-tight uppercase sm:text-4xl">Feed</h1>
+        <div className="flex flex-col gap-1.5">
+          <span className="text-eyebrow text-accent-volt">Feed</span>
+          <h1 className="font-display text-3xl leading-[0.98] font-bold tracking-tight uppercase sm:text-4xl">The competition never stands still.</h1>
+        </div>
         <div role="tablist" aria-label="Feed" className="tabs">
           <Link role="tab" aria-selected href="/activity" className="tab tab-active py-3">
             Activity

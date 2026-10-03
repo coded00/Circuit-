@@ -51,11 +51,11 @@ function Avatar({ avatarUrl, name, size, ringClass }: { avatarUrl: string | null
   const px = `${size}px`;
   return avatarUrl ? (
     // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs
-    <img src={avatarUrl} alt="" style={{ height: px, width: px }} className={`rounded-full border-2 object-cover ${ringClass}`} />
+    <img src={avatarUrl} alt="" style={{ height: px, width: px }} className={`cut-avatar border-2 object-cover ${ringClass}`} />
   ) : (
     <div
       style={{ height: px, width: px }}
-      className={`flex items-center justify-center rounded-full border-2 bg-surface-elevated text-lg font-semibold text-muted ${ringClass}`}
+      className={`flex items-center justify-center cut-avatar border-2 bg-surface-elevated text-lg font-semibold text-muted ${ringClass}`}
     >
       {name.slice(0, 1).toUpperCase()}
     </div>

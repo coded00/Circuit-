@@ -78,7 +78,7 @@ export default function BattleForm({
           Game
         </label>
         <select id="game" required value={game} onChange={(e) => setGame(e.target.value)} className="field-input">
-          {games.length === 0 && <option value="">No games available — ask an admin to add one</option>}
+          {games.length === 0 && <option value="">No games available. Ask an admin to add one</option>}
           {games.map((g) => (
             <option key={g.id} value={g.name}>
               {g.name}
@@ -147,7 +147,7 @@ export default function BattleForm({
             selected={visibility === "QUICK_MATCH"}
             onSelect={() => setVisibility("QUICK_MATCH")}
             title="Quick Match"
-            description="Challenge every eligible online player at once — first to accept gets the match"
+            description="Challenge every eligible online player at once. First to accept gets the match"
           />
           <OptionCard
             selected={visibility === "OPEN"}

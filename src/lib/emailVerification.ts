@@ -43,7 +43,7 @@ export async function sendVerificationEmail(user: { id: string; email: string | 
   await sendEmail(
     email,
     "Verify your Circuit email",
-    `Confirm this is your email to finish setting up your Circuit account.\n\nVerify here — this link expires in 24 hours:\n${SITE_URL}/verify-email?token=${raw}\n\nIf you didn't create a Circuit account, you can ignore this email.`
+    `Confirm this is your email to finish setting up your Circuit account.\n\nVerify here. This link expires in 24 hours:\n${SITE_URL}/verify-email?token=${raw}\n\nIf you didn't create a Circuit account, you can ignore this email.`
   );
   return { ok: true };
 }

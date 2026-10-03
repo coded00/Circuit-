@@ -20,6 +20,7 @@ import { prisma } from "@/lib/db";
 import { getFriendIds } from "@/lib/friends";
 import { computeStandings } from "@/lib/standings";
 import { enrichPlayers, type DiscoveryPlayer } from "@/lib/discovery";
+import { reachableUsersWhere } from "@/lib/privacy";
 
 const SECTION_SIZE = 8;
 // How many non-friend/non-self users to consider before ranking within a
@@ -61,11 +62,11 @@ export async function getPersonalizedSections(viewerId: string): Promise<Discove
   });
   if (!viewer) return [];
 
-  const viewerFriendIds = await getFriendIds(viewerId);
+  const [viewerFriendIds, reachable] = await Promise.all([getFriendIds(viewerId), reachableUsersWhere(viewerId, "discover")]);
   const excludeIds = [...viewerFriendIds, viewerId];
 
   const pool = await prisma.user.findMany({
-    where: { id: { notIn: excludeIds }, isSuspended: false },
+    where: { AND: [reachable, { id: { notIn: excludeIds } }], isSuspended: false },
     orderBy: { createdAt: "desc" },
     take: CANDIDATE_POOL_SIZE,
     select: {

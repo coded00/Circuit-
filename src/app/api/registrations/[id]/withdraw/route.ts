@@ -30,7 +30,7 @@ export async function POST(
   }
   if (new Date() >= registration.tournament.registrationCloseAt) {
     return NextResponse.json(
-      { error: "Registration has closed — you can no longer withdraw." },
+      { error: "Registration has closed. You can no longer withdraw." },
       { status: 409 }
     );
   }
@@ -41,7 +41,7 @@ export async function POST(
   // match makes no sense and was reachable without this check.
   if (registration.tournament.status === "LIVE" || registration.tournament.status === "COMPLETE") {
     return NextResponse.json(
-      { error: "This tournament's bracket has already started — you can no longer withdraw." },
+      { error: "This tournament's bracket has already started. You can no longer withdraw." },
       { status: 409 }
     );
   }

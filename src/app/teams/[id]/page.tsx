@@ -31,7 +31,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   if (!team) return buildMetadata({ title: "Team not found", description: "This team doesn't exist on Circuit.", path: `/teams/${id}`, noindex: true });
   const members = team._count.members;
   return buildMetadata({
-    title: `${team.name}${team.tag ? ` [${team.tag}]` : ""} — Circuit team`,
+    title: `${team.name}${team.tag ? ` [${team.tag}]` : ""} | Circuit team`,
     description: `${team.name}${team.game ? `, a ${team.game} team` : ""} on Circuit. ${members} player${members === 1 ? "" : "s"}, captained by @${team.captain.handle}. See the roster and join the Circuit.`,
     path: `/teams/${id}`,
   });

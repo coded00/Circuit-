@@ -129,7 +129,7 @@ export function CreateEventDialog({ communityId, open, onClose, communityHref }:
             <input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} className="field-input h-11 text-sm text-foreground" />
           </label>
         </div>
-        <input value={location} onChange={(e) => setLocation(e.target.value)} maxLength={120} placeholder="Where — e.g. Online (#general) or a venue" className="field-input h-11" aria-label="Location" />
+        <input value={location} onChange={(e) => setLocation(e.target.value)} maxLength={120} placeholder="Where. E.g. Online (#general) or a venue" className="field-input h-11" aria-label="Location" />
         <textarea value={description} onChange={(e) => setDescription(e.target.value)} maxLength={1000} rows={3} placeholder="Details (optional)" className="field-input resize-none" aria-label="Details" />
         {error && <p className="field-error">{error}</p>}
         <button type="submit" disabled={busy || title.trim().length < 3} className="btn-primary h-11">

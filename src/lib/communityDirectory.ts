@@ -105,7 +105,7 @@ export const OFFICIAL_SEED: { name: string; category: "LOCATION" | "INTEREST"; r
   })),
   { name: "Competitive Gaming", category: "INTEREST", description: "For players chasing ranks, trophies and prize money. Scrims, strategy and tournament talk." },
   { name: "Casual Gaming", category: "INTEREST", description: "No pressure, just games. Find chill squads and people to play with." },
-  { name: "Gaming News", category: "INTEREST", description: "Patches, releases and esports news — and what everyone thinks about it." },
+  { name: "Gaming News", category: "INTEREST", description: "Patches, releases and esports news. And what everyone thinks about it." },
   { name: "Content Creators", category: "INTEREST", description: "Streamers, YouTubers and clip makers. Share your work, collab and grow." },
 ];
 
@@ -421,7 +421,7 @@ async function parseCommunityInput(input: CommunityInput, { partial, requireSafe
   if (input.rules !== undefined || required("rules")) {
     const r = optionalText(input.rules, COMMUNITY_RULES_MAX);
     if (!r.ok) fail({ field: "rules", message: `Keep the rules under ${COMMUNITY_RULES_MAX} characters.` });
-    else if (!r.value && required("rules")) fail({ field: "rules", message: "Every community needs rules — even a few lines." });
+    else if (!r.value && required("rules")) fail({ field: "rules", message: "Every community needs rules. Even a few lines." });
     else data.rules = r.value;
   }
   if (input.applicationQuestion !== undefined) {
@@ -463,7 +463,7 @@ export async function createCommunity(owner: { id: string; isSuspended: boolean;
     });
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
-      throw new CommunityInputError("slug", "That link is taken — try another.");
+      throw new CommunityInputError("slug", "That link is taken. Try another.");
     }
     throw err;
   }

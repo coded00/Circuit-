@@ -11,7 +11,7 @@
  * doesn't need to repeat it.
  */
 import type { ComponentType } from "react";
-import { Trophy, Swords, Flag, Users, Wallet, Bell, AtSign, MessagesSquare, ShieldAlert } from "lucide-react";
+import { Trophy, Swords, Flag, Users, Wallet, Bell, AtSign, MessagesSquare, ShieldAlert, Store } from "lucide-react";
 import type { NotificationType } from "@/lib/notifications";
 
 export type NotificationCategory = {
@@ -25,6 +25,7 @@ const TOURNAMENT: NotificationCategory = { label: "Tournament", Icon: Trophy };
 const MATCH: NotificationCategory = { label: "Match", Icon: Swords };
 const DISPUTE: NotificationCategory = { label: "Dispute", Icon: Flag };
 const SOCIAL: NotificationCategory = { label: "Team & friends", Icon: Users };
+const MARKET: NotificationCategory = { label: "Marketplace", Icon: Store };
 const WALLET: NotificationCategory = { label: "Wallet", Icon: Wallet };
 const COMMUNITY: NotificationCategory = { label: "Community", Icon: MessagesSquare };
 const MENTION: NotificationCategory = { label: "Mention", Icon: AtSign };
@@ -33,6 +34,7 @@ const DEFAULT: NotificationCategory = { label: "Notification", Icon: Bell };
 
 const CATEGORY_BY_TYPE: Record<NotificationType, NotificationCategory> = {
   REGISTRATION_CONFIRMED: TOURNAMENT,
+  ACCOUNT_DELETION_REQUESTED: MODERATION,
   TOURNAMENT_UPDATE: TOURNAMENT,
   TOURNAMENT_CANCELLED: TOURNAMENT,
   TOURNAMENT_COMPLETE: TOURNAMENT,
@@ -46,6 +48,8 @@ const CATEGORY_BY_TYPE: Record<NotificationType, NotificationCategory> = {
   BATTLE_CHALLENGE: MATCH,
   BATTLE_ACCEPTED: MATCH,
   BATTLE_DECLINED: MATCH,
+  ORDER_FULFILLED: MARKET,
+  ORDER_CANCELLED: MARKET,
   BATTLE_EXPIRED: MATCH,
   NEW_CHALLENGE: MATCH,
   QUICK_MATCH_CHALLENGE: MATCH,

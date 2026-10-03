@@ -17,6 +17,7 @@ import { InfoTip } from "@/components/InfoTip";
 import Link from "next/link";
 import { ArrowLeft, Check, Flag, Share2, Timer, Trophy, Wallet } from "lucide-react";
 import { GameArtTile } from "@/components/GameArtTile";
+import { ArenaBackdrop } from "@/components/ArenaBackdrop";
 import { StatusPill, type StatusTone } from "@/components/StatusPill";
 import { CountdownTimer } from "@/components/CountdownTimer";
 import { Spinner } from "@/components/Spinner";
@@ -124,8 +125,8 @@ function PlayerSide({
     <div className={`flex min-w-0 flex-col items-center gap-3 text-center transition-opacity ${side === "A" ? "vs-left" : "vs-right"} ${isLoser ? "opacity-60" : ""}`}>
       <div className="relative">
         <div
-          className={`rounded-full p-[3px] ring-2 ${
-            isWinner ? "ring-gold" : isYou ? "ring-accent-volt" : "ring-border-strong"
+          className={`cut-avatar p-[3px] ${
+            isWinner ? "bg-gold" : isYou ? "bg-accent-volt" : "bg-border-strong"
           }`}
         >
           <PlayerAvatar person={player} size="xl" />
@@ -146,7 +147,7 @@ function PlayerSide({
         </Link>
         <span className="flex items-center justify-center gap-1.5 text-xs text-muted">
           <span className="truncate">@{player.handle}</span>
-          {isYou && <span className="rounded-full bg-accent-volt px-1.5 py-px text-[10px] font-bold text-accent-volt-foreground">YOU</span>}
+          {isYou && <span className="cut-xs bg-accent-volt px-1.5 py-px text-[10px] font-bold text-accent-volt-foreground">YOU</span>}
           {data.viewer.signedIn && !isYou && (
             <Link
               href={`/players/${player.handle}/report`}
@@ -171,10 +172,11 @@ function PlayerSide({
 
 function HeadToHead({ data }: { data: MatchViewData }) {
   return (
-    <section className="overflow-hidden rounded-[var(--radius-hero)] border border-border bg-surface">
+    <section className={`relative isolate overflow-hidden rounded-[var(--radius-hero)] border bg-surface ${data.statusPill.pulse ? "live-glow border-live/60" : "border-border"}`}>
+      {data.game && <ArenaBackdrop game={data.game} art={0.36} />}
       <div className="flex items-center justify-between gap-3 px-5 pt-5 sm:px-7">
         <div className="flex min-w-0 items-center gap-2.5">
-          {data.game && <GameArtTile game={data.game} className="h-8 w-8 shrink-0 rounded-[8px]" hideLabel imgWidth={80} />}
+          {data.game && <GameArtTile thumb game={data.game} className="h-8 w-8 shrink-0 rounded-[8px]" hideLabel imgWidth={80} />}
           <div className="flex min-w-0 flex-col">
             <span className="truncate text-sm font-semibold">{data.tournament?.name ?? data.game ?? "Match"}</span>
             <span className="truncate text-xs text-muted">
@@ -184,7 +186,7 @@ function HeadToHead({ data }: { data: MatchViewData }) {
           </div>
         </div>
         {data.stakeAmount > 0 && (
-          <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-gold/15 px-3 py-1 text-xs font-semibold text-gold">
+          <span className="flex shrink-0 items-center gap-1.5 cut-xs bg-gold/15 px-3 py-1 text-xs font-semibold text-gold">
             <Wallet size={12} />
             {formatNaira(data.stakeAmount * 2)} pot
           </span>
@@ -334,7 +336,7 @@ function NextStep({ data }: { data: MatchViewData }) {
     }
     return (
       <section className="card text-sm text-muted">
-        {winner ? `${winner.displayName} won this match.` : data.isDraw ? "This match ended in a draw." : "This match was voided — neither side takes the win."}
+        {winner ? `${winner.displayName} won this match.` : data.isDraw ? "This match ended in a draw." : "This match was voided. Neither side takes the win."}
       </section>
     );
   }

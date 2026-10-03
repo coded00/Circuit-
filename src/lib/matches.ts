@@ -871,7 +871,7 @@ export async function submitResult(input: SubmitResultInput): Promise<{ match: M
   });
   if (!match) throw new MatchError("NOT_FOUND", "Match not found.");
   if (match.tournament?.status === "CANCELLED") {
-    throw new MatchError("TOURNAMENT_CANCELLED", "This tournament was cancelled — no results can be submitted.");
+    throw new MatchError("TOURNAMENT_CANCELLED", "This tournament was cancelled. No results can be submitted.");
   }
   if (match.status === "COMPLETE") {
     throw new MatchError("ALREADY_COMPLETE", "This match is already complete.");
@@ -883,7 +883,7 @@ export async function submitResult(input: SubmitResultInput): Promise<{ match: M
     throw new MatchError("NOT_A_PARTICIPANT", "Only the two players in this match can submit a result.");
   }
   if (input.winnerId === DRAW_RESULT) {
-    if (!(await drawAllowed(match))) throw new MatchError("INVALID_WINNER", "A draw isn't allowed in this match — one player has to win.");
+    if (!(await drawAllowed(match))) throw new MatchError("INVALID_WINNER", "A draw isn't allowed in this match. One player has to win.");
   } else if (input.winnerId !== match.playerAId && input.winnerId !== match.playerBId) {
     throw new MatchError("INVALID_WINNER", "The declared winner must be one of the two players.");
   }
@@ -924,7 +924,7 @@ export async function confirmResult(input: { matchId: string; confirmingUserId: 
   });
   if (!match) throw new MatchError("NOT_FOUND", "Match not found.");
   if (match.tournament?.status === "CANCELLED") {
-    throw new MatchError("TOURNAMENT_CANCELLED", "This tournament was cancelled — no results can be submitted.");
+    throw new MatchError("TOURNAMENT_CANCELLED", "This tournament was cancelled. No results can be submitted.");
   }
   if (match.status === "COMPLETE") throw new MatchError("ALREADY_COMPLETE", "This match is already complete.");
   if (match.status === "DISPUTED") throw new MatchError("DISPUTED", "This match is under dispute review.");
@@ -1002,7 +1002,7 @@ async function resolveAfterSubmission(
 async function completeMatch(match: Match, winnerId: string): Promise<Match> {
   // A league match that ends level is stored as complete with no winner.
   const isDraw = winnerId === DRAW_RESULT;
-  if (isDraw && !(await drawAllowed(match))) throw new MatchError("INVALID_WINNER", "A draw isn't allowed in this match — one player has to win.");
+  if (isDraw && !(await drawAllowed(match))) throw new MatchError("INVALID_WINNER", "A draw isn't allowed in this match. One player has to win.");
   const storedWinner = isDraw ? null : winnerId;
   const result = await prisma.match.updateMany({
     where: { id: match.id, status: { not: "COMPLETE" } },
@@ -1161,7 +1161,7 @@ export async function ruleDispute(input: RulingInput): Promise<Dispute> {
   });
   if (!dispute) throw new MatchError("NOT_FOUND", "Dispute not found.");
   if (dispute.match.tournament?.status === "CANCELLED") {
-    throw new MatchError("TOURNAMENT_CANCELLED", "This tournament was cancelled — nothing left to rule on.");
+    throw new MatchError("TOURNAMENT_CANCELLED", "This tournament was cancelled. Nothing left to rule on.");
   }
   if (dispute.status === "RESOLVED" || dispute.status === "VOID") {
     throw new MatchError("ALREADY_RESOLVED", "This dispute has already been resolved.");
@@ -1184,7 +1184,7 @@ export async function ruleDispute(input: RulingInput): Promise<Dispute> {
     if (dispute.organizerRulingDeadline && new Date() > dispute.organizerRulingDeadline) {
       throw new MatchError(
         "WINDOW_EXPIRED",
-        "The ruling window has passed — this dispute needs to escalate to staff."
+        "The ruling window has passed. This dispute needs to escalate to staff."
       );
     }
   }
@@ -1198,7 +1198,7 @@ export async function ruleDispute(input: RulingInput): Promise<Dispute> {
     if (dispute.match.tournamentId) {
       throw new MatchError(
         "VOID_UNSUPPORTED",
-        "Voiding a tournament bracket match isn't supported yet — see PRD §19; it needs a product decision, not an engineering guess."
+        "Voiding a tournament bracket match isn't supported yet. See PRD §19; it needs a product decision, not an engineering guess."
       );
     }
 
@@ -1279,7 +1279,7 @@ export async function ruleDispute(input: RulingInput): Promise<Dispute> {
   }
 
   if (input.winnerId === DRAW_RESULT) {
-    if (!(await drawAllowed(dispute.match))) throw new MatchError("INVALID_WINNER", "A draw isn't allowed in this match — one player has to win.");
+    if (!(await drawAllowed(dispute.match))) throw new MatchError("INVALID_WINNER", "A draw isn't allowed in this match. One player has to win.");
   } else if (!input.winnerId || ![dispute.match.playerAId, dispute.match.playerBId].includes(input.winnerId)) {
     throw new MatchError("INVALID_WINNER", "The ruled winner must be one of the two players.");
   }
@@ -1341,12 +1341,12 @@ export async function awardLeagueResult(input: { matchId: string; organizerId: s
   if ([match.playerAId, match.playerBId].includes(input.organizerId)) throw new MatchError("FORBIDDEN", "An organizer can't award their own match.");
   if (tournament.status === "CANCELLED") throw new MatchError("TOURNAMENT_CANCELLED", "This tournament was cancelled.");
   if (match.status === "COMPLETE") throw new MatchError("ALREADY_COMPLETE", "This match is already complete.");
-  if (match.status === "DISPUTED") throw new MatchError("DISPUTED", "This match is under dispute review — rule on the dispute instead.");
+  if (match.status === "DISPUTED") throw new MatchError("DISPUTED", "This match is under dispute review. Rule on the dispute instead.");
 
   const structure = tournament.bracket?.structure;
   const deadline = isLeagueStructure(structure) ? structure.deadlines[(match.round ?? 0) - 1] : undefined;
   if (!deadline) throw new MatchError("FORBIDDEN", "Only a scheduled matchday fixture can be awarded.");
-  if (Date.now() < new Date(deadline).getTime()) throw new MatchError("FORBIDDEN", "This fixture isn't overdue yet — players can still play it.");
+  if (Date.now() < new Date(deadline).getTime()) throw new MatchError("FORBIDDEN", "This fixture isn't overdue yet. Players can still play it.");
 
   const isDraw = input.outcome === DRAW_RESULT;
   if (isDraw && !(await drawAllowed(match))) throw new MatchError("INVALID_WINNER", "Draws aren't allowed in this league.");

@@ -102,7 +102,7 @@ export default function RulingForm({
             selected={voidMatch}
             onSelect={() => setVoidMatch(true)}
             title="Void this match"
-            description="No winner — Battle only, nothing to return"
+            description="No winner. Battle only, nothing to return"
           />
         )}
       </div>

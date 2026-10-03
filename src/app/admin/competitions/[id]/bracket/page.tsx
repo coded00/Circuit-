@@ -93,7 +93,7 @@ export default async function AdminBracketPage({ params }: { params: Promise<{ i
         </Link>
         <div className="state-block motion-fade-in">
           <h1 className="state-title">{tournament.name}</h1>
-          <p className="state-description">The bracket hasn&apos;t been generated yet — it appears once registration closes.</p>
+          <p className="state-description">The bracket hasn&apos;t been generated yet. It appears once registration closes.</p>
         </div>
       </div>
     );

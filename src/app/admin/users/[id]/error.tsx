@@ -17,7 +17,7 @@ export default function AdminUserDetailError({ error, reset }: { error: Error & 
         <AlertTriangle size={22} />
       </div>
       <h1 className="state-title">Couldn&apos;t load this user</h1>
-      <p className="state-description">This account&apos;s admin detail page failed to load — retry.</p>
+      <p className="state-description">This account&apos;s admin detail page failed to load. Retry.</p>
       <button type="button" onClick={reset} className="btn-primary">
         Try again
       </button>

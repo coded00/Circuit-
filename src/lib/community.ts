@@ -18,6 +18,7 @@ import { isAllowedReaction, MAX_REACTION_TYPES_PER_MESSAGE, summarizeReactions, 
 import { proofStorage } from "@/lib/storage";
 import { isSendableSticker } from "@/lib/stickers";
 import { sniffImageType } from "@/lib/imageSniff";
+import { blockedByUser } from "@/lib/blocks";
 
 export class CommunityError extends Error {
   code:
@@ -241,7 +242,7 @@ export async function joinCommunity(communityId: string, userId: string, opts: {
   if (await isBanned(communityId, userId)) throw new CommunityError("BANNED", "You can't join this community.");
 
   if (community.kind === "PLAYER") {
-    if (community.joinPolicy === "APPLY") throw new CommunityError("APPLICATION_REQUIRED", "This community reviews new members — apply to join.");
+    if (community.joinPolicy === "APPLY") throw new CommunityError("APPLICATION_REQUIRED", "This community reviews new members. Apply to join.");
     if (community.joinPolicy === "INVITE") throw new CommunityError("INVITE_REQUIRED", "This community is invite-only.");
   }
   if (community.rules && !opts.acceptRules) throw new CommunityError("RULES_NOT_ACCEPTED", "Accept the community rules to join.");
@@ -272,7 +273,7 @@ export async function leaveCommunity(communityId: string, userId: string) {
   if (!membership) throw new CommunityError("NOT_A_MEMBER", "Not a member.");
   if (membership.community.kind === "GLOBAL") throw new CommunityError("FORBIDDEN", "Everyone on Circuit is part of this community.");
   if (membership.community.ownerId === userId) {
-    throw new CommunityError("FORBIDDEN", "Owners can't leave — hand ownership to someone else or delete the community first.");
+    throw new CommunityError("FORBIDDEN", "Owners can't leave. Hand ownership to someone else or delete the community first.");
   }
   await prisma.$transaction([
     prisma.communityMember.delete({ where: { id: membership.id } }),
@@ -482,16 +483,19 @@ export async function getChannelMessages(
   take = 50,
   opts: { threadId?: string | null; aroundId?: string } = {}
 ): Promise<MessageCursorPage> {
-  await assertChannelMembership(channelId, userId);
+  // Membership and the block list are independent: ask for both at once.
+  const [, hidden] = await Promise.all([assertChannelMembership(channelId, userId), blockedByUser(userId)]);
   const threadId = opts.threadId ?? null;
+  // Messages from players this viewer has blocked don't show up for them.
+  const visibleAuthors = hidden.length > 0 ? { authorId: { notIn: hidden } } : {};
 
   if (opts.aroundId && !cursor) {
     const anchor = await prisma.message.findFirst({ where: { id: opts.aroundId, channelId, threadId }, select: { createdAt: true } });
     if (anchor) {
       const half = Math.floor(take / 2);
       const [older, newer] = await Promise.all([
-        prisma.message.findMany({ where: { channelId, threadId, deletedAt: null, createdAt: { lte: anchor.createdAt } }, orderBy: { createdAt: "desc" }, take: half + 1, include: MESSAGE_INCLUDE }),
-        prisma.message.findMany({ where: { channelId, threadId, deletedAt: null, createdAt: { gt: anchor.createdAt } }, orderBy: { createdAt: "asc" }, take: half, include: MESSAGE_INCLUDE }),
+        prisma.message.findMany({ where: { channelId, threadId, deletedAt: null, ...visibleAuthors, createdAt: { lte: anchor.createdAt } }, orderBy: { createdAt: "desc" }, take: half + 1, include: MESSAGE_INCLUDE }),
+        prisma.message.findMany({ where: { channelId, threadId, deletedAt: null, ...visibleAuthors, createdAt: { gt: anchor.createdAt } }, orderBy: { createdAt: "asc" }, take: half, include: MESSAGE_INCLUDE }),
       ]);
       const hasMore = older.length > half;
       const olderPage = hasMore ? older.slice(0, half) : older;
@@ -503,7 +507,7 @@ export async function getChannelMessages(
   }
 
   const messages = await prisma.message.findMany({
-    where: { channelId, deletedAt: null, threadId },
+    where: { channelId, deletedAt: null, threadId, ...visibleAuthors },
     orderBy: { createdAt: "desc" },
     take: take + 1,
     ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
@@ -725,7 +729,7 @@ export async function sendMessage(
       });
       if (last) {
         const wait = Math.ceil((last.createdAt.getTime() + slowModeSeconds * 1000 - Date.now()) / 60000);
-        throw new CommunityError("SLOW_MODE", `#${channelName} is in slow mode — you can post again in ${wait} min.`);
+        throw new CommunityError("SLOW_MODE", `#${channelName} is in slow mode. You can post again in ${wait} min.`);
       }
     }
   }

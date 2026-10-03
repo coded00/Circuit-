@@ -115,7 +115,7 @@ export default async function CommunityEventPage({ params }: Params) {
             <CalendarPlus size={15} /> Add to Google Calendar
           </a>
         )}
-        <ShareButton title={`${event.title} — ${community.name} on Circuit`} url={`${SITE_URL}${here}`} />
+        <ShareButton title={`${event.title} | ${community.name} on Circuit`} url={`${SITE_URL}${here}`} />
         {isMod && !event.cancelledAt && !over && <CancelEventButton eventId={event.id} />}
       </div>
 
@@ -126,17 +126,17 @@ export default async function CommunityEventPage({ params }: Params) {
           <Users size={17} /> Going · {going.length}
         </h2>
         {going.length === 0 ? (
-          <p className="text-sm text-muted">Nobody yet — be the first.</p>
+          <p className="text-sm text-muted">Nobody yet. Be the first.</p>
         ) : (
           <ul className="flex flex-wrap gap-2">
             {going.slice(0, 40).map((u) => (
               <li key={u.id}>
-                <Link href={`/players/${u.handle}`} className="flex items-center gap-2 rounded-full border border-border bg-surface py-1 pr-3 pl-1 text-sm font-medium hover:border-border-hover">
+                <Link href={`/players/${u.handle}`} className="flex items-center gap-2 cut-xs border border-border bg-surface py-1 pr-3 pl-1 text-sm font-medium hover:border-border-hover">
                   {u.avatarUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element -- external avatar
-                    <img src={u.avatarUrl} alt="" className="h-6 w-6 rounded-full object-cover" />
+                    <img src={u.avatarUrl} alt="" className="h-6 w-6 cut-avatar object-cover" />
                   ) : (
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-surface-elevated text-[11px] font-semibold text-muted">{u.displayName.slice(0, 1).toUpperCase()}</span>
+                    <span className="flex h-6 w-6 items-center justify-center cut-avatar bg-surface-elevated text-[11px] font-semibold text-muted">{u.displayName.slice(0, 1).toUpperCase()}</span>
                   )}
                   {u.displayName}
                 </Link>

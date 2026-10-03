@@ -12,7 +12,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const { id } = await params;
   const key = `community-apply:${user.id}`;
   if ((await isRateLimited(key, { max: 20, windowMs: 60 * 60 * 1000 })).limited) {
-    return NextResponse.json({ error: "Too many applications — try again later." }, { status: 429 });
+    return NextResponse.json({ error: "Too many applications. Try again later." }, { status: 429 });
   }
   try {
     await applyToCommunity(id, user.id, await jsonBody(request));

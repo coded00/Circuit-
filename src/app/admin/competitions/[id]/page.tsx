@@ -115,7 +115,7 @@ export default async function AdminCompetitionDetailPage({ params }: { params: P
         <div className="flex items-start gap-3 rounded-[10px] border border-gold/30 bg-gold/[0.06] px-4 py-3">
           <Snowflake size={16} className="mt-0.5 shrink-0 text-gold" />
           <div className="flex flex-col gap-0.5 text-[13px]">
-            <span className="font-medium text-foreground">Funds frozen — prize claims and cancel-with-refund are blocked.</span>
+            <span className="font-medium text-foreground">Funds frozen. Prize claims and cancel-with-refund are blocked.</span>
             {freezeReason && <span className="text-muted">Reason: {freezeReason}</span>}
           </div>
         </div>

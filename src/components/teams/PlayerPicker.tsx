@@ -101,7 +101,7 @@ export function PlayerPicker({
                   onClick={() => choose(p)}
                   className="flex w-full items-center gap-3 rounded-[8px] px-3 py-2 text-left text-sm transition enabled:hover:bg-surface disabled:opacity-50"
                 >
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-surface text-xs font-semibold">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden cut-avatar bg-surface text-xs font-semibold">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     {p.avatarUrl ? <img src={p.avatarUrl} alt="" className="h-full w-full object-cover" /> : (p.displayName || p.handle).charAt(0).toUpperCase()}
                   </span>

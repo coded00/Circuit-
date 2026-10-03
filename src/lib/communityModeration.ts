@@ -374,7 +374,7 @@ export async function deleteChannel(channelId: string, actor: Actor) {
   const channel = await prisma.channel.findUnique({ where: { id: channelId } });
   if (!channel) throw new CommunityError("NOT_FOUND", "Channel not found.");
   await requireModerator(channel.communityId, actor);
-  if (SYSTEM_CHANNEL_KEYS.has(channel.key)) throw new CommunityError("FORBIDDEN", `#${channel.name} is built in — rename it instead.`);
+  if (SYSTEM_CHANNEL_KEYS.has(channel.key)) throw new CommunityError("FORBIDDEN", `#${channel.name} is built in. Rename it instead.`);
   // Reactions and mentions cascade from their message.
   await prisma.$transaction([prisma.message.deleteMany({ where: { channelId } }), prisma.channel.delete({ where: { id: channelId } })]);
 }

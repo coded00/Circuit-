@@ -68,14 +68,14 @@ export default async function AdminContentPage({ searchParams }: { searchParams:
       )}
 
       {tab === "videos" && (
-        <Section description="Clips in the player feed. Imports pull the latest shorts from the approved YouTube channels as drafts — nothing appears in the feed until it's published here.">
+        <Section description="Clips in the player feed. Imports pull the latest shorts from the approved YouTube channels as drafts. Nothing appears in the feed until it's published here.">
           <VideoQueue videos={videos} counts={{ DRAFT: countOf("DRAFT"), PUBLISHED: countOf("PUBLISHED") }} youtubeConfigured={!!process.env.YOUTUBE_API_KEY} />
         </Section>
       )}
 
       {tab === "news" && (
         <Section
-          description={`Live RSS from gaming outlets${newsItems.length > 0 ? ` (${[...new Set(newsItems.map((n) => n.source))].join(", ")})` : ""}. Not editable — shown here for reference.`}
+          description={`Live RSS from gaming outlets${newsItems.length > 0 ? ` (${[...new Set(newsItems.map((n) => n.source))].join(", ")})` : ""}. Not editable. Shown here for reference.`}
         >
           {newsItems.length === 0 ? (
             <EmptyState title="News feed unavailable right now" description="The outlets' RSS feeds didn't respond. It retries on the next load." />

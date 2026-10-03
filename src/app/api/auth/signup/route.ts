@@ -27,9 +27,9 @@ import { isRateLimited, recordAttempt, clearAttempts } from "@/lib/rateLimit";
 import { HANDLE_RULES_MESSAGE, validateHandle } from "@/lib/handles";
 import { normalizeNigerianPhone } from "@/lib/phone";
 import { isCountryCode } from "@/lib/countries";
+import { MIN_PASSWORD_LENGTH } from "@/lib/passwordRules";
 import { parseSignupDateOfBirth } from "@/lib/age";
 
-const MIN_PASSWORD_LENGTH = 8;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 // Keyed by the submitted email, not IP. This stops repeated automated
 // attempts against one identifier; it does NOT by itself stop mass
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
   if (!isCountryCode(country)) return fail("country", "Choose your country.");
   const phoneInput = str("phone").trim();
   const phone = phoneInput ? normalizeNigerianPhone(phoneInput) : null;
-  if (phoneInput && !phone) return fail("phone", "Enter a Nigerian mobile number, e.g. 0803 123 4567 — or leave it blank.");
+  if (phoneInput && !phone) return fail("phone", "Enter a Nigerian mobile number, e.g. 0803 123 4567. Or leave it blank.");
   const dob = parseSignupDateOfBirth(body?.dateOfBirth);
   if (!dob.ok) return fail("dateOfBirth", dob.error);
 

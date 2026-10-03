@@ -35,7 +35,7 @@ export default async function AdminCompetitionEditPage({ params }: { params: Pro
         title="Edit competition"
         description={
           hasPaidRegistration
-            ? "Players have paid — entry fee and prize are locked. Everything else can still change until registration closes."
+            ? "Players have paid. Entry fee and prize are locked. Everything else can still change until registration closes."
             : "Changes apply immediately. The game and format lock once anyone registers."
         }
       />

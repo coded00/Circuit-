@@ -26,6 +26,7 @@ import { Panel, PanelEmpty, PanelRows, panelRowClass } from "@/components/ui/Pan
 import { openDueTournaments } from "@/lib/tournaments";
 import { tournamentPath } from "@/lib/seo";
 import { FilterMenu } from "./FilterMenu";
+import { FilterDisclosure } from "./FilterDisclosure";
 import { competitionKind, formatsForType, pickFeatured, spotsLabel, timeUntil, TYPE_GROUPS } from "@/lib/competeView";
 
 type SearchParams = {
@@ -139,7 +140,7 @@ function Featured({ t }: { t: Row }) {
   const closes = timeUntil(t.registrationCloseAt);
   const spots = spotsLabel(t.registered, t.participantCap);
   return (
-    <section data-surface="dark" className="relative isolate overflow-hidden rounded-[var(--radius-hero)] border border-border bg-background">
+    <section data-surface="dark" className={`relative isolate overflow-hidden rounded-[var(--radius-hero)] border bg-background ${live ? "live-glow border-live/60" : "border-border"}`}>
       <ViewTransition name={tournamentArtName(t.id)} share="tournament-morph" default="none">
         <GameArtTile game={t.game} posterUrl={t.posterUrl} className="-z-20" hideLabel fill imgWidth={1200} />
       </ViewTransition>
@@ -193,7 +194,7 @@ function CompetitionRow({ t }: { t: Row }) {
   const month = t.startAt.toLocaleDateString("en-NG", { month: "short" });
   const time = t.startAt.toLocaleTimeString("en-NG", { hour: "numeric", minute: "2-digit" });
   return (
-    <Link href={tournamentPath(t)} className={`${panelRowClass} gap-4 py-4 ${finished ? "opacity-85" : ""}`}>
+    <Link href={tournamentPath(t)} className={`${panelRowClass} gap-4 py-4 ${finished ? "opacity-70" : ""} ${live ? "shadow-[inset_3px_0_0_var(--live)] bg-live/[0.06]" : ""}`}>
       <div className="flex w-12 shrink-0 flex-col items-center leading-none">
         {live ? (
           <span className="flex flex-col items-center gap-1.5 text-live">
@@ -210,7 +211,7 @@ function CompetitionRow({ t }: { t: Row }) {
       </div>
 
       <ViewTransition name={tournamentArtName(t.id)} share="tournament-morph" default="none">
-        <GameArtTile game={t.game} posterUrl={t.posterUrl} className="hidden h-12 w-12 shrink-0 rounded-[10px] sm:block" hideLabel imgWidth={160} />
+        <GameArtTile thumb game={t.game} posterUrl={t.posterUrl} className={`hidden h-12 w-12 shrink-0 rounded-[10px] sm:block ${finished ? "ended-art" : ""}`} hideLabel imgWidth={160} />
       </ViewTransition>
 
       <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -384,7 +385,7 @@ export default async function CompetePage({ searchParams }: { searchParams: Prom
   );
 
   const chipClass = (active: boolean) =>
-    `flex shrink-0 items-center rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
+    `flex shrink-0 items-center cut-xs px-3.5 py-1.5 text-sm font-medium transition ${
       active ? "bg-foreground text-background" : "bg-surface-elevated text-muted hover:text-foreground"
     }`;
 
@@ -392,7 +393,8 @@ export default async function CompetePage({ searchParams }: { searchParams: Prom
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6 sm:px-8 sm:py-10">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex flex-col gap-1.5">
-          <h1 className="font-display text-3xl leading-none font-bold tracking-tight uppercase sm:text-4xl">Compete</h1>
+          <span className="text-eyebrow text-accent-volt">Compete</span>
+          <h1 className="font-display text-3xl leading-[0.98] font-bold tracking-tight uppercase sm:text-4xl">Your next rivalry starts here.</h1>
           <p className="text-sm text-muted">
             {liveCount > 0 && (
               <>
@@ -452,8 +454,8 @@ export default async function CompetePage({ searchParams }: { searchParams: Prom
           </nav>
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-          {filterControls}
+        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+          <FilterDisclosure activeCount={[entry, teamSize, type, prize, starts, play].filter(Boolean).length}>{filterControls}</FilterDisclosure>
           {sortControl}
         </div>
       </div>

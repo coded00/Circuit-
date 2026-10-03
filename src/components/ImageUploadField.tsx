@@ -38,7 +38,7 @@ export const POSTER_BOUNDS: ImageSizeBounds = {
   minHeight: 300,
   minRatio: 1.5,
   maxRatio: 4,
-  recommended: "1600×500px (a landscape banner, roughly 3:1) — used as your tournament's hero image and on its cards.",
+  recommended: "1600×500px (a landscape banner, roughly 3:1). Used as your tournament's hero image and on its cards.",
 };
 
 export const BANNER_BOUNDS: ImageSizeBounds = {
@@ -53,25 +53,25 @@ export const GAME_COVER_BOUNDS: ImageSizeBounds = {
   minHeight: 450,
   minRatio: 1.2,
   maxRatio: 2.4,
-  recommended: "1600×900px (16:9) — shown on this game's tiles and on competition cards.",
+  recommended: "1600×900px (16:9). Shown on this game's tiles and on competition cards.",
 };
 
-export type ImagePurpose = "avatar" | "poster" | "banner" | "game-icon" | "game-cover" | "community-icon" | "community-banner";
+export type ImagePurpose = "avatar" | "poster" | "listing" | "banner" | "game-icon" | "game-cover" | "community-icon" | "community-banner";
 
 /** Longest edge an upload is downscaled to, per purpose — big enough for
  *  where each is shown (and above POSTER_BOUNDS' 1200px minimum). */
-const MAX_EDGE: Record<ImagePurpose, number> = { avatar: 512, poster: 2400, banner: 2400, "game-icon": 256, "game-cover": 1600, "community-icon": 512, "community-banner": 2400 };
+const MAX_EDGE: Record<ImagePurpose, number> = { avatar: 512, poster: 2400, listing: 1600, banner: 2400, "game-icon": 256, "game-cover": 1600, "community-icon": 512, "community-banner": 2400 };
 
 function checkImageSize(width: number, height: number, bounds: ImageSizeBounds): string | null {
   if (width < bounds.minWidth || height < bounds.minHeight) {
-    return `Too small (${width}×${height}px) — needs at least ${bounds.minWidth}×${bounds.minHeight}px so it doesn't blur when stretched.`;
+    return `Too small (${width}×${height}px). Needs at least ${bounds.minWidth}×${bounds.minHeight}px so it doesn't blur when stretched.`;
   }
   const ratio = width / height;
   if (ratio < bounds.minRatio) {
-    return `Too narrow/tall (${width}×${height}px, ${ratio.toFixed(1)}:1) — this crops away most of the image on wide screens. Use a landscape image.`;
+    return `Too narrow/tall (${width}×${height}px, ${ratio.toFixed(1)}:1). This crops away most of the image on wide screens. Use a landscape image.`;
   }
   if (ratio > bounds.maxRatio) {
-    return `Too wide/thin (${width}×${height}px, ${ratio.toFixed(1)}:1) — this crops away too much on narrow screens. ${bounds.recommended}`;
+    return `Too wide/thin (${width}×${height}px, ${ratio.toFixed(1)}:1). This crops away too much on narrow screens. ${bounds.recommended}`;
   }
   return null;
 }

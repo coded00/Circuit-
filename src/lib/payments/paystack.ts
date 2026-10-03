@@ -23,7 +23,7 @@ const PAYSTACK_BASE_URL = "https://api.paystack.co";
 function getSecretKey(): string {
   const key = process.env.PAYSTACK_SECRET_KEY;
   if (!key) {
-    throw new Error("PAYSTACK_SECRET_KEY is not set — check your .env file.");
+    throw new Error("PAYSTACK_SECRET_KEY is not set. Check your .env file.");
   }
   return key;
 }

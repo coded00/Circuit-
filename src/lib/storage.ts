@@ -43,7 +43,7 @@ function getRefSecret(): string {
   const secret = process.env.JWT_SECRET;
   if (!secret) {
     throw new Error(
-      "JWT_SECRET is not set — it's also used to sign proof storage references. Set it in .env."
+      "JWT_SECRET is not set. It's also used to sign proof storage references. Set it in .env."
     );
   }
   return secret;

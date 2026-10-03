@@ -109,6 +109,9 @@ export async function cleanupAll(): Promise<void> {
   await prisma.battle.deleteMany({ where: { id: { in: battleIds } } });
   await prisma.escrowTransaction.deleteMany({ where: { OR: [{ tournamentId: { in: tournamentIds } }, { userId: { in: userIds } }] } });
   await prisma.registration.deleteMany({ where: { tournamentId: { in: tournamentIds } } });
+  // Marketplace: orders (RESTRICT on buyer/listing) before listings before users.
+  await prisma.order.deleteMany({ where: { OR: [{ buyerId: { in: userIds } }, { listing: { sellerId: { in: userIds } } }] } });
+  await prisma.listing.deleteMany({ where: { sellerId: { in: userIds } } });
   await prisma.walletTransaction.deleteMany({ where: { userId: { in: userIds } } });
   await prisma.notification.deleteMany({ where: { userId: { in: userIds } } });
   await prisma.rateLimitAttempt.deleteMany({ where: { key: { contains: "test-" } } });

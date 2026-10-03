@@ -227,14 +227,14 @@ export function parseLobbyGroups(
   if (!Number.isInteger(qualifiers) || qualifiers < 1) return { ok: false, error: "Set how many from each group go to the final." };
   if (!Number.isInteger(finalRounds) || finalRounds < 1 || finalRounds > MAX_LOBBY_ROUNDS) return { ok: false, error: `Final rounds must be between 1 and ${MAX_LOBBY_ROUNDS}.` };
   if (lobbyCapacity !== null && groups * qualifiers > lobbyCapacity) {
-    return { ok: false, error: `${groups} groups × ${qualifiers} qualifiers is ${groups * qualifiers} finalists — one lobby holds ${lobbyCapacity}.` };
+    return { ok: false, error: `${groups} groups × ${qualifiers} qualifiers is ${groups * qualifiers} finalists. One lobby holds ${lobbyCapacity}.` };
   }
   if (groups * qualifiers < 2) return { ok: false, error: "The final needs at least 2 entries." };
   if (Math.floor(participantCap / groups) <= qualifiers) {
-    return { ok: false, error: `With a cap of ${participantCap}, each of ${groups} groups would have ${Math.floor(participantCap / groups)} entries — fewer than ${qualifiers + 1}, so nobody would be knocked out.` };
+    return { ok: false, error: `With a cap of ${participantCap}, each of ${groups} groups would have ${Math.floor(participantCap / groups)} entries. Fewer than ${qualifiers + 1}, so nobody would be knocked out.` };
   }
   if (lobbyCapacity !== null && participantCap > groups * lobbyCapacity) {
-    return { ok: false, error: `${groups} lobbies hold ${groups * lobbyCapacity} entries — lower the cap or add groups.` };
+    return { ok: false, error: `${groups} lobbies hold ${groups * lobbyCapacity} entries. Lower the cap or add groups.` };
   }
   return { ok: true, value: { groups, qualifiers, finalRounds } };
 }

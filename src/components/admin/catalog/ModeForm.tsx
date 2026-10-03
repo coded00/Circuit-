@@ -89,7 +89,7 @@ export function ModeForm({ gameId, mode, onDone }: { gameId: string; mode?: Cata
           <span className="text-xs text-muted">
             {usesFormats
               ? "Add named formats under this mode (e.g. Solo, Duo, Squad)."
-              : "This mode has one configuration — set its player and team rules below."}
+              : "This mode has one configuration. Set its player and team rules below."}
           </span>
         </div>
         <Switch checked={usesFormats} onChange={setUsesFormats} label="Separate formats" />

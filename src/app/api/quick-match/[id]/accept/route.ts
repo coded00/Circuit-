@@ -97,7 +97,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     // case here, not an edge case.
     const current = await prisma.quickMatchChallenge.findUnique({ where: { id } });
     if (current?.status === "ACCEPTED" && !current.battleId) {
-      return NextResponse.json({ error: "This challenge is being accepted — try again in a moment." }, { status: 423 });
+      return NextResponse.json({ error: "This challenge is being accepted. Try again in a moment." }, { status: 423 });
     }
     return NextResponse.json({ error: "This challenge is no longer available." }, { status: 409 });
   }

@@ -57,6 +57,8 @@ const WALLET_TYPE: Record<string, { label: string; credit: boolean }> = {
   ENTRY_FEE_DEBIT: { label: "Entry fee", credit: false },
   ENTRY_FEE_REFUND: { label: "Entry fee refund", credit: true },
   STAKE_DEBIT: { label: "Challenge stake", credit: false },
+  MARKETPLACE_DEBIT: { label: "Marketplace purchase", credit: false },
+  MARKETPLACE_REFUND: { label: "Marketplace refund", credit: true },
   STAKE_CREDIT: { label: "Challenge winnings", credit: true },
   ORGANIZER_REVENUE_CREDIT: { label: "Organizer revenue", credit: true },
 };
@@ -92,6 +94,8 @@ const TYPE_OPTIONS: { value: WalletTransactionType | ""; label: string }[] = [
   { value: "ENTRY_FEE_DEBIT", label: "Entry fee" },
   { value: "ENTRY_FEE_REFUND", label: "Entry fee refund" },
   { value: "STAKE_DEBIT", label: "Challenge stake" },
+  { value: "MARKETPLACE_DEBIT", label: "Marketplace purchase" },
+  { value: "MARKETPLACE_REFUND", label: "Marketplace refund" },
   { value: "STAKE_CREDIT", label: "Challenge winnings" },
   { value: "ORGANIZER_REVENUE_CREDIT", label: "Organizer revenue" },
 ];
@@ -220,7 +224,7 @@ export default async function AdminFinancePage({ searchParams }: { searchParams:
 
   return (
     <>
-      <PageHeader title="Finance" description="Every naira moving through Circuit — entry fees, wallets, prizes and payouts." />
+      <PageHeader title="Finance" description="Every naira moving through Circuit. Entry fees, wallets, prizes and payouts." />
 
       <div className="flex flex-col gap-3">
         <Section title="Money in and out">

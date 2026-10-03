@@ -146,79 +146,88 @@ enum ReportStatus {
 /// Account creation is deferred (D4) — a User row is only created at
 /// register-with-intent-to-pay, Battle accept, or payout claim.
 model User {
-  id                String     @id @default(cuid())
-  displayName       String
-  handle            String     @unique
-  emailOrPhone      String     @unique
-  passwordHash      String?
-  avatarUrl         String?
+  id                  String                @id @default(cuid())
+  displayName         String
+  handle              String                @unique
+  emailOrPhone        String                @unique
+  passwordHash        String?
+  avatarUrl           String?
   /// Short public profile tagline (ACC-6 profile edit) — free text,
   /// entirely optional, never used anywhere else in the app.
-  bio               String?
+  bio                 String?
   /// Free-text city/state/country — same optional-profile-field convention
   /// as bio. Not shown anywhere yet; exists so Player Discovery's region
   /// filter (a later phase) has real values to query instead of starting
   /// from zero once that filter ships.
-  region            String?
+  region              String?
   /// Self-curated list of games shown on the public profile — player-typed
   /// free text, not derived from real match history and NOT sourced from
   /// the `Game` catalog the way Tournament.game/Battle.game are: a
   /// player's "games I play" is a personal claim, not a real competition,
   /// so it isn't constrained to what organizers can actually host.
-  favoriteGames     String[]   @default([])
-  dateOfBirth       DateTime?
-  ageVerified       Boolean    @default(false)
+  favoriteGames       String[]              @default([])
+  dateOfBirth         DateTime?
+  ageVerified         Boolean               @default(false)
   /// P0-7: linked payout destination — what REG-6's payout actually pays out to.
-  payoutMethodRef   String?
+  payoutMethodRef     String?
   /// Real, validated email — separate from `emailOrPhone` above, which may
   /// hold a phone number instead and was never format-checked at signup.
   /// Only ever set through Account Settings' own validation. Nullable:
   /// nobody is required to add one, they just don't get the email side of
   /// notifyNewContent below until they do.
-  email             String?    @unique
+  email               String?               @unique
   /// Set when they click the link in a verification email (or sign up
   /// with Google, which verifies the address). Cleared if the email changes.
-  emailVerifiedAt   DateTime?
+  emailVerifiedAt     DateTime?
   /// Finished (or skipped) the post-signup /welcome flow.
-  onboardedAt       DateTime?
+  onboardedAt         DateTime?
   /// Nigerian mobile in +234… form (src/lib/phone.ts). Optional at signup;
   /// not SMS-verified. Can be used to log in when present.
-  phone             String?    @unique
+  phone               String?               @unique
   /// ISO 3166-1 alpha-2 code picked at signup (src/lib/countries.ts). Null
   /// for accounts created before the country field existed.
-  country           String?
+  country             String?
   /// When they ticked "I agree to the Terms and Privacy Policy" at signup.
   /// Null for accounts created before the checkbox existed.
-  termsAcceptedAt   DateTime?
+  termsAcceptedAt     DateTime?
+  /// Privacy: false hides them from search and Discover (their profile is
+  /// still reachable by direct link). See src/lib/privacy.ts.
+  searchable          Boolean               @default(true)
+  /// Privacy: who may send them a direct challenge (a challenge aimed at
+  /// them, or a Quick Match request).
+  directChallenges    DirectChallengePolicy @default(ANYONE)
+  /// Set when they asked for their account to be deleted. Staff process it
+  /// by hand (money and records have to be settled first); null otherwise.
+  deletionRequestedAt DateTime?
   /// Single opt-out switch for "new tournament/challenge" broadcast
   /// announcements (email + push only — in-app notifications are always-on
   /// regardless, per InAppChannel's own comment in notifications.ts).
   /// Defaults to on so a real audience exists for the feature at all.
-  notifyNewContent  Boolean    @default(true)
+  notifyNewContent    Boolean               @default(true)
   /// Set once this user's browser subscribes via OneSignal. Not the
   /// broadcast targeting mechanism (that uses OneSignal's own "Subscribed
   /// Users" segment) — kept mainly for future debugging/visibility.
-  oneSignalPlayerId String?
+  oneSignalPlayerId   String?
   /// P6-1/P6-2/P6-4: Circuit staff access — dispute-queue escalation
   /// ruling, account suspension. No self-serve grant path exists yet;
   /// setting this currently means a direct DB write, which is fine at V1's
   /// staffing size but is itself worth flagging as a gap.
-  isStaff           Boolean    @default(false)
+  isStaff             Boolean               @default(false)
   /// Only meaningful when `isStaff` is true — which of the two fixed
   /// admin roles this staff account has. Null for an ordinary player.
   /// See `AdminRole`'s own comment for what each role can actually do.
-  adminRole         AdminRole?
+  adminRole           AdminRole?
   /// P6-4/TRU-4: blocks registering, paying, or accepting Battles —
   /// checked at those specific write actions, never at login or browsing
   /// (same "don't touch the read path" discipline as the age gate, TRU-5).
-  isSuspended       Boolean    @default(false)
-  suspensionReason  String?
+  isSuspended         Boolean               @default(false)
+  suspensionReason    String?
   /// Real, spendable Circuit balance (kobo) — funded via Fund Wallet,
   /// spent on entry fees, cashed out via Withdraw. The authoritative
   /// running total; `WalletTransaction` below is the immutable ledger
   /// that justifies it, kept in sync in the same DB transaction as every
   /// balance change so the two can never drift apart.
-  walletBalance     Int        @default(0)
+  walletBalance       Int                   @default(0)
   /// Quick Match presence (BTL-Q1): refreshed every ~25s by a client
   /// heartbeat while a signed-in tab is open (`PresenceHeartbeat.tsx`) —
   /// "online" for Quick Match eligibility means this timestamp is within
@@ -227,22 +236,26 @@ model User {
   /// an "online now" signal from stale login timestamps, so this is a
   /// narrowly-scoped, frequently-refreshed field for Quick Match only,
   /// not a general presence system other features should assume is fresh.
-  lastActiveAt      DateTime?
-  createdAt         DateTime   @default(now())
+  lastActiveAt        DateTime?
+  createdAt           DateTime              @default(now())
   /// V1 audit follow-up (money-relevant models) — walletBalance and the
   /// suspension/staff flags above all mutate after creation with no
   /// signal of when; useful for debugging a balance that looks stale and
   /// for reconciliation, same reasoning as the other money-relevant
   /// models this was added to alongside (WalletTransaction,
   /// EscrowTransaction, Registration, Tournament, Battle).
-  updatedAt         DateTime   @updatedAt
+  updatedAt           DateTime              @updatedAt
 
   organizerProfile        OrganizerProfile?
-  tournamentUpdates       TournamentUpdate[] @relation("TournamentUpdateAuthor")
+  blocking                UserBlock[]              @relation("Blocker")
+  blockedBy               UserBlock[]              @relation("Blocked")
+  tournamentUpdates       TournamentUpdate[]       @relation("TournamentUpdateAuthor")
   registrations           Registration[]
   matchesAsPlayerA        Match[]                  @relation("MatchPlayerA")
   matchesAsPlayerB        Match[]                  @relation("MatchPlayerB")
   matchesWon              Match[]                  @relation("MatchWinner")
+  listings                Listing[]
+  marketplaceOrders       Order[]
   battlesCreated          Battle[]                 @relation("BattleCreator")
   battlesTargeted         Battle[]                 @relation("BattleTarget")
   quickMatchesHosted      QuickMatchChallenge[]    @relation("QuickMatchHost")
@@ -304,6 +317,11 @@ enum AdminRole {
 }
 
 enum WalletTransactionType {
+  /// A Marketplace purchase paid from the wallet — internal only, no provider
+  /// touched. The matching `Order` row carries what was bought.
+  MARKETPLACE_DEBIT
+  /// A cancelled Marketplace order refunded back into the wallet.
+  MARKETPLACE_REFUND
   /// An entry fee that was paid from the wallet, refunded back into it when
   /// the player withdrew or the tournament was cancelled — internal only,
   /// the mirror of ENTRY_FEE_DEBIT. (Card-paid entries refund to the card.)
@@ -2013,4 +2031,120 @@ model TournamentUpdate {
   createdAt    DateTime   @default(now())
 
   @@index([tournamentId, createdAt])
+}
+
+enum DirectChallengePolicy {
+  ANYONE
+  FRIENDS
+  NOBODY
+}
+
+/// One player blocking another. It stops friend requests and direct
+/// challenges between them in both directions, hides the blocked player's
+/// chat messages from the blocker, and keeps them out of each other's
+/// Quick Match requests. Matches and disputes already under way are not
+/// affected. See src/lib/blocks.ts.
+model UserBlock {
+  id        String   @id @default(cuid())
+  blockerId String
+  blocker   User     @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blockedId String
+  blocked   User     @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+  @@index([blockedId])
+}
+
+/// What a Marketplace listing sells. SERVICE = a player/coach's time or skill
+/// (coaching, team spots, edits); DIGITAL = a platform-run or creator-made
+/// digital good (cosmetics, gift cards, guides); ITEM = in-game items,
+/// currency or accounts between players; STORE = organizer/brand goods
+/// (merch, entry bundles, passes).
+enum ListingCategory {
+  SERVICE
+  DIGITAL
+  ITEM
+  STORE
+}
+
+enum ListingStatus {
+  ACTIVE
+  PAUSED
+  SOLD
+  REMOVED
+}
+
+/// A thing for sale on the Marketplace. First slice: listing and browsing
+/// only. Price is kobo like every other amount in the app. There is no
+/// checkout yet; that (wallet payment held in escrow until delivery) is the
+/// next slice, so nothing here moves money.
+model Listing {
+  id          String          @id @default(cuid())
+  sellerId    String
+  seller      User            @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  category    ListingCategory
+  title       String
+  description String
+  /// Optional: which game this relates to (free text matching Game.name).
+  game        String?
+  priceKobo   Int
+  imageUrl    String?
+  /// Units left; null = unlimited (services, digital goods). Each paid order
+  /// takes one; at zero the listing flips to SOLD.
+  stock       Int?
+  /// What the buyer must tell us at checkout (e.g. "Your in-game name"),
+  /// so the order can be delivered. Null = nothing needed.
+  buyerPrompt String?
+  /// Where the file lives (an ebook hosted elsewhere, so it never sits in our
+  /// storage). When set, an order is delivered the moment it is paid and the
+  /// buyer downloads through an authenticated route; the raw link is never
+  /// sent to the page or to anyone who hasn't bought.
+  deliveryUrl String?
+  /// Staff pick: shown in the Marketplace home hero and its Featured row.
+  featured    Boolean         @default(false)
+  status      ListingStatus   @default(ACTIVE)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  orders Order[]
+
+  @@index([status, category, createdAt])
+  @@index([sellerId, status])
+}
+
+/// PAID = money taken from the buyer's wallet, awaiting delivery by Circuit;
+/// FULFILLED = delivered (with a note the buyer can read); CANCELLED =
+/// refunded to the wallet.
+enum OrderStatus {
+  PAID
+  FULFILLED
+  CANCELLED
+}
+
+/// One Marketplace purchase. Title/category/price are copied at purchase so
+/// editing or removing the listing later never rewrites history.
+model Order {
+  id             String          @id @default(cuid())
+  listingId      String
+  listing        Listing         @relation(fields: [listingId], references: [id])
+  buyerId        String
+  buyer          User            @relation(fields: [buyerId], references: [id])
+  listingTitle   String
+  category       ListingCategory
+  amountKobo     Int
+  /// The buyer's answer to the listing's `buyerPrompt`.
+  buyerNote      String?
+  status         OrderStatus     @default(PAID)
+  /// Circuit's delivery message (a code, a link, instructions) or the reason
+  /// for a cancellation. Shown to the buyer.
+  fulfilmentNote String?
+  fulfilledAt    DateTime?
+  cancelledAt    DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([buyerId, createdAt])
+  @@index([status, createdAt])
+  @@index([listingId])
 }

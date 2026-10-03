@@ -85,7 +85,7 @@ export function VideoQueue({ videos, counts, youtubeConfigured }: { videos: Admi
             title={youtubeConfigured ? undefined : "Set YOUTUBE_API_KEY to import"}
             onClick={async () => {
               const r = await call("import", "/api/admin/videos/import", "POST");
-              if (r) setMessage(`Imported ${r.created} new clip${r.created === 1 ? "" : "s"} (${r.skipped} already here)${r.failedChannels.length ? ` — couldn't reach: ${r.failedChannels.join(", ")}` : ""}.`);
+              if (r) setMessage(`Imported ${r.created} new clip${r.created === 1 ? "" : "s"} (${r.skipped} already here)${r.failedChannels.length ? `. Couldn't reach: ${r.failedChannels.join(", ")}` : ""}.`);
             }}
             className="btn-primary"
           >
@@ -96,7 +96,7 @@ export function VideoQueue({ videos, counts, youtubeConfigured }: { videos: Admi
       {message && <p className="text-[13px] text-muted">{message}</p>}
       {shown.length === 0 ? (
         <p className="rounded-[10px] border border-dashed border-border-strong px-6 py-10 text-center text-[13px] text-muted">
-          {term ? "No videos match that search." : tab === "DRAFT" ? "No drafts — import to pull in new clips." : "Nothing live in the feed yet."}
+          {term ? "No videos match that search." : tab === "DRAFT" ? "No drafts. Import to pull in new clips." : "Nothing live in the feed yet."}
         </p>
       ) : (
         <div className="overflow-hidden rounded-[10px] border border-border bg-surface">

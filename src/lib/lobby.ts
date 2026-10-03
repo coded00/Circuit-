@@ -361,12 +361,12 @@ export async function saveRoundResults(input: {
   const tournament = await lobbyTournament(input.tournamentId);
   if (!canManageLobby(input.actor, tournament)) throw new LobbyError("Only the organizer can enter results.", 403);
   if (tournament.status !== "LIVE") {
-    throw new LobbyError(tournament.status === "COMPLETE" ? "Results are final — this tournament is complete." : "The lobby hasn't started yet.", 409);
+    throw new LobbyError(tournament.status === "COMPLETE" ? "Results are final. This tournament is complete." : "The lobby hasn't started yet.", 409);
   }
   const round = await prisma.lobbyRound.findUnique({ where: { tournamentId_number: { tournamentId: tournament.id, number: input.roundNumber } } });
   if (!round) throw new LobbyError("That round doesn't exist.", 404);
   if (round.stage === "GROUP" && (await prisma.lobbyRound.findFirst({ where: { tournamentId: tournament.id, stage: "FINAL" } }))) {
-    throw new LobbyError("The final has started — group results are locked.", 409);
+    throw new LobbyError("The final has started. Group results are locked.", 409);
   }
   const entries = await prisma.registration.findMany({ where: { tournamentId: tournament.id, status: "CONFIRMED", ...scopeWhere(round) }, select: { id: true } });
   const parsed = validateRoundResults(input.results, entries.map((e) => e.id));
@@ -394,7 +394,7 @@ export async function saveRoundResults(input: {
 function flagBlocker(rounds: readonly LobbyRoundView[], now: Date): string | null {
   const flags = rounds.flatMap((r) => r.flags);
   if (flags.some((f) => f.status === "OPEN")) return "Answer the open flags first.";
-  if (flags.some((f) => f.status === "ESCALATED")) return "A flag is with Circuit staff — wait for their answer.";
+  if (flags.some((f) => f.status === "ESCALATED")) return "A flag is with Circuit staff. Wait for their answer.";
   const appealable = flags.find((f) => f.status === "DISMISSED" && !f.escalatedAt && f.resolvedAt && now.getTime() - f.resolvedAt.getTime() < FLAG_ANSWER_HOURS * HOUR);
   if (appealable) {
     const until = new Date(appealable.resolvedAt!.getTime() + FLAG_ANSWER_HOURS * HOUR);
@@ -416,7 +416,7 @@ export function finaliseBlocker(view: Pick<LobbyView, "rounds" | "board" | "stag
   const deciding = view.rounds.filter((r) => r.stage !== "GROUP");
   const blocker = pendingBlocker(deciding) ?? flagBlocker(view.rounds, now);
   if (blocker) return blocker;
-  if (!leaderboardWinner(view.board)) return "First place is tied on every tiebreak — check the results before finalising.";
+  if (!leaderboardWinner(view.board)) return "First place is tied on every tiebreak. Check the results before finalising.";
   return null;
 }
 
@@ -429,7 +429,7 @@ export function finalBlocker(view: Pick<LobbyView, "rounds" | "groupBoards" | "s
   const finalists: string[] = [];
   for (const g of view.groupBoards) {
     const q = qualifiersFrom(g.board, view.config.qualifiers);
-    if (!q) return { blocker: `Group ${g.letter} is tied on the qualification line on every tiebreak — check its results.`, finalists: [] };
+    if (!q) return { blocker: `Group ${g.letter} is tied on the qualification line on every tiebreak. Check its results.`, finalists: [] };
     finalists.push(...q);
   }
   return { blocker: null, finalists };
@@ -492,7 +492,7 @@ export async function raiseFlag(input: { tournamentId: string; roundNumber: numb
   const round = await prisma.lobbyRound.findUnique({ where: { tournamentId_number: { tournamentId: tournament.id, number: input.roundNumber } } });
   if (!round || round.status !== "POSTED") throw new LobbyError("You can flag a round once its results are posted.", 409);
   if (round.stage === "GROUP" && (await prisma.lobbyRound.findFirst({ where: { tournamentId: tournament.id, stage: "FINAL" } }))) {
-    throw new LobbyError("The final has started — group results are locked.", 409);
+    throw new LobbyError("The final has started. Group results are locked.", 409);
   }
   const inTournament = await prisma.registration.findFirst({
     where: { tournamentId: tournament.id, status: "CONFIRMED", ...scopeWhere(round), OR: [{ userId: input.user.id }, { roster: { some: { userId: input.user.id } } }] },

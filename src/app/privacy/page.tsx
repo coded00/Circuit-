@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { LegalPage } from "@/components/LegalPage";
 
-export const metadata: Metadata = { title: "Privacy Policy — Circuit" };
+export const metadata: Metadata = { title: "Privacy Policy | Circuit" };
 
 export default function PrivacyPage() {
   return (

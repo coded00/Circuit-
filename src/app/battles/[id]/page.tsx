@@ -41,6 +41,7 @@ import { getCurrentUser } from "@/lib/session";
 import { loginPath, signupPath } from "@/lib/safeRedirect";
 import { GameArtTile } from "@/components/GameArtTile";
 import { ShareButton } from "@/components/ShareButton";
+import { ArenaBackdrop } from "@/components/ArenaBackdrop";
 import { StatusPill } from "@/components/StatusPill";
 import { gameStandings, type Standing } from "@/lib/standings";
 import { getFriendIds } from "@/lib/friends";
@@ -91,11 +92,11 @@ function Avatar({
   const style = { height: fluidCircle(size), width: fluidCircle(size) };
   return avatarUrl ? (
     // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs
-    <img src={avatarUrl} alt="" style={style} className={`rounded-full border-2 object-cover ${ringClass}`} />
+    <img src={avatarUrl} alt="" style={style} className={`cut-avatar border-2 object-cover ${ringClass}`} />
   ) : (
     <div
       style={style}
-      className={`flex items-center justify-center rounded-full border-2 bg-surface text-2xl font-semibold text-muted ${ringClass}`}
+      className={`flex items-center justify-center cut-avatar border-2 bg-surface text-2xl font-semibold text-muted ${ringClass}`}
     >
       {name.slice(0, 1).toUpperCase()}
     </div>
@@ -121,7 +122,7 @@ function Tag({ children, tone }: { children: React.ReactNode; tone: "volt" | "or
         ? "border-accent-orange/50 text-accent-orange"
         : "border-border-strong text-muted";
   return (
-    <span className={`rounded-full border px-3 py-1 text-[11px] font-bold tracking-wide uppercase ${toneClass}`}>
+    <span className={`cut-xs border px-3 py-1 text-[11px] font-bold tracking-wide uppercase ${toneClass}`}>
       {children}
     </span>
   );
@@ -168,11 +169,11 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 
 function howItWorks(stakeAmount: number): string[] {
   return [
-    "Both players submit their result — matching reports settle the match instantly.",
+    "Both players submit their result. Matching reports settle the match instantly.",
     "Reports don't match? Circuit staff step in to review and rule.",
     stakeAmount > 0
-      ? `Staked ${formatNaira(stakeAmount)} each — the winner takes the full ${formatNaira(stakeAmount * 2)} pot. A voided dispute returns both stakes.`
-      : "Free to enter — no stakes, no entry fee.",
+      ? `Staked ${formatNaira(stakeAmount)} each. The winner takes the full ${formatNaira(stakeAmount * 2)} pot. A voided dispute returns both stakes.`
+      : "Free to enter. No stakes, no entry fee.",
   ];
 }
 
@@ -209,7 +210,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const stakeText = battle.stakeAmount > 0 ? `₦${(battle.stakeAmount / 100).toLocaleString("en-NG")} stake` : "free to enter";
   return buildMetadata({
     title: `${battle.game} 1v1 Challenge`,
-    description: `Join a ${battle.game} 1v1 Challenge on Circuit — ${stakeText}. Real opponents, real results.`,
+    description: `Join a ${battle.game} 1v1 Challenge on Circuit, ${stakeText}. Real opponents, real results.`,
     path: battlePath(battle),
     // Targeted (FRIENDS) challenges aren't genuinely public content —
     // only real open, anyone-can-accept challenges are worth indexing.
@@ -315,7 +316,7 @@ export default async function BattlePage({
 
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-4">
-              <GameArtTile game={battle.game} hideLabel className="h-16 w-16 shrink-0 rounded-[var(--radius-md)]" />
+              <GameArtTile thumb game={battle.game} hideLabel className="h-16 w-16 shrink-0 rounded-[var(--radius-md)]" />
               <div className="flex flex-col gap-1.5">
                 <h1 className="font-display text-3xl leading-none font-bold tracking-tight uppercase sm:text-4xl">
                   {battle.game}
@@ -335,13 +336,8 @@ export default async function BattlePage({
             </div>
           </div>
 
-          <div className="relative overflow-hidden rounded-[var(--radius-hero)] border border-border bg-surface p-6 sm:p-10">
-            <GameArtTile game={battle.game} className="opacity-[0.18]" fill hideLabel imgWidth={1200} />
-            <div
-              aria-hidden
-              className="absolute inset-0"
-              style={{ backgroundImage: "linear-gradient(180deg, transparent, var(--surface) 78%)" }}
-            />
+          <div className={`relative isolate overflow-hidden rounded-[var(--radius-hero)] border bg-surface p-6 sm:p-10 ${status.pulse && battle.status === "ACCEPTED" ? "live-glow border-live/60" : "border-border"}`}>
+            <ArenaBackdrop game={battle.game} art={0.4} />
 
             <div className="relative z-10 flex flex-col items-center gap-6">
               <div className="flex w-full items-start justify-center gap-4 sm:gap-12">

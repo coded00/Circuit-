@@ -119,7 +119,7 @@ export function LeagueStandings({
         return (
           <section key={key} className="flex flex-col gap-2">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h3 className="text-eyebrow text-muted">{key === "decider" ? "Decider — tie for first" : `Matchday ${key}${view.legs === 2 ? (Number(key) > view.totalRounds / 2 ? " · second leg" : " · first leg") : ""}`}</h3>
+              <h3 className="text-eyebrow text-muted">{key === "decider" ? "Decider: tie for first" : `Matchday ${key}${view.legs === 2 ? (Number(key) > view.totalRounds / 2 ? " · second leg" : " · first leg") : ""}`}</h3>
               {deadline && (
                 <span className="flex items-center gap-1 text-xs text-muted">
                   <CalendarClock size={12} /> Play by {dueLabel(deadline)}
@@ -170,11 +170,11 @@ export function LeagueStandings({
       <section className="widget flex flex-col gap-2">
         <h3 className="text-xs font-semibold tracking-wide text-muted uppercase">How it works</h3>
         <p className="text-sm text-muted">
-          Everyone plays everyone {view.legs === 2 ? "twice — home and away —" : "once"}: {regular.length} matches over {view.totalRounds} matchdays. Each matchday has a play-by date; play your fixture any
+          Everyone plays everyone {view.legs === 2 ? "twice (home and away)" : "once"}: {regular.length} matches over {view.totalRounds} matchdays. Each matchday has a play-by date; play your fixture any
           time before then. Every match is ready-up, report and proof like any Circuit match, with disputes going to the organiser, then Circuit staff.
         </p>
         <p className="text-sm text-muted">
-          {rules.winPoints} point{rules.winPoints === 1 ? "" : "s"} for a win{draws ? `, ${rules.drawPoints} for a draw` : " — draws aren't possible in this league"}, 0 for a loss. The {unit.toLowerCase()} on
+          {rules.winPoints} point{rules.winPoints === 1 ? "" : "s"} for a win{draws ? `, ${rules.drawPoints} for a draw` : ". Draws aren't possible in this league"}, 0 for a loss. The {unit.toLowerCase()} on
           top of the table when every match is done takes it. If a fixture isn&apos;t played by its deadline, the organiser can settle it so the table can finish.
         </p>
       </section>
@@ -205,7 +205,7 @@ export function LeagueStandings({
             </Link>
             <h1 className="flex items-center gap-2 font-display text-3xl leading-none font-bold tracking-tight uppercase sm:text-4xl">
               League table
-              <InfoTip align="start" text="Everyone plays everyone and earns points for results. The best record over the whole season wins — a bad day doesn't knock you out." />
+              <InfoTip align="start" text="Everyone plays everyone and earns points for results. The best record over the whole season wins. A bad day doesn't knock you out." />
             </h1>
             <span className="text-xs text-muted">
               {tournament.game} · League{view.legs === 2 ? " (home and away)" : ""} · {tournament.teamSize} · {view.entries.length} {unit.toLowerCase()}s · {view.totalRounds} matchdays
@@ -228,7 +228,7 @@ export function LeagueStandings({
                   ? "Won the decider after finishing level on top."
                   : "Top of the table when every match was played."
                 : view.decider
-                  ? `${name(view.decider.playerAId)} and ${name(view.decider.playerBId)} are level on top — the decider settles it.`
+                  ? `${name(view.decider.playerAId)} and ${name(view.decider.playerBId)} are level on top. The decider settles it.`
                   : `${done} of ${regular.length} matches played.`}
             </p>
             {champion && (

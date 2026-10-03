@@ -214,11 +214,11 @@ export function VideoCard({
         {/* Bottom-left: title/description/tags/attribution/discovery links */}
         <div className="absolute right-16 bottom-4 left-4 z-10 flex flex-col gap-2 text-white sm:right-20">
           {video.source === "YOUTUBE" ? (
-            <span className="w-fit rounded-full bg-black/50 px-2.5 py-1 text-[10px] font-semibold tracking-wide uppercase backdrop-blur-sm">
+            <span className="w-fit cut-xs bg-black/50 px-2.5 py-1 text-[10px] font-semibold tracking-wide uppercase backdrop-blur-sm">
               Powered by YouTube{video.sourceAuthor ? ` · ${video.sourceAuthor}` : ""}
             </span>
           ) : (
-            <span className="w-fit rounded-full bg-accent-volt/90 px-2.5 py-1 text-[10px] font-semibold tracking-wide text-accent-volt-foreground uppercase">
+            <span className="w-fit cut-xs bg-accent-volt/90 px-2.5 py-1 text-[10px] font-semibold tracking-wide text-accent-volt-foreground uppercase">
               Circuit
             </span>
           )}
@@ -228,7 +228,7 @@ export function VideoCard({
             {video.game && (
               <Link
                 href={gamePath(video.game)}
-                className="flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-xs font-medium backdrop-blur-sm transition hover:bg-white/25"
+                className="flex items-center gap-1 cut-xs bg-white/15 px-2.5 py-1 text-xs font-medium backdrop-blur-sm transition hover:bg-white/25"
               >
                 <Gamepad2 size={12} />
                 {video.game}
@@ -237,7 +237,7 @@ export function VideoCard({
             {video.tournament && (
               <Link
                 href={tournamentPath(video.tournament)}
-                className="flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-xs font-medium backdrop-blur-sm transition hover:bg-white/25"
+                className="flex items-center gap-1 cut-xs bg-white/15 px-2.5 py-1 text-xs font-medium backdrop-blur-sm transition hover:bg-white/25"
               >
                 <Trophy size={12} />
                 View Tournament

@@ -77,7 +77,7 @@ export default async function CommunitySettingsPage({ params, searchParams }: { 
           >
             {t.label}
             {((t.key === "applications" && pendingCount > 0) || (t.key === "reports" && openReports > 0)) && (
-              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-live px-1.5 font-mono text-[11px] text-white">
+              <span className="flex h-5 min-w-5 items-center justify-center cut-xs bg-live px-1.5 font-mono text-[11px] text-white">
                 {t.key === "reports" ? openReports : pendingCount}
               </span>
             )}

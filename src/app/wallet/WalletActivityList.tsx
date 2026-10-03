@@ -10,10 +10,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ChevronDown } from "lucide-react";
-import { ArrowDownLeft, ArrowUpRight, RotateCcw, Swords, Trophy, Ticket } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, RotateCcw, ShoppingBag, Swords, Trophy, Ticket } from "lucide-react";
 import { Panel, PanelEmpty } from "@/components/ui/Panel";
 
-export type WalletEntryKind = "FUND" | "WITHDRAWAL" | "ENTRY_FEE" | "REFUND" | "PRIZE_PAYOUT" | "STAKE" | "STAKE_PAYOUT";
+export type WalletEntryKind = "FUND" | "WITHDRAWAL" | "ENTRY_FEE" | "REFUND" | "PRIZE_PAYOUT" | "STAKE" | "STAKE_PAYOUT" | "PURCHASE" | "PURCHASE_REFUND";
 
 export type WalletEntry = {
   id: string;
@@ -38,6 +38,8 @@ const TYPE_LABEL: Record<WalletEntryKind, string> = {
   PRIZE_PAYOUT: "Prize payout",
   STAKE: "Challenge stake",
   STAKE_PAYOUT: "Challenge winnings",
+  PURCHASE: "Marketplace purchase",
+  PURCHASE_REFUND: "Marketplace refund",
 };
 const STATUS_LABEL = { COMPLETE: "Successful", PENDING: "Processing", FAILED: "Failed" } as const;
 
@@ -45,6 +47,7 @@ const FILTERS = [
   { key: "all", label: "All" },
   { key: "cash", label: "Top-ups & withdrawals" },
   { key: "compete", label: "Competitions" },
+  { key: "market", label: "Marketplace" },
 ] as const;
 
 const ICON: Record<WalletEntryKind, { Icon: typeof Trophy; className: string }> = {
@@ -55,6 +58,8 @@ const ICON: Record<WalletEntryKind, { Icon: typeof Trophy; className: string }> 
   PRIZE_PAYOUT: { Icon: Trophy, className: "bg-gold/15 text-gold" },
   STAKE: { Icon: Swords, className: "bg-accent-orange-soft text-accent-orange" },
   STAKE_PAYOUT: { Icon: Trophy, className: "bg-gold/15 text-gold" },
+  PURCHASE: { Icon: ShoppingBag, className: "bg-accent-blue-soft text-accent-blue" },
+  PURCHASE_REFUND: { Icon: RotateCcw, className: "bg-surface-elevated text-muted" },
 };
 
 function formatNaira(kobo: number): string {
@@ -81,7 +86,13 @@ export function WalletActivityList({ entries }: { entries: WalletEntry[] }) {
   const [openId, setOpenId] = useState<string | null>(null);
 
   const visible = entries.filter((e) =>
-    filter === "all" ? true : filter === "cash" ? e.kind === "FUND" || e.kind === "WITHDRAWAL" : e.kind !== "FUND" && e.kind !== "WITHDRAWAL"
+    filter === "all"
+      ? true
+      : filter === "cash"
+        ? e.kind === "FUND" || e.kind === "WITHDRAWAL"
+        : filter === "market"
+          ? e.kind === "PURCHASE" || e.kind === "PURCHASE_REFUND"
+          : e.kind !== "FUND" && e.kind !== "WITHDRAWAL" && e.kind !== "PURCHASE" && e.kind !== "PURCHASE_REFUND"
   );
 
   const groups: { label: string; items: WalletEntry[] }[] = [];
@@ -101,7 +112,7 @@ export function WalletActivityList({ entries }: { entries: WalletEntry[] }) {
             type="button"
             onClick={() => setFilter(f.key)}
             aria-pressed={filter === f.key}
-            className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium transition ${
+            className={`shrink-0 cut-xs px-3 py-1 text-xs font-medium transition ${
               filter === f.key ? "bg-foreground text-background" : "bg-surface-elevated text-muted hover:text-foreground"
             }`}
           >

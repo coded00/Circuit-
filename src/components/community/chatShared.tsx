@@ -123,9 +123,9 @@ export function Avatar({ author, online }: { author: Pick<Author, "displayName" 
     <span className="relative shrink-0">
       {author.avatarUrl ? (
         // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs
-        <img src={author.avatarUrl} alt="" className="h-8 w-8 rounded-full object-cover" />
+        <img src={author.avatarUrl} alt="" className="h-8 w-8 cut-avatar object-cover" />
       ) : (
-        <span className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface-elevated text-xs font-semibold text-muted">
+        <span className="flex h-8 w-8 items-center justify-center cut-avatar border border-border bg-surface-elevated text-xs font-semibold text-muted">
           {author.displayName.slice(0, 1).toUpperCase()}
         </span>
       )}
@@ -254,7 +254,7 @@ export function useMessageStream({ channelId, threadId = null, enabled, initialM
         });
       }
     } catch {
-      onError("Message didn't send — check your connection and try again.");
+      onError("Message didn't send. Check your connection and try again.");
       return null;
     }
     if (!res.ok) {

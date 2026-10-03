@@ -8,7 +8,6 @@ import { AccountMenu } from "./AccountMenu";
 import { MobileSearchToggle } from "./MobileSearchToggle";
 import { WalletBalanceChip } from "./WalletBalanceChip";
 import { GuestAuthLink } from "./GuestAuthLink";
-import { ThemeToggle } from "@/components/ThemeToggle";
 
 /**
  * Circuit — top header. ~60px, integrated into the page rather than a
@@ -40,11 +39,9 @@ import { ThemeToggle } from "@/components/ThemeToggle";
  * the true screen edge.
  *
  * Look: the header shares the sidebar's dark surface, so the app reads as
- * one dark frame around the light page. Left: a live pulse (real LIVE/OPEN
- * counts) and search. Right: one HUD strip — wallet · alerts · Create ·
- * you — every control the same size and separated by hairlines, instead
- * of a row of unrelated widgets. The theme toggle lives in the account
- * menu (and in the strip for signed-out visitors).
+ * one dark frame around the light page. Left: search. Right: one HUD
+ * strip — wallet · alerts · Create · you — every control the same size and
+ * separated by hairlines, instead of a row of unrelated widgets.
  *
  * Create is desktop/tablet-only (`hidden sm:block`) — at 320–375px the
  * phone header holds logo, search toggle, wallet, notifications and
@@ -61,11 +58,9 @@ function HudDivider() {
 }
 
 export async function TopBar({ user, disputeCount = 0 }: { user: User | null; disputeCount?: number }) {
-  const [unreadCount, friendRequestCount, liveCount, openCount] = await Promise.all([
+  const [unreadCount, friendRequestCount] = await Promise.all([
     user ? prisma.notification.count({ where: { userId: user.id, readAt: null } }) : 0,
     user ? prisma.friendship.count({ where: { addresseeId: user.id, accepted: false } }) : 0,
-    prisma.tournament.count({ where: { status: "LIVE" } }),
-    prisma.tournament.count({ where: { status: "OPEN" } }),
   ]);
 
   return (
@@ -87,33 +82,7 @@ export async function TopBar({ user, disputeCount = 0 }: { user: User | null; di
             <img src="/circuit-logo.png" alt="Circuit" width={700} height={347} className="h-9 w-auto max-w-none" />
           </Link>
 
-          {/* Live pulse — real counts only, hidden when there's nothing on. */}
-          {(liveCount > 0 || openCount > 0) && (
-            <Link
-              href={liveCount > 0 ? "/compete?status=LIVE" : "/compete?status=OPEN"}
-              className="hidden shrink-0 items-center gap-2 font-mono text-[11px] font-semibold tracking-[0.12em] text-white/60 uppercase transition hover:text-white lg:flex"
-            >
-              {liveCount > 0 && (
-                <>
-                  <span className="relative flex h-2 w-2" aria-hidden>
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-live opacity-60" />
-                    <span className="relative inline-flex h-2 w-2 rounded-full bg-live" />
-                  </span>
-                  <span>
-                    <span className="text-white">{liveCount}</span> live
-                  </span>
-                </>
-              )}
-              {liveCount > 0 && openCount > 0 && <span className="text-white/25">·</span>}
-              {openCount > 0 && (
-                <span>
-                  <span className="text-white">{openCount}</span> open
-                </span>
-              )}
-            </Link>
-          )}
-
-          <SearchInput className="hidden min-w-0 flex-1 sm:block sm:max-w-[300px] xl:max-w-[380px]" />
+          <SearchInput className="hidden min-w-0 flex-1 sm:block sm:max-w-[340px] xl:max-w-[460px]" />
 
           <div className="ml-auto flex shrink-0 items-center gap-2">
             <MobileSearchToggle />
@@ -140,9 +109,6 @@ export async function TopBar({ user, disputeCount = 0 }: { user: User | null; di
               </div>
             ) : (
               <div className="flex items-center gap-1 rounded-[12px] border border-white/[0.08] bg-white/[0.03] p-1">
-                <div className="hidden sm:block">
-                  <ThemeToggle />
-                </div>
                 <GuestAuthLink mode="login" className="rounded-[9px] px-3 py-2 text-sm font-semibold text-white/80 transition hover:bg-white/[0.07] hover:text-white">
                   Log in
                 </GuestAuthLink>

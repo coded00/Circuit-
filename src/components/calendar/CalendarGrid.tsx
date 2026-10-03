@@ -86,7 +86,7 @@ export function CalendarGrid({
 
               <span className="flex items-center justify-between sm:px-1">
                 <span
-                  className={`flex h-7 w-7 items-center justify-center rounded-full font-mono text-[13px] font-semibold tabular-nums sm:h-6 sm:w-auto sm:min-w-6 sm:rounded-[6px] sm:px-1.5 sm:text-xs ${
+                  className={`flex h-7 w-7 items-center justify-center cut-xs font-mono text-[13px] font-semibold tabular-nums sm:h-6 sm:w-auto sm:min-w-6 sm:rounded-[6px] sm:px-1.5 sm:text-xs ${
                     isToday
                       ? "bg-accent-volt text-accent-volt-foreground"
                       : isSelected

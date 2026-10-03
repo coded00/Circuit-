@@ -76,7 +76,7 @@ export function SignInMethods({
           </span>
           <div className="flex min-w-0 flex-1 flex-col">
             <span className="text-sm font-semibold">Password</span>
-            <span className="truncate text-xs text-muted">{hasPassword ? "Set" : "Not set — use “Forgot password” on the login page to add one"}</span>
+            <span className="truncate text-xs text-muted">{hasPassword ? "Set" : "Not set. Use “Forgot password” on the login page to add one"}</span>
           </div>
         </li>
         <li className="flex items-center gap-3 p-3.5">

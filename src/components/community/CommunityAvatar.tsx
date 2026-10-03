@@ -1,14 +1,14 @@
 /**
  * Circuit — a community's icon: its uploaded image, or a crest made from
- * its tag/initials. Rounded-square (players are round), so a community is
- * never mistaken for a person at a glance.
+ * its tag/initials. Square with the sliced corner (the same shape as player
+ * avatars), tinted lime so a community is never mistaken for a person.
  */
 
 const SIZES = {
-  sm: "h-8 w-8 rounded-[9px] text-[11px]",
-  md: "h-11 w-11 rounded-[12px] text-sm",
-  lg: "h-16 w-16 rounded-[16px] text-lg border-[3px] border-surface",
-  xl: "h-20 w-20 rounded-[20px] text-2xl border-4 border-background sm:h-24 sm:w-24",
+  sm: "h-8 w-8 cut-avatar text-[11px]",
+  md: "h-11 w-11 cut-avatar text-sm",
+  lg: "h-16 w-16 cut-avatar text-lg border-[3px] border-surface",
+  xl: "h-20 w-20 cut-avatar text-2xl border-4 border-background sm:h-24 sm:w-24",
 } as const;
 
 export function communityInitials(name: string, tag?: string | null): string {

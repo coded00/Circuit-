@@ -58,7 +58,7 @@ export async function createEvent(
   await postSystemMessage(
     communityId,
     actor.id,
-    `📅 New event: ${title} — ${WHEN(startsAt)}${location ? ` · ${location}` : ""}. RSVP: ${communityHref(community)}/events/${event.id}`
+    `📅 New event: ${title} | ${WHEN(startsAt)}${location ? ` · ${location}` : ""}. RSVP: ${communityHref(community)}/events/${event.id}`
   ).catch(() => undefined);
   return event;
 }

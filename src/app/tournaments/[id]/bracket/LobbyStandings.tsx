@@ -117,7 +117,7 @@ export function LobbyStandings({
       <section className="card overflow-hidden p-0">
         {!anyPosted && (
           <p className="border-b border-border px-5 py-3 text-sm text-muted">
-            {live ? "No results yet — standings fill in as each round is posted." : "Standings appear once the lobby starts."}
+            {live ? "No results yet. Standings fill in as each round is posted." : "Standings appear once the lobby starts."}
           </p>
         )}
         <div className="overflow-x-auto">
@@ -271,7 +271,7 @@ export function LobbyStandings({
               </ol>
             )}
 
-            {hiddenOpen > 0 && <p className="text-xs text-muted">A player has flagged these results — they&apos;re being reviewed.</p>}
+            {hiddenOpen > 0 && <p className="text-xs text-muted">A player has flagged these results. They&apos;re being reviewed.</p>}
             {visibleFlags.map((flag) => {
               const status = FLAG_STATUS[flag.status];
               const canAnswer = (flag.status === "OPEN" && isManager) || (flag.status === "ESCALATED" && !!viewer?.isStaff);

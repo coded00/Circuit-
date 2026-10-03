@@ -48,7 +48,7 @@ export const GAME_RULES: Record<string, string> = {
 - Winner submits a screenshot of the final score showing both usernames/clubs.
 - No exploits. No disconnecting to avoid a loss — reconnect and finish, or forfeit.`,
 
-  efootball: `- Agree match length before kickoff — community brackets commonly run 6-12 minute halves; there's no single universal default, so state it in this tournament's own rules.
+  efootball: `- Agree match length before kickoff. Community brackets commonly run 6-12 minute halves; there's no single universal default, so state it in this tournament's own rules.
 - A draw in a knockout match goes to extra time, then penalties.
 - Winner submits a screenshot of the final score.
 - No exploits. No disconnecting to avoid a loss — reconnect and finish, or forfeit.`,
@@ -68,7 +68,7 @@ export const GAME_RULES: Record<string, string> = {
   // Delta Force has no established, standardized competitive ruleset yet
   // (a 2025 title still maturing its competitive scene) — same honesty
   // as GTA V below rather than inventing one.
-  "delta force": `- Delta Force doesn't yet have an established competitive/esports ruleset — state the exact mode (Havoc Warfare, Hazard Operations, Hot Zone, etc.) and win condition in this tournament's own rules.
+  "delta force": `- Delta Force doesn't yet have an established competitive/esports ruleset. State the exact mode (Havoc Warfare, Hazard Operations, Hot Zone, etc.) and win condition in this tournament's own rules.
 - Both players/teams should agree the mode and win condition before the match starts.
 - Submit a screenshot or recording of the final results screen as proof.
 - No mod menus, cheats, or exploits. Be on time for the scheduled match — no-shows forfeit.`,
@@ -76,7 +76,7 @@ export const GAME_RULES: Record<string, string> = {
   // GTA V/GTA Online has no official ranked mode and no recognized
   // competitive circuit — it's an open-world sandbox, not built for
   // bracket play. Deliberately generic, not a fabricated "official" set.
-  "gta v": `- GTA V has no standard competitive ruleset — state the exact game mode/session type (Deathmatch, Race, Capture, etc.) in this tournament's own rules.
+  "gta v": `- GTA V has no standard competitive ruleset. State the exact game mode/session type (Deathmatch, Race, Capture, etc.) in this tournament's own rules.
 - Both players should agree the win condition before starting, since Circuit isn't defining one for this game.
 - Screen-record or screenshot the final results/scoreboard as proof.
 - No mod menus, cheats, or lobby exploits.

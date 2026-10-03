@@ -56,7 +56,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "Remove this mode's formats before changing how it's contested." }, { status: 400 });
   }
   if (!next.usesFormats && namedFormats.length > 1) {
-    return NextResponse.json({ error: "A mode without formats can only keep one configuration — delete the extra formats first." }, { status: 400 });
+    return NextResponse.json({ error: "A mode without formats can only keep one configuration. Delete the extra formats first." }, { status: 400 });
   }
 
   // The single configuration of a formatless mode, re-validated against

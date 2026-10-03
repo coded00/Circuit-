@@ -91,7 +91,7 @@ export function CompetitionPicker({
     const q = Number(value.lobbyQualifiers);
     const cap = format?.lobbyCapacity ?? null;
     if (!g) return { text: "", error: false };
-    if (cap && g * q > cap) return { text: `${g} × ${q} = ${g * q} finalists — one lobby holds ${cap}.`, error: true };
+    if (cap && g * q > cap) return { text: `${g} × ${q} = ${g * q} finalists. One lobby holds ${cap}.`, error: true };
     return { text: `${g * q} finalists${cap ? ` of ${cap} lobby places` : ""}. Up to ${cap ? g * cap : "—"} entries across the groups.`, error: false };
   })();
 
@@ -124,7 +124,7 @@ export function CompetitionPicker({
           {catalog.map((g) => (
             <option key={g.id} value={g.id}>
               {g.name}
-              {g.available ? "" : " — coming soon"}
+              {g.available ? "" : ". Coming soon"}
             </option>
           ))}
         </select>
@@ -213,7 +213,7 @@ export function CompetitionPicker({
           </div>
           <span className="field-hint">
             {format.entry} · {format.match}
-            {format.unavailable ? ` — ${UNAVAILABLE_LABEL[format.unavailable].toLowerCase()}` : ""}
+            {format.unavailable ? `, ${UNAVAILABLE_LABEL[format.unavailable].toLowerCase()}` : ""}
           </span>
         </div>
       )}
@@ -282,7 +282,7 @@ export function CompetitionPicker({
             />
             <span className="flex flex-col">
               <span className="font-medium">Allow draws</span>
-              <span className="text-xs text-muted">Turn this off for games that can&apos;t end level — every match then has a winner.</span>
+              <span className="text-xs text-muted">Turn this off for games that can&apos;t end level. Every match then has a winner.</span>
             </span>
           </label>
           <span className="field-hint">

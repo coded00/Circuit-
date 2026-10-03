@@ -21,7 +21,7 @@ import { buildMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = buildMetadata({
   title: "Feed",
-  description: "Short-form gaming clips, highlights, and news — Circuit tournaments and official channels in one feed.",
+  description: "Short-form gaming clips, highlights, and news | Circuit tournaments and official channels in one feed.",
   path: "/ladder",
 });
 
@@ -37,7 +37,7 @@ export default async function FeedPage() {
       {/* The full-screen video feed has no header, so this is the way back to Activity. */}
       <Link
         href="/activity"
-        className="absolute top-3 left-3 z-20 rounded-full bg-black/55 px-3.5 py-1.5 text-[13px] font-semibold text-white backdrop-blur-sm transition hover:bg-black/70"
+        className="absolute top-3 left-3 z-20 cut-xs bg-black/55 px-3.5 py-1.5 text-[13px] font-semibold text-white backdrop-blur-sm transition hover:bg-black/70"
       >
         ← Activity
       </Link>

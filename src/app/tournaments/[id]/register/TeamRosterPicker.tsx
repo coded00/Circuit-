@@ -213,9 +213,9 @@ export function TeamRosterPicker({
                 )}
               </div>
               {problem !== null ? (
-                <span className="text-danger">The shares add up to {Number(problem.toFixed(2))}% — they need to make 100%.</span>
+                <span className="text-danger">The shares add up to {Number(problem.toFixed(2))}%. They need to make 100%.</span>
               ) : (
-                <span className="text-muted">{value.shares ? "Custom split — adds up to 100%." : "Shared equally between everyone on the roster."}</span>
+                <span className="text-muted">{value.shares ? "Custom split. Adds up to 100%." : "Shared equally between everyone on the roster."}</span>
               )}
             </div>
           )}

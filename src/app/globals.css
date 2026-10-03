@@ -209,9 +209,8 @@
    `--foreground` at this scope. Re-declaring both here forces that
    re-evaluation at the scope boundary.
 
-   The same block also backs the site-wide dark mode: ThemeToggle sets
-   `data-theme="dark"` on <html> (persisted in localStorage, applied
-   before first paint by the inline script in layout.tsx), which turns
+   The same block also backs the site-wide dark mode: layout.tsx renders
+   `data-theme="dark"` on <html> (the app is dark-only), which turns
    the whole app onto this palette the same way a `data-surface` wrapper
    turns one section onto it. */
 [data-surface="dark"],
@@ -430,34 +429,122 @@ body {
      light default surface and any dark-scoped one) — keyboard users get
      a real focus indicator instead of relying on the browser's default
      outline, which several of these classes visually crowd out anyway. */
+
+  /* The Circuit corner: the bottom-right is sliced off on a diagonal, the
+     other three stay sharp. --cut is the size of the slice; clip-path does the
+     cut, so the ::before below redraws the outline along the diagonal
+     (set --cut-line to the element's border colour; transparent = none). */
+  .cut-xs,
+  .cut-sm,
+  .cut-lg,
+  .btn-primary,
+  .btn-secondary,
+  .btn-ghost,
+  .btn-danger,
+  .btn-danger-solid,
+  .btn-golive,
+  .btn-icon,
+  .badge {
+    --cut-line: transparent;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%);
+    border-radius: 0;
+  }
+  .cut-xs,
+  .badge {
+    --cut: 6px;
+  }
+  .cut-sm,
+  .btn-primary,
+  .btn-secondary,
+  .btn-ghost,
+  .btn-danger,
+  .btn-danger-solid,
+  .btn-golive,
+  .btn-icon {
+    --cut: 10px;
+  }
+  .cut-lg {
+    --cut: 20px;
+  }
+  /* Avatars and other square marks: the slice scales with the box (a quarter of it). */
+  .cut-avatar {
+    clip-path: polygon(0 0, 100% 0, 100% 72%, 72% 100%, 0 100%);
+    border-radius: 0;
+  }
+  .btn-primary,
+  .btn-secondary,
+  .btn-ghost,
+  .btn-danger,
+  .btn-danger-solid,
+  .btn-golive,
+  .btn-icon,
+  .badge,
+  .cut-xs,
+  .cut-sm,
+  .cut-lg {
+    position: relative;
+  }
+  .cut-xs::before,
+  .cut-sm::before,
+  .cut-lg::before,
+  .btn-primary::before,
+  .btn-secondary::before,
+  .btn-ghost::before,
+  .btn-danger::before,
+  .btn-danger-solid::before,
+  .btn-golive::before,
+  .btn-icon::before,
+  .badge::before {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: var(--cut);
+    height: var(--cut);
+    pointer-events: none;
+    background: linear-gradient(to bottom right, transparent calc(50% - 1px), var(--cut-line) calc(50% - 1px), var(--cut-line) 50%, transparent 50%);
+  }
+  .btn-secondary {
+    --cut-line: var(--border-strong);
+  }
+  .btn-danger {
+    --cut-line: color-mix(in srgb, var(--danger) 40%, transparent);
+  }
+  .btn-golive {
+    --cut-line: var(--accent-blue);
+  }
+  .badge-solid {
+    --cut-line: rgb(255 255 255 / 0.15);
+  }
+
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-control)] bg-accent-volt px-5 py-2.5
+    @apply inline-flex items-center justify-center gap-1.5 rounded-none bg-accent-volt px-5 py-2.5
       text-sm font-semibold text-accent-volt-foreground shadow-sm transition duration-[var(--duration-base)] ease-[var(--ease-standard)]
-      hover:brightness-95 active:scale-[0.97] active:brightness-90 active:duration-[var(--duration-instant)]
+      hover:brightness-105 active:brightness-95 active:duration-[var(--duration-instant)]
       disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100
       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-volt/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
   }
 
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-control)] border border-border-strong
+    @apply inline-flex items-center justify-center gap-1.5 rounded-none border border-border-strong
       bg-transparent px-5 py-2.5 text-sm font-medium text-foreground transition duration-[var(--duration-base)] ease-[var(--ease-standard)]
-      hover:bg-surface-elevated active:scale-[0.97] active:duration-[var(--duration-instant)]
+      hover:bg-surface-elevated active:duration-[var(--duration-instant)]
       disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100
       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
   }
 
   .btn-ghost {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-control)] bg-surface-elevated px-5 py-2.5
+    @apply inline-flex items-center justify-center gap-1.5 rounded-none bg-surface-elevated px-5 py-2.5
       text-sm font-medium text-muted transition duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:text-foreground
-      active:scale-[0.97] active:duration-[var(--duration-instant)]
+      active:duration-[var(--duration-instant)]
       disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100
       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
   }
 
   .btn-danger {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-control)] border border-danger/40
+    @apply inline-flex items-center justify-center gap-1.5 rounded-none border border-danger/40
       px-5 py-2.5 text-sm font-medium text-danger transition duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:bg-danger/10
-      active:scale-[0.97] active:duration-[var(--duration-instant)]
+      active:duration-[var(--duration-instant)]
       disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100
       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
   }
@@ -466,9 +553,9 @@ body {
      only until the last two disabled buttons using it are removed
      (TopBar, YourChannel) as part of the homepage rework. */
   .btn-golive {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-control)] border px-4 py-2 text-sm font-semibold
+    @apply inline-flex items-center justify-center gap-1.5 rounded-none border px-4 py-2 text-sm font-semibold
       text-foreground transition duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:bg-surface-elevated
-      active:scale-[0.97] active:duration-[var(--duration-instant)]
+      active:duration-[var(--duration-instant)]
       disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100;
     background: var(--surface-elevated);
     border-color: var(--accent-blue);
@@ -478,10 +565,88 @@ body {
     /* 44px — the WCAG/iOS minimum touch target. One shared class, so this
        fixes every icon-only button app-wide (header actions, mobile search
        toggle, admin top bar, share triggers) in one place. */
-    @apply inline-flex h-11 w-11 items-center justify-center rounded-full text-muted transition duration-[var(--duration-base)] ease-[var(--ease-standard)]
+    @apply inline-flex h-11 w-11 items-center justify-center rounded-none text-muted transition duration-[var(--duration-base)] ease-[var(--ease-standard)]
       hover:bg-surface-elevated hover:text-foreground active:scale-90 active:duration-[var(--duration-instant)]
       disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100
       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
+  }
+
+  /* Game-button elevation: a solid lip along the bottom edge (an inset
+     shadow, so the sliced corner never clips it) that the button sits on.
+     Hover lifts it a touch, press sinks it onto the lip. --lip is the lip
+     colour, --lip-size its height. */
+  .btn-primary,
+  .btn-secondary,
+  .btn-ghost,
+  .btn-danger,
+  .btn-danger-solid,
+  .btn-golive,
+  .btn-icon {
+    --lip-size: 3px;
+    box-shadow: inset 0 1px 0 var(--lip-top, transparent), inset 0 calc(var(--lip-size) * -1) 0 var(--lip, transparent);
+    transition-property: transform, box-shadow, background-color, color, filter, border-color, opacity;
+  }
+  .btn-primary {
+    --lip: color-mix(in srgb, var(--accent-volt) 52%, black);
+    --lip-top: rgb(255 255 255 / 0.4);
+    --lip-size: 4px;
+  }
+  .btn-danger-solid {
+    --lip: color-mix(in srgb, var(--danger) 55%, black);
+    --lip-top: rgb(255 255 255 / 0.25);
+    --lip-size: 4px;
+  }
+  .btn-secondary,
+  .btn-golive {
+    --lip: rgb(255 255 255 / 0.1);
+  }
+  .btn-ghost {
+    --lip: rgb(0 0 0 / 0.3);
+  }
+  .btn-danger {
+    --lip: color-mix(in srgb, var(--danger) 30%, transparent);
+  }
+  .btn-icon:hover {
+    --lip: rgb(255 255 255 / 0.08);
+    --lip-size: 2px;
+  }
+  .btn-primary:hover:not(:disabled),
+  .btn-secondary:hover:not(:disabled),
+  .btn-ghost:hover:not(:disabled),
+  .btn-danger:hover:not(:disabled),
+  .btn-danger-solid:hover:not(:disabled),
+  .btn-golive:hover:not(:disabled) {
+    transform: translateY(-1px);
+    --lip-size: 4px;
+  }
+  .btn-primary:active:not(:disabled),
+  .btn-secondary:active:not(:disabled),
+  .btn-ghost:active:not(:disabled),
+  .btn-danger:active:not(:disabled),
+  .btn-danger-solid:active:not(:disabled),
+  .btn-golive:active:not(:disabled),
+  .btn-icon:active:not(:disabled) {
+    transform: translateY(2px);
+    --lip-size: 1px;
+  }
+  .btn-primary:disabled,
+  .btn-secondary:disabled,
+  .btn-ghost:disabled,
+  .btn-danger:disabled,
+  .btn-danger-solid:disabled,
+  .btn-golive:disabled {
+    --lip-size: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .btn-primary,
+    .btn-secondary,
+    .btn-ghost,
+    .btn-danger,
+    .btn-danger-solid,
+    .btn-golive,
+    .btn-icon {
+      transform: none !important;
+    }
   }
 
   /* Phase 13: a floating panel (dropdown menu, popover) — soft elevation,
@@ -558,7 +723,7 @@ body {
  */
 @layer components {
   .badge {
-    @apply inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold
+    @apply inline-flex w-fit items-center gap-1.5 rounded-none px-2.5 py-1 text-xs font-semibold
       whitespace-nowrap;
   }
 
@@ -1195,9 +1360,9 @@ body {
   /* Solid destructive — the confirm step of a delete/cancel/withdraw.
      .btn-danger (outlined) stays for the trigger buttons on the page. */
   .btn-danger-solid {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-control)] bg-danger px-5 py-2.5
-      text-sm font-semibold text-white shadow-sm transition duration-[var(--duration-base)] ease-[var(--ease-standard)]
-      hover:bg-danger-strong active:scale-[0.97] active:duration-[var(--duration-instant)]
+    @apply inline-flex items-center justify-center gap-1.5 rounded-none bg-danger px-5 py-2.5
+      text-sm font-semibold text-white transition duration-[var(--duration-base)] ease-[var(--ease-standard)]
+      hover:bg-danger-strong active:duration-[var(--duration-instant)]
       disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100
       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)];
   }
@@ -1694,3 +1859,92 @@ html:not([data-nav-morph])::view-transition-new(.tournament-morph) {
 [data-stagger] > *:nth-child(5) { animation-delay: 160ms; }
 [data-stagger] > *:nth-child(6) { animation-delay: 200ms; }
 [data-stagger] > *:nth-child(n + 7) { animation-delay: 240ms; }
+
+/*
+ * ============================================================================
+ * Atmosphere — the lighting and depth that make the dark theme feel like a
+ * space rather than a flat colour. Page glow, game-lit heroes, a glowing LIVE
+ * state, quieted finished events, and softer elevation on panels.
+ * Everything animated here is gated by the prefers-reduced-motion block above.
+ * ============================================================================
+ */
+
+/* A soft wash of colour fixed behind the whole app (dark theme only). */
+.app-ambient {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+:root[data-theme="dark"] .app-ambient {
+  display: block;
+  background:
+    radial-gradient(48rem 32rem at 12% -8%, rgba(193, 244, 0, 0.07), transparent 62%),
+    radial-gradient(56rem 36rem at 105% 4%, rgba(124, 58, 237, 0.13), transparent 62%),
+    radial-gradient(48rem 30rem at 55% 112%, rgba(59, 130, 246, 0.09), transparent 64%);
+}
+
+/* A game-coloured light across a hero: set --glow to the game's tint. */
+.arena-glow {
+  pointer-events: none;
+  background:
+    radial-gradient(75% 85% at 15% 0%, color-mix(in srgb, var(--glow, #4c1d95) 70%, transparent), transparent 70%),
+    radial-gradient(60% 70% at 100% 100%, color-mix(in srgb, var(--glow, #4c1d95) 45%, transparent), transparent 72%);
+}
+/* Dark edges, so the eye settles on the middle. */
+.arena-vignette {
+  pointer-events: none;
+  background: radial-gradient(125% 105% at 50% 38%, transparent 52%, rgba(0, 0, 0, 0.55));
+}
+
+/* A live competition glows red at the edge, and the inner light slowly swells and
+   settles. Only opacity animates (the cheap, compositor-only property); the outer
+   glow is static. The element needs a positioned parent for the ring, hence relative. */
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.live-glow {
+  position: relative;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--live) 55%, transparent),
+    0 0 26px -6px color-mix(in srgb, var(--live) 38%, transparent);
+}
+.live-glow::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--live) 90%, transparent),
+    inset 0 0 30px -12px color-mix(in srgb, var(--live) 60%, transparent);
+  animation: live-pulse var(--duration-ambient) ease-in-out infinite;
+}
+
+/* Finished or cancelled: the art recedes so live and open ones stand out. */
+.ended-art {
+  filter: grayscale(0.75) brightness(0.8);
+}
+
+/* Panels sit above the page instead of lying on it. */
+:root[data-theme="dark"] .card,
+[data-surface="dark"] .card {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.045),
+    0 22px 44px -28px rgba(0, 0, 0, 0.8);
+}
+
+/* The two lights on a duel poster: warm on the challenger's side, cool on the empty slot waiting for you. */
+.duel-lights {
+  pointer-events: none;
+  background:
+    radial-gradient(55% 85% at 20% 58%, rgba(193, 244, 0, 0.2), transparent 70%),
+    radial-gradient(55% 85% at 82% 58%, rgba(129, 140, 248, 0.28), transparent 70%);
+}

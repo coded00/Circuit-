@@ -20,6 +20,7 @@ import { formatNotification } from "@/lib/notification-format";
 
 export type NotificationType =
   | "REGISTRATION_CONFIRMED"
+  | "ACCOUNT_DELETION_REQUESTED"
   | "TOURNAMENT_UPDATE"
   | "MATCH_READY"
   | "MATCH_LIVE"
@@ -32,6 +33,8 @@ export type NotificationType =
   | "BATTLE_CHALLENGE"
   | "BATTLE_ACCEPTED"
   | "BATTLE_DECLINED"
+  | "ORDER_FULFILLED"
+  | "ORDER_CANCELLED"
   | "BATTLE_EXPIRED"
   | "REGISTRATION_CAP_FILLED"
   | "REGISTRATION_CLOSED"

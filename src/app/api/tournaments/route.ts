@@ -108,8 +108,8 @@ export async function POST(request: Request) {
       {
         error: competition.lobbyCapacity
           ? groupCount > 1
-            ? `${groupCount} group lobbies hold ${capLimit} entries — set a cap between 2 and ${capLimit}.`
-            : `This format's lobby holds ${competition.lobbyCapacity} entries — set a cap between 2 and ${competition.lobbyCapacity}, or split into groups.`
+            ? `${groupCount} group lobbies hold ${capLimit} entries. Set a cap between 2 and ${capLimit}.`
+            : `This format's lobby holds ${competition.lobbyCapacity} entries. Set a cap between 2 and ${competition.lobbyCapacity}, or split into groups.`
           : structureMax
             ? `A ${getStructure(competition.fields.format)!.label.toLowerCase()} can have at most ${structureMax} entries.`
             : `Participant cap must be a whole number between 2 and ${MAX_PARTICIPANT_CAP}.`,

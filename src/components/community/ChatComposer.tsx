@@ -268,7 +268,7 @@ export function ChatComposer({
             Replying to <span className="font-semibold text-foreground">{replyingTo.authorName}</span>
             {replyingTo.snippet && <> · {replyingTo.snippet}</>}
           </span>
-          <button type="button" onClick={onCancelReply} aria-label="Cancel reply" className="shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold text-muted hover:text-foreground">
+          <button type="button" onClick={onCancelReply} aria-label="Cancel reply" className="shrink-0 cut-xs px-2 py-0.5 text-xs font-semibold text-muted hover:text-foreground">
             Cancel
           </button>
         </div>
@@ -299,9 +299,9 @@ export function ChatComposer({
             >
               {user.avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs
-                <img src={user.avatarUrl} alt="" className="h-7 w-7 shrink-0 rounded-full object-cover" />
+                <img src={user.avatarUrl} alt="" className="h-7 w-7 shrink-0 cut-avatar object-cover" />
               ) : (
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-elevated text-xs font-semibold text-muted">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center cut-avatar bg-surface-elevated text-xs font-semibold text-muted">
                   {user.displayName.slice(0, 1).toUpperCase()}
                 </span>
               )}
@@ -421,7 +421,7 @@ export function ChatComposer({
               <button
                 type="button"
                 onClick={() => setEmojiCategory("recent")}
-                className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${emojiCategory === "recent" ? "bg-surface-elevated text-foreground" : "text-muted"}`}
+                className={`shrink-0 cut-xs px-3 py-1 text-xs font-medium ${emojiCategory === "recent" ? "bg-surface-elevated text-foreground" : "text-muted"}`}
               >
                 Recent
               </button>
@@ -431,7 +431,7 @@ export function ChatComposer({
                 key={category.key}
                 type="button"
                 onClick={() => setEmojiCategory(category.key)}
-                className={`flex shrink-0 items-center gap-1 rounded-full px-3 py-1 text-xs font-medium ${emojiCategory === category.key ? "bg-surface-elevated text-foreground" : "text-muted"}`}
+                className={`flex shrink-0 items-center gap-1 cut-xs px-3 py-1 text-xs font-medium ${emojiCategory === category.key ? "bg-surface-elevated text-foreground" : "text-muted"}`}
               >
                 <span aria-hidden>{category.icon}</span>
                 {category.label}

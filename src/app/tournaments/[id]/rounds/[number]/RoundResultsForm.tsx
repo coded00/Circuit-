@@ -167,7 +167,7 @@ export function RoundResultsForm({
         onChange={setProofUrl}
         onValidityChange={setProofBlocked}
         purpose="banner"
-        hint="The end-of-game scoreboard — players can check it against what you entered."
+        hint="The end-of-game scoreboard. Players can check it against what you entered."
       />
 
       {error && <p className="text-sm text-danger">{error}</p>}

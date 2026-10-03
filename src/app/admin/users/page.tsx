@@ -46,6 +46,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
   }
   if (status === "active") and.push({ isSuspended: false });
   if (status === "suspended") and.push({ isSuspended: true });
+  if (status === "deletion") and.push({ deletionRequestedAt: { not: null } });
   if (game?.trim()) {
     const term = game.trim();
     and.push({
@@ -118,6 +119,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
             <option value="">Any status</option>
             <option value="active">Active</option>
             <option value="suspended">Suspended</option>
+            <option value="deletion">Deletion requested</option>
           </select>
         </Field>
         <Field label="Game" htmlFor="game">

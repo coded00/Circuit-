@@ -35,7 +35,7 @@ export const COMPETITION_STRUCTURES: readonly CompetitionStructure[] = [
   {
     id: "DOUBLE_ELIMINATION",
     label: "Double elimination",
-    description: "Lose twice and you're out — a losers' bracket, then a grand final.",
+    description: "Lose twice and you're out. A losers' bracket, then a grand final.",
     style: "HEAD_TO_HEAD",
     runnable: true,
     maxEntries: 32,
@@ -59,7 +59,7 @@ export const COMPETITION_STRUCTURES: readonly CompetitionStructure[] = [
   {
     id: "LEAGUE",
     label: "League",
-    description: "Everyone plays everyone on set matchdays — once, or home and away — and a points table decides the winner. Wins, draws and losses earn points.",
+    description: "Everyone plays everyone on set matchdays, once or home and away, and a points table decides the winner. Wins, draws and losses earn points.",
     style: "HEAD_TO_HEAD",
     runnable: true,
     maxEntries: 16,

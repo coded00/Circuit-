@@ -51,9 +51,9 @@ export default function LinkGoogleForm({ handle, displayName, avatarUrl }: { han
       <div className="flex items-center gap-3 rounded-[12px] border border-white/[0.08] bg-white/[0.03] p-3">
         {avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- user avatar, arbitrary host
-          <img src={avatarUrl} alt="" referrerPolicy="no-referrer" className="h-11 w-11 shrink-0 rounded-full object-cover" />
+          <img src={avatarUrl} alt="" referrerPolicy="no-referrer" className="h-11 w-11 shrink-0 cut-avatar object-cover" />
         ) : (
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface text-base font-semibold text-muted">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center cut-avatar bg-surface text-base font-semibold text-muted">
             {displayName.slice(0, 1).toUpperCase()}
           </span>
         )}

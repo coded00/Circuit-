@@ -23,6 +23,7 @@ export function GameArtTile({
   hideLabel = false,
   imgWidth = 480,
   fill = false,
+  thumb = false,
   children,
 }: {
   game: string;
@@ -47,9 +48,11 @@ export function GameArtTile({
    *  last, so the hardcoded `relative` below can silently win and leave
    *  the tile unpositioned (and invisible) inside a hero. */
   fill?: boolean;
+  /** A small square thumbnail: use the game's small icon rather than its wide cover. */
+  thumb?: boolean;
   children?: React.ReactNode;
 }) {
-  const catalogImage = useGameImage(game);
+  const catalogImage = useGameImage(game, thumb ? "icon" : "cover");
   const stockPhoto = realGameImage(game);
   const imageSrc = posterUrl || catalogImage || (stockPhoto ? unsplashUrl(stockPhoto, imgWidth) : null);
   const tint = gameTint(game);

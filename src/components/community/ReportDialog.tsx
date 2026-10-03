@@ -66,7 +66,7 @@ export function ReportDialog({ open, onClose, target, title }: { open: boolean; 
             <span className="flex h-12 w-12 items-center justify-center rounded-full bg-success/15 text-success">
               <Check size={22} />
             </span>
-            <p className="font-display text-lg font-bold tracking-tight">Thanks — we&apos;ve got it</p>
+            <p className="font-display text-lg font-bold tracking-tight">Thanks. We&apos;ve got it</p>
             <p className="text-sm text-muted">The right people will review it. You won&apos;t be named to the person you reported.</p>
             <button type="button" onClick={close} className="btn-secondary mt-1 h-10 px-5">
               Done
@@ -86,7 +86,7 @@ export function ReportDialog({ open, onClose, target, title }: { open: boolean; 
                   role="radio"
                   aria-checked={reason === r.value}
                   onClick={() => setReason(r.value)}
-                  className={`h-9 rounded-full border px-3.5 text-sm font-semibold transition ${
+                  className={`h-9 cut-xs border px-3.5 text-sm font-semibold transition ${
                     reason === r.value ? "border-foreground bg-foreground text-background" : "border-border hover:border-border-hover"
                   }`}
                 >

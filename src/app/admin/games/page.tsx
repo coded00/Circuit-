@@ -24,7 +24,7 @@ export default async function AdminGamesPage() {
     <>
       <PageHeader
         title="Games"
-        description={`${plural(games.length, "game")} · ${published} published. Organizers only see published, active games — and only the modes and formats switched on here.`}
+        description={`${plural(games.length, "game")} · ${published} published. Organizers only see published, active games. And only the modes and formats switched on here.`}
         actions={
           <Link href="/admin/games/new" className="btn-primary">
             <Plus size={15} /> New game

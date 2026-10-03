@@ -27,7 +27,7 @@ import { DiscoverySectionRow } from "@/components/discover/DiscoverySectionRow";
 
 export const metadata: Metadata = {
   title: "Communities",
-  description: "Find your scene on Circuit — official game hubs, campus crews and city communities for Nigerian gamers.",
+  description: "Find your scene on Circuit. Official game hubs, campus crews and city communities for Nigerian gamers.",
 };
 
 type SearchParams = { q?: string; game?: string; region?: string; sort?: string; category?: string };
@@ -88,7 +88,7 @@ export default async function CommunitiesPage({ searchParams }: { searchParams: 
             <span className="h-px w-6 bg-accent-volt" aria-hidden />
             Communities
           </span>
-          <h1 className="font-display text-[32px] leading-[0.95] font-bold tracking-tight uppercase sm:text-[44px]">Find your scene</h1>
+          <h1 className="font-display text-[32px] leading-[0.95] font-bold tracking-tight uppercase sm:text-[44px]">Find the ones worth facing.</h1>
           <p className="max-w-xl text-[15px] text-muted">Official game hubs, campus crews and city squads. Join the conversation, or start your own.</p>
         </div>
         <Link href={createHref} className="btn-primary h-11 shrink-0 gap-1.5 px-5">
@@ -108,7 +108,7 @@ export default async function CommunitiesPage({ searchParams }: { searchParams: 
           </span>
           <span className="flex min-w-0 flex-1 flex-col">
             <span className="text-sm font-semibold">Finish setting up</span>
-            <span className="text-[13px] text-muted">Tell us your games, city and interests — we&apos;ll pick communities for you.</span>
+            <span className="text-[13px] text-muted">Tell us your games, city and interests. We&apos;ll pick communities for you.</span>
           </span>
           <span className="text-sm font-semibold text-accent-blue">Start →</span>
         </Link>
@@ -130,7 +130,7 @@ export default async function CommunitiesPage({ searchParams }: { searchParams: 
                 key={c.label}
                 href={next.toString() ? `/communities?${next}` : "/communities"}
                 aria-current={on ? "page" : undefined}
-                className={`flex h-9 shrink-0 items-center rounded-full border px-3.5 text-sm font-semibold transition ${
+                className={`flex h-9 shrink-0 items-center cut-xs border px-3.5 text-sm font-semibold transition ${
                   on ? "border-foreground bg-foreground text-background" : "border-border bg-surface hover:border-border-hover"
                 }`}
               >
@@ -206,7 +206,7 @@ export default async function CommunitiesPage({ searchParams }: { searchParams: 
 
       {results ? (
         results.length === 0 ? (
-          <EmptyState title="Nothing matches that yet" body="Try another game or a nearby city — or start the community you were looking for." action={{ href: createHref, label: "Create community" }} />
+          <EmptyState title="Nothing matches that yet" body="Try another game or a nearby city. Or start the community you were looking for." action={{ href: createHref, label: "Create community" }} />
         ) : (
           <Grid cards={results} />
         )
@@ -262,7 +262,7 @@ export default async function CommunitiesPage({ searchParams }: { searchParams: 
               ) : (
                 <EmptyState
                   title="No player communities yet"
-                  body="Start one for your campus, your city or your squad — share the invite link on WhatsApp and bring everyone in."
+                  body="Start one for your campus, your city or your squad. Share the invite link on WhatsApp and bring everyone in."
                   action={{ href: createHref, label: "Create the first one" }}
                 />
               )}
@@ -304,7 +304,7 @@ function YourCommunities({ communities }: { communities: JoinedCommunity[] }) {
               <span className="truncate text-xs text-muted">{c.subtitle}</span>
             </span>
             {c.unreadCount > 0 && (
-              <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-live px-1.5 font-mono text-[11px] font-semibold text-white">
+              <span className="flex h-5 min-w-5 shrink-0 items-center justify-center cut-xs bg-live px-1.5 font-mono text-[11px] font-semibold text-white">
                 {c.unreadCount > 99 ? "99+" : c.unreadCount}
               </span>
             )}

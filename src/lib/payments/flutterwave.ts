@@ -22,7 +22,7 @@ const FLUTTERWAVE_BASE_URL = "https://api.flutterwave.com/v3";
 function getSecretKey(): string {
   const key = process.env.FLUTTERWAVE_SECRET_KEY;
   if (!key) {
-    throw new Error("FLUTTERWAVE_SECRET_KEY is not set — check your .env file.");
+    throw new Error("FLUTTERWAVE_SECRET_KEY is not set. Check your .env file.");
   }
   return key;
 }

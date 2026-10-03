@@ -25,6 +25,7 @@ import { getWalletActivity } from "@/lib/wallet";
 import { friendStatusBetween } from "@/lib/friends";
 import { matchStatusInfo } from "@/components/StatusPill";
 import { countryName, isCountryCode } from "@/lib/countries";
+import { hasBlocked } from "@/lib/blocks";
 import { openBattleFilter } from "@/lib/battles";
 import { ProfileView, type AttentionItem, type MatchSummary, type ProfileData } from "./ProfileView";
 
@@ -59,7 +60,8 @@ export default async function PlayerProfilePage({
 
   const viewer = await getCurrentUser();
   const isOwnProfile = viewer?.id === player.id;
-  const friendStatus = viewer && !isOwnProfile ? await friendStatusBetween(viewer.id, player.id) : null;
+  const [friendStatus, viewerBlocked] =
+    viewer && !isOwnProfile ? await Promise.all([friendStatusBetween(viewer.id, player.id), hasBlocked(viewer.id, player.id)]) : [null, false];
 
   const [
     activeMatches,
@@ -286,6 +288,7 @@ export default async function PlayerProfilePage({
     viewerSignedIn: Boolean(viewer),
     friendStatus,
     profileUrl: `${process.env.NEXT_PUBLIC_APP_URL}/players/${player.handle}`,
+    viewerBlocked,
     stats: {
       wins,
       losses,

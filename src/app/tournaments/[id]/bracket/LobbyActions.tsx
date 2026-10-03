@@ -57,7 +57,7 @@ export function FlagRoundForm({ tournamentId, roundNumber, roundLabel }: { tourn
         maxLength={1000}
         value={reason}
         onChange={(e) => setReason(e.target.value)}
-        placeholder="e.g. We finished 2nd, not 5th — we had 7 kills. Screenshot in the tournament chat."
+        placeholder="e.g. We finished 2nd, not 5th. We had 7 kills. Screenshot in the tournament chat."
         className="field-textarea text-sm"
       />
       {error && <p className="text-sm text-danger">{error}</p>}

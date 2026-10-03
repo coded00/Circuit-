@@ -153,7 +153,7 @@ export function ThreadPanel({
             <Spinner size={20} className="text-muted" />
           </div>
         ) : stream.messages && stream.messages.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted">No replies yet — start the conversation.</p>
+          <p className="py-6 text-center text-sm text-muted">No replies yet. Start the conversation.</p>
         ) : (
           stream.messages && (
             <MessageList

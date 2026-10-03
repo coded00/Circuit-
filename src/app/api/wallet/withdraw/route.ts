@@ -140,7 +140,7 @@ export async function POST(request: Request) {
     captureException(err, { route: "wallet/withdraw", userId: user.id, walletTransactionId: txnId, amount, provider: provider.name });
     await applyTransferOutcome(reference, "FAILED");
     return NextResponse.json(
-      { error: "We couldn't send your withdrawal right now. Your balance has been restored — please try again later." },
+      { error: "We couldn't send your withdrawal right now. Your balance has been restored. Please try again later." },
       { status: 502 }
     );
   }

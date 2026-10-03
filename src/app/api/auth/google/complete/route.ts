@@ -30,7 +30,7 @@ export async function POST(request: Request) {
 
   const phoneInput = typeof body?.phone === "string" ? body.phone.trim() : "";
   const phone = phoneInput ? normalizeNigerianPhone(phoneInput) : null;
-  if (phoneInput && !phone) return NextResponse.json({ error: "Enter a Nigerian mobile number, e.g. 0803 123 4567 — or leave it blank.", field: "phone" }, { status: 400 });
+  if (phoneInput && !phone) return NextResponse.json({ error: "Enter a Nigerian mobile number, e.g. 0803 123 4567. Or leave it blank.", field: "phone" }, { status: 400 });
   const dob = parseSignupDateOfBirth(body?.dateOfBirth);
   if (!dob.ok) return NextResponse.json({ error: dob.error, field: "dateOfBirth" }, { status: 400 });
 

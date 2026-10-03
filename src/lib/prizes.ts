@@ -61,7 +61,7 @@ export function parsePrizeSplit(input: unknown, maxPlaces: number): Result<numbe
     if (values[i] > values[i - 1]) return { ok: false, error: "A lower place can't get a bigger share than a higher one." };
   }
   const total = values.reduce((a, b) => a + b, 0);
-  if (total !== 100) return { ok: false, error: `The shares add up to ${total}% — they need to make 100%.` };
+  if (total !== 100) return { ok: false, error: `The shares add up to ${total}%. They need to make 100%.` };
   return { ok: true, value: normalizeSplit(values) };
 }
 

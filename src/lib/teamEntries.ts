@@ -71,7 +71,7 @@ export async function validateTeamEntry(tournament: TournamentShape, captainId: 
 
   const bounds = rosterBounds(tournament);
   if (picked.size < bounds.min || picked.size > bounds.max) {
-    throw new TeamEntryError(`This format needs a roster of ${describeRoster(bounds)} — you picked ${picked.size}.`);
+    throw new TeamEntryError(`This format needs a roster of ${describeRoster(bounds)}. You picked ${picked.size}.`);
   }
   const members = new Map(team.members.map((m) => [m.userId, m.user]));
   members.set(captainId, members.get(captainId) ?? { id: captainId, isSuspended: false, displayName: "" });

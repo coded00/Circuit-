@@ -40,9 +40,9 @@ export default async function RoundResultsPage({ params }: { params: Promise<{ i
       {tournament.status !== "LIVE" || (round.stage === "GROUP" && view.stage === "FINAL") ? (
         <p className="card text-sm text-muted">
           {tournament.status === "COMPLETE"
-            ? "Results are final — this tournament is complete."
+            ? "Results are final. This tournament is complete."
             : tournament.status === "LIVE"
-              ? "The final has started — group results are locked."
+              ? "The final has started. Group results are locked."
               : "The lobby hasn't started yet."}
         </p>
       ) : (

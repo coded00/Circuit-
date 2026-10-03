@@ -109,8 +109,8 @@ export function PrizeSplitField({
                 .map((s) => `${placeLabel(s.place)} ${naira(s.amount)} (${s.percent}%)`)
                 .join(" · ")
             : "Percent of the prize per finishing place."}
-          {knockout && current.length === 3 ? " — the two semi-final losers share 3rd." : ""}
-          {locked ? " Locked — players have already registered." : " Each place claims its own share. Ties split the places they cover."}
+          {knockout && current.length === 3 ? ". The two semi-final losers share 3rd." : ""}
+          {locked ? " Locked. Players have already registered." : " Each place claims its own share. Ties split the places they cover."}
         </span>
       )}
     </fieldset>

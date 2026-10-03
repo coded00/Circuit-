@@ -12,7 +12,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const { id } = await params;
   const key = `community-invite:${user.id}`;
   if ((await isRateLimited(key, { max: 30, windowMs: 60 * 60 * 1000 })).limited) {
-    return NextResponse.json({ error: "Too many invite links — try again later." }, { status: 429 });
+    return NextResponse.json({ error: "Too many invite links. Try again later." }, { status: 429 });
   }
   try {
     const invite = await createInvite(id, user, await jsonBody(request));

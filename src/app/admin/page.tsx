@@ -202,7 +202,7 @@ export default async function AdminOverviewPage() {
         {waiting.length === 0 ? (
           <Panel className="flex items-center gap-2.5 !py-3.5">
             <CheckCircle2 size={16} className="text-success" />
-            <span className="text-[13px] text-muted">All clear — no disputes, reports, appeals or payouts waiting on staff.</span>
+            <span className="text-[13px] text-muted">All clear. No disputes, reports, appeals or payouts waiting on staff.</span>
           </Panel>
         ) : (
           <Panel padded={false}>

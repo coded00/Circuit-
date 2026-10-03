@@ -53,7 +53,7 @@ export function PickYourGames({ games, preselected }: { games: GameOption[]; pre
         <div className="flex flex-col gap-1">
           <span className="font-mono text-[10px] font-semibold tracking-[0.16em] text-muted uppercase">Start here</span>
           <h2 className="font-display text-xl font-bold tracking-tight sm:text-2xl">Which games do you play?</h2>
-          <p className="text-sm text-muted">We&apos;ll drop you into each game&apos;s official hub — squads, clips and tournament news.</p>
+          <p className="text-sm text-muted">We&apos;ll drop you into each game&apos;s official hub. Squads, clips and tournament news.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {games.map((g) => {
@@ -70,9 +70,9 @@ export function PickYourGames({ games, preselected }: { games: GameOption[]; pre
               >
                 {g.iconUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element -- catalog icon
-                  <img src={g.iconUrl} alt="" className="h-7 w-7 rounded-full object-cover" />
+                  <img src={g.iconUrl} alt="" className="h-7 w-7 cut-avatar object-cover" />
                 ) : (
-                  <span className={`flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold ${on ? "bg-black/15" : "bg-surface-elevated"}`}>
+                  <span className={`flex h-7 w-7 items-center justify-center cut-avatar text-[11px] font-bold ${on ? "bg-black/15" : "bg-surface-elevated"}`}>
                     {g.name.slice(0, 1)}
                   </span>
                 )}

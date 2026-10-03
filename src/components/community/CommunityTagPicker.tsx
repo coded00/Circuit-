@@ -43,7 +43,7 @@ export function CommunityTagPicker({ options, current }: { options: Option[]; cu
             type="button"
             onClick={() => save("")}
             aria-pressed={value === ""}
-            className={`h-9 rounded-full border px-3.5 text-sm font-semibold transition ${value === "" ? "border-foreground bg-foreground text-background" : "border-border hover:border-border-hover"}`}
+            className={`h-9 cut-xs border px-3.5 text-sm font-semibold transition ${value === "" ? "border-foreground bg-foreground text-background" : "border-border hover:border-border-hover"}`}
           >
             No tag
           </button>
@@ -68,7 +68,7 @@ export function CommunityTagPicker({ options, current }: { options: Option[]; cu
           <Check size={13} /> Saved
         </p>
       )}
-      {state === "error" && <p className="field-error">Couldn&apos;t save — try again.</p>}
+      {state === "error" && <p className="field-error">Couldn&apos;t save. Try again.</p>}
     </section>
   );
 }

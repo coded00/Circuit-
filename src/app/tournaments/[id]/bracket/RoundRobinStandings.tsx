@@ -55,7 +55,7 @@ export function RoundRobinStandings({
               <th className="text-eyebrow w-12 px-1 py-2.5 text-center text-muted" title="Wins">W</th>
               <th className="text-eyebrow w-12 px-1 py-2.5 text-center text-muted" title="Losses">L</th>
               {swiss && (
-                <th className="text-eyebrow w-12 px-1 py-2.5 text-center text-muted" title="Buchholz — your opponents' combined wins">
+                <th className="text-eyebrow w-12 px-1 py-2.5 text-center text-muted" title="Buchholz. Your opponents' combined wins">
                   Bh
                 </th>
               )}
@@ -93,7 +93,7 @@ export function RoundRobinStandings({
       </div>
       <p className="border-t border-border px-5 py-2.5 text-xs text-muted">
         {swiss
-          ? "Most wins takes it (a bye counts as a win). Ties break on Buchholz — the combined wins of everyone you played — then score difference. If first place is still level after the last round, the top two play a decider."
+          ? "Most wins takes it (a bye counts as a win). Ties break on Buchholz (the combined wins of everyone you played), then score difference. If first place is still level after the last round, the top two play a decider."
           : `Most wins takes it. Ties break on head-to-head results between the tied ${unit.toLowerCase()}s, then score difference. If first place is still level, the top two play a decider.`}
       </p>
     </section>
@@ -106,11 +106,11 @@ export function RoundRobinStandings({
         const list = view.matches.filter((m) => (key === "decider" ? m.decider : !m.decider && String(m.round) === key));
         return (
           <section key={key} className="flex flex-col gap-2">
-            <h3 className="text-eyebrow text-muted">{key === "decider" ? "Decider — tie for first" : `Round ${key}`}</h3>
+            <h3 className="text-eyebrow text-muted">{key === "decider" ? "Decider: tie for first" : `Round ${key}`}</h3>
             {!swiss || key === "decider" ? null : byesIn(Number(key)).map((b) => (
               <div key={`bye-${b.userId}`} className="card-row flex items-center justify-between gap-3 p-3 opacity-80">
                 <span className="truncate text-sm font-medium">{name(b.userId)}</span>
-                <span className="text-[11px] font-semibold text-muted uppercase">Bye — counts as a win</span>
+                <span className="text-[11px] font-semibold text-muted uppercase">Bye. Counts as a win</span>
               </div>
             ))}
             {list.map((m) => {
@@ -196,7 +196,7 @@ export function RoundRobinStandings({
                     ? `Most wins after ${swiss.totalRounds} Swiss rounds.`
                     : "Most wins when every match was played."
                 : view.decider
-                  ? `${name(view.decider.playerAId)} and ${name(view.decider.playerBId)} are level on top — the decider settles it.`
+                  ? `${name(view.decider.playerAId)} and ${name(view.decider.playerBId)} are level on top. The decider settles it.`
                   : swiss
                     ? `Round ${swiss.currentRound} of ${swiss.totalRounds} · ${done} of ${view.matches.length} matches played.`
                     : `${done} of ${view.matches.length} matches played.`}

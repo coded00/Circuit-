@@ -104,7 +104,7 @@ export default async function DashboardTournamentDetailPage({
         {tournament.cancellationLockAt && statusCancellable && (
           <span className="text-xs text-muted">
             {pastCancellationLock
-              ? `Past the cancellation lock (${formatDateTime(tournament.cancellationLockAt)}) — staff-only now`
+              ? `Past the cancellation lock (${formatDateTime(tournament.cancellationLockAt)}). Staff-only now`
               : `You can cancel until ${formatDateTime(tournament.cancellationLockAt)}`}
           </span>
         )}
@@ -161,7 +161,7 @@ export default async function DashboardTournamentDetailPage({
           )}
         </div>
         <p className="text-sm text-muted">
-          {bracket ? "Generated — see the bracket view for live match status." : "Not generated yet."}
+          {bracket ? "Generated. See the bracket view for live match status." : "Not generated yet."}
         </p>
       </section>
 

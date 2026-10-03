@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   if (typeof body.channelId !== "string") return NextResponse.json({ error: "Which channel?" }, { status: 400 });
   const key = `thread-create:${user.id}`;
   if ((await isRateLimited(key, { max: 20, windowMs: 60 * 60 * 1000 })).limited) {
-    return NextResponse.json({ error: "You've started a lot of threads — try again later." }, { status: 429 });
+    return NextResponse.json({ error: "You've started a lot of threads. Try again later." }, { status: 429 });
   }
   try {
     const thread = await createThread(body.channelId, user, body);

@@ -85,7 +85,7 @@ export default async function AdminMatchPage({ params }: { params: Promise<{ id:
           <Scale size={16} className={`mt-0.5 shrink-0 ${canRuleAsStaff ? "text-danger" : "text-muted"}`} />
           <span className="text-foreground">
             {canRuleAsStaff
-              ? "Escalated to staff — compare both reports below, then rule. Your ruling is final."
+              ? "Escalated to staff. Compare both reports below, then rule. Your ruling is final."
               : match.dispute.status === "ORGANIZER_REVIEW"
                 ? "Waiting on the tournament organizer's ruling. It escalates to staff automatically if they miss the window."
                 : "This dispute isn't in the staff queue."}

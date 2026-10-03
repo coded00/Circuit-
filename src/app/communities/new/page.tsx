@@ -29,12 +29,12 @@ export default async function NewCommunityPage() {
       </Link>
       <header className="flex flex-col gap-2">
         <h1 className="font-display text-[28px] leading-[0.95] font-bold tracking-tight uppercase sm:text-[36px]">Start a community</h1>
-        <p className="text-[15px] text-muted">For your campus, your city, your crew or your game. You&apos;ll be the owner — you can add moderators later.</p>
+        <p className="text-[15px] text-muted">For your campus, your city, your crew or your game. You&apos;ll be the owner. You can add moderators later.</p>
       </header>
       {!user.emailVerifiedAt && !user.isStaff ? (
         <EmailVerificationBanner
           email={user.email ?? user.emailOrPhone}
-          reason="Communities can only be created by verified accounts — it keeps spam and fake communities out. Verify your email to continue."
+          reason="Communities can only be created by verified accounts. It keeps spam and fake communities out. Verify your email to continue."
         />
       ) : owned >= MAX_OWNED_COMMUNITIES ? (
         <p className="rounded-[14px] border border-border bg-surface px-4 py-4 text-sm text-muted">

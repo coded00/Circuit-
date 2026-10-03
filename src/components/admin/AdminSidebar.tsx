@@ -35,6 +35,7 @@ import {
   MessagesSquare,
   Scale,
   Flag,
+  Store,
   type LucideIcon,
 } from "lucide-react";
 
@@ -57,6 +58,7 @@ export const ADMIN_NAV_GROUPS: { label: string; items: AdminNavItem[] }[] = [
     label: "Catalog",
     items: [
       { href: "/admin/games", label: "Games", icon: Gamepad2 },
+      { href: "/admin/marketplace", label: "Marketplace", icon: Store },
       { href: "/admin/content", label: "Content", icon: Newspaper },
       { href: "/admin/calendar", label: "Calendar", icon: Calendar },
     ],

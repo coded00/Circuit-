@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     await sendEmail(
       deliverTo,
       "Reset your Circuit password",
-      `Someone (hopefully you) asked to reset the password for your Circuit account.\n\nReset it here — this link expires in 1 hour:\n${resetUrl}\n\nIf you didn't request this, you can safely ignore this email.`
+      `Someone (hopefully you) asked to reset the password for your Circuit account.\n\nReset it here. This link expires in 1 hour:\n${resetUrl}\n\nIf you didn't request this, you can safely ignore this email.`
     );
   }
 

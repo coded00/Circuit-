@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { logout } from "@/lib/logout";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { ChevronDown, ShoppingBag, Gift, Trophy, Swords, Shield, Wallet, Compass } from "lucide-react";
 
 type NavUser = { handle: string; displayName: string; avatarUrl: string | null; isStaff: boolean };
@@ -153,7 +152,6 @@ export function AccountMenu({
           )}
 
           <div className="my-1 border-t border-border" />
-          <ThemeToggle variant="menu" />
           <button
             type="button"
             onClick={handleLogout}

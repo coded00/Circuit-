@@ -30,9 +30,9 @@ export function ReactionChips({
           type="button"
           onClick={() => onToggle(r.emoji, !r.reacted)}
           aria-pressed={r.reacted}
-          aria-label={`${r.emoji} ${r.count} — ${r.reacted ? "remove your reaction" : "react"}`}
+          aria-label={`${r.emoji} ${r.count}, ${r.reacted ? "remove your reaction" : "react"}`}
           title={r.names.join(", ") + (r.count > r.names.length ? ` and ${r.count - r.names.length} more` : "")}
-          className={`flex h-7 items-center gap-1 rounded-full border px-2 text-[13px] leading-none transition active:scale-95 ${
+          className={`flex h-7 items-center gap-1 cut-xs border px-2 text-[13px] leading-none transition active:scale-95 ${
             r.reacted
               ? "border-accent-volt bg-accent-volt/20 font-semibold text-foreground"
               : "border-border bg-surface-elevated/60 text-muted hover:border-border-hover hover:text-foreground"
@@ -94,7 +94,7 @@ export function ReactionPicker({
             type="button"
             onClick={() => setCategory(c.key)}
             aria-label={c.label}
-            className={`shrink-0 rounded-full px-2.5 py-1 text-base transition ${category === c.key ? "bg-surface-elevated" : "opacity-60 hover:opacity-100"}`}
+            className={`shrink-0 cut-xs px-2.5 py-1 text-base transition ${category === c.key ? "bg-surface-elevated" : "opacity-60 hover:opacity-100"}`}
           >
             {c.icon}
           </button>

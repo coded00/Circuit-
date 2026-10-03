@@ -190,7 +190,7 @@ function ModeCard({
               Formats · {mode.formats.length}
             </span>
             {mode.formats.length === 0 && !adding && (
-              <p className="text-xs text-muted">No formats yet — organizers can&apos;t pick this mode until it has one.</p>
+              <p className="text-xs text-muted">No formats yet. Organizers can&apos;t pick this mode until it has one.</p>
             )}
             {mode.formats.length > 0 && (
               <ul className="flex flex-col gap-1.5">
@@ -258,7 +258,7 @@ export function ModesBuilder({ gameId, modes: serverModes }: { gameId: string; m
       {modes.length === 0 && !adding && (
         <div className="rounded-[14px] border border-dashed border-border-strong px-6 py-10 text-center">
           <p className="text-sm font-semibold">No modes yet</p>
-          <p className="mt-1 text-xs text-muted">Add the ways this game is played competitively — each with its own formats and team rules.</p>
+          <p className="mt-1 text-xs text-muted">Add the ways this game is played competitively. Each with its own formats and team rules.</p>
         </div>
       )}
       {modes.map((m, i) => (

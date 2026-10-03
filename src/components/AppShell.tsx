@@ -76,7 +76,9 @@ export function AppShell({
 
   return (
     <>
-      <div className="mx-auto grid min-h-full w-full max-w-[1920px] grid-cols-1 pb-[calc(7rem_+_env(safe-area-inset-bottom))] sm:grid-cols-[var(--sidebar-width-sm)_1fr] sm:pb-0 lg:grid-cols-[var(--sidebar-width-lg)_1fr]">
+      {/* Soft colour behind everything (dark theme only). */}
+      <div aria-hidden className="app-ambient" />
+      <div className="relative z-[1] mx-auto grid min-h-full w-full max-w-[1920px] grid-cols-1 pb-[calc(7rem_+_env(safe-area-inset-bottom))] sm:grid-cols-[var(--sidebar-width-sm)_1fr] sm:pb-0 lg:grid-cols-[var(--sidebar-width-lg)_1fr]">
         <div>{sidebar}</div>
         <div className="flex min-w-0 flex-col">
           {topBar}

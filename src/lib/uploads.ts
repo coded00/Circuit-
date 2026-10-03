@@ -25,6 +25,7 @@ export const MAX_PUBLIC_IMAGE_BYTES = 4 * 1024 * 1024;
 export const IMAGE_PURPOSES = {
   avatar: { staffOnly: false },
   poster: { staffOnly: false },
+  listing: { staffOnly: false },
   "community-icon": { staffOnly: false },
   "community-banner": { staffOnly: false },
   banner: { staffOnly: true },

@@ -57,7 +57,7 @@ function NotificationInbox({
           <h2 className="font-display flex items-center gap-2 text-[17px] font-bold tracking-tight">
             Notifications
             {unreadCount > 0 && (
-              <span className="rounded-full bg-accent-volt px-1.5 py-0.5 font-mono text-[10px] leading-none font-bold text-accent-volt-foreground">
+              <span className="cut-xs bg-accent-volt px-1.5 py-0.5 font-mono text-[10px] leading-none font-bold text-accent-volt-foreground">
                 {unreadCount > 99 ? "99+" : unreadCount}
               </span>
             )}
@@ -233,7 +233,7 @@ export function NotificationBell({
       >
         <Bell size={18} />
         {unreadCount > 0 && (
-          <span className="absolute top-1.5 right-1.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-live px-1 font-mono text-[10px] leading-none font-bold text-white ring-2 ring-background">
+          <span className="absolute top-1.5 right-1.5 flex h-[17px] min-w-[17px] items-center justify-center cut-xs bg-live px-1 font-mono text-[10px] leading-none font-bold text-white ring-2 ring-background">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}

@@ -1,19 +1,21 @@
 /**
  * Circuit — the one tournament card (homepage Featured/Upcoming rows,
- * calendar, game pages). Poster on top with only the status on it; below,
- * game + name, then the three facts people choose a tournament by —
- * prize/entry, start date, slots — with a slim fill bar. The whole card is
- * the link; no per-card button, no gradient scrim over the art.
+ * calendar, game pages). Cinematic: the game's art runs edge to edge, lit
+ * with that game's colour, and the title, status and the three facts people
+ * choose a tournament by (prize/entry, start, slots) sit over it on a dark
+ * fade. A LIVE tournament glows; a finished or cancelled one dims so open
+ * and live ones stand out. The whole card is the link.
  */
 
 import Link from "next/link";
 import { ViewTransition } from "react";
+import { ArrowRight } from "lucide-react";
 import { GameArtTile } from "@/components/GameArtTile";
 import { tournamentArtName } from "@/lib/viewTransitions";
-import { ArrowRight } from "lucide-react";
 import { StatusPill } from "@/components/StatusPill";
-import { tournamentCtaLabel, tournamentDisplayStatus } from "@/lib/tournamentCta";
 import { tournamentPath } from "@/lib/seo";
+import { ArenaGlow } from "@/components/ArenaBackdrop";
+import { tournamentCtaLabel, tournamentDisplayStatus } from "@/lib/tournamentCta";
 
 export type TournamentCardData = {
   id: string;
@@ -30,8 +32,12 @@ export type TournamentCardData = {
   _count: { registrations: number };
 };
 
+/** Short on a card: ₦2,500, ₦10K, ₦1.5M. Exact amounts live on the tournament page. */
 function formatNaira(kobo: number): string {
-  return `₦${(kobo / 100).toLocaleString("en-NG")}`;
+  const naira = kobo / 100;
+  if (naira >= 1_000_000) return `₦${+(naira / 1_000_000).toFixed(1)}M`;
+  if (naira >= 10_000) return `₦${+(naira / 1_000).toFixed(naira >= 100_000 ? 0 : 1)}K`;
+  return `₦${naira.toLocaleString("en-NG")}`;
 }
 
 function formatShortDate(date: Date): string {
@@ -53,73 +59,91 @@ export function TournamentCard({
   const registered = t._count.registrations;
   // "Draft" is organizer language, so an announced-but-not-yet-open
   // tournament reads "Announced"; an open one with no slots reads "Full".
-  const counts = { status: t.status, participantCap: t.participantCap, registered };
+  const counts = {
+    status: t.status,
+    participantCap: t.participantCap,
+    registered,
+  };
   const status = tournamentDisplayStatus(counts);
   const cta = tournamentCtaLabel(counts);
   const fill = t.participantCap > 0 ? Math.min(100, (registered / t.participantCap) * 100) : 0;
   const spotsLeft = t.participantCap - registered;
   const nearlyFull = spotsLeft > 0 && t.participantCap > 0 && spotsLeft / t.participantCap <= 0.2;
+  const live = t.status === "LIVE";
+  const ended = t.status === "COMPLETE" || t.status === "CANCELLED";
+
+  const art = <GameArtTile game={t.game} posterUrl={t.posterUrl} className={`h-full w-full ${ended ? "ended-art" : ""}`} hideLabel imgWidth={640} fill />;
 
   return (
     <Link
       href={tournamentPath(t)}
-      className="group flex h-full w-full flex-col overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface transition duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:-translate-y-0.5 hover:border-border-hover active:translate-y-0 active:scale-[0.99] active:duration-[var(--duration-instant)]"
+      className={`group relative isolate flex h-full w-full flex-col overflow-hidden cut-lg border bg-black text-white transition duration-[var(--duration-base)] ease-[var(--ease-standard)] hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] active:duration-[var(--duration-instant)] ${
+        live ? "live-glow border-live/60 [--cut-line:color-mix(in_srgb,var(--live)_60%,transparent)]" : "border-border [--cut-line:var(--border)] hover:border-border-hover"
+      } ${ended ? "opacity-90" : ""}`}
     >
-      <div className="relative aspect-video w-full shrink-0 overflow-hidden bg-surface-elevated sm:aspect-[16/10]">
-        <div className="h-full w-full transition-transform duration-[var(--duration-moderate)] ease-[var(--ease-standard)] group-hover:scale-[1.03]">
+      {/* Same shape on every card: a banner-shaped art area (the organizer's
+          banner, or the game's art), then the details. */}
+      <div className="relative aspect-[3/1] w-full shrink-0 overflow-hidden bg-black">
+        <div
+          aria-hidden
+          className="absolute inset-0 transition-transform duration-[var(--duration-reveal)] ease-[var(--ease-standard)] group-hover:scale-[1.04]"
+        >
           {morph ? (
             <ViewTransition name={tournamentArtName(t.id)} share="tournament-morph" default="none">
-              <GameArtTile game={t.game} posterUrl={t.posterUrl} className="h-full w-full" hideLabel imgWidth={560} />
+              {art}
             </ViewTransition>
           ) : (
-            <GameArtTile game={t.game} posterUrl={t.posterUrl} className="h-full w-full" hideLabel imgWidth={560} />
+            art
           )}
         </div>
-        <div className="absolute top-2.5 left-2.5 flex gap-1.5">
-          <StatusPill tone={status.tone} pulse={status.pulse} solid>
-            {status.label}
-          </StatusPill>
-          {featured && <span className="badge bg-accent-volt text-accent-volt-foreground">Featured</span>}
-        </div>
+        <ArenaGlow game={t.game} className="opacity-40" />
       </div>
 
-      <div className="flex flex-1 flex-col gap-3 p-3.5 sm:gap-4 sm:p-4">
+      <div className={`flex flex-1 flex-col justify-center gap-3 p-4`}>
         <div className="flex min-w-0 flex-col gap-1">
-          <span className="truncate text-xs text-muted">
-            {t.game} · {t.teamSize}
-          </span>
-          <span className="line-clamp-2 font-display text-base leading-tight font-bold tracking-tight sm:text-lg">{t.name}</span>
+          <div className="flex items-center justify-between gap-2">
+            <span className="min-w-0 truncate font-mono text-[11px] tracking-wide text-white/70 uppercase">
+              {t.game} · {t.teamSize}
+            </span>
+            <span className="flex shrink-0 items-center gap-1 [&_.badge]:px-2 [&_.badge]:py-0.5 [&_.badge]:text-[10px] [&_.badge-open]:bg-success-strong!">
+              <StatusPill tone={status.tone} pulse={status.pulse} solid>
+                {status.label === "Registration open" ? "Open" : status.label}
+              </StatusPill>
+              {featured && <span className="badge bg-accent-volt text-accent-volt-foreground">Featured</span>}
+            </span>
+          </div>
+          <span className="line-clamp-2 font-display text-lg leading-[1.05] font-bold tracking-tight uppercase sm:text-xl">{t.name}</span>
         </div>
 
-        <dl className="mt-auto grid grid-cols-3 gap-2 border-t border-border pt-3">
+        <dl className="grid grid-cols-[1fr_1fr_0.8fr] gap-2 rounded-[12px] border border-white/10 bg-black/60 p-2.5">
           <div className="flex min-w-0 flex-col gap-0.5">
-            <dt className="text-[10px] font-medium tracking-wide text-muted uppercase">{t.prizeAmount ? "Prize" : "Entry"}</dt>
+            <dt className="text-[10px] font-medium tracking-wide text-white/60 uppercase">{t.prizeAmount ? "Prize" : "Entry"}</dt>
             <dd className={`text-stat truncate text-sm ${t.prizeAmount ? "text-gold" : t.entryFee === 0 ? "text-success" : ""}`}>
               {t.prizeAmount ? formatNaira(t.prizeAmount) : t.entryFee === 0 ? "Free" : formatNaira(t.entryFee)}
             </dd>
           </div>
           <div className="flex min-w-0 flex-col gap-0.5">
-            <dt className="text-[10px] font-medium tracking-wide text-muted uppercase">
+            <dt className="text-[10px] font-medium tracking-wide text-white/60 uppercase">
               {t.status === "DRAFT" && t.registrationOpenAt ? "Opens" : "Starts"}
             </dt>
-            <dd className="text-stat truncate text-sm">
-              {formatShortDate(t.status === "DRAFT" && t.registrationOpenAt ? t.registrationOpenAt : t.startAt)}
-            </dd>
+            <dd className="text-stat truncate text-sm">{formatShortDate(t.status === "DRAFT" && t.registrationOpenAt ? t.registrationOpenAt : t.startAt)}</dd>
           </div>
           <div className="flex min-w-0 flex-col gap-0.5">
-            <dt className="text-[10px] font-medium tracking-wide text-muted uppercase">Slots</dt>
+            <dt className="text-[10px] font-medium tracking-wide text-white/60 uppercase">Slots</dt>
             <dd className={`text-stat truncate text-sm ${nearlyFull || spotsLeft <= 0 ? "text-accent-orange" : ""}`}>
               {registered}/{t.participantCap}
             </dd>
           </div>
         </dl>
-        <div className="-mt-2 h-1 w-full overflow-hidden rounded-full bg-surface-elevated" aria-hidden>
+
+        <div className="h-1 w-full overflow-hidden rounded-full bg-white/15" aria-hidden>
           <div
-            className={`h-full rounded-full transition-[width] duration-[var(--duration-reveal)] ${spotsLeft <= 0 || nearlyFull ? "bg-accent-orange" : "bg-accent-blue"}`}
+            className={`h-full rounded-full transition-[width] duration-[var(--duration-reveal)] ${spotsLeft <= 0 || nearlyFull ? "bg-accent-orange" : "bg-accent-volt"}`}
             style={{ width: `${fill}%` }}
           />
         </div>
-        <span className="flex items-center justify-between text-[13px] font-semibold text-foreground/90 transition-colors group-hover:text-accent-blue">
+
+        <span className="flex items-center justify-between text-[13px] font-semibold transition-colors group-hover:text-accent-volt">
           {cta}
           <ArrowRight size={15} className="transition-transform duration-[var(--duration-base)] group-hover:translate-x-0.5" aria-hidden />
         </span>

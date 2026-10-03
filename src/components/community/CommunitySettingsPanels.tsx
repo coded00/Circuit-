@@ -161,8 +161,8 @@ type Ban = { userId: string; handle: string; displayName: string; reason: string
 
 function Avatar({ name, url }: { name: string; url: string | null }) {
   // eslint-disable-next-line @next/next/no-img-element -- external avatar
-  if (url) return <img src={url} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" />;
-  return <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-elevated text-xs font-semibold text-muted">{name.slice(0, 1).toUpperCase()}</span>;
+  if (url) return <img src={url} alt="" className="h-8 w-8 shrink-0 cut-avatar object-cover" />;
+  return <span className="flex h-8 w-8 shrink-0 items-center justify-center cut-avatar bg-surface-elevated text-xs font-semibold text-muted">{name.slice(0, 1).toUpperCase()}</span>;
 }
 
 export function MemberManager({
@@ -191,7 +191,7 @@ export function MemberManager({
   async function remove(m: Member, ban: boolean) {
     const ok = await confirm({
       title: ban ? `Ban ${m.displayName}?` : `Remove ${m.displayName}?`,
-      message: ban ? "They're removed and can't rejoin — not even with an invite — until you unban them." : "They can rejoin later if the community is open.",
+      message: ban ? "They're removed and can't rejoin, not even with an invite, until you unban them." : "They can rejoin later if the community is open.",
       confirmLabel: ban ? "Ban" : "Remove",
     });
     if (ok) run(`rm-${m.userId}`, `/api/communities/${communityId}/members/${m.userId}`, "DELETE", { ban });

@@ -76,9 +76,9 @@ export default function CompleteGoogleSignupForm({
       <div className="flex items-center gap-3 rounded-[12px] border border-white/[0.08] bg-white/[0.03] p-3">
         {googlePicture && useGooglePhoto ? (
           // eslint-disable-next-line @next/next/no-img-element -- Google-hosted profile photo
-          <img src={googlePicture} alt="" referrerPolicy="no-referrer" className="h-11 w-11 shrink-0 rounded-full object-cover" />
+          <img src={googlePicture} alt="" referrerPolicy="no-referrer" className="h-11 w-11 shrink-0 cut-avatar object-cover" />
         ) : (
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface text-base font-semibold text-muted">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center cut-avatar bg-surface text-base font-semibold text-muted">
             {(displayName || handle || "?").slice(0, 1).toUpperCase()}
           </span>
         )}
@@ -158,7 +158,7 @@ export default function CompleteGoogleSignupForm({
                   type="button"
                   aria-pressed={on}
                   onClick={() => toggleGame(game)}
-                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-medium transition ${
+                  className={`flex items-center gap-1.5 cut-xs border px-3 py-1.5 text-[13px] font-medium transition ${
                     on ? "border-foreground bg-foreground text-background" : "border-border text-muted hover:border-border-hover hover:text-foreground"
                   }`}
                 >

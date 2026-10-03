@@ -90,7 +90,7 @@ export default function ResultForm({
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5">
       <fieldset className="flex flex-col gap-2">
-        <legend className="field-label mb-2">{drawAllowed ? "Who won — or was it a draw?" : "Who won?"}</legend>
+        <legend className="field-label mb-2">{drawAllowed ? "Who won. Or was it a draw?" : "Who won?"}</legend>
         <div className={`grid gap-3 ${drawAllowed ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2"}`}>
           {[playerA, playerB].map((player) => {
             const selected = winnerId === player.id;

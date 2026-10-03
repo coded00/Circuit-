@@ -46,6 +46,7 @@ import UpdateForm from "./UpdateForm";
 import DeleteUpdateButton from "./DeleteUpdateButton";
 import ClaimPrizeButton from "./ClaimPrizeButton";
 import { buildMetadata, parseIdSegment, tournamentPath, gamePath, organiserPath, absoluteUrl, DEFAULT_DESCRIPTION } from "@/lib/seo";
+import { ArenaGlow } from "@/components/ArenaBackdrop";
 
 function formatNaira(kobo: number): string {
   return `₦${(kobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 0 })}`;
@@ -96,7 +97,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const path = tournamentPath(tournament);
 
   return buildMetadata({
-    title: `${tournament.name} — ${tournament.game} Tournament`,
+    title: `${tournament.name} | ${tournament.game} Tournament`,
     description: `Join ${tournament.name}, a ${tournament.game} tournament on Circuit. ${prizeText}. Register now and compete.`,
     path,
     image: tournament.posterUrl ?? undefined,
@@ -163,7 +164,7 @@ export default async function TournamentPage({ params, searchParams }: { params:
     ...(tournament.formatName ? [{ label: "Format", value: tournament.formatName }] : []),
     {
       label: "Entry",
-      value: tournament.entryType === "TEAM" ? `Teams of ${tournament.playersPerTeam}` : "Individual — 1 player",
+      value: tournament.entryType === "TEAM" ? `Teams of ${tournament.playersPerTeam}` : "Individual. 1 player",
     },
     ...(tournament.competitionStyle === "HEAD_TO_HEAD" ? [{ label: "Matches", value: `${tournament.playersPerTeam}v${tournament.playersPerTeam}` }] : []),
     ...(isLobby
@@ -178,7 +179,7 @@ export default async function TournamentPage({ params, searchParams }: { params:
           { label: "Scoring", value: describePoints(effectiveTable(tournament)) },
         ]
       : []),
-    { label: "How it's run", value: structure ? `${structure.label} — ${structure.description}` : formatText },
+    { label: "How it's run", value: structure ? `${structure.label}, ${structure.description}` : formatText },
   ];
   const hasBracket = tournament.status === "LIVE" || tournament.status === "COMPLETE";
   // A real countdown only makes sense before the bracket actually starts.
@@ -309,7 +310,7 @@ export default async function TournamentPage({ params, searchParams }: { params:
           <Panel title="Game & host">
             <PanelRows>
               <Link href={gamePath(tournament.game)} className={panelRowClass}>
-                <GameArtTile game={tournament.game} className="h-11 w-11 shrink-0 rounded-[10px]" hideLabel imgWidth={120} />
+                <GameArtTile thumb game={tournament.game} className="h-11 w-11 shrink-0 rounded-[10px]" hideLabel imgWidth={120} />
                 <div className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-sm font-medium">{tournament.game}</span>
                   <span className="text-metadata">More {tournament.game} tournaments</span>
@@ -367,7 +368,7 @@ export default async function TournamentPage({ params, searchParams }: { params:
                           <Link
                             key={m.handle}
                             href={`/players/${m.handle}`}
-                            className="rounded-full border border-border px-2 py-0.5 text-xs text-muted transition-colors hover:border-border-hover hover:text-foreground"
+                            className="cut-xs border border-border px-2 py-0.5 text-xs text-muted transition-colors hover:border-border-hover hover:text-foreground"
                           >
                             {m.displayName}
                           </Link>
@@ -411,10 +412,10 @@ export default async function TournamentPage({ params, searchParams }: { params:
                       : "The lobby is live. The leaderboard updates as each round's results are posted."
                     : isRoundRobin
                       ? tournament.format === "SWISS"
-                        ? "Swiss rounds are live — each round is drawn when the last one finishes."
+                        ? "Swiss rounds are live. Each round is drawn when the last one finishes."
                         : isLeague
-                          ? "The league is live — follow the table and play each matchday's fixture before its deadline."
-                          : "Everyone plays everyone — follow the standings as matches finish."
+                          ? "The league is live. Follow the table and play each matchday's fixture before its deadline."
+                          : "Everyone plays everyone. Follow the standings as matches finish."
                       : "The bracket is live. Follow every round as results come in."}
                 </p>
                 <Link href={`/tournaments/${tournament.id}/bracket`} className="btn-primary">
@@ -424,10 +425,10 @@ export default async function TournamentPage({ params, searchParams }: { params:
             ) : isRoundRobin ? (
               <p className="text-sm text-muted">
                 {isLeague
-                  ? `When registration closes on ${formatDate(tournament.registrationCloseAt)}, every fixture is drawn — everyone plays everyone${tournament.leagueLegs === 2 ? " twice, home and away" : " once"}, a matchday every ${tournament.leagueMatchdayDays ?? 7} days. ${tournament.leagueWinPoints ?? 3} points for a win${tournament.leagueDrawPoints != null ? `, ${tournament.leagueDrawPoints} for a draw` : " (no draws)"}; the top of the table takes it.`
+                  ? `When registration closes on ${formatDate(tournament.registrationCloseAt)}, every fixture is drawn. Everyone plays everyone${tournament.leagueLegs === 2 ? " twice, home and away" : " once"}, a matchday every ${tournament.leagueMatchdayDays ?? 7} days. ${tournament.leagueWinPoints ?? 3} points for a win${tournament.leagueDrawPoints != null ? `, ${tournament.leagueDrawPoints} for a draw` : " (no draws)"}; the top of the table takes it.`
                   : tournament.format === "SWISS"
-                  ? `When registration closes on ${formatDate(tournament.registrationCloseAt)}, round 1 is drawn. Each round pairs players on the same record — never the same opponent twice — and the most wins after the last round takes it.`
-                  : `When registration closes on ${formatDate(tournament.registrationCloseAt)}, every pairing is drawn at once — everyone plays everyone, in any order. Most wins takes it.`}
+                  ? `When registration closes on ${formatDate(tournament.registrationCloseAt)}, round 1 is drawn. Each round pairs players on the same record, never the same opponent twice, and the most wins after the last round takes it.`
+                  : `When registration closes on ${formatDate(tournament.registrationCloseAt)}, every pairing is drawn at once. Everyone plays everyone, in any order. Most wins takes it.`}
               </p>
             ) : isLobby ? (
               <p className="text-sm text-muted">
@@ -512,7 +513,7 @@ export default async function TournamentPage({ params, searchParams }: { params:
             ) : tournament.prizeText ? (
               <p className="text-sm text-foreground/85">{tournament.prizeText}</p>
             ) : (
-              <p className="text-sm text-muted">No cash prize for this one — bragging rights only.</p>
+              <p className="text-sm text-muted">No cash prize for this one. Bragging rights only.</p>
             )}
           </PanelBody>
         </Panel>
@@ -590,12 +591,16 @@ export default async function TournamentPage({ params, searchParams }: { params:
           while someone else registers with this page open. */}
       <Poller />
 
-      <header data-surface="dark" className="overflow-hidden rounded-[var(--radius-hero)] border border-border bg-surface">
-        <div className="relative aspect-[5/2] w-full sm:aspect-[4/1]">
+      <header data-surface="dark" className={`overflow-hidden rounded-[var(--radius-hero)] border bg-surface ${tournament.status === "LIVE" ? "live-glow border-live/60" : "border-border"}`}>
+        <div className="relative aspect-[5/3] w-full sm:aspect-[16/6]">
           {/* Same name as the card/row art it was opened from — morphs between them. */}
           <ViewTransition name={tournamentArtName(tournament.id)} share="tournament-morph" default="none">
             <GameArtTile game={tournament.game} posterUrl={tournament.posterUrl} fill hideLabel imgWidth={1400} />
           </ViewTransition>
+          {/* The game's own colour across the art, and a fade into the details below. */}
+          <ArenaGlow game={tournament.game} className="opacity-70" />
+          <div aria-hidden className="arena-vignette absolute inset-0" />
+          <div aria-hidden className="absolute inset-x-0 bottom-0 h-3/4 bg-gradient-to-t from-surface via-surface/70 to-transparent" />
           <div className="absolute top-4 left-4 z-10 flex flex-wrap items-center gap-2">
             <StatusPill tone={status.tone} pulse={status.pulse} solid size="md">
               {status.label}
@@ -609,7 +614,7 @@ export default async function TournamentPage({ params, searchParams }: { params:
           </div>
         </div>
 
-        <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-end sm:justify-between sm:p-7">
+        <div className="relative z-10 -mt-24 flex flex-col gap-4 p-5 sm:-mt-32 sm:flex-row sm:items-end sm:justify-between sm:p-7">
           <div className="flex min-w-0 flex-col gap-2">
             <span className="text-xs text-muted">
               <Link href={gamePath(tournament.game)} className="font-medium text-foreground/80 transition hover:text-accent-volt">
@@ -755,7 +760,7 @@ export default async function TournamentPage({ params, searchParams }: { params:
           {canClaimPrize && myShare && (
             <ClaimPrizeButton
               tournamentId={tournament.id}
-              label={prizeResults.length > 1 ? `Claim ${formatNaira(myShare.amount)} — ${placeLabel(myShare.place)} place` : undefined}
+              label={prizeResults.length > 1 ? `Claim ${formatNaira(myShare.amount)}, ${placeLabel(myShare.place)} place` : undefined}
             />
           )}
 

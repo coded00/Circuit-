@@ -84,7 +84,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const description =
     active.length > 0
       ? `${active.length} open ${game} tournament${active.length === 1 ? "" : "s"} on Circuit right now. Register, compete, and climb the ${game} leaderboard.`
-      : `Real ${game} tournaments and 1v1 Challenges on Circuit — Nigeria-first esports competitions with real prizes.${standings.length ? ` See the current ${game} leaderboard.` : ""}`;
+      : `Real ${game} tournaments and 1v1 Challenges on Circuit. Nigeria-first esports competitions with real prizes.${standings.length ? ` See the current ${game} leaderboard.` : ""}`;
 
   return buildMetadata({
     title: `${game} Tournaments & Esports Competitions`,
@@ -171,7 +171,7 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
             {standings.map((s, i) => (
               <Link key={s.userId} href={`/players/${s.handle}`} className="card-row flex items-center gap-3 p-3">
                 <span className="w-5 shrink-0 text-center text-sm font-bold text-muted">{i + 1}</span>
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-surface-elevated text-xs font-semibold text-muted">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center cut-avatar border border-border bg-surface-elevated text-xs font-semibold text-muted">
                   {s.displayName.slice(0, 1).toUpperCase()}
                 </span>
                 <div className="flex min-w-0 flex-1 flex-col">

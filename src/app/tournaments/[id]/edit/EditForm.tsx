@@ -209,7 +209,7 @@ export default function EditForm({
           </div>
           <span className="field-hint">
             {competitionLocked
-              ? "Locked — players have already registered for this game and format."
+              ? "Locked. Players have already registered for this game and format."
               : "Saved before the game catalog existed. Change it to pick from the current modes and formats."}
           </span>
           {tournament.format === "LEAGUE" && (
@@ -257,7 +257,7 @@ export default function EditForm({
         ) : structureMax ? (
           <span className="field-hint">
             {["ROUND_ROBIN", "LEAGUE"].includes(competition?.structure ?? tournament.format)
-              ? `Up to ${structureMax} entries — every pairing is a match (${(structureMax * (structureMax - 1)) / 2} matches at ${structureMax}).`
+              ? `Up to ${structureMax} entries. Every pairing is a match (${(structureMax * (structureMax - 1)) / 2} matches at ${structureMax}).`
               : `Up to ${structureMax} entries.`}
           </span>
         ) : null}

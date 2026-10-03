@@ -49,7 +49,7 @@ export default async function BattleBoardPage({ searchParams }: { searchParams: 
   const records = await challengeRecords(battles.map((b) => b.game));
 
   const chipClass = (active: boolean) =>
-    `flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
+    `flex shrink-0 items-center gap-1.5 cut-xs px-3.5 py-1.5 text-sm font-medium transition ${
       active ? "bg-foreground text-background" : "bg-surface-elevated text-muted hover:text-foreground"
     }`;
 
@@ -59,10 +59,11 @@ export default async function BattleBoardPage({ searchParams }: { searchParams: 
 
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex flex-col gap-1.5">
-          <h1 className="font-display text-3xl leading-none font-bold tracking-tight uppercase sm:text-4xl">Challenges</h1>
+          <span className="text-eyebrow text-accent-volt">Challenges</span>
+          <h1 className="font-display text-3xl leading-[0.98] font-bold tracking-tight uppercase sm:text-4xl">There&apos;s always another level.</h1>
           <p className="text-sm text-muted">
             {allOpen.length === 0 ? (
-              "Nobody's waiting right now — open one and see who bites."
+              "Nobody's waiting right now. Open one and see who bites."
             ) : (
               <>
                 <span className="text-stat text-foreground">{allOpen.length}</span> open

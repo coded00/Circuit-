@@ -60,7 +60,7 @@ export function AwardResultButton({ matchId, playerA, playerB, drawAllowed }: { 
             type="button"
             aria-pressed={outcome === o.value}
             onClick={() => setOutcome(o.value)}
-            className={`rounded-full border px-3 py-1 text-xs font-medium transition ${outcome === o.value ? "border-accent-volt bg-accent-volt-soft" : "border-border hover:border-border-strong"}`}
+            className={`cut-xs border px-3 py-1 text-xs font-medium transition ${outcome === o.value ? "border-accent-volt bg-accent-volt-soft" : "border-border hover:border-border-strong"}`}
           >
             {o.label}
           </button>

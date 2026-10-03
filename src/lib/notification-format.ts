@@ -33,13 +33,15 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
         message: `${str(p, "tournamentName") || "A tournament you're in"}: ${str(p, "snippet")}`,
         href: `/tournaments/${str(p, "tournamentId")}?tab=updates`,
       };
+    case "ACCOUNT_DELETION_REQUESTED":
+      return { message: `@${str(p, "handle")} asked to delete their account.`, href: `/admin/users/${str(p, "userId")}` };
     case "REGISTRATION_CONFIRMED":
       return {
         message: str(p, "tournamentName") ? `You're in ${str(p, "tournamentName")}. Your registration is confirmed.` : "Your registration is confirmed.",
         href: `/tournaments/${str(p, "tournamentId")}`,
       };
     case "MATCH_READY":
-      return { message: "Your next match is ready.", href: `/matches/${str(p, "matchId")}` };
+      return { message: "It's almost time. Your next match is ready.", href: `/matches/${str(p, "matchId")}` };
     case "MATCH_LIVE":
       return { message: "Your opponent is ready. Match is live.", href: `/matches/${str(p, "matchId")}` };
     case "RESULT_SUBMITTED":
@@ -76,6 +78,10 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
         message: `${str(p, "byName") || "The player you challenged"} declined your ${str(p, "game") || ""} challenge.`.replace("  ", " "),
         href: `/battles/${str(p, "battleId")}`,
       };
+    case "ORDER_FULFILLED":
+      return { message: `Your order is ready: ${str(p, "title") || "see the details"}.`, href: "/marketplace/orders" };
+    case "ORDER_CANCELLED":
+      return { message: `Your order was cancelled and refunded to your wallet: ${str(p, "title") || ""}.`.replace(": .", "."), href: "/marketplace/orders" };
     case "BATTLE_EXPIRED":
       return { message: `Your ${str(p, "game") || ""} challenge expired with no takers.`.replace("  ", " "), href: `/battles/${str(p, "battleId")}` };
     case "REGISTRATION_CAP_FILLED":
@@ -118,7 +124,7 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
     case "APPEAL_DECIDED":
       return {
         message: p.overturned
-          ? `Your appeal was accepted — ${str(p, "subject") || "access"} is restored.`
+          ? `Your appeal was accepted, ${str(p, "subject") || "access"} is restored.`
           : `Your appeal about ${str(p, "subject") || "the suspension"} was reviewed and upheld.${str(p, "response") ? ` ${str(p, "response")}` : ""}`,
         href: str(p, "href") || "/account",
       };
@@ -129,8 +135,8 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
     case "LOBBY_STARTED":
       return {
         message: str(p, "group")
-          ? `${str(p, "tournamentName") || "Your tournament"} has started — you're in Group ${str(p, "group")} for ${str(p, "rounds") || "several"} rounds. Good luck.`
-          : `${str(p, "tournamentName") || "Your tournament"} has started — ${str(p, "rounds") || "several"} rounds, one lobby. Good luck.`,
+          ? `${str(p, "tournamentName") || "Your tournament"} has started. You're in Group ${str(p, "group")} for ${str(p, "rounds") || "several"} rounds. Good luck.`
+          : `${str(p, "tournamentName") || "Your tournament"} has started, ${str(p, "rounds") || "several"} rounds, one lobby. Good luck.`,
         href: `/tournaments/${str(p, "tournamentId")}/bracket`,
       };
     case "LOBBY_ROUND_POSTED":
@@ -151,18 +157,18 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
     case "LOBBY_FINAL_SET":
       return {
         message: p.qualified
-          ? `You're through to the final of ${str(p, "tournamentName") || "your tournament"} — ${str(p, "rounds") || "several"} rounds, points start fresh.`
-          : `The group stage of ${str(p, "tournamentName") || "your tournament"} is over — you didn't make the final this time.`,
+          ? `You're through to the final of ${str(p, "tournamentName") || "your tournament"}, ${str(p, "rounds") || "several"} rounds, points start fresh.`
+          : `The group stage of ${str(p, "tournamentName") || "your tournament"} is over. You didn't make the final this time.`,
         href: `/tournaments/${str(p, "tournamentId")}/bracket`,
       };
     case "SWISS_BYE":
       return {
-        message: `You have a bye in round ${str(p, "round")} of ${str(p, "rounds")} of ${str(p, "tournamentName") || "your tournament"} — it counts as a win.`,
+        message: `You have a bye in round ${str(p, "round")} of ${str(p, "rounds")} of ${str(p, "tournamentName") || "your tournament"}. It counts as a win.`,
         href: `/tournaments/${str(p, "tournamentId")}/bracket`,
       };
     case "LEAGUE_STARTED":
       return {
-        message: `${str(p, "tournamentName") || "Your league"} has started — ${str(p, "matches") || "several"} matches to play. The first matchday is due ${str(p, "firstDeadline") ? new Date(str(p, "firstDeadline")).toLocaleDateString("en-NG", { day: "numeric", month: "short" }) : "soon"}.`,
+        message: `${str(p, "tournamentName") || "Your league"} has started, ${str(p, "matches") || "several"} matches to play. The first matchday is due ${str(p, "firstDeadline") ? new Date(str(p, "firstDeadline")).toLocaleDateString("en-NG", { day: "numeric", month: "short" }) : "soon"}.`,
         href: `/tournaments/${str(p, "tournamentId")}/bracket`,
       };
     case "LEAGUE_RESULT_AWARDED": {
@@ -174,7 +180,7 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
     }
     case "ROUND_ROBIN_STARTED":
       return {
-        message: `${str(p, "tournamentName") || "Your tournament"} has started — you have ${str(p, "matches") || "several"} matches to play, in any order.`,
+        message: `${str(p, "tournamentName") || "Your tournament"} has started. You have ${str(p, "matches") || "several"} matches to play, in any order.`,
         href: `/tournaments/${str(p, "tournamentId")}/bracket`,
       };
     case "LOBBY_ROOM_POSTED":
@@ -203,7 +209,7 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
     case "NEW_CHALLENGE":
       return { message: `New open Challenge: ${str(p, "game")}`, href: `/battles/${str(p, "battleId")}` };
     case "WITHDRAWAL_RETURNED":
-      return { message: `Your withdrawal of ${money(p, "amount")} didn't go through — the money is back in your wallet.`, href: "/wallet" };
+      return { message: `Your withdrawal of ${money(p, "amount")} didn't go through. The money is back in your wallet.`, href: "/wallet" };
     case "PRIZE_PAYOUT_FAILED":
       return {
         message: `Your ${money(p, "amount")} prize from ${str(p, "tournamentName") || "your tournament"} couldn't be sent. Check your payout details and claim it again.`,
@@ -216,7 +222,7 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
       };
     case "REGISTRATION_NAME_TAKEN":
       return {
-        message: `Your entry for ${str(p, "tournamentName") || "a tournament"} couldn't be confirmed: another player took the in-game name "${str(p, "inGameName")}" while you were paying. Your payment is being refunded — register again with a different name.`,
+        message: `Your entry for ${str(p, "tournamentName") || "a tournament"} couldn't be confirmed: another player took the in-game name "${str(p, "inGameName")}" while you were paying. Your payment is being refunded. Register again with a different name.`,
         href: `/tournaments/${str(p, "tournamentId")}`,
       };
     case "ENTRY_FEE_REFUND": {
@@ -228,7 +234,7 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
           : stage === "DONE"
             ? `Your ${what} refund has been completed. Your bank may take a few days to show it.`
             : stage === "FAILED"
-              ? `Your ${what} refund didn't go through. Circuit has been alerted and will sort it out — you don't need to do anything.`
+              ? `Your ${what} refund didn't go through. Circuit has been alerted and will sort it out. You don't need to do anything.`
               : `Your ${what} is being refunded to the card or account you paid with. It can take a few days to show up.`;
       return { message, href: stage === "WALLET" ? "/wallet" : `/tournaments/${str(p, "tournamentId")}` };
     }

@@ -51,7 +51,7 @@ export default async function FundWalletCallbackPage({
         <>
           <Spinner size={28} className="text-muted" />
           <h1 className="state-title">Payment processing</h1>
-          <p className="state-description">This can take a minute — this page will update on its own once it&apos;s confirmed.</p>
+          <p className="state-description">This can take a minute. This page will update on its own once it&apos;s confirmed.</p>
         </>
       )}
       <Link href="/wallet" className="btn-secondary">

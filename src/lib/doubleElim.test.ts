@@ -65,7 +65,7 @@ describe("double elimination", () => {
 
   it("with 2 entries, the first match's loser goes straight to the grand final", () => {
     const s = buildDoubleElim(ids(2));
-    const { played } = playOut(s, (a, b) => (s.nodes.find((x) => x.id === "GF")!.matchId ? "p2" : "p1"));
+    const { played } = playOut(s, () => (s.nodes.find((x) => x.id === "GF")!.matchId ? "p2" : "p1"));
     expect(played).toEqual(["W1-0", "GF", "GF2"]);
     expect(s.championId).toBe("p2");
   });

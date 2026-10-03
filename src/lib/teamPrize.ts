@@ -50,7 +50,7 @@ export function parseTeamShares(
   const total = Object.values(out).reduce((a, b) => a + b, 0);
   // A hair off (two decimals of rounding) is settled on the captain; anything more is an error.
   if (Math.abs(total - FULL_SHARE_BP) > ordered.length) {
-    return { ok: false, error: `The prize shares add up to ${basisPointsToPercent(total)}% — they need to make 100%.` };
+    return { ok: false, error: `The prize shares add up to ${basisPointsToPercent(total)}%. They need to make 100%.` };
   }
   out[captainId] += FULL_SHARE_BP - total;
   return { ok: true, value: out };

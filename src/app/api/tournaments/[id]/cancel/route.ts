@@ -48,7 +48,7 @@ export async function POST(
   }
   if (tournament.fundsFrozen) {
     return NextResponse.json(
-      { error: "Funds for this tournament are frozen pending review — cancelling would refund them." },
+      { error: "Funds for this tournament are frozen pending review. Cancelling would refund them." },
       { status: 409 }
     );
   }
@@ -62,7 +62,7 @@ export async function POST(
   // startAt itself.
   if (tournament.cancellationLockAt && new Date() >= tournament.cancellationLockAt && !user.isStaff) {
     return NextResponse.json(
-      { error: "Past the cancellation lock — only Circuit staff can cancel this tournament now." },
+      { error: "Past the cancellation lock. Only Circuit staff can cancel this tournament now." },
       { status: 409 }
     );
   }

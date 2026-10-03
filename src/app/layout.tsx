@@ -15,7 +15,6 @@ import { PresenceHeartbeat } from "@/components/PresenceHeartbeat";
 import { BackForwardRefresh } from "@/components/BackForwardRefresh";
 import { QuickMatchIncomingListener } from "@/components/QuickMatchIncomingListener";
 import { SITE_NAME, SITE_URL, DEFAULT_DESCRIPTION } from "@/lib/seo";
-import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import { gameImageMap } from "@/lib/gameCatalogQueries";
 import { GameImageProvider } from "@/components/GameImageProvider";
 
@@ -52,7 +51,7 @@ const geistMono = Geist_Mono({
 // no metadata export of its own.
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: "Circuit — Gaming Tournaments & Esports Competitions",
+  title: "Circuit | Gaming Tournaments & Esports Competitions",
   description: DEFAULT_DESCRIPTION,
   openGraph: {
     siteName: SITE_NAME,
@@ -104,15 +103,10 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       data-scroll-behavior="smooth"
+      data-theme="dark"
       className={`${bodyFont.variable} ${displayFont.variable} ${geistMono.variable} h-full antialiased`}
-      // THEME_INIT_SCRIPT below may set data-theme before React hydrates.
       suppressHydrationWarning
     >
-      <head>
-        {/* Applies the saved dark-mode choice before first paint, so a
-            dark-mode user never sees a flash of the light theme. */}
-        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
-      </head>
       {/* suppressHydrationWarning is scoped to this element's own attributes
           only (not its children) — needed because extensions like Grammarly
           inject data-gr-* attributes onto <body> before React hydrates,

@@ -150,7 +150,7 @@ export function CommunityForm({
                 type="button"
                 aria-pressed={values.category === c.value}
                 onClick={() => set("category", c.value)}
-                className={`h-9 rounded-full border px-3.5 text-sm font-semibold transition ${
+                className={`h-9 cut-xs border px-3.5 text-sm font-semibold transition ${
                   values.category === c.value ? "border-foreground bg-foreground text-background" : "border-border hover:border-border-hover"
                 }`}
               >
@@ -180,7 +180,7 @@ export function CommunityForm({
               maxLength={32}
             />
           </div>
-          <span className="field-hint">Can&apos;t be changed later — it&apos;s in every link you share.</span>
+          <span className="field-hint">Can&apos;t be changed later. It&apos;s in every link you share.</span>
           {err("slug")}
         </div>
       )}

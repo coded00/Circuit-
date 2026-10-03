@@ -4,7 +4,7 @@ import { ChevronDown, LifeBuoy } from "lucide-react";
 import { supportUrl } from "@/lib/support";
 
 export const metadata: Metadata = {
-  title: "Help — Circuit",
+  title: "Help | Circuit",
   description: "How tournaments, entry fees, match results, disputes and prizes work on Circuit.",
 };
 

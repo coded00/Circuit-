@@ -43,7 +43,7 @@ export default async function RegistrationCallbackPage({
       {confirmed ? (
         <>
           <CheckCircle2 size={40} className="motion-scale-in text-success" />
-          <h1 className="state-title">You&apos;re in!</h1>
+          <h1 className="state-title">You&apos;re in. Let the games begin.</h1>
           <p className="state-description">Your registration is confirmed.</p>
         </>
       ) : (

@@ -393,7 +393,7 @@ export function CommunityView({
               </div>
             ) : messages.length === 0 ? (
               <p className="flex flex-1 items-center justify-center text-center text-sm text-muted">
-                {isMember ? `No messages yet — be the first to say something in #${activeChannel?.name}.` : "Join to read and post in this community."}
+                {isMember ? `No messages yet. Be the first to say something in #${activeChannel?.name}.` : "Join to read and post in this community."}
               </p>
             ) : (
               <MessageList

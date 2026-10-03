@@ -21,6 +21,7 @@ import { loginPath } from "@/lib/safeRedirect";
 import { Landmark } from "lucide-react";
 import { getCurrentUser } from "@/lib/session";
 import { getWalletActivity } from "@/lib/wallet";
+import { prisma } from "@/lib/db";
 import { needsEmailVerification } from "@/lib/emailGate";
 import { accountEmail } from "@/lib/emailVerification";
 import { EmailVerificationBanner } from "@/components/EmailVerificationBanner";
@@ -54,7 +55,15 @@ export default async function WalletPage() {
 
   const { balance, fundingHistory, rows, totalPaid, totalRefunded, totalWon, pendingWithdrawals, heldInChallenges } = await getWalletActivity(user.id);
 
+  const orders = await prisma.order.findMany({ where: { buyerId: user.id }, orderBy: { createdAt: "desc" }, take: 100 });
+
   const entries: WalletEntry[] = [
+    ...orders.flatMap((o): WalletEntry[] => [
+      { id: `o-${o.id}`, at: o.createdAt.toISOString(), kind: "PURCHASE", title: "Marketplace purchase", subtitle: o.listingTitle, amount: o.amountKobo, credit: false, status: "COMPLETE", reference: o.id, href: "/marketplace/orders" },
+      ...(o.status === "CANCELLED" && o.cancelledAt
+        ? [{ id: `or-${o.id}`, at: o.cancelledAt.toISOString(), kind: "PURCHASE_REFUND" as const, title: "Marketplace refund", subtitle: o.listingTitle, amount: o.amountKobo, credit: true, status: "COMPLETE" as const, reference: o.id, href: "/marketplace/orders" }]
+        : []),
+    ]),
     ...fundingHistory.map(
       (t): WalletEntry => ({
         id: `w-${t.id}`,
@@ -95,7 +104,7 @@ export default async function WalletPage() {
           <div className="flex flex-col gap-2">
             <span className="text-eyebrow text-muted">Available balance</span>
             <span className="text-stat text-4xl leading-none sm:text-5xl">{formatNaira(balance)}</span>
-            <span className="text-xs text-muted">Available to spend on entry fees and stakes, or withdraw anytime.</span>
+            <span className="text-xs text-muted">Available to spend on entry fees, stakes and the Marketplace, or withdraw anytime.</span>
             {(pendingWithdrawals > 0 || heldInChallenges > 0) && (
               <span className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
                 {heldInChallenges > 0 && (

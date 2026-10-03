@@ -206,7 +206,7 @@ export function FeedClient({
             key={t.key}
             type="button"
             onClick={() => selectTab(t.key)}
-            className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold transition ${
+            className={`shrink-0 cut-xs px-3.5 py-1.5 text-sm font-semibold transition ${
               tab === t.key ? "bg-accent-volt text-accent-volt-foreground" : "text-white/70 hover:bg-white/10 hover:text-white"
             }`}
           >
@@ -217,7 +217,7 @@ export function FeedClient({
           <select
             value={game ?? ""}
             onChange={(e) => selectGame(e.target.value)}
-            className="ml-1 shrink-0 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-sm text-white"
+            className="ml-1 shrink-0 cut-xs border border-white/15 bg-white/10 px-3 py-1.5 text-sm text-white"
           >
             <option value="">All games</option>
             {games.map((g) => (
@@ -246,7 +246,7 @@ export function FeedClient({
             {tab === "following" && !currentUserId ? (
               <>
                 <span className="font-display text-lg font-bold tracking-tight uppercase">Log In To See This</span>
-                <p className="text-sm text-white/70">Following shows drops for your favorite games — sign in to set them.</p>
+                <p className="text-sm text-white/70">Following shows drops for your favorite games. Sign in to set them.</p>
               </>
             ) : tab === "following" ? (
               <>

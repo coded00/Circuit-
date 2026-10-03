@@ -12,6 +12,8 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getCurrentUser } from "@/lib/session";
+import { reachableUsersWhere } from "@/lib/privacy";
 import { realGameNames } from "@/lib/games";
 import { slugify } from "@/lib/seo";
 
@@ -25,6 +27,9 @@ export async function GET(request: Request) {
   if (q.length < MIN_QUERY_LENGTH) {
     return NextResponse.json({ tournaments: [], battles: [], users: [], games: [], communities: [] });
   }
+
+  const viewer = await getCurrentUser();
+  const reachable = await reachableUsersWhere(viewer?.id ?? null, "discover");
 
   const [tournaments, battles, users, gameNames, communities] = await Promise.all([
     prisma.tournament.findMany({
@@ -41,7 +46,7 @@ export async function GET(request: Request) {
     }),
     prisma.user.findMany({
       where: {
-        OR: [{ displayName: { contains: q, mode: "insensitive" } }, { handle: { contains: q, mode: "insensitive" } }],
+        AND: [reachable, { OR: [{ displayName: { contains: q, mode: "insensitive" } }, { handle: { contains: q, mode: "insensitive" } }] }],
       },
       take: RESULTS_PER_CATEGORY,
       select: { id: true, displayName: true, handle: true, avatarUrl: true },

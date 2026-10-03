@@ -20,6 +20,7 @@ import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
 import { isRateLimited, recordAttempt } from "@/lib/rateLimit";
 import { captureException } from "@/lib/observability";
 import { parseExpiryHours } from "@/lib/battles";
+import { canSendDirectChallenge } from "@/lib/privacy";
 import { emailVerificationRequired } from "@/lib/emailGate";
 
 const VALID_FORMATS = ["SINGLE", "BEST_OF_3"];
@@ -116,6 +117,8 @@ export async function POST(request: Request) {
     if (target.id === user.id) {
       return NextResponse.json({ error: "You can't challenge yourself." }, { status: 400 });
     }
+    const direct = await canSendDirectChallenge(user.id, target);
+    if (!direct.ok) return NextResponse.json({ error: direct.reason }, { status: 403 });
     targetUserId = target.id;
   }
 

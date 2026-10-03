@@ -81,7 +81,7 @@ export async function AuthSplitLayout({ children }: { children: React.ReactNode 
           </Link>
           <Link
             href="/"
-            className="flex items-center gap-1.5 rounded-full bg-black/40 px-3 py-1.5 text-[13px] font-medium text-white/80 backdrop-blur-sm transition hover:text-white lg:bg-transparent lg:px-0 lg:text-muted lg:backdrop-blur-none lg:hover:text-foreground"
+            className="flex items-center gap-1.5 cut-xs bg-black/40 px-3 py-1.5 text-[13px] font-medium text-white/80 backdrop-blur-sm transition hover:text-white lg:bg-transparent lg:px-0 lg:text-muted lg:backdrop-blur-none lg:hover:text-foreground"
           >
             <ArrowLeft size={14} />
             Back to Circuit
@@ -102,7 +102,7 @@ export async function AuthSplitLayout({ children }: { children: React.ReactNode 
       {/* lg+: the key art, blended into the panel's edge. */}
       <aside className="relative hidden flex-1 overflow-hidden lg:block">
         {/* eslint-disable-next-line @next/next/no-img-element -- local /public asset */}
-        <img src="/auth-hero.jpg" alt="Circuit — more than a game" className="absolute inset-0 h-full w-full object-cover" />
+        <img src="/auth-hero.jpg" alt="Circuit. More than a game" className="absolute inset-0 h-full w-full object-cover" />
         <div aria-hidden className="absolute inset-y-0 left-0 w-40 bg-gradient-to-r from-background to-transparent" />
         <div aria-hidden className="absolute inset-x-0 bottom-0 h-56 bg-gradient-to-t from-black/85 to-transparent" />
         {stats.length > 0 && (

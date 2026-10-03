@@ -8,6 +8,7 @@
 import { prisma } from "@/lib/db";
 import { captureException } from "@/lib/observability";
 import type { Prisma, QuickMatchChallenge, User } from "@prisma/client";
+import { reachableUsersWhere } from "@/lib/privacy";
 
 export const VALID_FORMATS = ["SINGLE", "BEST_OF_3"];
 
@@ -43,11 +44,9 @@ type EligibleUser = Pick<User, "id" | "displayName" | "handle" | "avatarUrl" | "
  * Non-suspended, online (recent heartbeat), can afford the stake, and not
  * already busy in an active Battle/Match — the same "exclude self +
  * suspended" shape Discovery's own candidate-pool query already uses,
- * extended with the busy-exclusion Quick Match specifically needs. No
- * blocking exclusion: this codebase has no Block/BlockedUser concept
- * anywhere (only Friendship, which has no negative/blocked state), so
- * that part of a "who can challenge whom" rule set isn't implementable
- * yet — a real gap, not silently dropped.
+ * extended with the busy-exclusion Quick Match specifically needs. Anyone
+ * the host has a block with (either way) is left out, and so is anyone whose
+ * direct-challenge setting doesn't admit the host (nobody, or friends only).
  */
 export async function getEligibleRecipients(
   hostId: string,
@@ -55,7 +54,8 @@ export async function getEligibleRecipients(
 ): Promise<EligibleUser[]> {
   const cutoff = new Date(Date.now() - PRESENCE_WINDOW_MS);
 
-  const [busyInBattles, busyInMatches] = await Promise.all([
+  const [reachable, busyInBattles, busyInMatches] = await Promise.all([
+    reachableUsersWhere(hostId, "challenge"),
     prisma.battle.findMany({
       where: { status: { in: ["OPEN", "ACCEPTED"] } },
       select: { creatorId: true, targetUserId: true },
@@ -78,10 +78,15 @@ export async function getEligibleRecipients(
 
   return prisma.user.findMany({
     where: {
-      id: { notIn: Array.from(busyIds) },
-      isSuspended: false,
-      lastActiveAt: { gte: cutoff },
-      walletBalance: { gte: params.stakeAmount },
+      AND: [
+        reachable,
+        {
+          id: { notIn: Array.from(busyIds) },
+          isSuspended: false,
+          lastActiveAt: { gte: cutoff },
+          walletBalance: { gte: params.stakeAmount },
+        },
+      ],
     },
     select: { id: true, displayName: true, handle: true, avatarUrl: true, walletBalance: true },
     take: MAX_RECIPIENTS,

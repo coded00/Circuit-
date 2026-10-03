@@ -65,7 +65,7 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Pro
         </h1>
         <p className="max-w-xl text-[15px] text-muted">
           {onTeams
-            ? "Teams recruiting on Circuit — join one, or line up against them."
+            ? "Teams recruiting on Circuit. Join one, or line up against them."
             : "Teammates, rivals and friends. Search by name, the games they play, or where they are."}
         </p>
       </header>
@@ -281,7 +281,7 @@ async function TeamsTab({
         {recommended.length > 0 && <h2 className="font-display text-lg font-bold tracking-tight">All teams</h2>}
         {teams.length === 0 ? (
           hasFilters ? (
-            <EmptyState title="No teams match that search" body="Try another game or region — or start the team you were looking for." action={{ href: "/teams", label: "Start a team" }} />
+            <EmptyState title="No teams match that search" body="Try another game or region. Or start the team you were looking for." action={{ href: "/teams", label: "Start a team" }} />
           ) : (
             <EmptyState title="No teams yet" body="Be the first: start a team, set its game, and invite your squad." action={{ href: "/teams", label: "Start a team" }} />
           )

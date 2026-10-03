@@ -286,7 +286,7 @@ function PointsFields({
       </div>
       <p className={`field-hint ${summary ? "" : "text-danger"}`}>
         {summary
-          ? `Points for 1st, 2nd, 3rd… — places past the list score 0. Blank uses the standard table. Scores: ${summary}.`
+          ? `Points for 1st, 2nd, 3rd…. Places past the list score 0. Blank uses the standard table. Scores: ${summary}.`
           : !placement.ok
             ? placement.error
             : !kill.ok

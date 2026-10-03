@@ -162,7 +162,7 @@ export function InviteDialog({ open, onClose, communityId, communityName }: { op
 
   const text = `Join ${communityName} on Circuit`;
   const chip = (on: boolean) =>
-    `h-9 rounded-full border px-3.5 text-sm font-semibold transition ${on ? "border-foreground bg-foreground text-background" : "border-border hover:border-border-hover"}`;
+    `h-9 cut-xs border px-3.5 text-sm font-semibold transition ${on ? "border-foreground bg-foreground text-background" : "border-border hover:border-border-hover"}`;
 
   return (
     <DialogOverlay

@@ -38,7 +38,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Trophy, Gamepad2, Swords, Calendar, MessagesSquare, User as UserIcon, Wallet, Settings } from "lucide-react";
+import { Home, Trophy, Gamepad2, Swords, Calendar, MessagesSquare, User as UserIcon, Store, Settings } from "lucide-react";
 import { loginPath, signupPath } from "@/lib/safeRedirect";
 import { SidebarPromoCard } from "./SidebarPromoCard";
 
@@ -53,6 +53,7 @@ const PRIMARY: Item[] = [
   { href: "/battles", label: "Challenges", icon: Swords },
   { href: "/communities", label: "Communities", icon: MessagesSquare },
   { href: "/calendar", label: "Calendar", icon: Calendar },
+  { href: "/marketplace", label: "Marketplace", icon: Store },
 ];
 
 function isActive(pathname: string, href: string, also: string[] = []): boolean {
@@ -96,7 +97,6 @@ export function AppSidebar({ user }: { user: NavUser }) {
 
   const items: Item[] = [
     ...PRIMARY,
-    ...(user ? [{ href: "/wallet", label: "Wallet", icon: Wallet }] : []),
     ...(user ? [{ href: `/players/${user.handle}`, label: "Profile", icon: UserIcon }] : []),
   ];
   const activeIndex = items.findIndex((item) => isActive(pathname, item.href, item.also));
@@ -146,7 +146,7 @@ export function AppSidebar({ user }: { user: NavUser }) {
         )}
         {user ? (
           <div className="flex items-center gap-2 border-t border-border px-1 pt-3">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-elevated text-xs font-semibold text-muted">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center cut-avatar bg-surface-elevated text-xs font-semibold text-muted">
               {user.displayName.slice(0, 1).toUpperCase()}
             </span>
             <div className="flex min-w-0 flex-1 flex-col leading-tight">

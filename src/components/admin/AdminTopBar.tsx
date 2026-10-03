@@ -63,9 +63,9 @@ export function AdminTopBar({
         <div className="flex items-center gap-2.5">
           {admin.avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs
-            <img src={admin.avatarUrl} alt="" className="h-7 w-7 rounded-full border border-border object-cover" />
+            <img src={admin.avatarUrl} alt="" className="h-7 w-7 cut-avatar border border-border object-cover" />
           ) : (
-            <div className="flex h-7 w-7 items-center justify-center rounded-full border border-border bg-surface-elevated text-[11px] font-semibold text-muted">
+            <div className="flex h-7 w-7 items-center justify-center cut-avatar border border-border bg-surface-elevated text-[11px] font-semibold text-muted">
               {admin.displayName.slice(0, 1).toUpperCase()}
             </div>
           )}

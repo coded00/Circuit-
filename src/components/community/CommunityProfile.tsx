@@ -72,7 +72,7 @@ export function CommunityProfile({
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
         <Link
           href={backHref}
-          className="absolute top-3 left-3 flex items-center gap-1.5 rounded-full bg-black/45 px-3 py-1.5 text-[13px] font-medium text-white backdrop-blur-sm transition hover:bg-black/60"
+          className="absolute top-3 left-3 flex items-center gap-1.5 cut-xs bg-black/45 px-3 py-1.5 text-[13px] font-medium text-white backdrop-blur-sm transition hover:bg-black/60"
         >
           <ArrowLeft size={14} /> Communities
         </Link>
@@ -201,9 +201,9 @@ export function CommunityProfile({
                       <Link href={`/players/${m.handle}`} className="flex items-center gap-2.5 text-sm hover:underline">
                         {m.avatarUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element -- external avatar
-                          <img src={m.avatarUrl} alt="" className="h-7 w-7 rounded-full object-cover" />
+                          <img src={m.avatarUrl} alt="" className="h-7 w-7 cut-avatar object-cover" />
                         ) : (
-                          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-surface-elevated text-xs font-semibold text-muted">
+                          <span className="flex h-7 w-7 items-center justify-center cut-avatar bg-surface-elevated text-xs font-semibold text-muted">
                             {m.displayName.slice(0, 1).toUpperCase()}
                           </span>
                         )}

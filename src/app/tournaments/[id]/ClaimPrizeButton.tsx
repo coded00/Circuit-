@@ -60,7 +60,7 @@ export default function ClaimPrizeButton({ tournamentId, label }: { tournamentId
           </div>
         )}
         {success && <Trophy size={14} aria-hidden className="trophy-pop" />}
-        {success ? "Prize payout sent!" : "Prize payout initiated — processing."}
+        {success ? "Prize payout sent!" : "Prize payout initiated. Processing."}
       </div>
     );
   }

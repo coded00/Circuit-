@@ -40,7 +40,7 @@ export default async function AdminCommunitiesPage({ searchParams }: { searchPar
     <>
       <PageHeader
         title="Communities"
-        description="Game hubs are created for every published game. Suspend anything that breaks the rules — owners see the reason and can appeal from Reports & appeals."
+        description="Game hubs are created for every published game. Suspend anything that breaks the rules. Owners see the reason and can appeal from Reports & appeals."
         actions={<NewOfficialCommunity />}
       />
 

@@ -27,7 +27,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
             <AlertTriangle size={22} />
           </div>
           <h1 className="state-title">Something went wrong</h1>
-          <p className="state-description">Circuit hit a snag loading the page shell itself — try again in a moment.</p>
+          <p className="state-description">Circuit hit a snag loading the page shell itself. Try again in a moment.</p>
           <button type="button" onClick={reset} className="btn-primary">
             Try again
           </button>

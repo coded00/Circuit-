@@ -24,6 +24,8 @@ const WALLET_TYPE: Record<string, { label: string; credit: boolean }> = {
   ENTRY_FEE_DEBIT: { label: "Entry fee", credit: false },
   ENTRY_FEE_REFUND: { label: "Entry fee refund", credit: true },
   STAKE_DEBIT: { label: "Challenge stake", credit: false },
+  MARKETPLACE_DEBIT: { label: "Marketplace purchase", credit: false },
+  MARKETPLACE_REFUND: { label: "Marketplace refund", credit: true },
   STAKE_CREDIT: { label: "Challenge winnings", credit: true },
   ORGANIZER_REVENUE_CREDIT: { label: "Organizer revenue", credit: true },
 };
@@ -86,6 +88,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
             <StatusBadge tone={user.isSuspended ? "danger" : "success"} dot>
               {user.isSuspended ? "Suspended" : "Active"}
             </StatusBadge>
+            {user.deletionRequestedAt && <StatusBadge tone="attention">Deletion requested</StatusBadge>}
             {user.adminRole && <StatusBadge tone="info">{user.adminRole === "SUPER_ADMIN" ? "Super admin" : "Moderator"}</StatusBadge>}
             <span>
               @{user.handle} · {user.emailOrPhone} · Joined {formatDate(user.createdAt)}
@@ -118,6 +121,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
             { label: "Payout account", value: user.payoutMethodRef ? "Linked" : "Not linked" },
             { label: "Age verified", value: user.ageVerified ? "Yes" : "No" },
             { label: "Region", value: user.region ?? "—" },
+            { label: "Deletion requested", value: user.deletionRequestedAt ? formatDate(user.deletionRequestedAt) : "—" },
             { label: "Suspension reason", value: user.isSuspended ? (user.suspensionReason ?? "—") : "—" },
           ]}
         />

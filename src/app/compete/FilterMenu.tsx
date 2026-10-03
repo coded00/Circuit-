@@ -35,7 +35,7 @@ export function FilterMenu({ label, options, active, align = "start" }: { label:
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium transition ${
+        className={`flex items-center gap-1.5 cut-xs border px-3.5 py-1.5 text-sm font-medium transition ${
           chosen ? "border-foreground bg-foreground text-background" : "border-border bg-surface text-muted hover:border-border-strong hover:text-foreground"
         }`}
       >

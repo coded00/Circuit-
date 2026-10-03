@@ -72,7 +72,7 @@ export default async function AdminChallengesPage({ searchParams }: { searchPara
 
   return (
     <>
-      <PageHeader title="Challenges" description="Player-vs-player matches outside tournaments — open challenges and Quick Matches." />
+      <PageHeader title="Challenges" description="Player-vs-player matches outside tournaments. Open challenges and Quick Matches." />
       <SubNav
         active="challenges"
         items={[

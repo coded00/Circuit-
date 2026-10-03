@@ -24,7 +24,7 @@ export function AppealForm({ kind, communityId, pending }: { kind: "ACCOUNT_SUSP
     setSent(true);
   }
 
-  if (sent) return <p className="text-sm text-muted">Your appeal is with the Circuit team — you&apos;ll get a notification when it&apos;s decided.</p>;
+  if (sent) return <p className="text-sm text-muted">Your appeal is with the Circuit team. You&apos;ll get a notification when it&apos;s decided.</p>;
   return (
     <form onSubmit={submit} className="flex flex-col gap-2">
       <label htmlFor="appeal" className="text-sm font-semibold">

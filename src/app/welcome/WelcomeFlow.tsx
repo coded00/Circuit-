@@ -37,9 +37,9 @@ function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; chi
 function OptionIcon({ option }: { option: Option }) {
   return option.iconUrl ? (
     // eslint-disable-next-line @next/next/no-img-element -- catalog/community icon
-    <img src={option.iconUrl} alt="" className="h-8 w-8 rounded-full object-cover" />
+    <img src={option.iconUrl} alt="" className="h-8 w-8 cut-avatar object-cover" />
   ) : (
-    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-xs font-bold">{option.name.slice(0, 1)}</span>
+    <span className="flex h-8 w-8 items-center justify-center cut-avatar bg-white/10 text-xs font-bold">{option.name.slice(0, 1)}</span>
   );
 }
 
@@ -90,7 +90,7 @@ export function WelcomeFlow({
       body: JSON.stringify({ gameIds: [...gameIds], cityId, region: region.trim() || city?.region || null, interestIds: [...interestIds] }),
     }).catch(() => null);
     setBusy(false);
-    if (!res?.ok) return setError("Couldn't save that — try again.");
+    if (!res?.ok) return setError("Couldn't save that. Try again.");
     setGroups(((await res.json()) as { groups: Group[] }).groups);
     setStep(3);
   }
@@ -179,7 +179,7 @@ export function WelcomeFlow({
         <section className="flex flex-col gap-4">
           <div>
             <h1 className="font-display text-3xl leading-[1] font-bold tracking-tight uppercase">What are you into?</h1>
-            <p className="mt-2 text-sm text-white/60">Pick any — you can join more later.</p>
+            <p className="mt-2 text-sm text-white/60">Pick any. You can join more later.</p>
           </div>
           <div className="flex flex-col gap-2">
             {interests.map((i) => (
@@ -212,7 +212,7 @@ export function WelcomeFlow({
             <p className="mt-2 text-sm text-white/60">We added you to Circuit Global and the official communities you picked. A few more you might like:</p>
           </div>
           {groups.length === 0 ? (
-            <p className="text-sm text-white/60">No player communities match yet — you could start the first one.</p>
+            <p className="text-sm text-white/60">No player communities match yet. You could start the first one.</p>
           ) : (
             groups.map((g) => (
               <div key={g.reason} className="flex flex-col gap-2">
@@ -232,11 +232,11 @@ export function WelcomeFlow({
                         <Check size={13} /> Joined
                       </span>
                     ) : r.joinPolicy === "OPEN" && !r.hasRules ? (
-                      <button type="button" onClick={() => join(r)} className="h-9 rounded-full bg-white px-4 text-sm font-semibold text-black hover:bg-white/90">
+                      <button type="button" onClick={() => join(r)} className="h-9 cut-xs bg-white px-4 text-sm font-semibold text-black hover:bg-white/90">
                         Join
                       </button>
                     ) : (
-                      <Link href={r.href} target="_blank" className="h-9 rounded-full border border-white/20 px-4 text-sm leading-9 font-semibold hover:border-white/40">
+                      <Link href={r.href} target="_blank" className="h-9 cut-xs border border-white/20 px-4 text-sm leading-9 font-semibold hover:border-white/40">
                         View
                       </Link>
                     )}

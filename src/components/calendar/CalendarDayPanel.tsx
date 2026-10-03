@@ -35,7 +35,7 @@ export function AgendaEventBody({ event }: { event: CalendarEvent }) {
         href={eventHref(event)!}
         className="group flex min-w-0 flex-1 items-start gap-3 rounded-[12px] border border-border bg-surface p-3 transition duration-[var(--duration-base)] hover:border-border-hover hover:bg-surface-elevated/50"
       >
-        <GameArtTile game={event.game} className="h-10 w-10 shrink-0 rounded-[9px]" hideLabel imgWidth={100} />
+        <GameArtTile thumb game={event.game} className="h-10 w-10 shrink-0 rounded-[9px]" hideLabel imgWidth={100} />
         <span className="flex min-w-0 flex-1 flex-col gap-1.5">
           <span className="flex items-start justify-between gap-2">
             <span className="flex min-w-0 flex-col">

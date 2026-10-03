@@ -220,7 +220,7 @@ export default async function AdminSettingsPage() {
             )}
           </Section>
 
-          <Section id="profile" title="Your profile" description="Display name, handle, bio and password — the same settings every Circuit account has.">
+          <Section id="profile" title="Your profile" description="Display name, handle, bio and password. The same settings every Circuit account has.">
             <div>
               <Link href="/account" target="_blank" className="btn-secondary">
                 Edit profile <ArrowUpRight size={14} />

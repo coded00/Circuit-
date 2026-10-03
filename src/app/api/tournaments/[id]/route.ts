@@ -47,7 +47,7 @@ export async function PATCH(
   }
   if (new Date() >= tournament.registrationCloseAt) {
     return NextResponse.json(
-      { error: "This tournament can no longer be edited — registration has closed." },
+      { error: "This tournament can no longer be edited. Registration has closed." },
       { status: 409 }
     );
   }
@@ -65,7 +65,7 @@ export async function PATCH(
     return NextResponse.json(
       {
         error:
-          "Entry fee and prize amount are locked — a paid registration already exists for this tournament.",
+          "Entry fee and prize amount are locked. A paid registration already exists for this tournament.",
       },
       { status: 409 }
     );
@@ -85,7 +85,7 @@ export async function PATCH(
   if (changesCompetition) {
     const registered = await prisma.registration.count({ where: { tournamentId: id, status: { in: ["PENDING_PAYMENT", "CONFIRMED"] } } });
     if (registered > 0) {
-      return NextResponse.json({ error: "The game and format are locked — players have already registered for this tournament." }, { status: 409 });
+      return NextResponse.json({ error: "The game and format are locked. Players have already registered for this tournament." }, { status: 409 });
     }
     const competition = await resolveCompetition(body);
     if (!competition.ok) return NextResponse.json({ error: competition.error }, { status: 400 });
@@ -194,8 +194,8 @@ export async function PATCH(
               ? structureMax && style !== "LOBBY"
                 ? `This structure can have at most ${capLimit} entries.`
                 : groupCount > 1
-                  ? `${groupCount} group lobbies hold ${capLimit} entries — set a cap between 2 and ${capLimit}.`
-                  : `This format's lobby holds ${capLimit} entries — set a cap between 2 and ${capLimit}, or split into groups.`
+                  ? `${groupCount} group lobbies hold ${capLimit} entries. Set a cap between 2 and ${capLimit}.`
+                  : `This format's lobby holds ${capLimit} entries. Set a cap between 2 and ${capLimit}, or split into groups.`
               : `Participant cap must be a whole number between 2 and ${MAX_PARTICIPANT_CAP}.`,
         },
         { status: 400 }
@@ -249,7 +249,7 @@ export async function PATCH(
     if (value.join() !== tournament.prizeSplit.join()) {
       const entered = await prisma.registration.count({ where: { tournamentId: id, status: { in: ["PENDING_PAYMENT", "CONFIRMED"] } } });
       if (entered > 0) {
-        return NextResponse.json({ error: "The prize split is locked — players have already registered for this tournament." }, { status: 409 });
+        return NextResponse.json({ error: "The prize split is locked. Players have already registered for this tournament." }, { status: 409 });
       }
       data.prizeSplit = value;
     }

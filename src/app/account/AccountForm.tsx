@@ -236,7 +236,7 @@ export default function AccountForm({
           onChange={(e) => setFavoriteGames(e.target.value)}
           className="field-input"
         />
-        <span className="field-hint">Comma-separated, up to {MAX_FAVORITE_GAMES} games — shown on your public profile.</span>
+        <span className="field-hint">Comma-separated, up to {MAX_FAVORITE_GAMES} games. Shown on your public profile.</span>
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -282,7 +282,7 @@ export default function AccountForm({
             </p>
           </div>
           {payoutMethodRef && (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-success/15 px-2.5 py-0.5 text-xs font-medium text-success border border-success/30">
+            <span className="inline-flex items-center gap-1.5 cut-xs bg-success/15 px-2.5 py-0.5 text-xs font-medium text-success border border-success/30">
               <span className="h-1.5 w-1.5 rounded-full bg-success" />
               Active
             </span>
