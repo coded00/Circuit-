@@ -7,6 +7,8 @@ import { AuthHeading } from "@/components/auth/AuthHeading";
 import { AuthModeSwitch } from "@/components/auth/AuthModeSwitch";
 import { AuthMethods } from "@/components/auth/AuthMethods";
 import { isGoogleSignInEnabled } from "@/lib/oauth/google";
+import { prisma } from "@/lib/db";
+import { countryOptions } from "@/lib/countries";
 import SignupForm from "./SignupForm";
 
 export default async function SignupPage({ searchParams }: { searchParams: Promise<{ next?: string | string[] }> }) {
@@ -17,6 +19,13 @@ export default async function SignupPage({ searchParams }: { searchParams: Promi
     redirect(safeNextPath(typeof next === "string" ? next : null));
   }
 
+  // Only games Circuit actually runs (enabled and published).
+  const games = await prisma.game.findMany({
+    where: { enabled: true, publishedAt: { not: null } },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true, category: true, iconUrl: true },
+  });
+
   return (
     <AuthSplitLayout>
       <div className="flex flex-col gap-7">
@@ -26,7 +35,7 @@ export default async function SignupPage({ searchParams }: { searchParams: Promi
         <AuthHeading eyebrow="Create account" title="Join the Circuit" sub="Enter tournaments, call out rivals, win real prizes. Free to join." />
         <Suspense>
           <AuthMethods from="signup" googleEnabled={isGoogleSignInEnabled()}>
-            <SignupForm />
+            <SignupForm games={games} countries={countryOptions()} />
           </AuthMethods>
         </Suspense>
       </div>

@@ -24,6 +24,8 @@ import { playerRankInGame } from "@/lib/standings";
 import { getWalletActivity } from "@/lib/wallet";
 import { friendStatusBetween } from "@/lib/friends";
 import { matchStatusInfo } from "@/components/StatusPill";
+import { countryName, isCountryCode } from "@/lib/countries";
+import { openBattleFilter } from "@/lib/battles";
 import { ProfileView, type AttentionItem, type MatchSummary, type ProfileData } from "./ProfileView";
 
 const ACTIVE_MATCH_PRIORITY: Record<string, number> = { DISPUTED: 0, NEEDS_RESULT: 1, UPCOMING: 2 };
@@ -96,7 +98,7 @@ export default async function PlayerProfilePage({
         })
       : Promise.resolve([]),
     isOwnProfile
-      ? prisma.battle.findMany({ where: { creatorId: player.id, status: "OPEN" }, select: { id: true, game: true, format: true } })
+      ? prisma.battle.findMany({ where: { creatorId: player.id, ...openBattleFilter() }, select: { id: true, game: true, format: true } })
       : Promise.resolve([]),
     prisma.registration.findMany({
       where: { userId: player.id },
@@ -205,6 +207,13 @@ export default async function PlayerProfilePage({
 
   // --- Achievements (derived, with real progress) --------------------------
   const tournamentsJoined = allRegistrations.filter((r) => r.status === "CONFIRMED").length;
+  // A tournament prize actually paid out to them — real money movement, not a claim.
+  const prizesWon = await prisma.escrowTransaction.count({ where: { type: "PRIZE_PAYOUT", registration: { userId: player.id } } });
+  let bestWinRun = 0;
+  for (let i = 0, run = 0; i < decided.length; i++) {
+    run = decided[i] === "W" ? run + 1 : 0;
+    bestWinRun = Math.max(bestWinRun, run);
+  }
   const achievements: ProfileData["achievements"] = [
     { key: "first-match", label: "First Match", description: "Played a first match", unlocked: played >= 1, progress: { current: played, target: 1 } },
     { key: "five-wins", label: "5 Wins", description: "Won 5 matches", unlocked: wins >= 5, progress: { current: wins, target: 5 } },
@@ -215,6 +224,10 @@ export default async function PlayerProfilePage({
       unlocked: tournamentsJoined >= 1,
       progress: { current: tournamentsJoined, target: 1 },
     },
+    { key: "ten-wins", label: "10 Wins", description: "Won 10 matches", unlocked: wins >= 10, progress: { current: wins, target: 10 } },
+    { key: "hot-streak", label: "Hot Streak", description: "Won 3 matches in a row", unlocked: bestWinRun >= 3, progress: { current: bestWinRun, target: 3 } },
+    { key: "versatile", label: "Versatile", description: "Played matches in 3 different games", unlocked: gameStats.length >= 3, progress: { current: gameStats.length, target: 3 } },
+    { key: "prize-winner", label: "Prize Winner", description: "Won a tournament prize", unlocked: prizesWon >= 1, progress: { current: prizesWon, target: 1 } },
     { key: "top-10", label: "Top 10", description: "Ranked top 10 in a game", unlocked: (bestRank?.rank ?? 99) <= 10, progress: null },
   ];
 
@@ -261,6 +274,7 @@ export default async function PlayerProfilePage({
       avatarUrl: player.avatarUrl,
       bio: player.bio,
       region: player.region,
+      country: player.country && isCountryCode(player.country) ? { code: player.country, name: countryName(player.country) } : null,
       favoriteGames: player.favoriteGames,
       createdAt: player.createdAt,
       communityTag:

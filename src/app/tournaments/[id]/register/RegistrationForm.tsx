@@ -15,6 +15,7 @@ export default function RegistrationForm({
   walletBalance,
   username,
   savedName,
+  rulesText,
   team,
 }: {
   tournamentId: string;
@@ -24,6 +25,8 @@ export default function RegistrationForm({
   username: string;
   /** The in-game name they typed last time for this game. */
   savedName: string | null;
+  /** The organizer's rules, shown before the player agrees to them. */
+  rulesText: string | null;
   /** TEAM tournaments: the teams this user captains and the roster size. */
   team?: { options: CaptainTeamOption[]; bounds: RosterBounds; profileHref: string; hasPrize: boolean };
 }) {
@@ -64,13 +67,16 @@ export default function RegistrationForm({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [matchFound, setMatchFound] = useState(false);
+  const [rulesAccepted, setRulesAccepted] = useState(false);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
     setSubmitting(true);
 
-    const res = await fetch(`/api/tournaments/${tournamentId}/registrations`, {
+    let res: Response;
+    try {
+      res = await fetch(`/api/tournaments/${tournamentId}/registrations`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -79,7 +85,12 @@ export default function RegistrationForm({
         ...(team ? { teamId: roster.teamId, roster: Object.entries(roster.members).map(([userId, id]) => ({ userId, inGameId: id, ...(roster.shares ? { prizePercent: Number(displayedShares(roster, captainId)[userId]) } : {}) })) } : {}),
         ...(entryFee > 0 && payFromWallet ? { payFrom: "wallet" } : {}),
       }),
-    });
+      });
+    } catch {
+      setError("We couldn't reach Circuit. Check your connection and try again.");
+      setSubmitting(false);
+      return;
+    }
     const data = await res.json().catch(() => null);
 
     if (!res.ok) {
@@ -158,6 +169,21 @@ export default function RegistrationForm({
       </div>
       )}
 
+      {(!team || team.options.length > 0) && (
+        <div className="flex flex-col gap-2">
+          <span className="field-label">Tournament rules</span>
+          {rulesText ? (
+            <div className="max-h-44 overflow-y-auto rounded-[10px] border border-border bg-surface-elevated p-3 text-[13px] leading-relaxed whitespace-pre-wrap">{rulesText}</div>
+          ) : (
+            <p className="rounded-[10px] border border-border p-3 text-[13px] text-muted">The organizer hasn&apos;t posted extra rules. Play fair and report results honestly.</p>
+          )}
+          <label className="flex items-start gap-2.5 text-sm">
+            <input type="checkbox" checked={rulesAccepted} onChange={(e) => setRulesAccepted(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>I&apos;ve read the rules and agree to follow them.</span>
+          </label>
+        </div>
+      )}
+
       {entryFee > 0 && (
         <div className="flex flex-col gap-1.5">
           <span className="field-label">How would you like to pay?</span>
@@ -188,9 +214,9 @@ export default function RegistrationForm({
 
       {error && <p className="field-error motion-fade-in">{error}</p>}
       {(!team || team.options.length > 0) && (
-        <button type="submit" disabled={submitting || !rosterReady || !inGameId || nameStatus === "taken"} className="btn-primary">
+        <button type="submit" disabled={submitting || !rosterReady || !inGameId || nameStatus === "taken" || !rulesAccepted} className="btn-primary">
           {submitting && <Spinner />}
-          {submitting ? "Registering…" : team ? "Register team" : "Register"}
+          {submitting ? "Registering…" : entryFee > 0 ? (payFromWallet ? "Pay from wallet and register" : "Continue to payment") : team ? "Register team" : "Register"}
         </button>
       )}
     </form>

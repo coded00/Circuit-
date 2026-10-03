@@ -15,6 +15,7 @@ import { createBattleMatch } from "@/lib/matches";
 import { notify } from "@/lib/notifications";
 import { getFriendIds } from "@/lib/friends";
 import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
+import { battleExpiresAt } from "@/lib/battles";
 
 class InsufficientWalletBalanceError extends Error {}
 
@@ -40,6 +41,9 @@ export async function POST(
   }
   if (battle.status !== "OPEN") {
     return NextResponse.json({ error: "This Battle isn't open anymore." }, { status: 409 });
+  }
+  if (battleExpiresAt(battle).getTime() <= Date.now()) {
+    return NextResponse.json({ error: "This challenge has expired." }, { status: 409 });
   }
   if (battle.creatorId === user.id) {
     return NextResponse.json({ error: "You can't accept your own Battle." }, { status: 403 });

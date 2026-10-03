@@ -106,8 +106,8 @@ export async function suggestHandle(profile: GoogleProfile): Promise<string> {
 export type NewGoogleUserInput = {
   handle: string;
   displayName: string;
-  /** +234… (src/lib/phone.ts). */
-  phone: string;
+  /** +234… (src/lib/phone.ts), or null — optional. */
+  phone: string | null;
   dateOfBirth: Date;
   region: string | null;
   favoriteGames: string[];
@@ -126,7 +126,7 @@ export async function createGoogleUser(profile: GoogleProfile, input: NewGoogleU
   // Re-checked here, not just when the flow started: an email account
   // could have been registered in the meantime.
   if (await findUserByEmail(profile.email)) throw new NewAccountError("email_taken");
-  if (await prisma.user.findFirst({ where: { OR: [{ phone: input.phone }, { emailOrPhone: input.phone }] }, select: { id: true } })) {
+  if (input.phone && (await prisma.user.findFirst({ where: { OR: [{ phone: input.phone }, { emailOrPhone: input.phone }] }, select: { id: true } }))) {
     throw new NewAccountError("phone_taken");
   }
 

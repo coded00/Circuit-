@@ -673,6 +673,16 @@ export default async function TournamentPage({ params }: { params: Promise<{ id:
                     <Check size={15} strokeWidth={3} />
                     You&apos;re in
                   </p>
+                  {tournament.status !== "COMPLETE" && (
+                    <ul className="ml-4 list-disc space-y-1 text-xs leading-relaxed text-muted">
+                      <li>
+                        {hasBracket
+                          ? "It's underway. Open the Bracket tab to find your match."
+                          : `It starts ${formatDate(tournament.startAt)}. We'll notify you the moment your match is ready.`}
+                      </li>
+                      <li>Each match has a code. Show it in your proof screenshot when you report the result.</li>
+                    </ul>
+                  )}
                   {now < tournament.registrationCloseAt && tournament.status !== "LIVE" && tournament.status !== "COMPLETE" && (
                     <WithdrawButton registrationId={myRegistration.id} />
                   )}
@@ -694,7 +704,7 @@ export default async function TournamentPage({ params }: { params: Promise<{ id:
                     <span className="text-stat">
                       <CountdownTimer target={tournament.registrationCloseAt.toISOString()} zeroLabel="a moment" />
                     </span>
-                    {tournament.entryFee > 0 ? " · Paystack or Flutterwave" : ""}
+                    {tournament.entryFee > 0 ? " · Card or wallet" : ""}
                   </p>
                 </div>
               ) : now >= tournament.registrationOpenAt && now < tournament.registrationCloseAt && registrantCount >= tournament.participantCap ? (

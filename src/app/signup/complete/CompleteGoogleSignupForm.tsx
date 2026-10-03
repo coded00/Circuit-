@@ -111,16 +111,15 @@ export default function CompleteGoogleSignupForm({
       <AuthField id="displayName" label="Display name" icon={UserRound} maxLength={40} value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder={handle} />
       <AuthField
         id="phone"
-        label="Phone number"
+        label="Phone number (optional)"
         icon={Phone}
         type="tel"
         inputMode="tel"
         autoComplete="tel-national"
-        required
         placeholder="0803 123 4567"
         value={phone}
         onChange={(e) => setPhone(e.target.value)}
-        hint={normalizeNigerianPhone(phone) ? `Saved as ${formatNigerianPhone(normalizeNigerianPhone(phone)!)}` : "Nigerian mobile number."}
+        hint={normalizeNigerianPhone(phone) ? `Saved as ${formatNigerianPhone(normalizeNigerianPhone(phone)!)}` : "Nigerian mobile. Add it now to log in with your number."}
         hintTone={normalizeNigerianPhone(phone) ? "ok" : "muted"}
       />
       <AuthField

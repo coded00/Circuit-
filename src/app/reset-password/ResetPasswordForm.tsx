@@ -46,11 +46,18 @@ export default function ResetPasswordForm() {
     }
 
     setSubmitting(true);
-    const res = await fetch("/api/auth/reset-password", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token, password }),
-    });
+    let res: Response;
+    try {
+      res = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, password }),
+      });
+    } catch {
+      setError("We couldn't reach Circuit. Check your connection and try again.");
+      setSubmitting(false);
+      return;
+    }
 
     const data = await res.json().catch(() => null);
     setSubmitting(false);
@@ -95,7 +102,21 @@ export default function ResetPasswordForm() {
         hint={confirmPassword && confirmPassword === password ? "Passwords match" : undefined}
         hintTone="ok"
       />
-      {error && <p className="field-error" role="alert">{error}</p>}
+      {error && (
+        <p className="field-error" role="alert">
+          {error}
+          {/* An expired or used link can't be retried — send them to get a fresh one. */}
+          {error.includes("expired") && (
+            <>
+              {" "}
+              <Link href="/forgot-password" className="font-semibold underline">
+                Request a new link
+              </Link>
+              .
+            </>
+          )}
+        </p>
+      )}
       <button type="submit" disabled={submitting} className="btn-primary h-12 w-full text-[15px]">
         {submitting && <Spinner />}
         {submitting ? "Updating…" : "Update password"}

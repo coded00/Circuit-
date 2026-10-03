@@ -49,7 +49,7 @@ export default async function WalletPage() {
   const user = await getCurrentUser();
   if (!user) redirect(loginPath("/wallet"));
 
-  const { balance, fundingHistory, rows, totalPaid, totalRefunded, totalWon } = await getWalletActivity(user.id);
+  const { balance, fundingHistory, rows, totalPaid, totalRefunded, totalWon, pendingWithdrawals, heldInChallenges } = await getWalletActivity(user.id);
 
   const entries: WalletEntry[] = [
     ...fundingHistory.map(
@@ -62,6 +62,8 @@ export default async function WalletPage() {
         amount: t.amount,
         credit: t.type === "FUND",
         status: normalizeStatus(t.status),
+        reference: t.providerRef ?? t.id,
+        href: null,
       })
     ),
     ...rows.map(
@@ -77,6 +79,8 @@ export default async function WalletPage() {
         amount: r.amount,
         credit: r.type === "REFUND" || r.type === "PRIZE_PAYOUT" || r.type === "STAKE_PAYOUT",
         status: normalizeStatus(r.status),
+        reference: r.reference,
+        href: r.href,
       })
     ),
   ].sort((a, b) => b.at.localeCompare(a.at));
@@ -86,9 +90,23 @@ export default async function WalletPage() {
       <section data-surface="dark" className="overflow-hidden rounded-[var(--radius-hero)] border border-border">
         <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-end sm:justify-between sm:p-7">
           <div className="flex flex-col gap-2">
-            <span className="text-eyebrow text-muted">Wallet balance</span>
+            <span className="text-eyebrow text-muted">Available balance</span>
             <span className="text-stat text-4xl leading-none sm:text-5xl">{formatNaira(balance)}</span>
-            <span className="text-xs text-muted">Spend it on entry fees and stakes, or withdraw anytime.</span>
+            <span className="text-xs text-muted">Available to spend on entry fees and stakes, or withdraw anytime.</span>
+            {(pendingWithdrawals > 0 || heldInChallenges > 0) && (
+              <span className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
+                {heldInChallenges > 0 && (
+                  <span>
+                    <span className="text-stat text-foreground">{formatNaira(heldInChallenges)}</span> held in challenges
+                  </span>
+                )}
+                {pendingWithdrawals > 0 && (
+                  <span>
+                    <span className="text-stat text-foreground">{formatNaira(pendingWithdrawals)}</span> withdrawal processing
+                  </span>
+                )}
+              </span>
+            )}
           </div>
           <div className="flex flex-wrap items-start gap-2">
             <FundWalletButton />

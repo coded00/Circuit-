@@ -29,7 +29,10 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
 
   switch (type as NotificationType) {
     case "REGISTRATION_CONFIRMED":
-      return { message: "Your registration is confirmed.", href: `/tournaments/${str(p, "tournamentId")}` };
+      return {
+        message: str(p, "tournamentName") ? `You're in ${str(p, "tournamentName")}. Your registration is confirmed.` : "Your registration is confirmed.",
+        href: `/tournaments/${str(p, "tournamentId")}`,
+      };
     case "MATCH_READY":
       return { message: "Your next match is ready.", href: `/matches/${str(p, "matchId")}` };
     case "MATCH_LIVE":
@@ -63,6 +66,13 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
       return { message: "You've been challenged to a Battle.", href: `/battles/${str(p, "battleId")}` };
     case "BATTLE_ACCEPTED":
       return { message: "Your Challenge was accepted.", href: `/battles/${str(p, "battleId")}` };
+    case "BATTLE_DECLINED":
+      return {
+        message: `${str(p, "byName") || "The player you challenged"} declined your ${str(p, "game") || ""} challenge.`.replace("  ", " "),
+        href: `/battles/${str(p, "battleId")}`,
+      };
+    case "BATTLE_EXPIRED":
+      return { message: `Your ${str(p, "game") || ""} challenge expired with no takers.`.replace("  ", " "), href: `/battles/${str(p, "battleId")}` };
     case "REGISTRATION_CAP_FILLED":
       return {
         message: "Registration filled. Bracket generated.",

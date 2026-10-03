@@ -8,6 +8,8 @@
  */
 
 import { useState } from "react";
+import Link from "next/link";
+import { ChevronDown } from "lucide-react";
 import { ArrowDownLeft, ArrowUpRight, RotateCcw, Swords, Trophy, Ticket } from "lucide-react";
 import { Panel, PanelEmpty } from "@/components/ui/Panel";
 
@@ -22,7 +24,22 @@ export type WalletEntry = {
   amount: number; // kobo, always positive
   credit: boolean;
   status: "COMPLETE" | "PENDING" | "FAILED";
+  /** The payment provider's reference, or Circuit's own record id. */
+  reference: string;
+  /** The tournament or challenge it belongs to. */
+  href: string | null;
 };
+
+const TYPE_LABEL: Record<WalletEntryKind, string> = {
+  FUND: "Top-up",
+  WITHDRAWAL: "Withdrawal",
+  ENTRY_FEE: "Entry fee",
+  REFUND: "Refund",
+  PRIZE_PAYOUT: "Prize payout",
+  STAKE: "Challenge stake",
+  STAKE_PAYOUT: "Challenge winnings",
+};
+const STATUS_LABEL = { COMPLETE: "Successful", PENDING: "Processing", FAILED: "Failed" } as const;
 
 const FILTERS = [
   { key: "all", label: "All" },
@@ -61,6 +78,7 @@ function dayLabel(iso: string): string {
 
 export function WalletActivityList({ entries }: { entries: WalletEntry[] }) {
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["key"]>("all");
+  const [openId, setOpenId] = useState<string | null>(null);
 
   const visible = entries.filter((e) =>
     filter === "all" ? true : filter === "cash" ? e.kind === "FUND" || e.kind === "WITHDRAWAL" : e.kind !== "FUND" && e.kind !== "WITHDRAWAL"
@@ -105,28 +123,68 @@ export function WalletActivityList({ entries }: { entries: WalletEntry[] }) {
             <div className="divide-y divide-border border-t border-border">
               {group.items.map((e) => {
                 const { Icon, className } = ICON[e.kind];
+                const open = openId === e.id;
                 return (
-                  <div key={e.id} className="flex items-center gap-3 px-5 py-3">
-                    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${className}`}>
-                      <Icon size={16} />
-                    </span>
-                    <div className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate text-sm font-medium">{e.title}</span>
-                      <span className="text-metadata truncate">{e.subtitle}</span>
-                    </div>
-                    <div className="flex shrink-0 flex-col items-end gap-0.5">
-                      <span
-                        className={`text-stat text-sm ${e.status === "FAILED" ? "text-muted line-through" : e.credit ? "text-success" : "text-foreground"}`}
-                      >
-                        {e.credit ? "+" : "−"}
-                        {formatNaira(e.amount)}
+                  <div key={e.id}>
+                    <button
+                      type="button"
+                      onClick={() => setOpenId(open ? null : e.id)}
+                      aria-expanded={open}
+                      className="flex w-full items-center gap-3 px-5 py-3 text-left transition hover:bg-surface-elevated/50"
+                    >
+                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${className}`}>
+                        <Icon size={16} />
                       </span>
-                      {e.status !== "COMPLETE" && (
-                        <span className={`text-[11px] font-medium ${e.status === "FAILED" ? "text-danger" : "text-warning"}`}>
-                          {e.status === "FAILED" ? "Failed" : "Processing"}
+                      <div className="flex min-w-0 flex-1 flex-col">
+                        <span className="truncate text-sm font-medium">{e.title}</span>
+                        <span className="text-metadata truncate">{e.subtitle}</span>
+                      </div>
+                      <div className="flex shrink-0 flex-col items-end gap-0.5">
+                        <span className={`text-stat text-sm ${e.status === "FAILED" ? "text-muted line-through" : e.credit ? "text-success" : "text-foreground"}`}>
+                          {e.credit ? "+" : "−"}
+                          {formatNaira(e.amount)}
                         </span>
-                      )}
-                    </div>
+                        {e.status !== "COMPLETE" && (
+                          <span className={`text-[11px] font-medium ${e.status === "FAILED" ? "text-danger" : "text-warning"}`}>
+                            {e.status === "FAILED" ? "Failed" : "Processing"}
+                          </span>
+                        )}
+                      </div>
+                      <ChevronDown size={15} className={`shrink-0 text-muted transition-transform ${open ? "rotate-180" : ""}`} aria-hidden />
+                    </button>
+                    {open && (
+                      <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5 bg-surface-elevated/40 px-5 py-3.5 text-xs sm:grid-cols-3">
+                        <div className="flex flex-col gap-0.5">
+                          <dt className="text-muted">Type</dt>
+                          <dd className="font-medium">{TYPE_LABEL[e.kind]}</dd>
+                        </div>
+                        <div className="flex flex-col gap-0.5">
+                          <dt className="text-muted">Amount</dt>
+                          <dd className="text-stat font-medium">{formatNaira(e.amount)} NGN</dd>
+                        </div>
+                        <div className="flex flex-col gap-0.5">
+                          <dt className="text-muted">Status</dt>
+                          <dd className="font-medium">{STATUS_LABEL[e.status]}</dd>
+                        </div>
+                        <div className="flex flex-col gap-0.5">
+                          <dt className="text-muted">Date</dt>
+                          <dd className="font-medium" suppressHydrationWarning>
+                            {new Date(e.at).toLocaleString("en-NG", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: TZ })}
+                          </dd>
+                        </div>
+                        <div className="col-span-2 flex min-w-0 flex-col gap-0.5">
+                          <dt className="text-muted">Reference</dt>
+                          <dd className="truncate font-mono font-medium select-all">{e.reference}</dd>
+                        </div>
+                        {e.href && (
+                          <div className="col-span-2 sm:col-span-3">
+                            <Link href={e.href} className="font-semibold text-accent-blue hover:underline">
+                              View {e.href.startsWith("/battles") ? "challenge" : "tournament"} →
+                            </Link>
+                          </div>
+                        )}
+                      </dl>
+                    )}
                   </div>
                 );
               })}

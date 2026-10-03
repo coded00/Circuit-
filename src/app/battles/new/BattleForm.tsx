@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { BATTLE_EXPIRY_OPTIONS, DEFAULT_BATTLE_EXPIRY_HOURS } from "@/lib/battleExpiry";
 import { useRouter } from "next/navigation";
 import { OptionCard } from "@/components/OptionCard";
 
@@ -30,6 +31,7 @@ export default function BattleForm({
   const [visibility, setVisibility] = useState<"OPEN" | "TARGETED" | "FRIENDS" | "QUICK_MATCH">("OPEN");
   const [targetHandle, setTargetHandle] = useState("");
   const [streamUrl, setStreamUrl] = useState("");
+  const [expiresInHours, setExpiresInHours] = useState<number>(DEFAULT_BATTLE_EXPIRY_HOURS);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -52,6 +54,7 @@ export default function BattleForm({
               targetHandle: visibility === "TARGETED" ? targetHandle : undefined,
               streamUrl: streamUrl || null,
               stakeAmount: staked ? nairaToKobo(stakeNaira) : 0,
+              expiresInHours,
             }
       ),
     });
@@ -216,6 +219,38 @@ export default function BattleForm({
             onChange={(e) => setStreamUrl(e.target.value)}
             className="field-input"
           />
+        </div>
+      )}
+
+      {visibility !== "QUICK_MATCH" && (
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="expiresIn" className="field-label">
+            Stays open for
+          </label>
+          <select id="expiresIn" value={expiresInHours} onChange={(e) => setExpiresInHours(Number(e.target.value))} className="field-input">
+            {BATTLE_EXPIRY_OPTIONS.map((o) => (
+              <option key={o.hours} value={o.hours}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <span className="field-hint">If nobody accepts by then, the challenge closes on its own.</span>
+        </div>
+      )}
+
+      {/* Review: what you're about to publish, including what happens to any stake. */}
+      {visibility !== "QUICK_MATCH" && (
+        <div className="flex flex-col gap-1 rounded-[12px] border border-border bg-surface-elevated p-3.5 text-[13px]">
+          <span className="text-[11px] font-semibold tracking-wide uppercase">Review</span>
+          <span>
+            {game} · {format === "BEST_OF_3" ? "Best of 3" : "Single match"} ·{" "}
+            {visibility === "OPEN" ? "Anyone can accept" : visibility === "FRIENDS" ? "Friends only" : targetHandle ? `Sent to @${targetHandle.replace(/^@/, "")}` : "Sent to one player"}
+          </span>
+          <span className="text-muted">
+            {staked && nairaToKobo(stakeNaira) > 0
+              ? `₦${stakeNaira} is held from your wallet now. It returns if the challenge expires, is declined or you cancel it, and the winner takes both stakes.`
+              : "Free: no stake and no entry fee."}
+          </span>
         </div>
       )}
 

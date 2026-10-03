@@ -35,6 +35,7 @@ const STATIC_ROUTES: { path: string; changeFrequency: MetadataRoute.Sitemap[numb
   { path: "/", changeFrequency: "daily", priority: 1 },
   { path: "/compete", changeFrequency: "hourly", priority: 0.9 },
   { path: "/ladder", changeFrequency: "hourly", priority: 0.7 },
+  { path: "/activity", changeFrequency: "hourly", priority: 0.6 },
   { path: "/leaderboard", changeFrequency: "daily", priority: 0.6 },
   { path: "/battles", changeFrequency: "hourly", priority: 0.7 },
   { path: "/calendar", changeFrequency: "daily", priority: 0.6 },

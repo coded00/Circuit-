@@ -51,6 +51,7 @@ export function WelcomeFlow({
   interests,
   initialGameIds,
   initialRegion,
+  startStep = 0,
 }: {
   displayName: string;
   next: string;
@@ -59,9 +60,10 @@ export function WelcomeFlow({
   interests: (Option & { description: string | null })[];
   initialGameIds: string[];
   initialRegion: string;
+  startStep?: number;
 }) {
   const router = useRouter();
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(startStep);
   const [gameIds, setGameIds] = useState<Set<string>>(new Set(initialGameIds));
   const [cityId, setCityId] = useState<string | null>(() => cities.find((c) => c.region && initialRegion && c.region.toLowerCase() === initialRegion.toLowerCase())?.id ?? null);
   const [region, setRegion] = useState(initialRegion);

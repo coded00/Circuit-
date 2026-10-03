@@ -33,6 +33,10 @@ export type WalletRow = {
   type: "ENTRY_FEE" | "REFUND" | "PRIZE_PAYOUT" | "STAKE" | "STAKE_PAYOUT";
   amount: number;
   status: string;
+  /** The tournament or challenge this money belongs to, as a page link. */
+  href: string | null;
+  /** The provider reference when there is one, otherwise Circuit's own record id. */
+  reference: string;
 };
 
 export type FundingRow = {
@@ -41,6 +45,8 @@ export type FundingRow = {
   type: "FUND" | "WITHDRAWAL";
   amount: number;
   status: string;
+  /** The payment provider's reference for this top-up or withdrawal. */
+  providerRef: string | null;
 };
 
 export type WalletActivity = {
@@ -51,15 +57,21 @@ export type WalletActivity = {
   totalRefunded: number;
   totalWon: number;
   net: number;
+  /** Withdrawals requested but not yet confirmed by the bank transfer (already out of the balance). */
+  pendingWithdrawals: number;
+  /** Stakes locked in challenges that are still open or being played. */
+  heldInChallenges: number;
 };
 
 export async function getWalletActivity(userId: string): Promise<WalletActivity> {
-  const [user, fundingTxns] = await Promise.all([
+  const [user, fundingTxns, pendingOut, held] = await Promise.all([
     prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { walletBalance: true } }),
     prisma.walletTransaction.findMany({
       where: { userId, type: { in: ["FUND", "WITHDRAWAL"] } },
       orderBy: { createdAt: "desc" },
     }),
+    prisma.walletTransaction.aggregate({ where: { userId, type: "WITHDRAWAL", status: "PENDING" }, _sum: { amount: true } }),
+    prisma.escrowTransaction.aggregate({ where: { userId, type: "STAKE", battle: { status: { in: ["OPEN", "ACCEPTED"] } } }, _sum: { amount: true } }),
   ]);
   const fundingHistory: FundingRow[] = fundingTxns.map((t) => ({
     id: t.id,
@@ -67,11 +79,12 @@ export async function getWalletActivity(userId: string): Promise<WalletActivity>
     type: t.type as "FUND" | "WITHDRAWAL",
     amount: t.amount,
     status: t.status,
+    providerRef: t.providerRef ?? null,
   }));
 
   const myRegistrations = await prisma.registration.findMany({
     where: { userId },
-    select: { id: true, tournament: { select: { name: true, game: true } } },
+    select: { id: true, tournament: { select: { id: true, name: true, game: true } } },
   });
   const registrationById = new Map(myRegistrations.map((r) => [r.id, r.tournament]));
 
@@ -101,7 +114,7 @@ export async function getWalletActivity(userId: string): Promise<WalletActivity>
       type: "PRIZE_PAYOUT",
       OR: [{ userId }, ...(championTournamentIds.length ? [{ userId: null, tournamentId: { in: championTournamentIds } }] : [])],
     },
-    include: { tournament: { select: { name: true, game: true } } },
+    include: { tournament: { select: { id: true, name: true, game: true } } },
     orderBy: { createdAt: "desc" },
   });
 
@@ -134,6 +147,8 @@ export async function getWalletActivity(userId: string): Promise<WalletActivity>
           type: t.type,
           amount: t.amount,
           status: t.status,
+          href: tournament ? `/tournaments/${tournament.id}` : null,
+          reference: t.providerRef ?? t.id,
         };
       }),
     ...prizeTxns.map((t) => ({
@@ -144,6 +159,8 @@ export async function getWalletActivity(userId: string): Promise<WalletActivity>
       type: "PRIZE_PAYOUT" as const,
       amount: t.amount,
       status: t.status,
+      href: t.tournament ? `/tournaments/${t.tournament.id}` : null,
+      reference: t.providerRef ?? t.id,
     })),
     ...battleTxns.map((t) => ({
       id: t.id,
@@ -153,6 +170,8 @@ export async function getWalletActivity(userId: string): Promise<WalletActivity>
       type: t.type as "STAKE" | "STAKE_PAYOUT" | "REFUND",
       amount: t.amount,
       status: t.status,
+      href: t.battleId ? `/battles/${t.battleId}` : null,
+      reference: t.providerRef ?? t.id,
     })),
   ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
@@ -174,5 +193,7 @@ export async function getWalletActivity(userId: string): Promise<WalletActivity>
     totalRefunded,
     totalWon,
     net: totalWon + totalRefunded - totalPaid,
+    pendingWithdrawals: pendingOut._sum.amount ?? 0,
+    heldInChallenges: held._sum.amount ?? 0,
   };
 }

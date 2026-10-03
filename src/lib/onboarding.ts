@@ -9,6 +9,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { communityHref } from "@/lib/community";
+import { ensureGameHubs } from "@/lib/communityDirectory";
 
 export type OnboardingChoices = { gameIds: string[]; cityId: string | null; region: string | null; interestIds: string[] };
 
@@ -20,7 +21,12 @@ export function parseChoices(body: Record<string, unknown>): OnboardingChoices {
 
 /** Joins the chosen official communities and saves games/region. */
 export async function applyChoices(userId: string, choices: OnboardingChoices) {
-  const [hubs, officials] = await Promise.all([
+  // Hubs are created lazily; make sure the chosen games have one so the
+  // player is joined even if nobody has opened /welcome yet.
+  if (choices.gameIds.length > 0) await ensureGameHubs().catch(() => undefined);
+  const [chosenGames, hubs, officials] = await Promise.all([
+    // Saved by name regardless of hubs: the profile's "games I play" list.
+    prisma.game.findMany({ where: { id: { in: choices.gameIds }, enabled: true, publishedAt: { not: null } }, select: { name: true } }),
     prisma.community.findMany({ where: { kind: "GAME_HUB", enabled: true, gameId: { in: choices.gameIds } }, select: { id: true, game: { select: { name: true } } } }),
     prisma.community.findMany({
       where: { kind: "OFFICIAL", enabled: true, id: { in: [...choices.interestIds, ...(choices.cityId ? [choices.cityId] : [])] } },
@@ -36,7 +42,7 @@ export async function applyChoices(userId: string, choices: OnboardingChoices) {
   await prisma.user.update({
     where: { id: userId },
     data: {
-      favoriteGames: [...new Set([...(user?.favoriteGames ?? []), ...hubs.map((h) => h.game!.name)])].slice(0, 12),
+      favoriteGames: [...new Set([...(user?.favoriteGames ?? []), ...chosenGames.map((g) => g.name), ...hubs.map((h) => h.game!.name)])].slice(0, 12),
       region: choices.region ?? city?.region ?? user?.region ?? null,
     },
   });

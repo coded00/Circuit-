@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Gamepad2, Megaphone, Trophy, Users } from "lucide-react";
+import { ArrowRight, Check, Gamepad2, Megaphone, Swords, Trophy, Users } from "lucide-react";
 import { GameArtTile } from "@/components/GameArtTile";
 import { StatusPill, tournamentStatusInfo, battleStatusInfo } from "@/components/StatusPill";
 import { EVENT_KIND_META, eventColor, eventHref, eventTitle, eventTimeLabel, type CalendarEvent } from "./types";
@@ -58,6 +58,11 @@ export function AgendaEventBody({ event }: { event: CalendarEvent }) {
               <Trophy size={12} className="text-gold" />
               {prize}
             </span>
+            {event.kind === "tournament" && event.mine && (
+              <span className="flex items-center gap-1 text-xs font-semibold text-success">
+                <Check size={12} strokeWidth={3} /> You&apos;re in
+              </span>
+            )}
             {event.kind === "tournament" && (
               <span className="flex items-center gap-1 font-mono text-[11px] text-muted tabular-nums">
                 <Users size={12} />
@@ -70,9 +75,46 @@ export function AgendaEventBody({ event }: { event: CalendarEvent }) {
     );
   }
 
-  // Community/Game Release: admin-authored rows with no detail page of
-  // their own — the calendar is their whole surface, so not a link.
+  // One of your own league fixtures, due by its matchday deadline.
+  if (event.kind === "match") {
+    return (
+      <Link
+        href={eventHref(event)!}
+        className="group flex min-w-0 flex-1 items-center gap-3 rounded-[12px] border border-border bg-surface p-3 transition duration-[var(--duration-base)] hover:border-border-hover hover:bg-surface-elevated/50"
+      >
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[9px] bg-surface-elevated text-foreground">
+          <Swords size={17} />
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate text-sm font-semibold text-foreground">{eventTitle(event)}</span>
+          <span className="truncate text-xs text-muted">{event.tournamentName} · matchday deadline</span>
+        </span>
+        <ArrowRight size={14} className="shrink-0 text-muted-strong transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
+      </Link>
+    );
+  }
+
+  // A community's own event links to that community; game releases and
+  // admin-authored events have no page — the calendar is their whole surface.
   const Icon = event.kind === "community" ? Megaphone : Gamepad2;
+  const href = eventHref(event);
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className="group flex min-w-0 flex-1 items-center gap-3 rounded-[12px] border border-border bg-surface p-3 transition duration-[var(--duration-base)] hover:border-border-hover hover:bg-surface-elevated/50"
+      >
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[9px] bg-surface-elevated text-foreground">
+          <Icon size={17} />
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate text-sm font-semibold text-foreground">{event.title}</span>
+          <span className="text-xs text-muted">{EVENT_KIND_META[event.kind].label}</span>
+        </span>
+        <ArrowRight size={14} className="shrink-0 text-muted-strong transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
+      </Link>
+    );
+  }
   return (
     <div className="flex min-w-0 flex-1 items-center gap-3 rounded-[12px] border border-dashed border-border-strong p-3">
       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[9px] bg-surface-elevated text-foreground">

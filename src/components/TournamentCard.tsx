@@ -10,7 +10,9 @@ import Link from "next/link";
 import { ViewTransition } from "react";
 import { GameArtTile } from "@/components/GameArtTile";
 import { tournamentArtName } from "@/lib/viewTransitions";
-import { StatusPill, tournamentStatusInfo } from "@/components/StatusPill";
+import { ArrowRight } from "lucide-react";
+import { StatusPill } from "@/components/StatusPill";
+import { tournamentCtaLabel, tournamentDisplayStatus } from "@/lib/tournamentCta";
 import { tournamentPath } from "@/lib/seo";
 
 export type TournamentCardData = {
@@ -48,10 +50,12 @@ export function TournamentCard({
    *  set it (duplicate names cancel the transition). */
   morph?: boolean;
 }) {
-  // "Draft" is organizer language; on a public card an announced-but-not-
-  // yet-open tournament reads as "Announced".
-  const status = t.status === "DRAFT" ? { tone: "neutral" as const, label: "Announced" } : tournamentStatusInfo(t.status);
   const registered = t._count.registrations;
+  // "Draft" is organizer language, so an announced-but-not-yet-open
+  // tournament reads "Announced"; an open one with no slots reads "Full".
+  const counts = { status: t.status, participantCap: t.participantCap, registered };
+  const status = tournamentDisplayStatus(counts);
+  const cta = tournamentCtaLabel(counts);
   const fill = t.participantCap > 0 ? Math.min(100, (registered / t.participantCap) * 100) : 0;
   const spotsLeft = t.participantCap - registered;
   const nearlyFull = spotsLeft > 0 && t.participantCap > 0 && spotsLeft / t.participantCap <= 0.2;
@@ -115,6 +119,10 @@ export function TournamentCard({
             style={{ width: `${fill}%` }}
           />
         </div>
+        <span className="flex items-center justify-between text-[13px] font-semibold text-foreground/90 transition-colors group-hover:text-accent-blue">
+          {cta}
+          <ArrowRight size={15} className="transition-transform duration-[var(--duration-base)] group-hover:translate-x-0.5" aria-hidden />
+        </span>
       </div>
     </Link>
   );

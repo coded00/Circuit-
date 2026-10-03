@@ -15,6 +15,9 @@ import { Check, ImageUp } from "lucide-react";
 import { Spinner } from "@/components/Spinner";
 import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
 
+/** Mirrors the server limit, so a too-big clip fails here and not after a long upload. */
+const MAX_PROOF_BYTES = 10 * 1024 * 1024;
+
 type PlayerOption = { id: string; displayName: string; handle: string; avatarUrl: string | null };
 
 export default function ResultForm({
@@ -46,6 +49,11 @@ export default function ResultForm({
       setError(drawAllowed ? "Pick who won, or a draw." : "Pick who won.");
       return;
     }
+    const file = new FormData(event.currentTarget).get("proof");
+    if (file instanceof File && file.size > MAX_PROOF_BYTES) {
+      setError(`That file is ${(file.size / 1024 / 1024).toFixed(1)}MB. Proof can be up to 10MB, so trim the clip or send a screenshot.`);
+      return;
+    }
     setError(null);
     setSubmitting(true);
 
@@ -55,7 +63,14 @@ export default function ResultForm({
     if (kills.trim()) form.set("kills", kills.trim());
     form.set("proofShowsMatchCode", confirmed ? "true" : "false");
 
-    const res = await fetch(`/api/matches/${matchId}/results`, { method: "POST", body: form });
+    let res: Response;
+    try {
+      res = await fetch(`/api/matches/${matchId}/results`, { method: "POST", body: form });
+    } catch {
+      setError("We couldn't reach Circuit, so nothing was submitted. Check your connection and try again.");
+      setSubmitting(false);
+      return;
+    }
     const data = await res.json().catch(() => null);
 
     if (!res.ok) {

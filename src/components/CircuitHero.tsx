@@ -1,6 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { CalendarClock } from "lucide-react";
+import { CountdownTimer } from "@/components/CountdownTimer";
+import { InfoTip } from "@/components/InfoTip";
+import { StatusPill } from "@/components/StatusPill";
+import { startsWithinADay, tournamentCtaLabel, tournamentDisplayStatus } from "@/lib/tournamentCta";
 import { useSpotlight } from "@/lib/useSpotlight";
 import { CINEMATIC_GAMING_IMAGE, realGameImage, unsplashUrl } from "@/lib/gameImagery";
 import { tournamentPath } from "@/lib/seo";
@@ -26,6 +31,9 @@ type Tournament = {
   id: string;
   name: string;
   game: string;
+  status: string;
+  teamSize: string;
+  startAt: Date;
   entryFee: number;
   participantCap: number;
   prizeAmount: number | null;
@@ -105,21 +113,54 @@ export function CircuitHero({
         >
           {tournament ? (
             <>
-              <span className="text-eyebrow text-accent-volt">Featured · {tournament.game}</span>
-              <h1 className="text-hero line-clamp-2">{tournament.name}</h1>
-              <p className="max-w-[440px] text-sm text-muted sm:text-base">
-                {tournament.prizeAmount
-                  ? `₦${(tournament.prizeAmount / 100).toLocaleString("en-NG")} prize pool · `
-                  : tournament.entryFee === 0
-                    ? "Free entry · "
-                    : `${formatNaira(tournament.entryFee)} entry · `}
-                {tournament._count.registrations}/{tournament.participantCap} players
-              </p>
-              <div className="flex flex-wrap gap-3 pt-1">
-                <Link href={tournamentPath(tournament)} className="btn-primary">
-                  View tournament
-                </Link>
-              </div>
+              {(() => {
+                const counts = { status: tournament.status, participantCap: tournament.participantCap, registered: tournament._count.registrations };
+                const status = tournamentDisplayStatus(counts);
+                const left = Math.max(0, tournament.participantCap - tournament._count.registrations);
+                const showCountdown = tournament.status === "OPEN" && startsWithinADay(new Date(tournament.startAt));
+                return (
+                  <>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <StatusPill tone={status.tone} pulse={status.pulse} solid>
+                        {status.label}
+                      </StatusPill>
+                      <span className="text-eyebrow text-accent-volt">
+                        {tournament.game} · {tournament.teamSize}
+                      </span>
+                    </div>
+                    <h1 className="text-hero line-clamp-2">{tournament.name}</h1>
+                    <p className="max-w-[440px] text-sm text-muted sm:text-base">
+                      {tournament.prizeAmount
+                        ? `₦${(tournament.prizeAmount / 100).toLocaleString("en-NG")} prize pool · `
+                        : tournament.entryFee === 0
+                          ? "Free entry · "
+                          : `${formatNaira(tournament.entryFee)} entry · `}
+                      {tournament.status === "OPEN"
+                        ? left > 0
+                          ? `${left} ${left === 1 ? "spot" : "spots"} left`
+                          : "No spots left"
+                        : `${tournament._count.registrations}/${tournament.participantCap} players`}
+                    </p>
+                    {(tournament.status === "OPEN" || tournament.status === "DRAFT") && (
+                      <p className="flex items-center gap-2 text-sm text-foreground/90">
+                        <CalendarClock size={16} className="text-accent-volt" aria-hidden />
+                        {showCountdown ? (
+                          <span>
+                            Starts in <CountdownTimer target={new Date(tournament.startAt).toISOString()} />
+                          </span>
+                        ) : (
+                          <span suppressHydrationWarning>Starts {new Date(tournament.startAt).toLocaleString("en-NG", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
+                        )}
+                      </p>
+                    )}
+                    <div className="flex flex-wrap gap-3 pt-1">
+                      <Link href={tournamentPath(tournament)} className="btn-primary">
+                        {tournamentCtaLabel(counts)}
+                      </Link>
+                    </div>
+                  </>
+                );
+              })()}
             </>
           ) : banner ? (
             <>
@@ -176,24 +217,31 @@ export function CircuitHero({
               label: "Open tournaments",
               short: "Tournaments",
               value: stats.openTournaments.toLocaleString("en-NG"),
+              hint: "Tournaments you can register for right now.",
             },
             {
               label: "Challenges waiting",
               short: "Challenges",
               value: stats.openChallenges.toLocaleString("en-NG"),
+              hint: "Open 1v1 challenges you can accept.",
             },
             {
               label: "Prize money",
               short: "Prizes",
               value: formatNaira(stats.prizeMoney),
+              hint: "Total prize pools of tournaments that are open or live now.",
               gold: true,
             },
           ].map((item) => (
             <div key={item.label} className="flex min-w-0 flex-col gap-1 bg-surface px-4 py-3 sm:px-8 sm:py-4">
-              <dt className="truncate text-[10px] font-medium tracking-wide text-muted uppercase sm:text-[11px]">
+              <dt className="flex items-center gap-1.5 text-[10px] font-medium tracking-wide text-muted uppercase sm:text-[11px]">
                 {/* Short labels on phones: three columns leave ~100px each. */}
-                <span className="sm:hidden">{item.short}</span>
-                <span className="hidden sm:inline">{item.label}</span>
+                <span className="truncate sm:hidden">{item.short}</span>
+                <span className="hidden truncate sm:inline">{item.label}</span>
+                {/* No room beside the labels at phone width. */}
+                <span className="hidden sm:inline-flex">
+                  <InfoTip text={item.hint} label={`What "${item.label}" counts`} />
+                </span>
               </dt>
               <dd className={`text-stat truncate text-base sm:text-xl ${item.gold ? "text-gold" : ""}`}>{item.value}</dd>
             </div>

@@ -1,11 +1,14 @@
 /**
  * Circuit — email signup (ACC-2), fed by the multi-step form on /signup.
- * Collects email, password (+ confirmation), username, a Nigerian mobile
- * number and date of birth; everything is re-validated here.
+ * Collects name, email, password (+ confirmation), terms acceptance,
+ * username, country, date of birth and an optional Nigerian mobile
+ * number; everything is re-validated here. Games, avatar and bio are
+ * saved by the form afterwards, through the signed-in endpoints.
  *
  * - Email is stored lowercased as the login identifier (and as `email`),
  *   and checked case-insensitively so "Ada@x.com" can't register twice.
- * - Phone is normalised to +234… (src/lib/phone.ts) — not SMS-verified.
+ * - Phone is optional; when given it's normalised to +234… (src/lib/phone.ts)
+ *   — not SMS-verified.
  * - Date of birth must be 13+ (src/lib/age.ts); the separate 18+ rule for
  *   paid entry and payouts still lives in src/lib/age-gate.ts.
  *
@@ -23,6 +26,7 @@ import { joinGlobalCommunity } from "@/lib/community";
 import { isRateLimited, recordAttempt, clearAttempts } from "@/lib/rateLimit";
 import { HANDLE_RULES_MESSAGE, validateHandle } from "@/lib/handles";
 import { normalizeNigerianPhone } from "@/lib/phone";
+import { isCountryCode } from "@/lib/countries";
 import { parseSignupDateOfBirth } from "@/lib/age";
 
 const MIN_PASSWORD_LENGTH = 8;
@@ -36,22 +40,30 @@ const SIGNUP_WINDOW_MS = 15 * 60 * 1000;
 
 const EXISTING_ACCOUNT_MESSAGE = "Couldn't create your account. If you already have one, try logging in instead.";
 
-type Field = "email" | "password" | "confirmPassword" | "handle" | "phone" | "dateOfBirth";
+type Field = "name" | "email" | "password" | "confirmPassword" | "terms" | "handle" | "country" | "phone" | "dateOfBirth";
+const MAX_NAME_LENGTH = 40;
 const fail = (field: Field, error: string, status = 400) => NextResponse.json({ error, field }, { status });
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const str = (key: string) => (typeof body?.[key] === "string" ? (body[key] as string) : "");
 
+  const name = str("name").trim().replace(/\s+/g, " ");
+  if (!name) return fail("name", "Enter your name.");
+  if (name.length > MAX_NAME_LENGTH) return fail("name", `Keep your name to ${MAX_NAME_LENGTH} characters or fewer.`);
   const email = str("email").trim().toLowerCase();
   if (!EMAIL_PATTERN.test(email)) return fail("email", "Enter a valid email address.");
   const password = str("password");
   if (password.length < MIN_PASSWORD_LENGTH) return fail("password", `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
   if (str("confirmPassword") !== password) return fail("confirmPassword", "Passwords don't match.");
+  if (body?.acceptTerms !== true) return fail("terms", "Accept the Terms and Privacy Policy to join.");
   const handle = validateHandle(str("handle"));
   if (!handle) return fail("handle", HANDLE_RULES_MESSAGE);
-  const phone = normalizeNigerianPhone(str("phone"));
-  if (!phone) return fail("phone", "Enter a Nigerian mobile number, e.g. 0803 123 4567.");
+  const country = str("country");
+  if (!isCountryCode(country)) return fail("country", "Choose your country.");
+  const phoneInput = str("phone").trim();
+  const phone = phoneInput ? normalizeNigerianPhone(phoneInput) : null;
+  if (phoneInput && !phone) return fail("phone", "Enter a Nigerian mobile number, e.g. 0803 123 4567 — or leave it blank.");
   const dob = parseSignupDateOfBirth(body?.dateOfBirth);
   if (!dob.ok) return fail("dateOfBirth", dob.error);
 
@@ -70,7 +82,7 @@ export async function POST(request: Request) {
       where: { OR: [{ emailOrPhone: { equals: email, mode: "insensitive" } }, { email: { equals: email, mode: "insensitive" } }] },
       select: { id: true },
     }),
-    prisma.user.findFirst({ where: { OR: [{ phone }, { emailOrPhone: phone }] }, select: { id: true } }),
+    phone ? prisma.user.findFirst({ where: { OR: [{ phone }, { emailOrPhone: phone }] }, select: { id: true } }) : null,
   ]);
   if (emailTaken) {
     await recordAttempt(rateLimitKey);
@@ -84,7 +96,7 @@ export async function POST(request: Request) {
   const passwordHash = await hashPassword(password);
   try {
     const user = await prisma.user.create({
-      data: { emailOrPhone: email, email, phone, dateOfBirth: dob.date, passwordHash, handle, displayName: handle },
+      data: { emailOrPhone: email, email, phone, country, termsAcceptedAt: new Date(), dateOfBirth: dob.date, passwordHash, handle, displayName: name },
     });
     await clearAttempts(rateLimitKey);
 

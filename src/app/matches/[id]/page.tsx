@@ -69,6 +69,8 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   // double elimination: which bracket and round this is.
   let roundLabel = `Round ${match.round}`;
   let drawAllowed = false;
+  /** League fixtures are due by their matchday's deadline. */
+  let playBy: Date | null = null;
   if (["ROUND_ROBIN", "SWISS", "DOUBLE_ELIMINATION", "LEAGUE"].includes(match.tournament?.format ?? "") && match.tournamentId) {
     const bracket = await prisma.bracket.findUnique({ where: { tournamentId: match.tournamentId } });
     if (isLeagueStructure(bracket?.structure)) {
@@ -76,6 +78,8 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
       roundLabel = isDecider ? "Decider" : `Matchday ${match.round}`;
       // Draws are worth points only if the organizer allowed them; a decider has to have a winner.
       drawAllowed = match.tournament?.leagueDrawPoints != null && !isDecider;
+      const due = isDecider ? null : bracket.structure.deadlines[(match.round ?? 1) - 1];
+      playBy = due && match.status !== "COMPLETE" ? new Date(due) : null;
     }
     if ((isRoundRobinStructure(bracket?.structure) || isSwissStructure(bracket?.structure)) && (match.round ?? 0) > bracket.structure.totalRounds) roundLabel = "Decider";
     if (isDoubleElimStructure(bracket?.structure)) {
@@ -102,6 +106,26 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   const isDraw = match.status === "COMPLETE" && !match.winnerId && reports.some((r) => r.winnerId === DRAW_RESULT);
   const finalScore =
     match.status === "COMPLETE" && (match.winnerId || isDraw) ? (reports.find((r) => r.winnerId === (match.winnerId ?? DRAW_RESULT))?.score ?? null) : null;
+
+  // Who each report says won, in words (names, not ids).
+  const nameOf = (userId: string) => (userId === match.playerAId ? match.playerA.displayName : match.playerB.displayName);
+  const claimText = (r: ResultPayload) => (r.winnerId === DRAW_RESULT ? "Draw" : `${nameOf(r.winnerId)} won`);
+  const reportOf = (which: "A" | "B") => (which === "A" ? match.resultA : match.resultB) as (ResultPayload & { confirmed?: boolean }) | null;
+  const opponentSide: "A" | "B" | null = side === "A" ? "B" : side === "B" ? "A" : null;
+  const opponentRaw = opponentSide ? reportOf(opponentSide) : null;
+  // The first player's claim, shown to the second so they can confirm or dispute it.
+  const opponentReport =
+    side !== null && opponentSide && opponentRaw && !hasReported && match.status === "NEEDS_RESULT"
+      ? {
+          claimText: opponentRaw.winnerId === user?.id ? "You won" : claimText(opponentRaw),
+          score: opponentRaw.score,
+          proofUrl: (opponentSide === "A" ? match.proofARef : match.proofBRef) ? `/api/matches/${match.id}/proof/${opponentSide.toLowerCase()}` : null,
+        }
+      : null;
+  const reportRows = (["A", "B"] as const).flatMap((which) => {
+    const r = reportOf(which);
+    return r ? [{ name: which === "A" ? match.playerA.displayName : match.playerB.displayName, claimText: claimText(r), score: r.score, confirmed: !!r.confirmed }] : [];
+  });
 
   const bothReady = match.playerAReadyAt !== null && match.playerBReadyAt !== null;
   // Live-refresh while genuinely waiting on something to change.
@@ -132,7 +156,10 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
       canShareWin: side !== null && match.winnerId === user?.id && isWagerBattleWin(match),
     },
     reportWindowExpiresAt: match.reportWindowExpiresAt,
-    dispute: match.dispute ? { id: match.dispute.id } : null,
+    dispute: match.dispute ? { id: match.dispute.id, status: match.dispute.status, organizerDeadline: match.dispute.organizerRulingDeadline } : null,
+    opponentReport,
+    reports: reportRows,
+    playBy,
     ruling,
     // TRU-2/PRD §19: voiding is only unambiguous for a Battle — see
     // MatchError "VOID_UNSUPPORTED" in src/lib/matches.ts.

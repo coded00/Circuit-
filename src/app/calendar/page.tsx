@@ -28,6 +28,10 @@ import { ViewTransition } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { prisma } from "@/lib/db";
+import { getCurrentUser } from "@/lib/session";
+import { communityHref } from "@/lib/community";
+import { openBattleFilter } from "@/lib/battles";
+import { isLeagueStructure } from "@/lib/leagueStandings";
 import { publishedGames } from "@/lib/gameCatalogQueries";
 import {
   addMonths,
@@ -56,9 +60,9 @@ type SearchParams = {
 };
 
 type ViewMode = "month" | "week" | "list";
-type EventType = "all" | "tournaments" | "challenges" | "community" | "game_releases";
+type EventType = "all" | "mine" | "tournaments" | "challenges" | "community" | "game_releases";
 
-const TYPE_TABS: { value: Exclude<EventType, "all">; kind: EventKind }[] = [
+const TYPE_TABS: { value: Exclude<EventType, "all" | "mine">; kind: EventKind }[] = [
   { value: "tournaments", kind: "tournament" },
   { value: "challenges", kind: "challenge" },
   { value: "community", kind: "community" },
@@ -74,6 +78,7 @@ function formatCompactNaira(kobo: number): string {
 
 export default async function CalendarPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams;
+  const user = await getCurrentUser();
   const now = new Date();
   const todayKey = dateKey(now);
 
@@ -83,7 +88,9 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const month = Number.isInteger(mNum) && mNum >= 1 && mNum <= 12 ? mNum : now.getMonth() + 1;
   const view: ViewMode = sp.view === "week" || sp.view === "list" ? sp.view : "month";
   const type: EventType =
-    sp.type === "tournaments" || sp.type === "challenges" || sp.type === "community" || sp.type === "game_releases"
+    sp.type === "mine" && user
+      ? "mine"
+      : sp.type === "tournaments" || sp.type === "challenges" || sp.type === "community" || sp.type === "game_releases"
       ? sp.type
       : "all";
   const game = sp.game?.trim() ?? "";
@@ -100,7 +107,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const rangeStart = startOfDay(gridDays[0]);
   const rangeEnd = endOfDay(gridDays[gridDays.length - 1]);
 
-  const [tournaments, battles, communityEvents, gameReleaseEvents] = await Promise.all([
+  const [tournaments, battles, communityEvents, gameReleaseEvents, myRegistrations, joinedCommunityEvents, myMatches] = await Promise.all([
     prisma.tournament.findMany({
           where: {
             startAt: { gte: rangeStart, lte: rangeEnd },
@@ -127,7 +134,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     prisma.battle.findMany({
           where: {
             createdAt: { gte: rangeStart, lte: rangeEnd },
-            status: "OPEN" as const,
+            ...openBattleFilter(),
             ...(game ? { game: { contains: game, mode: "insensitive" as const } } : {}),
           },
           orderBy: { createdAt: "asc" },
@@ -154,7 +161,54 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
           orderBy: { date: "asc" },
           take: 200,
         }),
+    // Personal layer (signed in): what you've entered, the events of
+    // communities you've joined, and your own league fixtures.
+    user ? prisma.registration.findMany({ where: { userId: user.id, status: "CONFIRMED" }, select: { tournamentId: true } }) : Promise.resolve([]),
+    user
+      ? prisma.communityEvent.findMany({
+          where: { startsAt: { gte: rangeStart, lte: rangeEnd }, cancelledAt: null, community: { enabled: true, members: { some: { userId: user.id } } } },
+          orderBy: { startsAt: "asc" },
+          take: 200,
+          select: { id: true, title: true, startsAt: true, community: { select: { kind: true, slug: true, tournamentId: true } } },
+        })
+      : Promise.resolve([]),
+    user
+      ? prisma.match.findMany({
+          where: {
+            OR: [{ playerAId: user.id }, { playerBId: user.id }],
+            status: { in: ["UPCOMING", "NEEDS_RESULT"] },
+            tournament: { format: "LEAGUE", status: "LIVE" },
+          },
+          take: 100,
+          select: {
+            id: true,
+            round: true,
+            status: true,
+            playerAId: true,
+            playerA: { select: { displayName: true } },
+            playerB: { select: { displayName: true } },
+            tournamentId: true,
+            tournament: { select: { name: true } },
+          },
+        })
+      : Promise.resolve([]),
   ]);
+
+  // League fixtures have a due date (their matchday's deadline); other
+  // formats don't schedule individual matches, so they aren't plotted.
+  const myTournamentIds = new Set(myRegistrations.map((r) => r.tournamentId));
+  const leagueBrackets = myMatches.length
+    ? await prisma.bracket.findMany({ where: { tournamentId: { in: [...new Set(myMatches.map((m) => m.tournamentId!))] } }, select: { tournamentId: true, structure: true } })
+    : [];
+  const matchEvents: CalendarEvent[] = myMatches.flatMap((m): CalendarEvent[] => {
+    const structure = leagueBrackets.find((b) => b.tournamentId === m.tournamentId)?.structure;
+    if (!isLeagueStructure(structure) || (m.round ?? 0) > structure.totalRounds) return [];
+    const due = structure.deadlines[(m.round ?? 1) - 1];
+    if (!due) return [];
+    const date = new Date(due);
+    if (date < rangeStart || date > rangeEnd) return [];
+    return [{ kind: "match", id: m.id, date, opponent: m.playerAId === user!.id ? m.playerB.displayName : m.playerA.displayName, tournamentName: m.tournament?.name ?? "League", status: m.status }];
+  });
 
   const allEvents: CalendarEvent[] = [
     ...tournaments.map(
@@ -172,6 +226,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         prizeText: t.prizeText,
         participantCap: t.participantCap,
         registered: t._count.registrations,
+        mine: myTournamentIds.has(t.id),
       })
     ),
     ...battles.map(
@@ -185,12 +240,15 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         hostName: b.creator.displayName,
       })
     ),
-    ...communityEvents.map((e): CalendarEvent => ({ kind: "community", id: e.id, date: e.date, title: e.title })),
+    ...communityEvents.map((e): CalendarEvent => ({ kind: "community", id: e.id, date: e.date, title: e.title, href: null, mine: false })),
+    ...joinedCommunityEvents.map((e): CalendarEvent => ({ kind: "community", id: e.id, date: e.startsAt, title: e.title, href: communityHref(e.community), mine: true })),
+    ...matchEvents,
     ...gameReleaseEvents.map((e): CalendarEvent => ({ kind: "game_release", id: e.id, date: e.date, title: e.title })),
   ].sort((a, b) => a.date.getTime() - b.date.getTime());
 
-  const kindForType = type === "all" ? null : TYPE_TABS.find((t) => t.value === type)!.kind;
-  const events = kindForType ? allEvents.filter((e) => e.kind === kindForType) : allEvents;
+  const isMine = (e: CalendarEvent) => e.kind === "match" || ((e.kind === "tournament" || e.kind === "community") && e.mine);
+  const kindForType = type === "all" || type === "mine" ? null : TYPE_TABS.find((t) => t.value === type)!.kind;
+  const events = type === "mine" ? allEvents.filter(isMine) : kindForType ? allEvents.filter((e) => e.kind === kindForType) : allEvents;
 
   const eventsByDay = new Map<string, CalendarEvent[]>();
   for (const event of events) {
@@ -343,6 +401,17 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
           All
           <span className="font-mono text-[11px] opacity-60 tabular-nums">{Array.from(kindCounts.values()).reduce((a, b) => a + b, 0)}</span>
         </Link>
+        {user && (
+          <Link
+            href={href({ type: type === "mine" ? "all" : "mine" })}
+            scroll={false}
+            aria-pressed={type === "mine"}
+            className={`${chipBase} ${type === "mine" ? chipActive : chipIdle}`}
+          >
+            My calendar
+            <span className="font-mono text-[11px] opacity-60 tabular-nums">{allEvents.filter((e) => inMonth(e) && isMine(e)).length}</span>
+          </Link>
+        )}
         {TYPE_TABS.map((tab) => {
           const meta = EVENT_KIND_META[tab.kind];
           const active = type === tab.value;

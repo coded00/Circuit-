@@ -44,19 +44,19 @@ import { SidebarPromoCard } from "./SidebarPromoCard";
 
 type NavUser = { handle: string; displayName: string; isStaff: boolean } | null;
 
-type Item = { href: string; label: string; icon: React.ComponentType<{ size?: number; className?: string }> };
+type Item = { href: string; label: string; icon: React.ComponentType<{ size?: number; className?: string }>; /** Other routes that belong to this item (Feed also covers the video feed). */ also?: string[] };
 
 const PRIMARY: Item[] = [
   { href: "/", label: "Home", icon: Home },
   { href: "/compete", label: "Compete", icon: Trophy },
-  { href: "/ladder", label: "Feed", icon: Gamepad2 },
+  { href: "/activity", label: "Feed", icon: Gamepad2, also: ["/ladder"] },
   { href: "/battles", label: "Challenges", icon: Swords },
   { href: "/communities", label: "Communities", icon: MessagesSquare },
   { href: "/calendar", label: "Calendar", icon: Calendar },
 ];
 
-function isActive(pathname: string, href: string): boolean {
-  return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
+function isActive(pathname: string, href: string, also: string[] = []): boolean {
+  return [href, ...also].some((h) => (h === "/" ? pathname === "/" : pathname === h || pathname.startsWith(`${h}/`)));
 }
 
 /** Row height (46px) + the nav's own gap-1 (4px) — the sliding indicator
@@ -99,7 +99,7 @@ export function AppSidebar({ user }: { user: NavUser }) {
     ...(user ? [{ href: "/wallet", label: "Wallet", icon: Wallet }] : []),
     ...(user ? [{ href: `/players/${user.handle}`, label: "Profile", icon: UserIcon }] : []),
   ];
-  const activeIndex = items.findIndex((item) => isActive(pathname, item.href));
+  const activeIndex = items.findIndex((item) => isActive(pathname, item.href, item.also));
 
   return (
     <aside

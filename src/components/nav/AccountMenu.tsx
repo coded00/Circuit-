@@ -107,6 +107,9 @@ export function AccountMenu({
           <Link href="/account" onClick={() => setOpen(false)} className="block px-4 py-2 text-sm hover:bg-surface-elevated">
             Account settings
           </Link>
+          <Link href="/help" onClick={() => setOpen(false)} className="block px-4 py-2 text-sm hover:bg-surface-elevated">
+            Help
+          </Link>
 
           <div className="my-1 border-t border-border" />
           <MenuLink href="/discover" icon={Compass} onClick={() => setOpen(false)}>

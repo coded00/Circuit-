@@ -23,11 +23,18 @@ export default function LoginForm() {
     setError(null);
     setSubmitting(true);
 
-    const res = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ emailOrPhone, password }),
-    });
+    let res: Response;
+    try {
+      res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emailOrPhone, password }),
+      });
+    } catch {
+      setError("We couldn't reach Circuit. Check your connection and try again.");
+      setSubmitting(false);
+      return;
+    }
 
     if (!res.ok) {
       const data = await res.json().catch(() => null);

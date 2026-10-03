@@ -26,6 +26,7 @@ import { Prisma } from "@prisma/client";
 import type { Dispute, Match } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { notify, notifyStaff } from "@/lib/notifications";
+import { expireOpenBattles } from "@/lib/battles";
 import { proofStorage } from "@/lib/storage";
 import { settleOrganizerRevenue } from "@/lib/settlement";
 import { trackEvent } from "@/lib/analytics";
@@ -62,7 +63,8 @@ export class MatchError extends Error {
     | "FORBIDDEN"
     | "WINDOW_EXPIRED"
     | "VOID_UNSUPPORTED"
-    | "TOURNAMENT_CANCELLED";
+    | "TOURNAMENT_CANCELLED"
+    | "NOTHING_TO_CONFIRM";
 
   constructor(code: MatchError["code"], message: string) {
     super(message);
@@ -111,6 +113,8 @@ export type ResultPayload = {
   kills?: number;
   /** Set when the organizer awarded this result (an unplayed league fixture) instead of a player reporting it. */
   awarded?: boolean;
+  /** Set when this side didn't report their own result but confirmed the opponent's (no separate proof). */
+  confirmed?: boolean;
 };
 
 const AUTO_ACCEPT_WINDOW_MS = 2 * 60 * 60 * 1000; // BRK-10, 2h placeholder
@@ -905,6 +909,44 @@ export async function submitResult(input: SubmitResultInput): Promise<{ match: M
   return resolveAfterSubmission(updated, input.submittingUserId);
 }
 
+/**
+ * The second player agrees with the result the first one reported. Recorded
+ * as their own matching report (flagged `confirmed`, no proof of their own,
+ * since the first report's proof is already on the match), so it takes the
+ * exact same path as two agreeing reports: the match completes, the bracket
+ * advances, payouts and notifications run. To disagree they report their own
+ * result with proof instead (submitResult), which opens a dispute.
+ */
+export async function confirmResult(input: { matchId: string; confirmingUserId: string }): Promise<{ match: Match; outcome: SubmitResultOutcome }> {
+  const match = await prisma.match.findUnique({
+    where: { id: input.matchId },
+    include: { tournament: { select: { status: true } } },
+  });
+  if (!match) throw new MatchError("NOT_FOUND", "Match not found.");
+  if (match.tournament?.status === "CANCELLED") {
+    throw new MatchError("TOURNAMENT_CANCELLED", "This tournament was cancelled — no results can be submitted.");
+  }
+  if (match.status === "COMPLETE") throw new MatchError("ALREADY_COMPLETE", "This match is already complete.");
+  if (match.status === "DISPUTED") throw new MatchError("DISPUTED", "This match is under dispute review.");
+  if (input.confirmingUserId !== match.playerAId && input.confirmingUserId !== match.playerBId) {
+    throw new MatchError("NOT_A_PARTICIPANT", "Only the two players in this match can confirm a result.");
+  }
+
+  const isPlayerA = input.confirmingUserId === match.playerAId;
+  const mine = isPlayerA ? match.resultA : match.resultB;
+  const theirs = (isPlayerA ? match.resultB : match.resultA) as ResultPayload | null;
+  if (mine) throw new MatchError("ALREADY_RESOLVED", "You've already reported this match.");
+  if (!theirs) throw new MatchError("NOTHING_TO_CONFIRM", "Your opponent hasn't reported a result yet.");
+
+  const confirmation: ResultPayload = { winnerId: theirs.winnerId, score: theirs.score, submittedAt: new Date().toISOString(), confirmed: true };
+  const updated = await prisma.match.update({
+    where: { id: match.id },
+    data: isPlayerA ? { resultA: confirmation as unknown as Prisma.InputJsonValue } : { resultB: confirmation as unknown as Prisma.InputJsonValue },
+  });
+  trackEvent("match_score_submitted", { userId: input.confirmingUserId, matchId: match.id });
+  return resolveAfterSubmission(updated, input.confirmingUserId);
+}
+
 async function resolveAfterSubmission(
   match: Match,
   submittingUserId: string
@@ -1367,6 +1409,7 @@ export async function runScheduledSweep(): Promise<{
   organizerRevenueSettled: number;
   quickMatchExpired: number;
   quickMatchRecoveredStuck: number;
+  battlesExpired: number;
   transfersSettled: number;
   latePaymentsChecked: number;
   errors?: string[];
@@ -1461,6 +1504,10 @@ export async function runScheduledSweep(): Promise<{
   const quickMatchSweep = await sweepQuickMatchChallenges();
   if (quickMatchSweep.errors.length > 0) errors.push(...quickMatchSweep.errors);
 
+  // Challenges nobody accepted in time close, and any stake goes back.
+  const battleExpiry = await expireOpenBattles();
+  if (battleExpiry.errors.length > 0) errors.push(...battleExpiry.errors);
+
   const repair = await repairStalledAdvancement();
   if (repair.errors.length > 0) errors.push(...repair.errors);
 
@@ -1482,6 +1529,7 @@ export async function runScheduledSweep(): Promise<{
     organizerRevenueSettled: settlement.settled,
     quickMatchExpired: quickMatchSweep.expired,
     quickMatchRecoveredStuck: quickMatchSweep.recoveredStuck,
+    battlesExpired: battleExpiry.expired,
     ...money,
     ...(errors.length > 0 ? { errors } : {}),
   };

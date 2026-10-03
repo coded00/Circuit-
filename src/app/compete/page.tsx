@@ -36,6 +36,24 @@ type SearchParams = {
   teamSize?: string;
   type?: string;
   sort?: string;
+  /** Prize pool bucket: under5k, 5k-20k, over20k. */
+  prize?: string;
+  /** Start window: 24h, week, month. */
+  starts?: string;
+  /** Who plays: solo or team (the tournament's entry type). */
+  play?: string;
+};
+
+// Prize buckets are in kobo (₦1 = 100).
+const PRIZE_BUCKETS: Record<string, { label: string; where: Prisma.IntNullableFilter }> = {
+  under5k: { label: "Under ₦5,000", where: { gt: 0, lt: 500_000 } },
+  "5k-20k": { label: "₦5,000 to ₦20,000", where: { gte: 500_000, lte: 2_000_000 } },
+  over20k: { label: "Over ₦20,000", where: { gt: 2_000_000 } },
+};
+const START_WINDOWS: Record<string, { label: string; days: number }> = {
+  "24h": { label: "Next 24 hours", days: 1 },
+  week: { label: "Next 7 days", days: 7 },
+  month: { label: "Next 30 days", days: 30 },
 };
 
 const STATUS_TABS: { value: TournamentStatus | ""; label: string }[] = [
@@ -75,6 +93,7 @@ type Row = {
   prizeAmount: number | null;
   posterUrl: string | null;
   registered: number;
+  createdAt: Date;
 };
 
 /** One small square per spot for small fields, filled as people join; a plain count for big ones. */
@@ -239,7 +258,7 @@ function CompetitionRow({ t }: { t: Row }) {
 export default async function CompetePage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   await openDueTournaments();
   const current = await searchParams;
-  const { q, game, status, entry, teamSize, type, sort } = current;
+  const { q, game, status, entry, teamSize, type, sort, prize, starts, play } = current;
 
   const where: Prisma.TournamentWhereInput = {};
   if (q) where.name = { contains: q, mode: "insensitive" };
@@ -248,6 +267,13 @@ export default async function CompetePage({ searchParams }: { searchParams: Prom
   if (entry === "free") where.entryFee = 0;
   if (entry === "paid") where.entryFee = { gt: 0 };
   if (teamSize) where.teamSize = teamSize;
+  if (prize && PRIZE_BUCKETS[prize]) where.prizeAmount = PRIZE_BUCKETS[prize].where;
+  if (starts && START_WINDOWS[starts]) {
+    const from = new Date();
+    where.startAt = { gte: from, lte: new Date(from.getTime() + START_WINDOWS[starts].days * 24 * 60 * 60 * 1000) };
+  }
+  if (play === "solo") where.entryType = "INDIVIDUAL";
+  if (play === "team") where.entryType = "TEAM";
   const typeFormats = formatsForType(type);
   if (typeFormats) where.format = { in: [...typeFormats] };
 
@@ -281,6 +307,7 @@ export default async function CompetePage({ searchParams }: { searchParams: Prom
         registrationCloseAt: true,
         prizeAmount: true,
         posterUrl: true,
+        createdAt: true,
         _count: { select: { registrations: { where: { status: "CONFIRMED" } } } },
       },
     }),
@@ -298,10 +325,12 @@ export default async function CompetePage({ searchParams }: { searchParams: Prom
       const p = (b.prizeAmount ?? 0) - (a.prizeAmount ?? 0);
       if (p !== 0) return p;
     }
+    if (sort === "players" && b.registered !== a.registered) return b.registered - a.registered;
+    if (sort === "new") return b.createdAt.getTime() - a.createdAt.getTime();
     return rank(a.status) === 2 ? b.startAt.getTime() - a.startAt.getTime() : a.startAt.getTime() - b.startAt.getTime();
   });
 
-  const hasFilters = Boolean(q || game || status || entry || teamSize || type);
+  const hasFilters = Boolean(q || game || status || entry || teamSize || type || prize || starts || play);
   // Lead with one competition unless they're searching for something in particular or browsing finished ones.
   const featured = !q && (!status || status === "OPEN" || status === "LIVE") ? pickFeatured(tournaments) : null;
   const rest = featured ? tournaments.filter((t) => t.id !== featured.id) : tournaments;
@@ -326,6 +355,13 @@ export default async function CompetePage({ searchParams }: { searchParams: Prom
         { value: "free", label: "Free" },
         { value: "paid", label: "Paid" },
       ])}
+      {menu("Players", "play", [
+        { value: "", label: "Solo or team" },
+        { value: "solo", label: "Solo" },
+        { value: "team", label: "Team" },
+      ])}
+      {menu("Prize", "prize", [{ value: "", label: "Any prize" }, ...Object.entries(PRIZE_BUCKETS).map(([value, b]) => ({ value, label: b.label }))])}
+      {menu("Starts", "starts", [{ value: "", label: "Any date" }, ...Object.entries(START_WINDOWS).map(([value, w]) => ({ value, label: w.label }))])}
       {menu("Type", "type", [{ value: "", label: "Any type" }, ...TYPE_GROUPS.map((g) => ({ value: g.value, label: g.label }))])}
       {teamSizeRows.length > 1 && teamSizeRows.length <= 8 && menu("Mode", "teamSize", [{ value: "", label: "Any mode" }, ...teamSizeRows.map((r) => ({ value: r.teamSize, label: r.teamSize }))])}
       {hasFilters && (
@@ -341,6 +377,8 @@ export default async function CompetePage({ searchParams }: { searchParams: Prom
     [
       { value: "", label: "Soonest first" },
       { value: "prize", label: "Biggest prize" },
+      { value: "players", label: "Most players" },
+      { value: "new", label: "Recently added" },
     ],
     "end"
   );
@@ -371,6 +409,9 @@ export default async function CompetePage({ searchParams }: { searchParams: Prom
           {teamSize && <input type="hidden" name="teamSize" value={teamSize} />}
           {type && <input type="hidden" name="type" value={type} />}
           {sort && <input type="hidden" name="sort" value={sort} />}
+          {prize && <input type="hidden" name="prize" value={prize} />}
+          {starts && <input type="hidden" name="starts" value={starts} />}
+          {play && <input type="hidden" name="play" value={play} />}
           <Search size={16} className="pointer-events-none absolute left-3.5 text-muted" />
           <span className="sr-only">Search tournaments</span>
           <input type="search" name="q" defaultValue={q ?? ""} placeholder="Search by name" className="field-input w-full pl-10" />

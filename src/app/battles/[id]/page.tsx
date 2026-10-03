@@ -41,12 +41,15 @@ import { getCurrentUser } from "@/lib/session";
 import { loginPath, signupPath } from "@/lib/safeRedirect";
 import { GameArtTile } from "@/components/GameArtTile";
 import { ShareButton } from "@/components/ShareButton";
-import { StatusPill, battleStatusInfo } from "@/components/StatusPill";
+import { StatusPill } from "@/components/StatusPill";
 import { gameStandings, type Standing } from "@/lib/standings";
 import { getFriendIds } from "@/lib/friends";
 import { CountUp } from "@/components/CountUp";
 import AcceptButton from "./AcceptButton";
 import CancelBattleButton from "./CancelBattleButton";
+import DeclineButton from "./DeclineButton";
+import { battleExpiresAt } from "@/lib/battleExpiry";
+import { challengeStage } from "@/lib/challengeStage";
 import { buildMetadata, parseIdSegment, battlePath, absoluteUrl, DEFAULT_DESCRIPTION } from "@/lib/seo";
 
 function formatNaira(kobo: number): string {
@@ -185,6 +188,9 @@ const getBattle = cache(async (id: string) =>
         select: {
           id: true,
           createdAt: true,
+          status: true,
+          playerAReadyAt: true,
+          playerBReadyAt: true,
           playerA: { select: { id: true, displayName: true, handle: true, avatarUrl: true } },
           playerB: { select: { id: true, displayName: true, handle: true, avatarUrl: true } },
         },
@@ -226,10 +232,16 @@ export default async function BattlePage({
   const isCreator = user !== null && user.id === battle.creatorId;
   const isFriendOfCreator =
     user !== null && battle.visibility === "FRIENDS" ? (await getFriendIds(battle.creatorId)).includes(user.id) : false;
+  // An OPEN challenge past its expiry is expired for everyone, even if the
+  // sweep hasn't closed it (and returned any stake) yet.
+  const now = new Date();
+  const expiresAt = battleExpiresAt(battle);
+  const lapsed = battle.status === "EXPIRED" || (battle.status === "OPEN" && expiresAt <= now);
   const canAccept =
     user !== null &&
     !isCreator &&
     battle.status === "OPEN" &&
+    !lapsed &&
     (battle.visibility === "OPEN" || battle.targetUserId === user.id || isFriendOfCreator);
 
   // A real Match row is the only thing that means "matched" — targetUserId
@@ -255,7 +267,7 @@ export default async function BattlePage({
   const opponentRank = opponentIndex === -1 ? null : opponentIndex + 1;
   const opponentStanding = opponentIndex === -1 ? undefined : standings[opponentIndex];
 
-  const status = battleStatusInfo(battle.status);
+  const status = challengeStage(battle, battle.matches[0] ?? null, expiresAt, now);
   const formatText = formatLabel(battle.format);
 
   // Only a viewer who could personally accept an open-to-anyone slot right
@@ -290,7 +302,7 @@ export default async function BattlePage({
               Back to Challenges
             </Link>
             <StatusPill tone={status.tone} pulse={status.pulse}>
-              {battle.status === "OPEN" ? (
+              {battle.status === "OPEN" && !lapsed ? (
                 <>
                   <Zap size={13} />
                   Open Challenge
@@ -393,6 +405,16 @@ export default async function BattlePage({
           </div>
 
           {cancelled && <p className="alert alert-danger">This Challenge was cancelled.</p>}
+          {lapsed && (
+            <p className="alert alert-warning">
+              This Challenge expired with no takers.{battle.stakeAmount > 0 ? " The stake was returned to the host's wallet." : ""}
+            </p>
+          )}
+          {battle.status === "OPEN" && !lapsed && (
+            <p className="text-center text-xs text-muted" suppressHydrationWarning>
+              Expires {formatRelative(expiresAt)}
+            </p>
+          )}
 
           <div className="flex flex-col items-center gap-2">
             {isMatched && realMatch && (
@@ -400,7 +422,8 @@ export default async function BattlePage({
                 {battle.status === "COMPLETE" ? "View Result →" : "View Matchup →"}
               </Link>
             )}
-            {isCreator && battle.status === "OPEN" && <CancelBattleButton battleId={battle.id} />}
+            {isCreator && battle.status === "OPEN" && !lapsed && <CancelBattleButton battleId={battle.id} />}
+            {canAccept && battle.visibility === "TARGETED" && battle.targetUserId === user?.id && <DeclineButton battleId={battle.id} />}
             {canAccept && (
               <>
                 <AcceptButton battleId={battle.id} />
@@ -411,7 +434,7 @@ export default async function BattlePage({
                 </p>
               </>
             )}
-            {!user && battle.status === "OPEN" && (
+            {!user && battle.status === "OPEN" && !lapsed && (
               <>
                 <Link href={loginPath(`/battles/${battle.id}`)} className="btn-primary w-full sm:w-fit">
                   Log in to accept →

@@ -21,6 +21,7 @@ import { ExploreTheCircuit } from "@/components/ExploreTheCircuit";
 import { OpenChallenges } from "@/components/OpenChallenges";
 import { UpcomingCompetitions } from "@/components/UpcomingCompetitions";
 import { GamerNews } from "@/components/GamerNews";
+import { YourCircuit } from "@/components/YourCircuit";
 import { CommunitiesCard } from "@/components/CommunitiesCard";
 import { getJoinedCommunities } from "@/lib/community";
 import { publishedGames } from "@/lib/gameCatalogQueries";
@@ -28,6 +29,7 @@ import { challengeRecords, globalStandings } from "@/lib/standings";
 import { getFriendIds } from "@/lib/friends";
 import { getActiveAnnouncement } from "@/lib/announcements";
 import { openDueTournaments } from "@/lib/tournaments";
+import { openBattleFilter } from "@/lib/battles";
 import { AnnouncementBanner } from "@/components/AnnouncementBanner";
 import { Panel, PanelEmpty, PanelRows, panelRowClass } from "@/components/ui/Panel";
 import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
@@ -85,11 +87,38 @@ async function getFeaturedTournaments(limit: number) {
   return [...prized, ...filler];
 }
 
-export default async function Home({
-  searchParams,
-}: {
-  searchParams: Promise<{ leaderboard?: string }>;
-}) {
+/** Shown while the page's data loads: the hero and a row of cards, same footprint as the real thing. */
+function HomeSkeleton() {
+  return (
+    <div className="flex w-full flex-1 flex-col gap-8 px-4 py-6 sm:px-8 sm:py-10" aria-busy="true" aria-label="Loading">
+      <div className="skeleton h-[340px] w-full rounded-[var(--radius-hero)]" />
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_var(--right-rail-width)]">
+        <div className="flex flex-col gap-4">
+          <div className="skeleton h-6 w-48" />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-3">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="skeleton h-64 w-full rounded-[var(--radius-lg)]" />
+            ))}
+          </div>
+        </div>
+        <div className="flex flex-col gap-6">
+          <div className="skeleton h-40 w-full rounded-[var(--radius-lg)]" />
+          <div className="skeleton h-56 w-full rounded-[var(--radius-lg)]" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function Home({ searchParams }: { searchParams: Promise<{ leaderboard?: string }> }) {
+  return (
+    <Suspense fallback={<HomeSkeleton />}>
+      <HomeContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function HomeContent({ searchParams }: { searchParams: Promise<{ leaderboard?: string }> }) {
   const { leaderboard: leaderboardScope } = await searchParams;
   await openDueTournaments();
   const user = await getCurrentUser();
@@ -132,8 +161,10 @@ export default async function Home({
     ),
     prisma.battle.findMany({
       where: {
-        status: "OPEN",
-        OR: [{ visibility: "OPEN" }, ...(friendIds.length ? [{ visibility: "FRIENDS" as const, creatorId: { in: friendIds } }] : [])],
+        AND: [
+          openBattleFilter(),
+          { OR: [{ visibility: "OPEN" }, ...(friendIds.length ? [{ visibility: "FRIENDS" as const, creatorId: { in: friendIds } }] : [])] },
+        ],
       },
       orderBy: { createdAt: "desc" },
       take: 6,
@@ -148,12 +179,19 @@ export default async function Home({
     }),
     getActiveAnnouncement(),
     user ? getJoinedCommunities(user.id) : Promise.resolve([]),
-    // Hero's live numbers — real counts/sums, same visibility rules as the lists.
-    prisma.tournament.aggregate({ where: { status: { in: ["OPEN", "LIVE"] } }, _count: { _all: true }, _sum: { prizeAmount: true } }),
+    // Hero's live numbers. "Open tournaments" = registration open (the same
+    // number /compete calls "open for registration"); prize money is the
+    // pool across everything open or live.
+    Promise.all([
+      prisma.tournament.count({ where: { status: "OPEN" } }),
+      prisma.tournament.aggregate({ where: { status: { in: ["OPEN", "LIVE"] } }, _sum: { prizeAmount: true } }),
+    ]),
     prisma.battle.count({
       where: {
-        status: "OPEN",
-        OR: [{ visibility: "OPEN" }, ...(friendIds.length ? [{ visibility: "FRIENDS" as const, creatorId: { in: friendIds } }] : [])],
+        AND: [
+          openBattleFilter(),
+          { OR: [{ visibility: "OPEN" }, ...(friendIds.length ? [{ visibility: "FRIENDS" as const, creatorId: { in: friendIds } }] : [])] },
+        ],
       },
     }),
   ]);
@@ -173,14 +211,31 @@ export default async function Home({
         tournaments={featuredTournaments}
         banners={homepageBanners}
         stats={{
-          openTournaments: openTournamentStats._count._all,
+          openTournaments: openTournamentStats[0],
           openChallenges: openChallengeCount,
-          prizeMoney: openTournamentStats._sum.prizeAmount ?? 0,
+          prizeMoney: openTournamentStats[1]._sum.prizeAmount ?? 0,
         }}
       />
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_var(--right-rail-width)]">
         <div className="flex min-w-0 flex-col gap-8">
+          {user && <YourCircuit user={user} />}
+
+          {featuredTournaments.length === 0 && upcomingTournaments.length === 0 && (
+            <div className="card state-block">
+              <h2 className="state-title">No tournaments yet</h2>
+              <p className="state-description">Nothing is open or announced right now. Start one, or challenge a player to a 1v1 while you wait.</p>
+              <div className="flex flex-wrap justify-center gap-2">
+                <Link href="/tournaments/new" className="btn-primary">
+                  Create a tournament
+                </Link>
+                <Link href="/battles" className="btn-secondary">
+                  Challenge a player
+                </Link>
+              </div>
+            </div>
+          )}
+
           <FeaturedCompetitions tournaments={featuredTournaments} />
 
           <ExploreTheCircuit games={gameCounts} />

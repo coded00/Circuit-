@@ -111,6 +111,8 @@ export function battleStatusInfo(status: string): StatusInfo {
       return { tone: "open", label: "In progress" };
     case "CANCELLED":
       return { tone: "cancelled", label: "Cancelled" };
+    case "EXPIRED":
+      return { tone: "neutral", label: "Expired" };
     case "COMPLETE":
       return { tone: "complete", label: "Complete" };
     default:

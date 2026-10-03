@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { GameArtTile } from "@/components/GameArtTile";
 import { ShareButton } from "@/components/ShareButton";
+import { flagEmoji } from "@/lib/countries";
 import { StatusPill, registrationStatusInfo, type StatusTone } from "@/components/StatusPill";
 import { FriendButton, type FriendButtonStatus } from "@/components/FriendButton";
 import { FriendRequestRow } from "@/components/friends/FriendRequestRow";
@@ -78,6 +79,8 @@ export type ProfileData = {
     avatarUrl: string | null;
     bio: string | null;
     region: string | null;
+    /** From signup; null for accounts that predate the country field. */
+    country: { code: string; name: string } | null;
     favoriteGames: string[];
     createdAt: Date;
     /** The community tag they chose to wear. */
@@ -338,10 +341,10 @@ function ProfileHeader({ data }: { data: ProfileData }) {
                 <CalendarDays size={12} />
                 Joined {joined}
               </span>
-              {player.region && (
+              {(player.region || player.country) && (
                 <span className="flex items-center gap-1.5">
                   <MapPin size={12} />
-                  {player.region}
+                  {[player.region, player.country ? `${flagEmoji(player.country.code)} ${player.country.name}` : null].filter(Boolean).join(", ")}
                 </span>
               )}
             </p>
@@ -452,7 +455,7 @@ function Overview({ data }: { data: ProfileData }) {
         </Panel>
 
         {data.gameStats.length > 0 && (
-          <Panel title="Game performance" action={data.gameStats.length > 3 ? <ViewAll tab="matches" /> : undefined}>
+          <Panel title="Game performance" meta="From confirmed results" action={data.gameStats.length > 3 ? <ViewAll tab="matches" /> : undefined}>
             <GameRows games={data.gameStats.slice(0, 3)} />
           </Panel>
         )}
@@ -498,6 +501,7 @@ function Overview({ data }: { data: ProfileData }) {
 
         <Panel
           title="Favourite games"
+          meta="Self-reported"
           action={
             isOwnProfile ? (
               <Link href="/account" className="text-xs font-medium text-accent-blue hover:underline">

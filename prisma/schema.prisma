@@ -127,6 +127,8 @@ enum BattleStatus {
   ACCEPTED
   CANCELLED
   COMPLETE
+  /// Nobody accepted before `Battle.expiresAt`; any stake went back to the creator.
+  EXPIRED
 }
 
 enum ReportStatus {
@@ -179,9 +181,15 @@ model User {
   emailVerifiedAt   DateTime?
   /// Finished (or skipped) the post-signup /welcome flow.
   onboardedAt       DateTime?
-  /// Nigerian mobile in +234… form (src/lib/phone.ts). Required at signup
-  /// since the multi-step form; not SMS-verified. Can be used to log in.
+  /// Nigerian mobile in +234… form (src/lib/phone.ts). Optional at signup;
+  /// not SMS-verified. Can be used to log in when present.
   phone             String?    @unique
+  /// ISO 3166-1 alpha-2 code picked at signup (src/lib/countries.ts). Null
+  /// for accounts created before the country field existed.
+  country           String?
+  /// When they ticked "I agree to the Terms and Privacy Policy" at signup.
+  /// Null for accounts created before the checkbox existed.
+  termsAcceptedAt   DateTime?
   /// Single opt-out switch for "new tournament/challenge" broadcast
   /// announcements (email + push only — in-app notifications are always-on
   /// regardless, per InAppChannel's own comment in notifications.ts).
@@ -931,6 +939,10 @@ model Battle {
   streamUrl    String?
   status       BattleStatus     @default(OPEN)
   createdAt    DateTime         @default(now())
+  /// When an unaccepted challenge lapses (the creator picks 24h / 3 days /
+  /// 7 days). Null on challenges made before this existed: those are
+  /// treated as lapsing 7 days after `createdAt` (src/lib/battles.ts).
+  expiresAt    DateTime?
   /// V1 audit follow-up — status moves OPEN→ACCEPTED→COMPLETE/CANCELLED,
   /// and a staked Battle's stake sits locked the whole time; useful for
   /// spotting how long a Battle has actually been in its current state.

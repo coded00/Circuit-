@@ -19,6 +19,7 @@ import { parseOptionalUrl } from "@/lib/validation";
 import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
 import { isRateLimited, recordAttempt } from "@/lib/rateLimit";
 import { captureException } from "@/lib/observability";
+import { parseExpiryHours } from "@/lib/battles";
 
 const VALID_FORMATS = ["SINGLE", "BEST_OF_3"];
 const VALID_VISIBILITIES = ["OPEN", "TARGETED", "FRIENDS"];
@@ -90,6 +91,10 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
+  const expiryHours = parseExpiryHours(body?.expiresInHours);
+  if (expiryHours === null) {
+    return NextResponse.json({ error: "Choose how long the challenge stays open: 24 hours, 3 days or 7 days." }, { status: 400 });
+  }
   const streamUrlResult = parseOptionalUrl(body?.streamUrl);
   if (!streamUrlResult.ok) {
     return NextResponse.json({ error: "Stream link must be a valid http(s) URL." }, { status: 400 });
@@ -155,6 +160,7 @@ export async function POST(request: Request) {
           targetUserId,
           streamUrl: streamUrlResult.url,
           stakeAmount,
+          expiresAt: new Date(Date.now() + expiryHours * 60 * 60 * 1000),
         },
       });
 

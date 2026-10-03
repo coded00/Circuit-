@@ -17,11 +17,18 @@ export default function ForgotPasswordForm() {
     setError(null);
     setSubmitting(true);
 
-    const res = await fetch("/api/auth/forgot-password", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ emailOrPhone }),
-    });
+    let res: Response;
+    try {
+      res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emailOrPhone }),
+      });
+    } catch {
+      setError("We couldn't reach Circuit. Check your connection and try again.");
+      setSubmitting(false);
+      return;
+    }
 
     const data = await res.json().catch(() => null);
     setSubmitting(false);

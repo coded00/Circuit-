@@ -15,8 +15,8 @@ import { WelcomeFlow } from "./WelcomeFlow";
 
 export const metadata: Metadata = { title: "Welcome to Circuit", robots: { index: false, follow: false } };
 
-export default async function WelcomePage({ searchParams }: { searchParams: Promise<{ next?: string; again?: string }> }) {
-  const { next: rawNext, again } = await searchParams;
+export default async function WelcomePage({ searchParams }: { searchParams: Promise<{ next?: string; again?: string; from?: string }> }) {
+  const { next: rawNext, again, from } = await searchParams;
   const next = safeNextPath(rawNext?.startsWith("/welcome") ? "/" : rawNext);
   const user = await getCurrentUser();
   if (!user) redirect(loginPath(`/welcome${rawNext ? `?next=${encodeURIComponent(rawNext)}` : ""}`));
@@ -42,6 +42,8 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
         interests={officials.filter((o) => o.category === "INTEREST").map((o) => ({ id: o.id, name: o.name ?? "", iconUrl: o.iconUrl, description: o.description }))}
         initialGameIds={games.filter((g) => user.favoriteGames.includes(g.name)).map((g) => g.id)}
         initialRegion={user.region ?? ""}
+        // Signup already asked which games they play.
+        startStep={from === "signup" ? 1 : 0}
       />
     </AuthSplitLayout>
   );

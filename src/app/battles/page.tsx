@@ -19,6 +19,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
+import { openBattleFilter } from "@/lib/battles";
 import { getFriendIds } from "@/lib/friends";
 import Poller from "@/app/Poller";
 import { Panel, PanelEmpty } from "@/components/ui/Panel";
@@ -33,8 +34,7 @@ export default async function BattleBoardPage({ searchParams }: { searchParams: 
 
   const allOpen = await prisma.battle.findMany({
     where: {
-      status: "OPEN",
-      OR: [{ visibility: "OPEN" }, ...(friendIds.length ? [{ visibility: "FRIENDS" as const, creatorId: { in: friendIds } }] : [])],
+      AND: [openBattleFilter(), { OR: [{ visibility: "OPEN" }, ...(friendIds.length ? [{ visibility: "FRIENDS" as const, creatorId: { in: friendIds } }] : [])] }],
     },
     orderBy: { createdAt: "desc" },
     include: { creator: { select: { id: true, displayName: true, handle: true, avatarUrl: true } } },

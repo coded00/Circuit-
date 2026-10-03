@@ -227,6 +227,7 @@ export async function confirmEntryFeePayment(reference: string): Promise<void> {
   await notifyRoster(registration.id).catch(() => undefined);
   await notify(registration.userId, "REGISTRATION_CONFIRMED", {
     tournamentId: registration.tournamentId,
+    tournamentName: registration.tournament.name,
   });
 
   await maybeGenerateBracketOnCapFill(registration.tournamentId); // BRK-1's cap-fill path

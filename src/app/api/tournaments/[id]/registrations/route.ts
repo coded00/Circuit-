@@ -29,6 +29,7 @@ import { maybeGenerateBracketOnCapFill } from "@/lib/matches";
 import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
 import { computePlatformFee } from "@/lib/platformFee";
 import { trackEvent } from "@/lib/analytics";
+import { notify } from "@/lib/notifications";
 import { claimSlot, RegistrationFullError } from "@/lib/registrationCapacity";
 import { assertInGameNamesFree, InGameNameTakenError, rememberInGameName, requestedInGameNames } from "@/lib/inGameNames";
 import { notifyRoster, saveRoster, TeamEntryError, validateTeamEntry, type ValidRoster } from "@/lib/teamEntries";
@@ -150,6 +151,9 @@ export async function POST(
       await saveRoster(registration.id, roster.members);
       await notifyRoster(registration.id);
     }
+    // Free entries confirm right here, so this is where they hear about it
+    // (card payments are told from confirmEntryFeePayment instead).
+    await notify(user.id, "REGISTRATION_CONFIRMED", { tournamentId, tournamentName: tournament.name }).catch(() => undefined);
     await maybeGenerateBracketOnCapFill(tournamentId); // BRK-1's cap-fill path
     trackEvent("tournament_joined", { userId: user.id, tournamentId, game: tournament.game, amountMinor: 0 });
     return NextResponse.json(
@@ -261,6 +265,7 @@ export async function POST(
         await saveRoster(registration.id, roster.members);
         await notifyRoster(registration.id);
       }
+      await notify(user.id, "REGISTRATION_CONFIRMED", { tournamentId, tournamentName: tournament.name }).catch(() => undefined);
       await maybeGenerateBracketOnCapFill(tournamentId); // BRK-1's cap-fill path
       trackEvent("tournament_joined", { userId: user.id, tournamentId, game: tournament.game, amountMinor: tournament.entryFee });
       return NextResponse.json({ id: registration.id, status: "CONFIRMED" }, { status: 201 });

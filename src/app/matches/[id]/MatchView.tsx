@@ -26,6 +26,7 @@ import { CopyCode } from "@/components/ui/CopyCode";
 import ResultForm from "./ResultForm";
 import RulingForm from "./RulingForm";
 import EnterMatchButton from "./EnterMatchButton";
+import ConfirmOrDispute from "./ConfirmOrDispute";
 
 export type MatchPlayer = {
   id: string;
@@ -69,7 +70,14 @@ export type MatchViewData = {
     canShareWin: boolean;
   };
   reportWindowExpiresAt: Date | null;
-  dispute: { id: string } | null;
+  /** Where a dispute stands: with the organizer (until a deadline) or with Circuit staff. */
+  dispute: { id: string; status: string; organizerDeadline: Date | null } | null;
+  /** The first player's claimed result, shown to the second so they can confirm or dispute it. */
+  opponentReport: { claimText: string; score: string; proofUrl: string | null } | null;
+  /** Each player's report, in words — shown once a match is under review. */
+  reports: { name: string; claimText: string; score: string; confirmed: boolean }[];
+  /** League fixtures: when this matchday's game is due. */
+  playBy: Date | null;
   ruling: { endpoint: string } | null;
   voidUnsupportedReason?: string;
   timeline: { at: Date; label: string }[];
@@ -206,6 +214,12 @@ function HeadToHead({ data }: { data: MatchViewData }) {
           </span>
           <CopyCode code={data.code} label="Copy match code" />
         </div>
+        {data.playBy && (
+          <div className="flex flex-col gap-0.5">
+            <span className="text-eyebrow text-muted">Play by</span>
+            <span className="text-stat text-sm">{formatTimestamp(data.playBy)}</span>
+          </div>
+        )}
         <div className="flex flex-col items-end gap-0.5 text-right">
           <span className="text-eyebrow text-muted">{data.stakeAmount > 0 ? "Stake each" : "Entry"}</span>
           <span className="text-stat text-lg">{data.stakeAmount > 0 ? formatNaira(data.stakeAmount) : "Free"}</span>
@@ -333,6 +347,33 @@ function NextStep({ data }: { data: MatchViewData }) {
           <p className="text-sm text-muted">
             The two reports didn&apos;t match, so this result is being reviewed. You&apos;ll get a notification when it&apos;s decided.
           </p>
+          {data.reports.length > 0 && (
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+              {data.reports.map((r) => (
+                <div key={r.name} className="flex flex-col gap-0.5 rounded-[12px] border border-border bg-surface-elevated p-3.5">
+                  <span className="text-eyebrow text-muted">{r.name} reported</span>
+                  <span className="text-sm font-semibold">{r.claimText}</span>
+                  <span className="text-stat text-sm">{r.score}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {data.dispute && (
+            <p className="flex flex-wrap items-center gap-x-1.5 text-sm">
+              <span className="font-semibold">{data.dispute.status === "ESCALATED" ? "With Circuit staff." : "With the organizer."}</span>
+              <span className="text-muted">
+                {data.dispute.status === "ESCALATED" ? "Their ruling is final." : "If they don't rule in time it goes to Circuit staff."}
+              </span>
+              {data.dispute.status === "ORGANIZER_REVIEW" && data.dispute.organizerDeadline && (
+                <span className="flex items-center gap-1.5 text-muted">
+                  <Timer size={14} aria-hidden /> Escalates in{" "}
+                  <span className="text-stat text-foreground">
+                    <CountdownTimer target={data.dispute.organizerDeadline.toISOString()} zeroLabel="a moment" />
+                  </span>
+                </span>
+              )}
+            </p>
+          )}
           {data.ruling && data.dispute && (
             <RulingForm
               bare
@@ -393,7 +434,7 @@ function NextStep({ data }: { data: MatchViewData }) {
       <Panel title="Result reported">
         <PanelBody className="flex flex-col gap-2">
           <p className="text-sm text-muted">
-            Waiting for {opponent.displayName} to report. If they don&apos;t, your result is accepted automatically.
+            Waiting for {opponent.displayName} to confirm or dispute it. If they don&apos;t respond, your result is accepted automatically.
           </p>
           {data.reportWindowExpiresAt && (
             <p className="flex items-center gap-1.5 text-sm">
@@ -412,7 +453,7 @@ function NextStep({ data }: { data: MatchViewData }) {
   // --- Play + report ---
   if (reportingOpen) {
     return (
-      <Panel title={data.status === "NEEDS_RESULT" ? "Report your result" : "Match live"}>
+      <Panel title={data.opponentReport ? "Confirm the result" : data.status === "NEEDS_RESULT" ? "Report your result" : "Match live"}>
         <PanelBody className="flex flex-col gap-5">
           {data.status !== "NEEDS_RESULT" && (
             <ol className="flex flex-col gap-2 text-sm text-muted">
@@ -428,7 +469,19 @@ function NextStep({ data }: { data: MatchViewData }) {
               </li>
             </ol>
           )}
-          <ResultForm matchId={data.id} matchCode={data.code} playerA={playerA} playerB={playerB} drawAllowed={data.drawAllowed} />
+          {data.opponentReport ? (
+            <ConfirmOrDispute
+              matchId={data.id}
+              matchCode={data.code}
+              opponentName={opponent.displayName}
+              claim={data.opponentReport}
+              playerA={playerA}
+              playerB={playerB}
+              drawAllowed={data.drawAllowed}
+            />
+          ) : (
+            <ResultForm matchId={data.id} matchCode={data.code} playerA={playerA} playerB={playerB} drawAllowed={data.drawAllowed} />
+          )}
         </PanelBody>
       </Panel>
     );

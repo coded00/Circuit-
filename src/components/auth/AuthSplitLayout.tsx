@@ -4,7 +4,8 @@
  * sign-in rather than a form card on a blank page:
  *
  * - lg+: a fixed-width dark panel (logo, the form, a quiet footer) beside
- *   the full-height key art, which carries live platform numbers along
+ *   the full-height key art. The art stays put; only the panel scrolls.
+ *   The art, which carries live platform numbers along
  *   its bottom edge;
  * - below lg: the key art becomes a header (its baked-in logo and crown
  *   visible) that fades into the same dark panel.
@@ -57,7 +58,7 @@ export async function AuthSplitLayout({ children }: { children: React.ReactNode 
     // The panel uses the dark surface's own --background (set by
     // `data-surface="dark"`), and every fade below ends on that same var —
     // a hardcoded colour here would drift from it and show as a seam.
-    <div data-surface="dark" className="relative flex min-h-dvh w-full bg-background text-foreground">
+    <div data-surface="dark" className="relative flex min-h-dvh w-full bg-background text-foreground lg:h-dvh lg:overflow-hidden">
       {/* Phones/tablets: the key art as a header, fading into the panel. */}
       <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[38vh] min-h-[240px] overflow-hidden lg:hidden">
         {/* eslint-disable-next-line @next/next/no-img-element -- local /public asset, no next/image usage elsewhere in this codebase */}
@@ -72,7 +73,7 @@ export async function AuthSplitLayout({ children }: { children: React.ReactNode 
         />
       </div>
 
-      <div className="relative z-10 flex w-full flex-col lg:w-[540px] lg:shrink-0 lg:border-r lg:border-white/[0.06] xl:w-[580px]">
+      <div className="relative z-10 flex w-full flex-col lg:h-dvh lg:w-[540px] lg:shrink-0 lg:overflow-y-auto lg:overscroll-contain lg:border-r lg:border-white/[0.06] xl:w-[580px]">
         <header className="flex items-center justify-between px-6 pt-5 sm:px-10 lg:px-14 lg:pt-10">
           <Link href="/" className="hidden lg:block" aria-label="Circuit home">
             {/* eslint-disable-next-line @next/next/no-img-element -- local /public asset */}

@@ -170,7 +170,7 @@ export function MobileTabBar({ user }: { user: NavUser }) {
                 </Link>
               </>
             )}
-            <Link href="/ladder" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
+            <Link href="/activity" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
               <Gamepad2 size={18} /> Feed
             </Link>
             <Link href="/calendar" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
@@ -209,6 +209,9 @@ export function MobileTabBar({ user }: { user: NavUser }) {
                 <Link href="/account" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
                   Account settings
                 </Link>
+                <Link href="/help" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
+                  Help
+                </Link>
                 <button type="button" onClick={handleLogout} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-danger">
                   Log out
                 </button>
@@ -216,6 +219,9 @@ export function MobileTabBar({ user }: { user: NavUser }) {
             )}
             {!user && (
               <>
+                <Link href="/help" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
+                  Help
+                </Link>
                 <Link href={loginPath(pathname)} onClick={() => setMenuOpen(false)} className="btn-secondary mt-2 w-full">
                   Log in
                 </Link>
