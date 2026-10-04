@@ -8,6 +8,7 @@ import { getCurrentUser } from "@/lib/session";
 import { emailVerificationRequired } from "@/lib/emailGate";
 import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
 import { isRateLimited, recordAttempt } from "@/lib/rateLimit";
+import { AbandonedError } from "@/lib/keyedLock";
 import { OrderError, placeOrder } from "@/lib/marketplaceOrders";
 import { emailOrderReceipt } from "@/lib/orderEmails";
 
@@ -35,11 +36,12 @@ export async function POST(request: Request) {
   await recordAttempt(key);
 
   try {
-    const order = await placeOrder(user, { listingId: body.listingId, note: body.note });
+    const order = await placeOrder(user, { listingId: body.listingId, note: body.note }, { signal: request.signal });
     after(() => emailOrderReceipt(order, order.status === "FULFILLED"));
     return NextResponse.json({ id: order.id }, { status: 201 });
   } catch (err) {
     if (err instanceof OrderError) return NextResponse.json({ error: err.message }, { status: err.status });
+    if (err instanceof AbandonedError) return new NextResponse(null, { status: 499 }); // the buyer left while queued; nothing was charged
     throw err;
   }
 }

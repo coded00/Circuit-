@@ -33,6 +33,7 @@ import { notify } from "@/lib/notifications";
 import { claimSlot, RegistrationFullError } from "@/lib/registrationCapacity";
 import { assertInGameNamesFree, InGameNameTakenError, rememberInGameName, requestedInGameNames } from "@/lib/inGameNames";
 import { notifyRoster, saveRoster, TeamEntryError, validateTeamEntry, type ValidRoster } from "@/lib/teamEntries";
+import { AbandonedError, withKeyedLock } from "@/lib/keyedLock";
 import { emailVerificationRequired } from "@/lib/emailGate";
 
 class InsufficientWalletBalanceError extends Error {}
@@ -130,7 +131,7 @@ export async function POST(
   if (tournament.entryFee === 0) {
     let registration;
     try {
-      registration = await prisma.$transaction(async (tx) => {
+      registration = await withKeyedLock(`tournament:${tournamentId}`, () => prisma.$transaction(async (tx) => {
         await claimSlot(tx, tournamentId, tournament.participantCap);
         await assertInGameNamesFree(tx, tournamentId, user.id, requestedNames);
         return existing
@@ -141,8 +142,9 @@ export async function POST(
           : tx.registration.create({
               data: { tournamentId, userId: user.id, inGameId, status: "CONFIRMED", ...teamData },
             });
-      });
+      }), request.signal);
     } catch (err) {
+      if (err instanceof AbandonedError) return new NextResponse(null, { status: 499 });
       if (err instanceof RegistrationFullError) return NextResponse.json({ error: "Registration is full." }, { status: 409 });
       if (err instanceof InGameNameTakenError) return NextResponse.json({ error: err.message }, { status: 409 });
       throw err;
@@ -193,7 +195,7 @@ export async function POST(
     const feeAmount = computePlatformFee(tournament.entryFee, platformSetting?.platformFeeBps ?? 0);
 
     try {
-      const registration = await prisma.$transaction(async (tx) => {
+      const registration = await withKeyedLock(`tournament:${tournamentId}`, () => prisma.$transaction(async (tx) => {
         await claimSlot(tx, tournamentId, tournament.participantCap);
         await assertInGameNamesFree(tx, tournamentId, user.id, requestedNames);
         // Atomic guard: a single conditional UPDATE, not a read-then-write —
@@ -214,42 +216,21 @@ export async function POST(
               data: { tournamentId, userId: user.id, inGameId, status: "CONFIRMED", paymentRef: reference, ...teamData },
             });
 
-        await tx.escrowTransaction.create({
-          data: {
-            tournamentId,
-            registrationId: reg.id,
-            type: "ENTRY_FEE",
-            // `provider` here reflects Circuit's configured provider, not
-            // that it was actually charged for this transaction — see
-            // WalletTransactionType.ENTRY_FEE_DEBIT's own schema comment.
-            provider: provider.name,
-            amount: tournament.entryFee,
-            providerRef: reference,
-            status: "COMPLETE",
-          },
-        });
-        // Same fee logic as confirmEntryFeePayment's own comment — carved
-        // out of the entry fee that already arrived, not charged on top.
-        if (feeAmount > 0) {
-          await tx.escrowTransaction.create({
-            data: { tournamentId, registrationId: reg.id, type: "PLATFORM_FEE", amount: feeAmount, status: "COMPLETE" },
-          });
-        }
-        // The organizer's own cut — same PENDING-until-settled shape as
-        // confirmEntryFeePayment's own ORGANIZER_REVENUE row.
+        // The fee rows go in as one statement: this transaction holds the tournament lock.
+        // The provider on the entry row reflects Circuit's configured provider, not that it
+        // was charged for this transaction (see WalletTransactionType.ENTRY_FEE_DEBIT).
+        // The platform fee is carved out of the entry fee that already arrived, and the
+        // organizer's cut stays PENDING until settled, same as confirmEntryFeePayment.
         const organizerRevenueAmount = tournament.entryFee - feeAmount;
-        if (organizerRevenueAmount > 0) {
-          await tx.escrowTransaction.create({
-            data: {
-              tournamentId,
-              registrationId: reg.id,
-              userId: tournament.organizerId,
-              type: "ORGANIZER_REVENUE",
-              amount: organizerRevenueAmount,
-              status: "PENDING",
-            },
-          });
-        }
+        await tx.escrowTransaction.createMany({
+          data: [
+            { tournamentId, registrationId: reg.id, type: "ENTRY_FEE", provider: provider.name, amount: tournament.entryFee, providerRef: reference, status: "COMPLETE" },
+            ...(feeAmount > 0 ? [{ tournamentId, registrationId: reg.id, type: "PLATFORM_FEE" as const, amount: feeAmount, status: "COMPLETE" as const }] : []),
+            ...(organizerRevenueAmount > 0
+              ? [{ tournamentId, registrationId: reg.id, userId: tournament.organizerId, type: "ORGANIZER_REVENUE" as const, amount: organizerRevenueAmount, status: "PENDING" as const }]
+              : []),
+          ],
+        });
         await tx.walletTransaction.create({
           data: {
             userId: user.id,
@@ -261,7 +242,7 @@ export async function POST(
         });
 
         return reg;
-      });
+      }), request.signal);
 
       if (rememberName) await rememberInGameName(user.id, tournament.gameId, inGameId);
       if (roster) {
@@ -273,6 +254,7 @@ export async function POST(
       trackEvent("tournament_joined", { userId: user.id, tournamentId, game: tournament.game, amountMinor: tournament.entryFee });
       return NextResponse.json({ id: registration.id, status: "CONFIRMED" }, { status: 201 });
     } catch (err) {
+      if (err instanceof AbandonedError) return new NextResponse(null, { status: 499 });
       if (err instanceof InsufficientWalletBalanceError) {
         return NextResponse.json({ error: "Insufficient wallet balance." }, { status: 402 });
       }

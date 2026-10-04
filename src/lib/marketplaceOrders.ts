@@ -6,6 +6,7 @@
  * transaction as its WalletTransaction row, like every other wallet movement.
  */
 
+import { withKeyedLock } from "@/lib/keyedLock";
 import { prisma } from "@/lib/db";
 import { blockedBetween } from "@/lib/blocks";
 import { BUYER_NOTE_MAX } from "@/lib/marketplace";
@@ -19,7 +20,7 @@ export class OrderError extends Error {
   }
 }
 
-export async function placeOrder(buyer: { id: string; isSuspended: boolean }, input: { listingId: string; note?: unknown }) {
+export async function placeOrder(buyer: { id: string; isSuspended: boolean }, input: { listingId: string; note?: unknown }, options: { signal?: AbortSignal } = {}) {
   if (buyer.isSuspended) throw new OrderError("Your account is suspended.", 403);
 
   const listing = await prisma.listing.findUnique({
@@ -34,11 +35,11 @@ export async function placeOrder(buyer: { id: string; isSuspended: boolean }, in
   if (listing.buyerPrompt && !note) throw new OrderError(`${listing.buyerPrompt} is required.`, 400);
   if (note.length > BUYER_NOTE_MAX) throw new OrderError(`Keep that under ${BUYER_NOTE_MAX} characters.`, 400);
 
-  return prisma.$transaction(async (tx) => {
-    if (listing.stock !== null) {
-      const taken = await tx.listing.updateMany({ where: { id: listing.id, status: "ACTIVE", stock: { gt: 0 } }, data: { stock: { decrement: 1 } } });
-      if (taken.count === 0) throw new OrderError("Sold out.", 409);
-    }
+  // Orders for one listing queue here, not on the database row lock (see keyedLock).
+  return withKeyedLock(`listing:${listing.id}`, () => prisma.$transaction(async (tx) => {
+    // The buyer's own row first, the shared listing row last: the listing lock is then held
+    // for the stock update and the commit only, not for every write of the order. This is
+    // also the user-then-listing order cancelOrder uses, so the two can't deadlock.
     // One conditional UPDATE, not read-then-write: same guard as every wallet spend.
     const debited = await tx.user.updateMany({
       where: { id: buyer.id, walletBalance: { gte: listing.priceKobo } },
@@ -59,10 +60,14 @@ export async function placeOrder(buyer: { id: string; isSuspended: boolean }, in
         ...(listing.deliveryUrl ? { status: "FULFILLED" as const, fulfilledAt: new Date(), fulfilmentNote: "Your download is ready." } : {}),
       },
     });
-    // The last unit just went: close the listing.
-    if (listing.stock === 1) await tx.listing.update({ where: { id: listing.id }, data: { status: "SOLD" } });
+    if (listing.stock !== null) {
+      const taken = await tx.listing.updateMany({ where: { id: listing.id, status: "ACTIVE", stock: { gt: 0 } }, data: { stock: { decrement: 1 } } });
+      if (taken.count === 0) throw new OrderError("Sold out.", 409); // rolls the debit and order back
+      // The last unit just went: close the listing.
+      if (listing.stock === 1) await tx.listing.update({ where: { id: listing.id }, data: { status: "SOLD" } });
+    }
     return order;
-  });
+  }), options.signal);
 }
 
 /** Mark a paid order delivered. Returns the order, or null if it wasn't PAID. */

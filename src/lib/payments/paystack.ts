@@ -18,7 +18,12 @@ import type {
   VerifyChargeResult,
 } from "./types";
 
-const PAYSTACK_BASE_URL = "https://api.paystack.co";
+// Overridable so a local fake Paystack (scripts/fake-paystack.mjs) can stand in for load tests.
+// Honoured only with a test key: a live key always talks to the real API.
+const PAYSTACK_BASE_URL =
+  process.env.PAYSTACK_SECRET_KEY?.startsWith("sk_test_") && process.env.PAYSTACK_BASE_URL
+    ? process.env.PAYSTACK_BASE_URL
+    : "https://api.paystack.co";
 
 function getSecretKey(): string {
   const key = process.env.PAYSTACK_SECRET_KEY;
