@@ -31,6 +31,12 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        // Fixed brand images keep one name, so they can't be "immutable"; a week plus
+        // revalidate beats Next's default 4 hours for files that almost never change.
+        source: "/:file(circuit-logo.png|auth-hero.jpg)",
+        headers: [{ key: "Cache-Control", value: "public, max-age=604800, stale-while-revalidate=86400" }],
+      },
+      {
         source: "/:path*",
         headers: [
           {
