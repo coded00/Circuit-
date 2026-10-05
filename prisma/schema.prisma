@@ -697,6 +697,11 @@ model Tournament {
   /// than duplicating actor/reason/timestamp fields here — same "reuse
   /// the existing audit log" reasoning as every other admin action.
   fundsFrozen         Boolean          @default(false)
+  /// Who streams: the tournament, its players, both, or nobody. `streamUrl` below is the tournament's own stream.
+  streamMode          StreamMode       @default(NONE)
+  streamPlatform      StreamPlatform?
+  /// The platform's name when `streamPlatform` is OTHER.
+  streamPlatformName  String?
   /// Set when staff review a completed tournament's results and its collected money and approve the payout.
   /// Until then neither the prizes can be claimed nor the organizer's share released (see the admin Payouts page).
   payoutApprovedAt    DateTime?
@@ -767,13 +772,17 @@ model Registration {
   /// record of when each transition happened.
   updatedAt    DateTime           @updatedAt
 
-  escrowTxns    EscrowTransaction[]
-  roster        RosterMember[]
-  lobbyResults  LobbyResult[]
+  escrowTxns         EscrowTransaction[]
+  roster             RosterMember[]
+  lobbyResults       LobbyResult[]
   /// Grouped lobby tournaments: the entry's group (1 = A), and whether it
   /// qualified for the final.
-  lobbyGroup    Int?
-  lobbyFinalist Boolean             @default(false)
+  lobbyGroup         Int?
+  lobbyFinalist      Boolean             @default(false)
+  /// The player's own stream (optional), when the tournament takes player streams.
+  streamPlatform     StreamPlatform?
+  streamPlatformName String?
+  streamUrl          String?
 
   @@unique([tournamentId, userId])
   @@index([tournamentId, status])
@@ -2180,4 +2189,21 @@ model Order {
   @@index([status, createdAt])
   @@index([status, reservedUntil])
   @@index([listingId])
+}
+
+/// Where a stream is hosted. CIRCUIT is reserved for streams Circuit runs itself later; it is not offered yet.
+enum StreamPlatform {
+  TWITCH
+  YOUTUBE
+  KICK
+  OTHER
+  CIRCUIT
+}
+
+/// How a tournament is broadcast on Circuit.
+enum StreamMode {
+  TOURNAMENT_AND_PLAYERS
+  TOURNAMENT_ONLY
+  PLAYERS_ONLY
+  NONE
 }

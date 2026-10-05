@@ -8,6 +8,7 @@ import { Spinner } from "@/components/Spinner";
 import { MatchFoundHud } from "@/components/MatchFoundHud";
 import type { CaptainTeamOption, RosterBounds } from "@/lib/teamEntries";
 import { displayedShares, shareTotalProblem, TeamRosterPicker, type RosterPick } from "./TeamRosterPicker";
+import { EMPTY_STREAM, StreamFields, type StreamValue } from "@/components/streams/StreamFields";
 
 export default function RegistrationForm({
   tournamentId,
@@ -17,6 +18,7 @@ export default function RegistrationForm({
   savedName,
   rulesText,
   team,
+  playerStreams = false,
 }: {
   tournamentId: string;
   entryFee: number;
@@ -29,7 +31,10 @@ export default function RegistrationForm({
   rulesText: string | null;
   /** TEAM tournaments: the teams this user captains and the roster size. */
   team?: { options: CaptainTeamOption[]; bounds: RosterBounds; profileHref: string; hasPrize: boolean };
+  /** The tournament takes player streams: offer an optional place to add their own channel. */
+  playerStreams?: boolean;
 }) {
+  const [stream, setStream] = useState<StreamValue>(EMPTY_STREAM);
   const firstTeam = team?.options.find((t) => !t.blocked);
   const [roster, setRoster] = useState<RosterPick>(() => {
     const captain = firstTeam?.members.find((m) => m.isCaptain);
@@ -84,6 +89,7 @@ export default function RegistrationForm({
         ...(nameChoice === "custom" ? { saveInGameName: true } : {}),
         ...(team ? { teamId: roster.teamId, roster: Object.entries(roster.members).map(([userId, id]) => ({ userId, inGameId: id, ...(roster.shares ? { prizePercent: Number(displayedShares(roster, captainId)[userId]) } : {}) })) } : {}),
         ...(entryFee > 0 && payFromWallet ? { payFrom: "wallet" } : {}),
+        ...(playerStreams && stream.url.trim() ? { stream: { platform: stream.platform, platformName: stream.platform === "OTHER" ? stream.platformName : null, url: stream.url } } : {}),
       }),
       });
     } catch {
@@ -167,6 +173,14 @@ export default function RegistrationForm({
           )}
         </p>
       </div>
+      )}
+
+      {playerStreams && (
+        <div className="flex flex-col gap-2">
+          <span className="field-label">Add your stream (optional)</span>
+          <p className="text-xs text-muted">Let viewers watch your matches live.</p>
+          <StreamFields idPrefix="player-stream" value={stream} onChange={setStream} urlLabel="Channel URL" />
+        </div>
       )}
 
       {(!team || team.options.length > 0) && (

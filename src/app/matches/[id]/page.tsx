@@ -90,6 +90,17 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
 
   // Team tournaments: the captain holds the slot, the team's name is shown.
   const labels = match.tournamentId ? await teamEntryLabels(match.tournamentId) : new Map();
+  // Players' own streams for this tournament, so a match can link to where it is being played live.
+  const streams = match.tournamentId
+    ? await prisma.registration.findMany({
+        where: { tournamentId: match.tournamentId, userId: { in: [match.playerAId, match.playerBId] }, streamUrl: { not: null } },
+        select: { userId: true, streamPlatform: true, streamPlatformName: true, streamUrl: true },
+      })
+    : [];
+  const streamOf = (userId: string) => {
+    const s = streams.find((x) => x.userId === userId);
+    return s?.streamUrl ? { platform: s.streamPlatform, platformName: s.streamPlatformName, url: s.streamUrl } : null;
+  };
   const toPlayer = (p: typeof match.playerA, which: "A" | "B"): MatchPlayer => ({
     id: p.id,
     displayName: labels.get(p.id)?.teamName ?? p.displayName,
@@ -99,6 +110,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
     ready: (which === "A" ? match.playerAReadyAt : match.playerBReadyAt) !== null,
     reported: (which === "A" ? match.resultA : match.resultB) !== null,
     proofUrl: (which === "A" ? match.proofARef : match.proofBRef) ? `/api/matches/${match.id}/proof/${which.toLowerCase()}` : null,
+    stream: streamOf(p.id),
   });
 
   // The accepted score: whichever report named the actual winner.

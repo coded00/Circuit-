@@ -35,6 +35,8 @@ import { assertInGameNamesFree, InGameNameTakenError, rememberInGameName, reques
 import { notifyRoster, saveRoster, TeamEntryError, validateTeamEntry, type ValidRoster } from "@/lib/teamEntries";
 import { AbandonedError, withKeyedLock } from "@/lib/keyedLock";
 import { emailVerificationRequired } from "@/lib/emailGate";
+import { modeAllowsPlayerStreams, parseStream } from "@/lib/streams";
+import type { StreamPlatform } from "@prisma/client";
 
 class InsufficientWalletBalanceError extends Error {}
 
@@ -117,6 +119,17 @@ export async function POST(
   }
   const teamData = roster ? { teamId: roster.teamId, teamName: roster.teamName } : {};
 
+  // A player's own stream (optional), only for tournaments that take them.
+  let streamData: { streamPlatform: StreamPlatform; streamPlatformName: string | null; streamUrl: string } | Record<string, never> = {};
+  if (body?.stream && typeof body.stream === "object") {
+    if (!modeAllowsPlayerStreams(tournament.streamMode)) {
+      return NextResponse.json({ error: "This tournament doesn't take player streams." }, { status: 400 });
+    }
+    const parsedStream = parseStream(body.stream);
+    if (!parsedStream.ok) return NextResponse.json({ error: parsedStream.error, field: "stream" }, { status: 400 });
+    if (parsedStream.stream) streamData = { streamPlatform: parsedStream.stream.platform, streamPlatformName: parsedStream.stream.platformName, streamUrl: parsedStream.stream.url };
+  }
+
   // In-game names are unique per tournament. This early check gives a clear
   // error; the locked one inside each transaction below is the real guard.
   const requestedNames = requestedInGameNames(inGameId, user.id, roster);
@@ -137,10 +150,10 @@ export async function POST(
         return existing
           ? tx.registration.update({
               where: { id: existing.id },
-              data: { inGameId, status: "CONFIRMED", ...teamData },
+              data: { inGameId, status: "CONFIRMED", ...teamData, ...streamData },
             })
           : tx.registration.create({
-              data: { tournamentId, userId: user.id, inGameId, status: "CONFIRMED", ...teamData },
+              data: { tournamentId, userId: user.id, inGameId, status: "CONFIRMED", ...teamData, ...streamData },
             });
       }), request.signal);
     } catch (err) {
@@ -210,10 +223,10 @@ export async function POST(
         const reg = existing
           ? await tx.registration.update({
               where: { id: existing.id },
-              data: { inGameId, status: "CONFIRMED", paymentRef: reference, ...teamData },
+              data: { inGameId, status: "CONFIRMED", paymentRef: reference, ...teamData, ...streamData },
             })
           : await tx.registration.create({
-              data: { tournamentId, userId: user.id, inGameId, status: "CONFIRMED", paymentRef: reference, ...teamData },
+              data: { tournamentId, userId: user.id, inGameId, status: "CONFIRMED", paymentRef: reference, ...teamData, ...streamData },
             });
 
         // The fee rows go in as one statement: this transaction holds the tournament lock.
@@ -267,10 +280,10 @@ export async function POST(
   const registration = existing
     ? await prisma.registration.update({
         where: { id: existing.id },
-        data: { inGameId, status: "PENDING_PAYMENT", ...teamData },
+        data: { inGameId, status: "PENDING_PAYMENT", ...teamData, ...streamData },
       })
     : await prisma.registration.create({
-        data: { tournamentId, userId: user.id, inGameId, status: "PENDING_PAYMENT", ...teamData },
+        data: { tournamentId, userId: user.id, inGameId, status: "PENDING_PAYMENT", ...teamData, ...streamData },
       });
   if (rememberName) await rememberInGameName(user.id, tournament.gameId, inGameId);
   // Held while the captain pays; roster players are told once it's confirmed.

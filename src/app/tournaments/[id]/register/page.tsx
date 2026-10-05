@@ -8,6 +8,7 @@ import { captainTeamOptions, describeRoster, rosterBounds } from "@/lib/teamEntr
 import { refundConditions, registrationBlockers } from "@/lib/registrationEligibility";
 import { tournamentPath } from "@/lib/seo";
 import RegistrationForm from "./RegistrationForm";
+import { modeAllowsPlayerStreams } from "@/lib/streams";
 
 const naira = (kobo: number) => `₦${(kobo / 100).toLocaleString("en-NG")}`;
 const when = (d: Date) => d.toLocaleString("en-NG", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
@@ -139,6 +140,7 @@ export default async function RegisterPage({
           username={user.handle}
           savedName={savedName}
           rulesText={tournament.rulesText}
+          playerStreams={modeAllowsPlayerStreams(tournament.streamMode)}
           team={isTeam ? { options: teamOptions, bounds, profileHref: `/players/${user.handle}?tab=teams`, hasPrize: (tournament.prizeAmount ?? 0) > 0 } : undefined}
         />
       </div>

@@ -28,6 +28,8 @@ import ResultForm from "./ResultForm";
 import RulingForm from "./RulingForm";
 import EnterMatchButton from "./EnterMatchButton";
 import ConfirmOrDispute from "./ConfirmOrDispute";
+import { StreamLink } from "@/components/streams/StreamLink";
+import type { StreamPlatform } from "@prisma/client";
 
 export type MatchPlayer = {
   id: string;
@@ -39,6 +41,8 @@ export type MatchPlayer = {
   ready: boolean;
   reported: boolean;
   proofUrl: string | null;
+  /** The player's own stream for this tournament, if they added one. */
+  stream: { platform: StreamPlatform | null; platformName: string | null; url: string } | null;
 };
 
 export type MatchViewData = {
@@ -192,6 +196,21 @@ function HeadToHead({ data }: { data: MatchViewData }) {
           </span>
         )}
       </div>
+
+      {(data.playerA.stream || data.playerB.stream) && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 pt-4 sm:px-7">
+          <span className="text-xs text-muted">Watch live</span>
+          {[data.playerA, data.playerB].map(
+            (pl) =>
+              pl.stream && (
+                <span key={pl.id} className="flex items-center gap-1.5 text-xs">
+                  <span className="text-muted">{pl.displayName}</span>
+                  <StreamLink platform={pl.stream.platform} platformName={pl.stream.platformName} url={pl.stream.url} />
+                </span>
+              ),
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-2 px-3 py-8 sm:gap-6 sm:px-7">
         <PlayerSide player={data.playerA} data={data} side="A" />

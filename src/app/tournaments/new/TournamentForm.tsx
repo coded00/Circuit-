@@ -8,6 +8,9 @@ import type { PickerGame } from "@/lib/competitionRules";
 import { CompetitionPicker, defaultCompetition, selectedParts } from "@/components/CompetitionPicker";
 import { PrizeSplitField } from "@/components/PrizeSplitField";
 import { maxPrizePlaces } from "@/lib/prizes";
+import { StreamFields, StreamModePicker, EMPTY_STREAM, type StreamValue } from "@/components/streams/StreamFields";
+import { modeHasTournamentStream, type SelectablePlatform } from "@/lib/streams";
+import type { StreamMode } from "@prisma/client";
 
 function nairaToKobo(value: string): number {
   const naira = Number(value || 0);
@@ -53,7 +56,8 @@ export default function TournamentForm({
   const finalistCount = Number(competition.lobbyGroups) >= 2 ? Number(competition.lobbyGroups) * (Number(competition.lobbyQualifiers) || 0) : null;
   const splitTooLong = prizeKobo > 0 && prizeSplit.length > maxPrizePlaces(competition.structure, Number(participantCap) || 2, finalistCount);
   const [rulesText, setRulesText] = useState("");
-  const [streamUrl, setStreamUrl] = useState("");
+  const [streamMode, setStreamMode] = useState<StreamMode>("TOURNAMENT_AND_PLAYERS");
+  const [stream, setStream] = useState<StreamValue>(EMPTY_STREAM);
   const [enableCommunity, setEnableCommunity] = useState(true);
   const [posterUrl, setPosterUrl] = useState("");
   const [posterBlocked, setPosterBlocked] = useState(false);
@@ -90,7 +94,10 @@ export default function TournamentForm({
         prizeText: prizeText || null,
         prizeSplit: prizeKobo > 0 ? prizeSplit : [],
         rulesText,
-        streamUrl: streamUrl || null,
+        streamMode,
+        streamPlatform: stream.platform,
+        streamPlatformName: stream.platform === "OTHER" ? stream.platformName : null,
+        streamUrl: stream.url || null,
         enableCommunity,
         hostCommunityId: hostCommunityId || null,
         posterUrl: posterUrl || null,
@@ -288,19 +295,17 @@ export default function TournamentForm({
         />
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="streamUrl" className="field-label">
-          Stream link (optional)
-        </label>
-        <input
-          id="streamUrl"
-          type="url"
-          placeholder="https://twitch.tv/yourchannel"
-          value={streamUrl}
-          onChange={(e) => setStreamUrl(e.target.value)}
-          className="field-input"
-        />
-        <span className="field-hint">Shown as a &quot;Watch stream&quot; link on the tournament page.</span>
+      <div className="flex flex-col gap-4 border-t border-border pt-5">
+        <StreamModePicker idPrefix="stream-mode" value={streamMode} onChange={setStreamMode} />
+        {modeHasTournamentStream(streamMode) && (
+          <div className="flex flex-col gap-2">
+            <span className="text-sm font-semibold">Tournament stream</span>
+            <StreamFields idPrefix="tournament-stream" value={stream} onChange={setStream} hint="You can leave this empty for now and add it later when you edit the tournament." />
+          </div>
+        )}
+        {streamMode === "TOURNAMENT_AND_PLAYERS" || streamMode === "PLAYERS_ONLY" ? (
+          <span className="field-hint">Players will be able to add their own channel when they register.</span>
+        ) : null}
       </div>
 
       {hostCommunities.length > 0 && (

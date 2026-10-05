@@ -10,7 +10,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser, suspendedResponse } from "@/lib/session";
-import { parseOptionalUrl, parseOptionalImageUrl } from "@/lib/validation";
+import { parseOptionalImageUrl } from "@/lib/validation";
 import { logAdminAction } from "@/lib/auditLog";
 import { entriesPerMatch } from "@/lib/gameCatalog";
 import { parseLobbyGroups, parseLobbyRounds } from "@/lib/lobbyScoring";
@@ -19,6 +19,7 @@ import { getStructure } from "@/lib/competitionStructures";
 import { maxPrizePlaces, parsePrizeSplit } from "@/lib/prizes";
 import { resolveCompetition } from "@/lib/competitionConfig";
 import { prizeFundingError } from "@/lib/prizePool";
+import { resolveTournamentStream } from "@/lib/streams";
 
 const MAX_PARTICIPANT_CAP = 128;
 
@@ -233,12 +234,10 @@ export async function PATCH(
   if (body.prizeText !== undefined) {
     data.prizeText = typeof body.prizeText === "string" && body.prizeText.trim() ? body.prizeText.trim() : null;
   }
-  if (body.streamUrl !== undefined) {
-    const streamUrlResult = parseOptionalUrl(body.streamUrl);
-    if (!streamUrlResult.ok) {
-      return NextResponse.json({ error: "Stream link must be a valid http(s) URL." }, { status: 400 });
-    }
-    data.streamUrl = streamUrlResult.url;
+  if (body.streamMode !== undefined || body.streamUrl !== undefined || body.streamPlatform !== undefined || body.streamPlatformName !== undefined) {
+    const stream = resolveTournamentStream(body, tournament.streamMode);
+    if (!stream.ok) return NextResponse.json({ error: stream.error }, { status: 400 });
+    Object.assign(data, stream.data);
   }
   if (body.posterUrl !== undefined) {
     const posterUrlResult = parseOptionalImageUrl(body.posterUrl);

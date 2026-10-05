@@ -11,7 +11,7 @@
 import { NextResponse, after } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser, suspendedResponse } from "@/lib/session";
-import { parseOptionalUrl, parseOptionalImageUrl } from "@/lib/validation";
+import { parseOptionalImageUrl } from "@/lib/validation";
 import { parseLobbyGroups, parseLobbyRounds, type LobbyGroupsConfig } from "@/lib/lobbyScoring";
 import { getStructure } from "@/lib/competitionStructures";
 import { maxPrizePlaces, parsePrizeSplit } from "@/lib/prizes";
@@ -24,6 +24,7 @@ import { trackEvent } from "@/lib/analytics";
 import { isRateLimited, recordAttempt } from "@/lib/rateLimit";
 import { captureException } from "@/lib/observability";
 import { prizeFundingError } from "@/lib/prizePool";
+import { resolveTournamentStream } from "@/lib/streams";
 
 const MAX_PARTICIPANT_CAP = 128; // D2: V1 bracket ceiling.
 
@@ -88,7 +89,7 @@ export async function POST(request: Request) {
   const registrationOpenAt = parseDate(body.registrationOpenAt);
   const registrationCloseAt = parseDate(body.registrationCloseAt);
   const startAt = parseDate(body.startAt);
-  const streamUrlResult = parseOptionalUrl(body.streamUrl);
+  const streamResult = resolveTournamentStream(body);
   const posterUrlResult = parseOptionalImageUrl(body.posterUrl);
 
   // TRN-1: all fields required except prize info.
@@ -195,11 +196,8 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
-  if (!streamUrlResult.ok) {
-    return NextResponse.json(
-      { error: "Stream link must be a valid http(s) URL." },
-      { status: 400 }
-    );
+  if (!streamResult.ok) {
+    return NextResponse.json({ error: streamResult.error }, { status: 400 });
   }
   if (!posterUrlResult.ok) {
     return NextResponse.json(
@@ -254,7 +252,7 @@ export async function POST(request: Request) {
       registrationCloseAt,
       startAt,
       cancellationLockAt,
-      streamUrl: streamUrlResult.url,
+      ...streamResult.data,
       posterUrl: posterUrlResult.url,
       status,
       hostCommunityId,

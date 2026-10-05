@@ -10,6 +10,9 @@ import { getStructure } from "@/lib/competitionStructures";
 import { PrizeSplitField } from "@/components/PrizeSplitField";
 import { maxPrizePlaces } from "@/lib/prizes";
 import { CompetitionPicker, DEFAULT_ROUNDS, defaultCompetition, selectedParts, type CompetitionValue } from "@/components/CompetitionPicker";
+import { StreamFields, StreamModePicker, EMPTY_STREAM, type StreamValue } from "@/components/streams/StreamFields";
+import { modeHasTournamentStream, type SelectablePlatform } from "@/lib/streams";
+import type { StreamMode } from "@prisma/client";
 
 function toLocalInput(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -100,7 +103,12 @@ export default function EditForm({
   const splitMaxPlaces = maxPrizePlaces(splitStructure, Number(participantCap) || 2, groupsForSplit >= 2 ? groupsForSplit * qualifiersForSplit : null);
   const splitTooLong = prizeKobo > 0 && prizeSplit.length > splitMaxPlaces;
   const [rulesText, setRulesText] = useState(tournament.rulesText ?? "");
-  const [streamUrl, setStreamUrl] = useState(tournament.streamUrl ?? "");
+  const [streamMode, setStreamMode] = useState<StreamMode>(tournament.streamMode);
+  const [stream, setStream] = useState<StreamValue>({
+    platform: (tournament.streamPlatform && tournament.streamPlatform !== "CIRCUIT" ? tournament.streamPlatform : "TWITCH") as SelectablePlatform,
+    platformName: tournament.streamPlatformName ?? "",
+    url: tournament.streamUrl ?? "",
+  });
   const [posterUrl, setPosterUrl] = useState(tournament.posterUrl ?? "");
   const [posterBlocked, setPosterBlocked] = useState(false);
   const [registrationOpenAt, setRegistrationOpenAt] = useState(toLocalInput(tournament.registrationOpenAt));
@@ -138,7 +146,10 @@ export default function EditForm({
       participantCap: Number(participantCap),
       prizeText: prizeText || null,
       rulesText,
-      streamUrl: streamUrl || null,
+      streamMode,
+        streamPlatform: stream.platform,
+        streamPlatformName: stream.platform === "OTHER" ? stream.platformName : null,
+        streamUrl: stream.url || null,
       posterUrl: posterUrl || null,
       registrationOpenAt: new Date(registrationOpenAt).toISOString(),
       registrationCloseAt: new Date(registrationCloseAt).toISOString(),
@@ -368,17 +379,17 @@ export default function EditForm({
         />
       )}
 
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="streamUrl" className="field-label">
-          Stream link (optional)
-        </label>
-        <input
-          id="streamUrl"
-          type="url"
-          value={streamUrl}
-          onChange={(e) => setStreamUrl(e.target.value)}
-          className="field-input"
-        />
+      <div className="flex flex-col gap-4 border-t border-border pt-5">
+        <StreamModePicker idPrefix="stream-mode" value={streamMode} onChange={setStreamMode} />
+        {modeHasTournamentStream(streamMode) && (
+          <div className="flex flex-col gap-2">
+            <span className="text-sm font-semibold">Tournament stream</span>
+            <StreamFields idPrefix="tournament-stream" value={stream} onChange={setStream} hint="You can leave this empty for now and add it later when you edit the tournament." />
+          </div>
+        )}
+        {streamMode === "TOURNAMENT_AND_PLAYERS" || streamMode === "PLAYERS_ONLY" ? (
+          <span className="field-hint">Players will be able to add their own channel when they register.</span>
+        ) : null}
       </div>
 
       <ImageUploadField

@@ -49,6 +49,9 @@ import { buildMetadata, parseIdSegment, tournamentPath, gamePath, organiserPath,
 import { ArenaGlow } from "@/components/ArenaBackdrop";
 import { safeJsonLd } from "@/lib/jsonLd";
 import { payableFraction, releaseDelayHours } from "@/lib/prizePool";
+import { StreamLink } from "@/components/streams/StreamLink";
+import { MyStreamForm } from "@/components/streams/MyStreamForm";
+import { modeAllowsPlayerStreams, platformDisplayName } from "@/lib/streams";
 
 function formatNaira(kobo: number): string {
   return `₦${(kobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 0 })}`;
@@ -401,6 +404,11 @@ export default async function TournamentPage({ params, searchParams }: { params:
                           </span>
                         </div>
                       </div>
+                      {p.streamUrl && (
+                        <div className="pl-9">
+                          <StreamLink platform={p.streamPlatform} platformName={p.streamPlatformName} url={p.streamUrl} />
+                        </div>
+                      )}
                       <div className="flex flex-wrap gap-1.5 pl-9">
                         {team.roster.map((m) => (
                           <Link
@@ -416,18 +424,17 @@ export default async function TournamentPage({ params, searchParams }: { params:
                   );
                 }
                 return (
-                <Link
-                  key={p.userId}
-                  href={`/players/${p.user.handle}`}
-                  className="flex items-center gap-3 border-b border-border px-5 py-3 transition-colors hover:bg-surface-elevated/60 sm:odd:border-r"
-                >
-                  <span className="w-6 shrink-0 text-right font-mono text-xs text-muted tabular-nums">{i + 1}</span>
-                  <PlayerAvatar person={p.user} size="sm" />
-                  <div className="flex min-w-0 flex-col">
-                    <span className="truncate text-sm font-medium">{p.user.displayName}</span>
-                    <span className="text-metadata truncate">@{p.user.handle}</span>
-                  </div>
-                </Link>
+                <div key={p.userId} className="flex items-center justify-between gap-3 border-b border-border px-5 py-3 transition-colors hover:bg-surface-elevated/60 sm:odd:border-r">
+                  <Link href={`/players/${p.user.handle}`} className="flex min-w-0 items-center gap-3">
+                    <span className="w-6 shrink-0 text-right font-mono text-xs text-muted tabular-nums">{i + 1}</span>
+                    <PlayerAvatar person={p.user} size="sm" />
+                    <div className="flex min-w-0 flex-col">
+                      <span className="truncate text-sm font-medium">{p.user.displayName}</span>
+                      <span className="text-metadata truncate">@{p.user.handle}</span>
+                    </div>
+                  </Link>
+                  {p.streamUrl && <StreamLink platform={p.streamPlatform} platformName={p.streamPlatformName} url={p.streamUrl} compact />}
+                </div>
                 );
               })}
             </div>
@@ -698,9 +705,9 @@ export default async function TournamentPage({ params, searchParams }: { params:
               </Link>
             )}
             {tournament.streamUrl && (
-              <a href={tournament.streamUrl} target="_blank" rel="noreferrer" className="btn-secondary">
+              <a href={tournament.streamUrl} target="_blank" rel="noopener noreferrer nofollow ugc" className="btn-secondary">
                 <Tv size={14} />
-                Watch
+                Watch on {platformDisplayName(tournament.streamPlatform, tournament.streamPlatformName)}
               </a>
             )}
             <ShareButton variant="compact" title={`${tournament.name} on Circuit`} url={canonicalUrl} />
@@ -779,6 +786,9 @@ export default async function TournamentPage({ params, searchParams }: { params:
                       </li>
                       <li>Each match has a code. Show it in your proof screenshot when you report the result.</li>
                     </ul>
+                  )}
+                  {modeAllowsPlayerStreams(tournament.streamMode) && tournament.status !== "COMPLETE" && (
+                    <MyStreamForm tournamentId={tournament.id} current={{ platform: myRegistration.streamPlatform, platformName: myRegistration.streamPlatformName, url: myRegistration.streamUrl }} />
                   )}
                   {now < tournament.registrationCloseAt && tournament.status !== "LIVE" && tournament.status !== "COMPLETE" && (
                     <WithdrawButton registrationId={myRegistration.id} />
