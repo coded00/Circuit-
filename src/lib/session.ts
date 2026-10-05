@@ -22,7 +22,10 @@ export async function getCurrentUser(): Promise<User | null> {
   const session = await verifySessionToken(token);
   if (!session) return null;
 
-  return prisma.user.findUnique({ where: { id: session.userId } });
+  const user = await prisma.user.findUnique({ where: { id: session.userId } });
+  // A password change/reset or suspension bumps sessionVersion: older tokens stop working.
+  if (!user || (session.sv ?? 0) !== user.sessionVersion) return null;
+  return user;
 }
 
 type AuthGateResult = { user: User; error: null } | { user: null; error: NextResponse };

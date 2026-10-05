@@ -52,6 +52,18 @@ const nextConfig: NextConfig = {
             value: "strict-origin-when-cross-origin",
           },
           {
+            // Always HTTPS from here on. Without this a visitor's first request can be downgraded to http.
+            key: "Strict-Transport-Security",
+            value: "max-age=63072000; includeSubDomains",
+          },
+          {
+            // The part of a Content-Security-Policy that cannot break this app: no plugins, no
+            // <base> tag hijack, and no framing by other sites. A script-src policy needs per-request
+            // nonces and a staged rollout, so it is not switched on here.
+            key: "Content-Security-Policy",
+            value: "object-src 'none'; base-uri 'self'; frame-ancestors 'self'",
+          },
+          {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=()",
           },

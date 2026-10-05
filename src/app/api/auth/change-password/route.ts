@@ -7,7 +7,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
-import { hashPassword, verifyPasswordTimingSafe } from "@/lib/auth";
+import { hashPassword, verifyPasswordTimingSafe, createSessionToken, sessionCookie } from "@/lib/auth";
 import { isRateLimited, recordAttempt, clearAttempts } from "@/lib/rateLimit";
 import { MIN_PASSWORD_LENGTH } from "@/lib/passwordRules";
 
@@ -41,7 +41,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "That isn't your current password.", field: "currentPassword" }, { status: 400 });
   }
 
-  await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(next) } });
+  // Every other device signed in with the old password is signed out; this one gets a fresh token.
+  const updated = await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordHash: await hashPassword(next), sessionVersion: { increment: 1 } },
+    select: { sessionVersion: true },
+  });
   await clearAttempts(key);
-  return NextResponse.json({ ok: true });
+  const response = NextResponse.json({ ok: true });
+  response.cookies.set(sessionCookie.name, await createSessionToken({ userId: user.id, sv: updated.sessionVersion }), sessionCookie);
+  return response;
 }

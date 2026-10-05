@@ -43,8 +43,8 @@ services:
       POSTGRES_USER: circuit_user
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
       POSTGRES_DB: circuit
-    ports:
-      - "5432:5432"
+    # No `ports:` on purpose. The app reaches the database over the compose network; publishing 5432
+    # would expose it to the internet. For a one-off shell: docker compose exec postgres psql -U circuit_user circuit
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:

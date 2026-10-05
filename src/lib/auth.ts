@@ -14,6 +14,7 @@
 
 import { SignJWT, jwtVerify } from "jose";
 import bcrypt from "bcryptjs";
+import { prisma } from "@/lib/db";
 import { createHash, randomBytes } from "crypto";
 
 const SESSION_COOKIE_NAME = "circuit_session";
@@ -65,11 +66,15 @@ export async function verifyPasswordTimingSafe(
 
 export type SessionPayload = {
   userId: string;
+  /** User.sessionVersion when the token was issued; a token whose value no longer matches is rejected. */
+  sv?: number;
 };
 
 /** Issues a signed, expiring session token. Caller sets it as an httpOnly cookie. */
 export async function createSessionToken(payload: SessionPayload): Promise<string> {
-  return new SignJWT({ ...payload })
+  // The token is stamped with the user's current session version unless the caller knows it already.
+  const sv = payload.sv ?? (await prisma.user.findUnique({ where: { id: payload.userId }, select: { sessionVersion: true } }))?.sessionVersion ?? 0;
+  return new SignJWT({ ...payload, sv })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${SESSION_TTL_SECONDS}s`)
@@ -83,7 +88,8 @@ export async function verifySessionToken(
   try {
     const { payload } = await jwtVerify(token, getSessionSecret());
     if (typeof payload.userId !== "string") return null;
-    return { userId: payload.userId };
+    // Tokens issued before session versions existed carry none: they count as version 0.
+    return { userId: payload.userId, sv: typeof payload.sv === "number" ? payload.sv : 0 };
   } catch {
     return null;
   }

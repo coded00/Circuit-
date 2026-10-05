@@ -146,6 +146,9 @@ enum ReportStatus {
 /// Account creation is deferred (D4) — a User row is only created at
 /// register-with-intent-to-pay, Battle accept, or payout claim.
 model User {
+  /// Bumped on password change/reset and on suspension. Session tokens carry the value they were
+  /// issued with, so bumping it signs out every other device holding an older token.
+  sessionVersion Int @default(0)
   id                  String                @id @default(cuid())
   displayName         String
   handle              String                @unique
