@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sniffImageType } from "./imageSniff";
+import { sniffImageType, sniffProofType } from "./imageSniff";
 
 const pad = (bytes: number[] | string) =>
   Buffer.concat([typeof bytes === "string" ? Buffer.from(bytes, "ascii") : Buffer.from(bytes), Buffer.alloc(16)]);
@@ -30,5 +30,20 @@ describe("sniffImageType", () => {
   it("rejects files too short to carry a signature", () => {
     expect(sniffImageType(Buffer.from([0xff, 0xd8, 0xff]))).toBeNull();
     expect(sniffImageType(Buffer.alloc(0))).toBeNull();
+  });
+});
+
+describe("sniffProofType", () => {
+  const pad = (b: number[]) => Buffer.concat([Buffer.from(b), Buffer.alloc(16)]);
+  it("accepts screenshots and real clips", () => {
+    expect(sniffProofType(pad([0x89, 0x50, 0x4e, 0x47]))).toBe("image/png");
+    expect(sniffProofType(Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from("ftypmp42"), Buffer.alloc(8)]))).toBe("video/mp4");
+    expect(sniffProofType(Buffer.concat([Buffer.from([0, 0, 0, 0x14]), Buffer.from("ftypqt  "), Buffer.alloc(8)]))).toBe("video/quicktime");
+    expect(sniffProofType(pad([0x1a, 0x45, 0xdf, 0xa3]))).toBe("video/webm");
+  });
+  it("refuses HTML, SVG and scripts however the browser labelled them", () => {
+    expect(sniffProofType(Buffer.from("<html><script>alert(1)</script></html>"))).toBeNull();
+    expect(sniffProofType(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'))).toBeNull();
+    expect(sniffProofType(Buffer.from("#!/bin/sh\nrm -rf /\n"))).toBeNull();
   });
 });
