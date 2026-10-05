@@ -51,7 +51,7 @@ import { safeJsonLd } from "@/lib/jsonLd";
 import { payableFraction, releaseDelayHours } from "@/lib/prizePool";
 import { StreamLink } from "@/components/streams/StreamLink";
 import { MyStreamForm } from "@/components/streams/MyStreamForm";
-import { modeAllowsPlayerStreams, platformDisplayName } from "@/lib/streams";
+import { modeAllowsPlayerStreams } from "@/lib/streams";
 
 function formatNaira(kobo: number): string {
   return `₦${(kobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 0 })}`;
@@ -198,6 +198,8 @@ export default async function TournamentPage({ params, searchParams }: { params:
     },
   ];
   const hasBracket = tournament.status === "LIVE" || tournament.status === "COMPLETE";
+  // Something to watch: the tournament's own stream, or a player stream (the first page of participants is enough to know).
+  const hasWatch = !!tournament.streamUrl || (modeAllowsPlayerStreams(tournament.streamMode) && participants.some((p) => !!p.streamUrl));
   // A real countdown only makes sense before the bracket actually starts.
   const startingSoon = !hasBracket && tournament.status !== "CANCELLED" && isStartingSoon(tournament.startAt, now);
   const communityVisible = Boolean(tournament.community?.enabled || isOrganizer);
@@ -704,11 +706,11 @@ export default async function TournamentPage({ params, searchParams }: { params:
                 {bracketWord}
               </Link>
             )}
-            {tournament.streamUrl && (
-              <a href={tournament.streamUrl} target="_blank" rel="noopener noreferrer nofollow ugc" className="btn-secondary">
+            {hasWatch && (
+              <Link href={`/tournaments/${tournament.id}/watch`} className="btn-secondary">
                 <Tv size={14} />
-                Watch on {platformDisplayName(tournament.streamPlatform, tournament.streamPlatformName)}
-              </a>
+                Watch
+              </Link>
             )}
             <ShareButton variant="compact" title={`${tournament.name} on Circuit`} url={canonicalUrl} />
           </div>

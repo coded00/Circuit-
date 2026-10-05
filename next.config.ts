@@ -76,7 +76,7 @@ const nextConfig: NextConfig = {
               "img-src 'self' data: blob: https:",
               "font-src 'self' data:",
               "connect-src 'self' https://onesignal.com https://*.onesignal.com",
-              "frame-src https://www.youtube.com https://www.youtube-nocookie.com",
+              "frame-src https://www.youtube.com https://www.youtube-nocookie.com https://player.twitch.tv https://player.kick.com",
               "media-src 'self' blob: https:",
               "worker-src 'self' blob:",
               "manifest-src 'self'",

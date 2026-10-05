@@ -42,6 +42,7 @@ import { Settings } from "lucide-react";
 import { CalendarIcon, ChatIcon, HomeIcon, PadIcon, PlayerIcon, ShopIcon, SwordsIcon, TrophyIcon } from "@/components/icons/GameIcons";
 import { loginPath, signupPath } from "@/lib/safeRedirect";
 import { SidebarPromoCard } from "./SidebarPromoCard";
+import { Tv } from "lucide-react";
 
 type NavUser = { handle: string; displayName: string; isStaff: boolean } | null;
 
@@ -50,6 +51,7 @@ type Item = { href: string; label: string; icon: React.ComponentType<{ size?: nu
 const PRIMARY: Item[] = [
   { href: "/", label: "Home", icon: HomeIcon },
   { href: "/compete", label: "Compete", icon: TrophyIcon },
+  { href: "/watch", label: "Watch", icon: Tv },
   { href: "/activity", label: "Feed", icon: PadIcon, also: ["/ladder"] },
   { href: "/battles", label: "Challenges", icon: SwordsIcon },
   { href: "/communities", label: "Communities", icon: ChatIcon },
