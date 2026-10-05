@@ -40,7 +40,7 @@ export async function settleOrganizerRevenue(): Promise<{ settled: number; error
       // fundsFrozen check right above.
       matches: { none: { dispute: { status: { in: ["OPEN", "ORGANIZER_REVIEW", "ESCALATED"] } } } },
     },
-    select: { id: true, organizerId: true },
+    select: { id: true, organizerId: true, prizeAmount: true },
   });
 
   for (const tournament of readyTournaments) {
@@ -87,19 +87,26 @@ export async function settleOrganizerRevenue(): Promise<{ settled: number; error
         const flippedTotal = flippedRows.reduce((sum, row) => sum + row.amount, 0);
         if (flippedTotal <= 0) return 0;
 
+        // The prize is paid out of these same entry fees (see prizePool.ts), so it is set aside here and the
+        // organizer is credited what is left. A staff-run (sponsored) tournament keeps nothing back.
+        const organizer = await tx.user.findUnique({ where: { id: tournament.organizerId }, select: { isStaff: true } });
+        const prizeHold = organizer?.isStaff ? 0 : Math.min(tournament.prizeAmount ?? 0, flippedTotal);
+        const organizerShare = flippedTotal - prizeHold;
+        if (organizerShare <= 0) return 0;
+
         await tx.user.update({
           where: { id: tournament.organizerId },
-          data: { walletBalance: { increment: flippedTotal } },
+          data: { walletBalance: { increment: organizerShare } },
         });
         await tx.walletTransaction.create({
           data: {
             userId: tournament.organizerId,
             type: "ORGANIZER_REVENUE_CREDIT",
-            amount: flippedTotal,
+            amount: organizerShare,
             status: "COMPLETE",
           },
         });
-        return flippedTotal;
+        return organizerShare;
       });
 
       if (credited > 0) {

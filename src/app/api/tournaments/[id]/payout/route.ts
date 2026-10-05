@@ -20,6 +20,7 @@ import { trackEvent } from "@/lib/analytics";
 import { applyTransferOutcome } from "@/lib/payments/transfers";
 import { captureException, captureMessage } from "@/lib/observability";
 import { emailVerificationRequired } from "@/lib/emailGate";
+import { payableFraction, releaseDelayHours } from "@/lib/prizePool";
 
 // A row still PENDING or already COMPLETE means this prize is spoken for;
 // a FAILED row (the transfer call itself errored, or the provider reported
@@ -58,6 +59,15 @@ export async function POST(
   }
   if (tournament.fundsFrozen) {
     return NextResponse.json({ error: "Funds for this tournament are frozen pending review." }, { status: 409 });
+  }
+  // Nothing moves until the tournament is over and the settlement wait (T+1, same as Paystack) has passed.
+  const delayHours = await releaseDelayHours();
+  const releaseAt = tournament.completedAt ? new Date(tournament.completedAt.getTime() + delayHours * 60 * 60 * 1000) : null;
+  if (!releaseAt || releaseAt > new Date()) {
+    return NextResponse.json(
+      { error: `Prizes are released ${delayHours} hours after a tournament ends${releaseAt ? ` (from ${releaseAt.toUTCString()})` : ""}.` },
+      { status: 409 }
+    );
   }
   if (!tournament.prizeAmount || tournament.prizeAmount <= 0) {
     return NextResponse.json({ error: "This tournament has no cash prize to claim." }, { status: 409 });
@@ -121,7 +131,12 @@ export async function POST(
   // reference (Paystack rejects a reused one, and providerRef is unique).
   // Stored on the row up front so the transfer webhook can always find it.
   const reference = `payout_${randomUUID()}`;
-  const prizeAmount = share.amount;
+  // A prize is paid out of the entry fees actually collected, never more.
+  const fraction = await payableFraction(tournament);
+  const prizeAmount = Math.floor(share.amount * fraction);
+  if (prizeAmount <= 0) {
+    return NextResponse.json({ error: "No entry fees were collected for this tournament, so there is no prize to pay out." }, { status: 409 });
+  }
 
   // Reserve the claim — a PENDING row created inside a Serializable
   // transaction that re-checks for an existing claim first. Two concurrent

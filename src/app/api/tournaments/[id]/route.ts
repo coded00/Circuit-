@@ -18,6 +18,7 @@ import { parseLeagueSettings } from "@/lib/leagueTable";
 import { getStructure } from "@/lib/competitionStructures";
 import { maxPrizePlaces, parsePrizeSplit } from "@/lib/prizes";
 import { resolveCompetition } from "@/lib/competitionConfig";
+import { prizeFundingError } from "@/lib/prizePool";
 
 const MAX_PARTICIPANT_CAP = 128;
 
@@ -244,6 +245,17 @@ export async function PATCH(
   const nextFormat = (data.format as string | undefined) ?? tournament.format;
   const nextCap = (data.participantCap as number | undefined) ?? tournament.participantCap;
   const nextPrize = data.prizeAmount !== undefined ? (data.prizeAmount as number | null) : tournament.prizeAmount;
+  // The prize must stay fundable from entry fees whichever of the three numbers changed.
+  if (!user.isStaff && (data.prizeAmount !== undefined || data.entryFee !== undefined || data.participantCap !== undefined)) {
+    const feeSetting = await prisma.platformSetting.findUnique({ where: { id: "singleton" } });
+    const fundingError = prizeFundingError({
+      prizeAmount: nextPrize,
+      entryFee: (data.entryFee as number | undefined) ?? tournament.entryFee,
+      participantCap: nextCap,
+      platformFeeBps: feeSetting?.platformFeeBps ?? 0,
+    });
+    if (fundingError) return NextResponse.json({ error: fundingError }, { status: 400 });
+  }
   if (body.prizeSplit !== undefined || data.format !== undefined || data.participantCap !== undefined || data.prizeAmount !== undefined) {
     const split = parsePrizeSplit(body.prizeSplit ?? tournament.prizeSplit, maxPrizePlaces(nextFormat, nextCap, finalists));
     if (!split.ok) return NextResponse.json({ error: split.error }, { status: 400 });

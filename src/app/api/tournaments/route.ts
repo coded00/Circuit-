@@ -23,6 +23,7 @@ import { hostableCommunities } from "@/lib/communityDirectory";
 import { trackEvent } from "@/lib/analytics";
 import { isRateLimited, recordAttempt } from "@/lib/rateLimit";
 import { captureException } from "@/lib/observability";
+import { prizeFundingError } from "@/lib/prizePool";
 
 const MAX_PARTICIPANT_CAP = 128; // D2: V1 bracket ceiling.
 
@@ -168,6 +169,12 @@ export async function POST(request: Request) {
       { error: "Prize amount must be a whole number of kobo, 0 or more." },
       { status: 400 }
     );
+  }
+  // The prize comes out of entry fees, so it can't promise more than they could collect (staff-run tournaments may be sponsored).
+  if (!user.isStaff) {
+    const feeSetting = await prisma.platformSetting.findUnique({ where: { id: "singleton" } });
+    const fundingError = prizeFundingError({ prizeAmount, entryFee, participantCap, platformFeeBps: feeSetting?.platformFeeBps ?? 0 });
+    if (fundingError) return NextResponse.json({ error: fundingError }, { status: 400 });
   }
   if (!registrationOpenAt || !registrationCloseAt || !startAt) {
     return NextResponse.json(
