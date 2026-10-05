@@ -55,7 +55,7 @@ export default async function AdminPayoutsPage({ searchParams }: { searchParams:
                     <p className="text-xs text-muted">
                       {t.organizer.user.displayName} (@{t.organizer.user.handle})
                       {t.completedAt ? ` · finished ${t.completedAt.toLocaleDateString("en-NG")}` : ""}
-                      {t.payoutApprovedAt ? ` · approved ${t.payoutApprovedAt.toLocaleDateString("en-NG")}` : ""}
+                      {t.payoutApprovedAt ? ` · ${t.payoutApprovedById ? "approved" : "approved automatically"} ${t.payoutApprovedAt.toLocaleDateString("en-NG")}` : ""}
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">

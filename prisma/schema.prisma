@@ -1391,6 +1391,13 @@ model PlatformSetting {
   /// (OrganizerRevenueSettlementControl.tsx) does shift the settle point
   /// for every still-PENDING row, not just new ones.
   organizerRevenueSettlementHours  Int     @default(24)
+  /// Approve a completed tournament's payout automatically once the settlement wait has passed, when it has
+  /// no disputes or flags, no freeze, and the money to pay out is within payoutAutoApproveMaxKobo. Anything
+  /// else waits for a person on the admin Payouts page. Turn off to make every payout manual.
+  payoutAutoApprove                Boolean @default(true)
+  /// The most (winners' prizes plus the organizer's share) that is approved automatically, in kobo. Bigger
+  /// payouts always wait for staff. Default NGN 500,000.
+  payoutAutoApproveMaxKobo         Int     @default(50000000)
 }
 
 /// Every real write an admin makes anywhere in `/admin` appends one row

@@ -24,6 +24,7 @@ import { AdminUsersManager } from "@/components/admin/AdminUsersManager";
 import { MaintenanceModeToggle } from "@/components/admin/MaintenanceModeToggle";
 import { PlatformFeeControl } from "@/components/admin/PlatformFeeControl";
 import { OrganizerRevenueSettlementControl } from "@/components/admin/OrganizerRevenueSettlementControl";
+import { PayoutAutoApproveControl } from "@/components/admin/PayoutAutoApproveControl";
 import { ArrowUpRight } from "lucide-react";
 import { EmptyState, PageHeader, Panel, PanelRow, Section } from "@/components/admin/ui";
 
@@ -149,6 +150,11 @@ export default async function AdminSettingsPage() {
               <PanelRow>
                 <div className="w-full">
                   <OrganizerRevenueSettlementControl hours={platformSetting?.organizerRevenueSettlementHours ?? 24} canEdit={isSuperAdmin} />
+                </div>
+              </PanelRow>
+              <PanelRow>
+                <div className="w-full">
+                  <PayoutAutoApproveControl enabled={platformSetting?.payoutAutoApprove ?? true} maxKobo={platformSetting?.payoutAutoApproveMaxKobo ?? 50_000_000} canEdit={isSuperAdmin} />
                 </div>
               </PanelRow>
             </Panel>

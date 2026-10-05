@@ -29,6 +29,7 @@ import { notify, notifyStaff } from "@/lib/notifications";
 import { expireOpenBattles } from "@/lib/battles";
 import { proofStorage } from "@/lib/storage";
 import { settleOrganizerRevenue } from "@/lib/settlement";
+import { autoApprovePayouts } from "@/lib/payoutApproval";
 import { trackEvent } from "@/lib/analytics";
 import { captureException } from "@/lib/observability";
 import { logAdminAction } from "@/lib/auditLog";
@@ -1406,6 +1407,8 @@ export async function runScheduledSweep(): Promise<{
   advancementRepaired: number;
   autoAccepted: number;
   escalated: number;
+  payoutsAutoApproved: number;
+  payoutsHeldForStaff: number;
   organizerRevenueSettled: number;
   quickMatchExpired: number;
   quickMatchRecoveredStuck: number;
@@ -1493,6 +1496,10 @@ export async function runScheduledSweep(): Promise<{
   // folded into this one sweep call rather than a second cron entry — see
   // this file's own header on the Battle/tournament split for the same
   // "one function, branch inside it" preference.
+  // Approve the payouts with nothing wrong (see payoutApproval.ts) before settling, so what was just
+  // approved can be released in this same run.
+  const payoutApproval = await autoApprovePayouts();
+  if (payoutApproval.errors) errors.push(...payoutApproval.errors);
   const settlement = await settleOrganizerRevenue();
   if (settlement.errors) errors.push(...settlement.errors);
 
@@ -1526,6 +1533,8 @@ export async function runScheduledSweep(): Promise<{
     advancementRepaired: repair.repaired,
     autoAccepted,
     escalated,
+    payoutsAutoApproved: payoutApproval.approved,
+    payoutsHeldForStaff: payoutApproval.heldForStaff,
     organizerRevenueSettled: settlement.settled,
     quickMatchExpired: quickMatchSweep.expired,
     quickMatchRecoveredStuck: quickMatchSweep.recoveredStuck,

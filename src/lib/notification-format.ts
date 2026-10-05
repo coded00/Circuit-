@@ -238,6 +238,16 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
               : `Your ${what} is being refunded to the card or account you paid with. It can take a few days to show up.`;
       return { message, href: stage === "WALLET" ? "/wallet" : `/tournaments/${str(p, "tournamentId")}` };
     }
+    case "PAYOUT_APPROVED": {
+      const from = new Date(str(p, "claimFrom"));
+      const ready = Number.isNaN(from.getTime()) || from.getTime() <= Date.now();
+      return {
+        message: `Your ${money(p, "amount")} prize from ${str(p, "tournamentName") || "your tournament"} is approved. ${ready ? "You can claim it now." : `You can claim it from ${from.toLocaleDateString("en-NG", { day: "numeric", month: "short" })}.`}`,
+        href: `/tournaments/${str(p, "tournamentId")}`,
+      };
+    }
+    case "ORGANIZER_PAYOUT_APPROVED":
+      return { message: `Your ${money(p, "amount")} from ${str(p, "tournamentName") || "your tournament"} is approved and will be credited to your wallet shortly.`, href: "/wallet" };
     case "ORGANIZER_REVENUE_SETTLED":
       return { message: "Your tournament revenue was credited to your wallet.", href: "/wallet" };
     case "QUICK_MATCH_CHALLENGE":

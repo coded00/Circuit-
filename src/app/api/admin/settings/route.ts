@@ -21,7 +21,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const data: { maintenanceMode?: boolean; platformFeeBps?: number; organizerRevenueSettlementHours?: number } = {};
+  const data: { maintenanceMode?: boolean; platformFeeBps?: number; organizerRevenueSettlementHours?: number; payoutAutoApprove?: boolean; payoutAutoApproveMaxKobo?: number } = {};
   const actions: { action: string; metadata?: Prisma.InputJsonValue }[] = [];
 
   if (body.maintenanceMode !== undefined) {
@@ -62,6 +62,24 @@ export async function PATCH(request: Request) {
     actions.push({ action: "settings.organizerRevenueSettlementHoursChange", metadata: { organizerRevenueSettlementHours: hours } });
   }
 
+  if (body.payoutAutoApprove !== undefined) {
+    if (typeof body.payoutAutoApprove !== "boolean") {
+      return NextResponse.json({ error: "payoutAutoApprove must be a boolean." }, { status: 400 });
+    }
+    data.payoutAutoApprove = body.payoutAutoApprove;
+    actions.push({ action: body.payoutAutoApprove ? "settings.payoutAutoApproveOn" : "settings.payoutAutoApproveOff" });
+  }
+
+  if (body.payoutAutoApproveMaxKobo !== undefined) {
+    const max = Number(body.payoutAutoApproveMaxKobo);
+    // Kobo; 0 sends every payout to staff. The ceiling is only a guard against a mistyped amount.
+    if (!Number.isInteger(max) || max < 0 || max > 100_000_000_000) {
+      return NextResponse.json({ error: "The automatic approval limit must be a whole number of kobo, 0 or more." }, { status: 400 });
+    }
+    data.payoutAutoApproveMaxKobo = max;
+    actions.push({ action: "settings.payoutAutoApproveLimitChange", metadata: { payoutAutoApproveMaxKobo: max } });
+  }
+
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
   }
@@ -80,5 +98,7 @@ export async function PATCH(request: Request) {
     maintenanceMode: updated.maintenanceMode,
     platformFeeBps: updated.platformFeeBps,
     organizerRevenueSettlementHours: updated.organizerRevenueSettlementHours,
+    payoutAutoApprove: updated.payoutAutoApprove,
+    payoutAutoApproveMaxKobo: updated.payoutAutoApproveMaxKobo,
   });
 }
