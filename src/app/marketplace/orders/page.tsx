@@ -10,6 +10,7 @@ import { CategoryIcon } from "@/components/marketplace/categoryIcon";
 export const metadata = { robots: { index: false, follow: false } };
 
 const STATUS = {
+  PENDING_PAYMENT: { label: "Awaiting card payment", className: "bg-surface-elevated text-muted" },
   PAID: { label: "Being prepared", className: "bg-accent-blue-soft text-accent-blue" },
   FULFILLED: { label: "Delivered", className: "bg-success/15 text-success" },
   CANCELLED: { label: "Cancelled and refunded", className: "bg-surface-elevated text-muted" },
@@ -56,7 +57,7 @@ export default async function MyOrdersPage() {
                 </Link>
                 <span className="text-stat shrink-0 text-gold">{formatListingPrice(o.amountKobo)}</span>
               </div>
-              <span className={`cut-xs w-fit px-2 py-1 text-xs font-semibold ${STATUS[o.status].className}`}>{STATUS[o.status].label}</span>
+              <span className={`cut-xs w-fit px-2 py-1 text-xs font-semibold ${STATUS[o.status].className}`}>{o.status === "CANCELLED" && o.paymentMethod === "CARD" ? (o.refundStatus === "COMPLETE" ? "Cancelled and refunded to your card" : o.refundStatus === "FAILED" ? "Cancelled. We're sorting out your card refund" : o.refundStatus === "PENDING" ? "Cancelled. Refund to your card on its way" : "Cancelled") : STATUS[o.status].label}</span>
               {o.buyerNote && <p className="text-xs text-muted">You told us: {o.buyerNote}</p>}
               {o.status === "FULFILLED" && o.listing.deliveryUrl && (
                 <a href={`/api/marketplace/orders/${o.id}/download`} className="btn-primary w-fit">

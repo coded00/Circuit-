@@ -148,7 +148,7 @@ enum ReportStatus {
 model User {
   /// Bumped on password change/reset and on suspension. Session tokens carry the value they were
   /// issued with, so bumping it signs out every other device holding an older token.
-  sessionVersion Int @default(0)
+  sessionVersion      Int                   @default(0)
   id                  String                @id @default(cuid())
   displayName         String
   handle              String                @unique
@@ -2132,34 +2132,52 @@ model Listing {
 /// FULFILLED = delivered (with a note the buyer can read); CANCELLED =
 /// refunded to the wallet.
 enum OrderStatus {
+  /// Paid by card and waiting for the provider to confirm; the unit is held until `reservedUntil`.
+  PENDING_PAYMENT
   PAID
   FULFILLED
   CANCELLED
 }
 
+enum OrderPaymentMethod {
+  WALLET
+  CARD
+}
+
 /// One Marketplace purchase. Title/category/price are copied at purchase so
 /// editing or removing the listing later never rewrites history.
 model Order {
-  id             String          @id @default(cuid())
-  listingId      String
-  listing        Listing         @relation(fields: [listingId], references: [id])
-  buyerId        String
-  buyer          User            @relation(fields: [buyerId], references: [id])
-  listingTitle   String
-  category       ListingCategory
-  amountKobo     Int
+  id              String                   @id @default(cuid())
+  listingId       String
+  listing         Listing                  @relation(fields: [listingId], references: [id])
+  buyerId         String
+  buyer           User                     @relation(fields: [buyerId], references: [id])
+  listingTitle    String
+  category        ListingCategory
+  amountKobo      Int
   /// The buyer's answer to the listing's `buyerPrompt`.
-  buyerNote      String?
-  status         OrderStatus     @default(PAID)
+  buyerNote       String?
+  status          OrderStatus              @default(PAID)
   /// Circuit's delivery message (a code, a link, instructions) or the reason
   /// for a cancellation. Shown to the buyer.
-  fulfilmentNote String?
-  fulfilledAt    DateTime?
-  cancelledAt    DateTime?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  fulfilmentNote  String?
+  fulfilledAt     DateTime?
+  cancelledAt     DateTime?
+  /// How it was paid. A wallet order is debited at once; a card order starts PENDING_PAYMENT.
+  paymentMethod   OrderPaymentMethod       @default(WALLET)
+  paymentProvider PaymentProviderName?
+  /// The provider's charge reference for a card order. Unique, so a payment can only ever belong to one order.
+  paymentRef      String?                  @unique
+  /// A card order's unit is held until this time; if the payment has not been confirmed by then it is released.
+  reservedUntil   DateTime?
+  /// A card order that was cancelled is refunded to the card, not the wallet: the refund's reference and progress.
+  refundRef       String?                  @unique
+  refundStatus    WalletTransactionStatus?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
 
   @@index([buyerId, createdAt])
   @@index([status, createdAt])
+  @@index([status, reservedUntil])
   @@index([listingId])
 }

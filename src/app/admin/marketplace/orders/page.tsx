@@ -11,8 +11,8 @@ import { categoryLabel, formatListingPrice } from "@/lib/marketplace";
 import { EmptyState, PageHeader, StatusBadge, SubNav, plural, type BadgeTone } from "@/components/admin/ui";
 import { OrderActions } from "@/components/marketplace/OrderActions";
 
-const STATUS_TONE: Record<OrderStatus, BadgeTone> = { PAID: "attention", FULFILLED: "success", CANCELLED: "neutral" };
-const STATUS_LABEL: Record<OrderStatus, string> = { PAID: "To deliver", FULFILLED: "Delivered", CANCELLED: "Cancelled" };
+const STATUS_TONE: Record<OrderStatus, BadgeTone> = { PENDING_PAYMENT: "info", PAID: "attention", FULFILLED: "success", CANCELLED: "neutral" };
+const STATUS_LABEL: Record<OrderStatus, string> = { PENDING_PAYMENT: "Awaiting card payment", PAID: "To deliver", FULFILLED: "Delivered", CANCELLED: "Cancelled" };
 const FILTERS: { key: string; label: string; status: OrderStatus | null }[] = [
   { key: "paid", label: "To deliver", status: "PAID" },
   { key: "fulfilled", label: "Delivered", status: "FULFILLED" },
@@ -62,6 +62,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-stat">{formatListingPrice(o.amountKobo)}</span>
+                  {o.paymentMethod === "CARD" && <StatusBadge tone="neutral">Card</StatusBadge>}
                   <StatusBadge tone={STATUS_TONE[o.status]} dot>
                     {STATUS_LABEL[o.status]}
                   </StatusBadge>
@@ -69,6 +70,13 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
               </div>
               {o.buyerNote && <p className="text-[13px]"><span className="text-muted">Buyer details: </span>{o.buyerNote}</p>}
               {o.fulfilmentNote && <p className="text-[13px] whitespace-pre-wrap"><span className="text-muted">Note to buyer: </span>{o.fulfilmentNote}</p>}
+              {o.paymentMethod === "CARD" && o.status === "CANCELLED" && (
+                <p className="text-[13px]">
+                  <span className="text-muted">Card refund: </span>
+                  {o.refundStatus === "COMPLETE" ? "refunded" : o.refundStatus === "FAILED" ? "failed, needs a retry" : "in progress (the bank can take a few days)"}
+                </p>
+              )}
+              {o.paymentMethod === "CARD" && o.status === "CANCELLED" && o.refundStatus === "FAILED" && <OrderActions id={o.id} retryRefund />}
               {o.status === "PAID" && <OrderActions id={o.id} />}
               {o.status === "FULFILLED" && <OrderActions id={o.id} delivered />}
             </li>

@@ -7,7 +7,7 @@ import { formatListingPrice } from "@/lib/marketplace";
 import { loginPath } from "@/lib/safeRedirect";
 import { feedback } from "@/lib/feedback";
 
-/** Buy now from the wallet: confirm the price and balance, ask for the buyer's details if the listing needs them. */
+/** Buy now, from the wallet or by card: confirm the price, ask for the buyer's details if the listing needs them. */
 export function BuyPanel({
   listingId,
   priceKobo,
@@ -35,6 +35,7 @@ export function BuyPanel({
   const [error, setError] = useState<string | null>(null);
   const short = signedIn && walletBalance < priceKobo;
   const [step, setStep] = useState<"fill" | "review">("fill");
+  const [method, setMethod] = useState<"wallet" | "card">("wallet");
 
   async function buy(event: React.FormEvent) {
     event.preventDefault();
@@ -44,6 +45,23 @@ export function BuyPanel({
     }
     setBusy(true);
     setError(null);
+    if (method === "card") {
+      // Holds the unit and returns the card checkout's address; the order is confirmed when the payment is.
+      const res = await fetch("/api/marketplace/orders/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ listingId, note }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || typeof data?.authorizationUrl !== "string") {
+        setError(data?.error ?? "Couldn't start the card payment.");
+        setBusy(false);
+        setStep("fill");
+        return;
+      }
+      window.location.href = data.authorizationUrl;
+      return;
+    }
     const res = await fetch("/api/marketplace/orders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -91,15 +109,27 @@ export function BuyPanel({
             <span className="text-muted">Your wallet</span>
             <span className={`text-stat ${short ? "text-accent-orange" : ""}`}>{formatListingPrice(walletBalance)}</span>
           </div>
-          {short ? (
-            <Link href="/wallet" className="btn-primary w-fit">
-              Top up wallet
-            </Link>
-          ) : (
-            <button type="submit" className="btn-primary w-fit">
-              Buy for {formatListingPrice(priceKobo)}
-            </button>
-          )}
+          <div className="flex flex-wrap gap-2">
+            {short ? (
+              <>
+                <button type="submit" onClick={() => setMethod("card")} className="btn-primary w-fit">
+                  Pay {formatListingPrice(priceKobo)} by card
+                </button>
+                <Link href="/wallet" className="btn-secondary w-fit">
+                  Top up wallet
+                </Link>
+              </>
+            ) : (
+              <>
+                <button type="submit" onClick={() => setMethod("wallet")} className="btn-primary w-fit">
+                  Buy for {formatListingPrice(priceKobo)}
+                </button>
+                <button type="submit" onClick={() => setMethod("card")} className="btn-secondary w-fit">
+                  Pay by card
+                </button>
+              </>
+            )}
+          </div>
         </>
       ) : (
         <>
@@ -109,14 +139,23 @@ export function BuyPanel({
               <dt className="text-muted">Price</dt>
               <dd className="text-stat">{formatListingPrice(priceKobo)}</dd>
             </div>
-            <div className="flex justify-between gap-4">
-              <dt className="text-muted">Wallet now</dt>
-              <dd className="text-stat">{formatListingPrice(walletBalance)}</dd>
-            </div>
-            <div className="flex justify-between gap-4 border-t border-border pt-2">
-              <dt className="text-muted">Wallet after</dt>
-              <dd className="text-stat">{formatListingPrice(after)}</dd>
-            </div>
+            {method === "wallet" ? (
+              <>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted">Wallet now</dt>
+                  <dd className="text-stat">{formatListingPrice(walletBalance)}</dd>
+                </div>
+                <div className="flex justify-between gap-4 border-t border-border pt-2">
+                  <dt className="text-muted">Wallet after</dt>
+                  <dd className="text-stat">{formatListingPrice(after)}</dd>
+                </div>
+              </>
+            ) : (
+              <div className="flex justify-between gap-4 border-t border-border pt-2">
+                <dt className="text-muted">Pay with</dt>
+                <dd>Card, on the next page</dd>
+              </div>
+            )}
             {buyerPrompt && (
               <div className="flex justify-between gap-4">
                 <dt className="shrink-0 text-muted">{buyerPrompt}</dt>
@@ -124,9 +163,10 @@ export function BuyPanel({
               </div>
             )}
           </dl>
+          {method === "card" && <p className="text-xs text-muted">We hold your item for 20 minutes while you pay. If the payment isn&apos;t completed, it&apos;s released and you aren&apos;t charged.</p>}
           <div className="flex flex-wrap gap-2">
             <button type="submit" disabled={busy} className="btn-primary">
-              {busy ? "Paying…" : "Confirm and pay"}
+              {busy ? (method === "card" ? "Opening checkout…" : "Paying…") : method === "card" ? "Continue to card payment" : "Confirm and pay"}
             </button>
             <button type="button" disabled={busy} onClick={() => setStep("fill")} className="btn-secondary">
               Back
@@ -140,7 +180,7 @@ export function BuyPanel({
         </p>
       )}
       <p className="text-[12px] text-muted">
-        {instant ? "Paid from your wallet. Your download starts the moment you pay and stays in My orders." : "Paid from your wallet. If Circuit can't deliver, you're refunded to your wallet."}
+        {instant ? "Pay from your wallet or by card. Your download starts the moment you pay and stays in My orders." : "Pay from your wallet or by card. If Circuit can't deliver, you're refunded the same way."}
       </p>
     </form>
   );

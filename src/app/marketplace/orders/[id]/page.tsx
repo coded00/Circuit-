@@ -7,28 +7,49 @@ import { prisma } from "@/lib/db";
 import { categoryLabel, formatListingPrice } from "@/lib/marketplace";
 import { CategoryIcon } from "@/components/marketplace/categoryIcon";
 import { AutoDownload } from "@/components/marketplace/AutoDownload";
+import { confirmMarketplacePayment } from "@/lib/marketplaceCheckout";
+import Poller from "@/app/Poller";
 
 export const metadata = { robots: { index: false, follow: false } };
 
 const when = (d: Date) => d.toLocaleString("en-NG", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
 
-export default async function OrderReceiptPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ placed?: string }> }) {
-  const [{ id }, { placed }] = await Promise.all([params, searchParams]);
+export default async function OrderReceiptPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ placed?: string; paid?: string }> }) {
+  const [{ id }, { placed, paid }] = await Promise.all([params, searchParams]);
   const user = await getCurrentUser();
   if (!user) redirect(loginPath(`/marketplace/orders/${id}`));
 
-  const order = await prisma.order.findUnique({ where: { id }, include: { listing: { select: { id: true, deliveryUrl: true, imageUrl: true } } } });
+  const load = () => prisma.order.findUnique({ where: { id }, include: { listing: { select: { id: true, deliveryUrl: true, imageUrl: true } } } });
+  let order = await load();
   if (!order || order.buyerId !== user.id) notFound();
+  // Back from the card checkout: ask the provider whether the payment went through, so the buyer does not have to
+  // wait for the webhook (the same call the webhook makes, and safe to repeat).
+  if (order.status === "PENDING_PAYMENT" && order.paymentRef) {
+    await confirmMarketplacePayment(order.paymentRef).catch(() => undefined);
+    order = (await load()) ?? order;
+  }
+  const byCard = order.paymentMethod === "CARD";
+  const awaiting = order.status === "PENDING_PAYMENT";
 
   const hasDownload = order.status === "FULFILLED" && !!order.listing.deliveryUrl;
   const instant = !!order.listing.deliveryUrl;
   const cancelled = order.status === "CANCELLED";
 
   // Where the order is, as a short timeline.
+  const refundedTo = byCard ? "your card" : "your wallet";
+  const paidStep: { label: string; detail: string; state: "done" | "current" | "todo" | "failed" } = awaiting
+    ? { label: "Waiting for your payment", detail: order.reservedUntil ? `We're holding it for you until ${when(order.reservedUntil)}. If you've already paid, this page updates by itself.` : "Finish paying on the card page.", state: "current" }
+    : cancelled && byCard && !order.refundRef
+      ? { label: "Payment not completed", detail: "You weren't charged.", state: "failed" }
+      : { label: "Paid", detail: `${formatListingPrice(order.amountKobo)} ${byCard ? "by card" : "from your wallet"} · ${when(order.createdAt)}`, state: "done" };
   const steps: { label: string; detail: string; state: "done" | "current" | "todo" | "failed" }[] = [
-    { label: "Paid", detail: `${formatListingPrice(order.amountKobo)} from your wallet · ${when(order.createdAt)}`, state: "done" },
-    cancelled
-      ? { label: "Cancelled and refunded", detail: order.cancelledAt ? `${formatListingPrice(order.amountKobo)} back in your wallet · ${when(order.cancelledAt)}` : "Back in your wallet", state: "failed" }
+    paidStep,
+    awaiting
+      ? { label: "Then Circuit prepares it", detail: "We start as soon as the payment is confirmed.", state: "todo" }
+      : cancelled && byCard && !order.refundRef
+        ? { label: "Cancelled", detail: order.cancelledAt ? when(order.cancelledAt) : "", state: "failed" }
+      : cancelled
+      ? { label: "Cancelled and refunded", detail: order.cancelledAt ? `${formatListingPrice(order.amountKobo)} ${byCard ? "refunded to your card; your bank can take a few days to show it" : "back in your wallet"} · ${when(order.cancelledAt)}` : `Back in ${refundedTo}`, state: "failed" }
       : order.status === "FULFILLED"
         ? { label: instant ? "Ready to download" : "Delivered", detail: order.fulfilledAt ? when(order.fulfilledAt) : "", state: "done" }
         : { label: "Circuit is preparing it", detail: "You'll get a notification when it's ready.", state: "current" },
@@ -42,6 +63,18 @@ export default async function OrderReceiptPage({ params, searchParams }: { param
         </Link>
       </nav>
 
+      {awaiting && (paid || order.paymentRef) && <Poller intervalMs={5000} />}
+      {awaiting && paid && (
+        <p role="status" className="alert alert-info">
+          Confirming your payment. This usually takes a few seconds.
+        </p>
+      )}
+      {paid && !awaiting && !cancelled && (
+        <p role="status" className="alert alert-success flex items-center gap-2">
+          <CheckCircle2 size={16} aria-hidden />
+          Payment received. {hasDownload ? "Your download is ready below." : "Circuit will deliver your order and notify you."}
+        </p>
+      )}
       {placed && (
         <p role="status" className="alert alert-success flex items-center gap-2">
           <CheckCircle2 size={16} aria-hidden />
@@ -113,7 +146,7 @@ export default async function OrderReceiptPage({ params, searchParams }: { param
           </div>
           <div className="flex justify-between gap-4">
             <dt className="text-muted">Paid with</dt>
-            <dd>Wallet</dd>
+            <dd>{byCard ? "Card" : "Wallet"}</dd>
           </div>
           <div className="flex justify-between gap-4">
             <dt className="text-muted">Ordered</dt>

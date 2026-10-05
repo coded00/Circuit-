@@ -44,14 +44,14 @@ export default async function ListingPage({ params }: { params: Promise<{ id: st
   const soldOut = listing.stock === 0 || listing.status !== "ACTIVE";
   const steps = instant
     ? [
-        { Icon: Wallet, title: "Pay from your wallet", body: "One tap, and you see your balance before you confirm." },
+        { Icon: Wallet, title: "Pay from your wallet or by card", body: "One tap from your wallet, or a secure card checkout." },
         { Icon: Download, title: "Download straight away", body: "The file starts downloading the moment you pay." },
         { Icon: PackageCheck, title: "Yours to keep", body: "It stays in My orders, so you can download it again." },
       ]
     : [
-        { Icon: Wallet, title: "Pay from your wallet", body: "One tap, and you see your balance before you confirm." },
+        { Icon: Wallet, title: "Pay from your wallet or by card", body: "One tap from your wallet, or a secure card checkout." },
         { Icon: PackageCheck, title: "Circuit delivers it", body: "We prepare your order and send it to you. You get a notification." },
-        { Icon: Undo2, title: "Refunded if we can't", body: "If we can't deliver, the money goes straight back to your wallet." },
+        { Icon: Undo2, title: "Refunded if we can't", body: "If we can't deliver, the money goes straight back to your wallet or card." },
       ];
 
   return (

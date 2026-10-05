@@ -55,7 +55,8 @@ export default async function WalletPage() {
 
   const { balance, fundingHistory, rows, totalPaid, totalRefunded, totalWon, pendingWithdrawals, heldInChallenges } = await getWalletActivity(user.id);
 
-  const orders = await prisma.order.findMany({ where: { buyerId: user.id }, orderBy: { createdAt: "desc" }, take: 100 });
+  // Card orders never touched the wallet, so they are not part of its statement (they show under My orders).
+  const orders = await prisma.order.findMany({ where: { buyerId: user.id, paymentMethod: "WALLET" }, orderBy: { createdAt: "desc" }, take: 100 });
 
   const entries: WalletEntry[] = [
     ...orders.flatMap((o): WalletEntry[] => [

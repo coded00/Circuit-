@@ -10,6 +10,7 @@ import { withKeyedLock } from "@/lib/keyedLock";
 import { prisma } from "@/lib/db";
 import { blockedBetween } from "@/lib/blocks";
 import { BUYER_NOTE_MAX } from "@/lib/marketplace";
+import { refundCardOrder } from "@/lib/marketplaceCardRefund";
 
 export class OrderError extends Error {
   constructor(
@@ -20,7 +21,8 @@ export class OrderError extends Error {
   }
 }
 
-export async function placeOrder(buyer: { id: string; isSuspended: boolean }, input: { listingId: string; note?: unknown }, options: { signal?: AbortSignal } = {}) {
+/** The checks every purchase shares, however it is paid: who may buy what, and what the buyer must tell us. */
+export async function loadPurchasableListing(buyer: { id: string; isSuspended: boolean }, input: { listingId: string; note?: unknown }) {
   if (buyer.isSuspended) throw new OrderError("Your account is suspended.", 403);
 
   const listing = await prisma.listing.findUnique({
@@ -34,6 +36,11 @@ export async function placeOrder(buyer: { id: string; isSuspended: boolean }, in
   const note = typeof input.note === "string" ? input.note.trim() : "";
   if (listing.buyerPrompt && !note) throw new OrderError(`${listing.buyerPrompt} is required.`, 400);
   if (note.length > BUYER_NOTE_MAX) throw new OrderError(`Keep that under ${BUYER_NOTE_MAX} characters.`, 400);
+  return { listing, note };
+}
+
+export async function placeOrder(buyer: { id: string; isSuspended: boolean }, input: { listingId: string; note?: unknown }, options: { signal?: AbortSignal } = {}) {
+  const { listing, note } = await loadPurchasableListing(buyer, input);
 
   // Orders for one listing queue here, not on the database row lock (see keyedLock).
   return withKeyedLock(`listing:${listing.id}`, () => prisma.$transaction(async (tx) => {
@@ -87,7 +94,7 @@ export async function fulfilOrder(orderId: string, note: string | null) {
  * not put back in stock.
  */
 export async function cancelOrder(orderId: string, reason: string | null, options: { refundDelivered?: boolean } = {}) {
-  return prisma.$transaction(async (tx) => {
+  const order = await prisma.$transaction(async (tx) => {
     const before = await tx.order.findUnique({ where: { id: orderId }, select: { status: true } });
     const claimed = await tx.order.updateMany({
       where: { id: orderId, status: { in: options.refundDelivered ? ["PAID", "FULFILLED"] : ["PAID"] } },
@@ -95,8 +102,13 @@ export async function cancelOrder(orderId: string, reason: string | null, option
     });
     if (claimed.count === 0) return null;
     const order = await tx.order.findUniqueOrThrow({ where: { id: orderId } });
-    await tx.user.update({ where: { id: order.buyerId }, data: { walletBalance: { increment: order.amountKobo } } });
-    await tx.walletTransaction.create({ data: { userId: order.buyerId, type: "MARKETPLACE_REFUND", amount: order.amountKobo, status: "COMPLETE" } });
+    if (order.paymentMethod === "CARD") {
+      // Paid by card: the money goes back to the card (below, once this commits), not into the wallet.
+      await tx.order.update({ where: { id: orderId }, data: { refundRef: `refund_${order.paymentRef}`, refundStatus: "PENDING" } });
+    } else {
+      await tx.user.update({ where: { id: order.buyerId }, data: { walletBalance: { increment: order.amountKobo } } });
+      await tx.walletTransaction.create({ data: { userId: order.buyerId, type: "MARKETPLACE_REFUND", amount: order.amountKobo, status: "COMPLETE" } });
+    }
     // Give the unit back; a listing that sold out because of it opens again.
     const listing = await tx.listing.findUnique({ where: { id: order.listingId }, select: { stock: true, status: true } });
     if (before?.status === "PAID" && listing && listing.stock !== null) {
@@ -107,4 +119,7 @@ export async function cancelOrder(orderId: string, reason: string | null, option
     }
     return order;
   });
+  if (!order) return null;
+  // The card refund is a call to the payment provider, so it happens after the order is safely cancelled.
+  return order.paymentMethod === "CARD" ? refundCardOrder(order.id) : order;
 }

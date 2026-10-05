@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { confirmEntryFeePayment, confirmWalletFunding } from "@/lib/payments/confirm";
+import { confirmMarketplacePayment } from "@/lib/marketplaceCheckout";
+import { applyMarketplaceRefundOutcome } from "@/lib/marketplaceCardRefund";
 import { verifyPaystackSignature } from "@/lib/payments/webhookVerification";
 import { applyRefundOutcome, applyTransferOutcome } from "@/lib/payments/transfers";
 import { paystackClient } from "@/lib/payments/paystack";
@@ -50,12 +52,17 @@ export async function POST(request: Request) {
     if (type === "charge.success" && typeof reference === "string") {
       await confirmEntryFeePayment(reference);
       await confirmWalletFunding(reference);
+      await confirmMarketplacePayment(reference);
     } else if (TRANSFER_EVENTS.has(type) && typeof reference === "string") {
       const status = await paystackClient.verifyTransfer(reference);
       if (status !== "PENDING") await applyTransferOutcome(reference, status);
     } else if (type === "refund.processed" || type === "refund.failed") {
       const chargeRef = event.data?.transaction_reference ?? event.data?.transaction?.reference;
-      if (typeof chargeRef === "string") await applyRefundOutcome(chargeRef, type === "refund.processed" ? "SUCCESS" : "FAILED");
+      if (typeof chargeRef === "string") {
+        const outcome = type === "refund.processed" ? "SUCCESS" : "FAILED";
+        await applyRefundOutcome(chargeRef, outcome);
+        await applyMarketplaceRefundOutcome(chargeRef, outcome);
+      }
     }
   } catch (err) {
     // Rethrown so Paystack gets a 5xx and retries; every handler above is idempotent.

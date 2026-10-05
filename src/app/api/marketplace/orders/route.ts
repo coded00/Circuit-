@@ -4,9 +4,8 @@
  */
 
 import { NextResponse, after } from "next/server";
-import { getCurrentUser, suspendedResponse } from "@/lib/session";
-import { emailVerificationRequired } from "@/lib/emailGate";
-import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
+import { getCurrentUser } from "@/lib/session";
+import { buyerGate } from "@/lib/marketplaceGate";
 import { isRateLimited, recordAttempt } from "@/lib/rateLimit";
 import { AbandonedError } from "@/lib/keyedLock";
 import { OrderError, placeOrder } from "@/lib/marketplaceOrders";
@@ -15,19 +14,8 @@ import { emailOrderReceipt } from "@/lib/orderEmails";
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Sign in to buy." }, { status: 401 });
-  const suspended = suspendedResponse(user);
-  if (suspended) return suspended;
-
-  const unverified = emailVerificationRequired(user);
-  if (unverified) return unverified;
-  try {
-    assertAgeGate(user.dateOfBirth);
-  } catch (err) {
-    if (err instanceof AgeGateError) {
-      return NextResponse.json({ error: err.code === "MISSING_DOB" ? "Add your date of birth in your account settings before buying." : err.message }, { status: 403 });
-    }
-    throw err;
-  }
+  const blocked = buyerGate(user);
+  if (blocked) return blocked;
 
   const body = await request.json().catch(() => null);
   if (typeof body?.listingId !== "string") return NextResponse.json({ error: "Missing listing." }, { status: 400 });

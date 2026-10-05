@@ -6,14 +6,14 @@ import { useConfirmDialog } from "@/components/ConfirmDialogProvider";
 
 /** Staff: deliver a paid order (with a note the buyer reads), or cancel it and refund the buyer's wallet. */
 /** `delivered`: the order is already marked delivered, so the only action left is a refund. */
-export function OrderActions({ id, delivered = false }: { id: string; delivered?: boolean }) {
+export function OrderActions({ id, delivered = false, retryRefund = false }: { id: string; delivered?: boolean; retryRefund?: boolean }) {
   const router = useRouter();
   const confirmDialog = useConfirmDialog();
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function act(action: "fulfil" | "cancel" | "refund") {
+  async function act(action: "fulfil" | "cancel" | "refund" | "retry-refund") {
     if (action === "cancel" || action === "refund") {
       const ok = await confirmDialog(
         action === "refund"
@@ -32,6 +32,21 @@ export function OrderActions({ id, delivered = false }: { id: string; delivered?
     if (!res.ok) setError((await res.json().catch(() => null))?.error ?? "Couldn't update the order.");
     setBusy(false);
     router.refresh();
+  }
+
+  if (retryRefund) {
+    return (
+      <div className="flex flex-col gap-2">
+        <button type="button" disabled={busy} onClick={() => act("retry-refund")} className="btn-primary w-fit">
+          {busy ? "Retrying…" : "Retry the card refund"}
+        </button>
+        {error && (
+          <p role="alert" className="text-sm text-danger">
+            {error}
+          </p>
+        )}
+      </div>
+    );
   }
 
   return (

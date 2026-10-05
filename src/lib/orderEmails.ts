@@ -10,7 +10,7 @@ import { prisma } from "@/lib/db";
 import { sendEmail } from "@/lib/email";
 import { formatListingPrice } from "@/lib/marketplace";
 
-type OrderForEmail = { id: string; buyerId: string; listingTitle: string; amountKobo: number; status: string; fulfilmentNote: string | null };
+type OrderForEmail = { id: string; buyerId: string; listingTitle: string; amountKobo: number; status: string; fulfilmentNote: string | null; paymentMethod?: string };
 
 const SITE = () => (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/$/, "");
 
@@ -30,7 +30,7 @@ export function emailOrderReceipt(order: OrderForEmail, instant: boolean) {
     order,
     (title) => `Your Circuit order: ${title}`,
     (link) =>
-      `Thanks for your order of ${order.listingTitle} (${formatListingPrice(order.amountKobo)}, paid from your wallet).\n\n` +
+      `Thanks for your order of ${order.listingTitle} (${formatListingPrice(order.amountKobo)}, paid ${order.paymentMethod === "CARD" ? "by card" : "from your wallet"}).\n\n` +
       (instant ? "Your download is ready on your order page." : "Circuit is preparing it now. We'll let you know when it is delivered.") +
       `\n\nOrder #${order.id.slice(-8).toUpperCase()}: ${link}`,
   );
@@ -49,6 +49,6 @@ export function emailOrderRefunded(order: OrderForEmail) {
     order,
     (title) => `Refunded: ${title}`,
     (link) =>
-      `Your order of ${order.listingTitle} was cancelled and ${formatListingPrice(order.amountKobo)} went back to your Circuit wallet.${order.fulfilmentNote ? `\n\nNote from Circuit: ${order.fulfilmentNote}` : ""}\n\nDetails: ${link}`,
+      `Your order of ${order.listingTitle} was cancelled and ${formatListingPrice(order.amountKobo)} ${order.paymentMethod === "CARD" ? "is being refunded to your card (your bank can take a few days to show it)" : "went back to your Circuit wallet"}.${order.fulfilmentNote ? `\n\nNote from Circuit: ${order.fulfilmentNote}` : ""}\n\nDetails: ${link}`,
   );
 }

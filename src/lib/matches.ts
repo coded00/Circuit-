@@ -1407,6 +1407,7 @@ export async function runScheduledSweep(): Promise<{
   advancementRepaired: number;
   autoAccepted: number;
   escalated: number;
+  marketplaceHoldsReleased: number;
   payoutsAutoApproved: number;
   payoutsHeldForStaff: number;
   organizerRevenueSettled: number;
@@ -1496,6 +1497,18 @@ export async function runScheduledSweep(): Promise<{
   // folded into this one sweep call rather than a second cron entry — see
   // this file's own header on the Battle/tournament split for the same
   // "one function, branch inside it" preference.
+  // Card orders whose payment never arrived give their held unit back (src/lib/marketplaceCheckout.ts).
+  let marketplaceHolds: { released: number; confirmed: number } = { released: 0, confirmed: 0 };
+  try {
+    const { expireUnpaidOrders } = await import("@/lib/marketplaceCheckout");
+    const expiry = await expireUnpaidOrders();
+    marketplaceHolds = expiry;
+    if (expiry.errors) errors.push(...expiry.errors);
+  } catch (err) {
+    captureException(err, { source: "sweep:expireUnpaidOrders" });
+    errors.push("expireUnpaidOrders");
+  }
+
   // Approve the payouts with nothing wrong (see payoutApproval.ts) before settling, so what was just
   // approved can be released in this same run.
   const payoutApproval = await autoApprovePayouts();
@@ -1533,6 +1546,7 @@ export async function runScheduledSweep(): Promise<{
     advancementRepaired: repair.repaired,
     autoAccepted,
     escalated,
+    marketplaceHoldsReleased: marketplaceHolds.released,
     payoutsAutoApproved: payoutApproval.approved,
     payoutsHeldForStaff: payoutApproval.heldForStaff,
     organizerRevenueSettled: settlement.settled,
