@@ -19,7 +19,7 @@ import { cache, ViewTransition } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { Check, ChevronRight, MessageCircle, ShieldCheck, Timer, Trophy, Tv, Users } from "lucide-react";
+import { Check, ChevronRight, MessageCircle, ShieldCheck, Timer, Trophy, Users } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { teamEntryLabels } from "@/lib/teamEntries";
 import { describePoints, effectiveTable } from "@/lib/lobbyScoring";
@@ -707,8 +707,8 @@ export default async function TournamentPage({ params, searchParams }: { params:
               </Link>
             )}
             {hasWatch && (
-              <Link href={`/tournaments/${tournament.id}/watch`} className="btn-secondary">
-                <Tv size={14} />
+              <Link href={`/tournaments/${tournament.id}/watch`} className="btn-primary watch-attn">
+                <span className="watch-dot" aria-hidden />
                 Watch
               </Link>
             )}

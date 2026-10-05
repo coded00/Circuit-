@@ -20,22 +20,21 @@ export default async function TournamentWatchPage({ params }: { params: Promise<
   const live = hub.tournament.status === "LIVE";
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-5 px-4 py-6 sm:px-8 sm:py-10">
+    <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-5 px-4 py-6 sm:px-8 sm:py-10">
       <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-sm text-muted">
         <Link href={`/tournaments/${hub.tournament.id}`} className="flex items-center gap-1 transition hover:text-foreground">
           <ChevronLeft size={16} /> {hub.tournament.name}
         </Link>
       </nav>
 
-      <header className="flex flex-col gap-1">
-        <span className="text-eyebrow text-accent-volt">Circuit Watch</span>
-        <h1 className="font-display text-2xl leading-[1.05] font-bold tracking-tight uppercase sm:text-4xl">{hub.tournament.name}</h1>
-        <div className="flex items-center gap-2 text-xs text-muted">
-          {live && <span className="cut-xs bg-danger/15 px-2 py-0.5 font-semibold tracking-wide text-danger uppercase">Tournament live</span>}
-          <span>{hub.tournament.game}</span>
-          <span aria-hidden>·</span>
-          <span>Watch the game from every angle</span>
+      <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-1 border-b border-border pb-4">
+        <div className="min-w-0">
+          <p className="text-sm text-muted">
+            {hub.tournament.game} · Circuit Watch
+          </p>
+          <h1 className="font-display text-2xl leading-[1.05] font-bold tracking-tight uppercase sm:text-4xl">{hub.tournament.name}</h1>
         </div>
+        {live && <span className="cut-xs bg-danger px-2.5 py-1 text-xs font-bold tracking-wide text-white uppercase">On air</span>}
       </header>
 
       {hub.channels.length === 0 ? (

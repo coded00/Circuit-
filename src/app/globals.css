@@ -1283,6 +1283,40 @@ body {
   }
 }
 
+/* The Watch button: a soft brightness pulse and a pulsing dot, to draw the eye to a stream that can be watched. */
+@keyframes watch-attn {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.25);
+  }
+}
+@keyframes watch-dot {
+  0% {
+    box-shadow: 0 0 0 0 currentColor;
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 6px transparent;
+  }
+}
+.watch-attn {
+  animation: watch-attn 2s ease-in-out infinite;
+}
+.watch-attn:hover {
+  animation: none;
+}
+.watch-dot {
+  display: inline-block;
+  height: 8px;
+  width: 8px;
+  border-radius: 9999px;
+  background: currentColor;
+  animation: watch-dot 1.6s ease-out infinite;
+}
+
 @keyframes capacity-flash-pulse {
   0% {
     filter: brightness(1);
