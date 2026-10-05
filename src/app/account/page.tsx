@@ -61,6 +61,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
             initialEmail={user.email ?? ""}
             initialNotifyNewContent={user.notifyNewContent}
             initialRegion={user.region ?? ""}
+            hasPassword={!!user.passwordHash}
           />
           <CommunityTagPicker
             options={taggedCommunities.map((c) => ({ id: c.id, name: c.name ?? "Community", tag: c.tag! }))}

@@ -55,3 +55,16 @@ export async function requireSuperAdmin(message = "Only a Super Admin can do tha
   if (user.adminRole !== "SUPER_ADMIN") return { user: null, error: NextResponse.json({ error: message }, { status: 403 }) };
   return { user, error: null };
 }
+
+/**
+ * A suspended account may still sign in and read, appeal, and clean up its own pending items,
+ * but must not create content, take part in competitions or move money. Mutating routes call
+ * this right after the sign-in check and return its response when it is not null.
+ */
+export function suspendedResponse(user: Pick<User, "isSuspended" | "suspensionReason">): NextResponse | null {
+  if (!user.isSuspended) return null;
+  return NextResponse.json(
+    { error: `Your account is suspended: ${user.suspensionReason ?? "contact support."}` },
+    { status: 403 }
+  );
+}

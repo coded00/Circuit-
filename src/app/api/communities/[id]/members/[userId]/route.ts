@@ -5,7 +5,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, suspendedResponse } from "@/lib/session";
 import { muteMember, removeMember, setMemberRole, transferOwnership, unmuteMember } from "@/lib/communityModeration";
 import { handleCommunityError, jsonBody } from "@/lib/communityHttp";
 
@@ -14,6 +14,8 @@ type Params = { params: Promise<{ id: string; userId: string }> };
 export async function PATCH(request: Request, { params }: Params) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "You must be signed in." }, { status: 401 });
+  const suspended = suspendedResponse(user);
+  if (suspended) return suspended;
   const { id, userId } = await params;
   const body = await jsonBody(request);
   try {
@@ -31,6 +33,8 @@ export async function PATCH(request: Request, { params }: Params) {
 export async function DELETE(request: Request, { params }: Params) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "You must be signed in." }, { status: 401 });
+  const suspended = suspendedResponse(user);
+  if (suspended) return suspended;
   const { id, userId } = await params;
   const body = await jsonBody(request);
   try {

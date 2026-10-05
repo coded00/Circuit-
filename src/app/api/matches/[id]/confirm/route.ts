@@ -6,7 +6,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, suspendedResponse } from "@/lib/session";
 import { confirmResult, MatchError } from "@/lib/matches";
 
 const STATUS_BY_CODE: Partial<Record<MatchError["code"], number>> = {
@@ -22,6 +22,8 @@ const STATUS_BY_CODE: Partial<Record<MatchError["code"], number>> = {
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "You must be signed in." }, { status: 401 });
+  const suspended = suspendedResponse(user);
+  if (suspended) return suspended;
   const { id } = await params;
   try {
     const result = await confirmResult({ matchId: id, confirmingUserId: user.id });

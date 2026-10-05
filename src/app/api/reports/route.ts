@@ -4,10 +4,11 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, suspendedResponse } from "@/lib/session";
 import { proofStorage } from "@/lib/storage";
 import { notifyStaff } from "@/lib/notifications";
 import { PROOF_TYPE_ERROR, sniffProofType } from "@/lib/imageSniff";
+import { isRateLimited, recordAttempt } from "@/lib/rateLimit";
 
 const MAX_EVIDENCE_BYTES = 10 * 1024 * 1024;
 const VALID_REASON_CODES = [
@@ -29,6 +30,16 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ error: "You must be signed in to file a report." }, { status: 401 });
   }
+  const suspended = suspendedResponse(user);
+  if (suspended) return suspended;
+
+  // Every report notifies staff, so one account can't file them without limit.
+  const rateKey = `report:${user.id}`;
+  const { limited, retryAfterSeconds } = await isRateLimited(rateKey, { max: 10, windowMs: 60 * 60 * 1000 });
+  if (limited) {
+    return NextResponse.json({ error: "You've filed a lot of reports. Try again later." }, { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } });
+  }
+  await recordAttempt(rateKey);
 
   const form = await request.formData().catch(() => null);
   if (!form) {

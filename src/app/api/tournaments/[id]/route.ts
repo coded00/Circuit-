@@ -9,7 +9,7 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, suspendedResponse } from "@/lib/session";
 import { parseOptionalUrl, parseOptionalImageUrl } from "@/lib/validation";
 import { logAdminAction } from "@/lib/auditLog";
 import { entriesPerMatch } from "@/lib/gameCatalog";
@@ -36,6 +36,8 @@ export async function PATCH(
   if (!user) {
     return NextResponse.json({ error: "You must be signed in." }, { status: 401 });
   }
+  const suspended = suspendedResponse(user);
+  if (suspended) return suspended;
 
   const { id } = await params;
   const tournament = await prisma.tournament.findUnique({ where: { id } });

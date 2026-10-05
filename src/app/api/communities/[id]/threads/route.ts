@@ -5,7 +5,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, suspendedResponse } from "@/lib/session";
 import { createThread, listThreads } from "@/lib/communityThreads";
 import { handleCommunityError, jsonBody } from "@/lib/communityHttp";
 import { isRateLimited, recordAttempt } from "@/lib/rateLimit";
@@ -24,6 +24,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "You must be signed in." }, { status: 401 });
+  const suspended = suspendedResponse(user);
+  if (suspended) return suspended;
   const body = await jsonBody(request);
   if (typeof body.channelId !== "string") return NextResponse.json({ error: "Which channel?" }, { status: 400 });
   const key = `thread-create:${user.id}`;

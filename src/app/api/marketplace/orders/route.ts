@@ -4,7 +4,7 @@
  */
 
 import { NextResponse, after } from "next/server";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, suspendedResponse } from "@/lib/session";
 import { emailVerificationRequired } from "@/lib/emailGate";
 import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
 import { isRateLimited, recordAttempt } from "@/lib/rateLimit";
@@ -15,6 +15,8 @@ import { emailOrderReceipt } from "@/lib/orderEmails";
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Sign in to buy." }, { status: 401 });
+  const suspended = suspendedResponse(user);
+  if (suspended) return suspended;
 
   const unverified = emailVerificationRequired(user);
   if (unverified) return unverified;

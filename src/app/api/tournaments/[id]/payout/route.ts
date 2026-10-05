@@ -13,7 +13,7 @@ import { randomUUID } from "crypto";
 import { Prisma, EscrowStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { tournamentPrizeShares } from "@/lib/prizePlaces";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, suspendedResponse } from "@/lib/session";
 import { getDefaultPaymentProvider } from "@/lib/payments";
 import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
 import { trackEvent } from "@/lib/analytics";
@@ -45,6 +45,8 @@ export async function POST(
   if (!user) {
     return NextResponse.json({ error: "You must be signed in." }, { status: 401 });
   }
+  const suspended = suspendedResponse(user);
+  if (suspended) return suspended;
 
   const { id } = await params;
   const tournament = await prisma.tournament.findUnique({ where: { id } });

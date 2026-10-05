@@ -9,7 +9,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, suspendedResponse } from "@/lib/session";
 import { communityErrorResponse } from "@/lib/communityHttp";
 import {
   getChannelMessages,
@@ -65,6 +65,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ chan
 export async function POST(request: Request, { params }: { params: Promise<{ channelId: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "You must be signed in." }, { status: 401 });
+  const suspended = suspendedResponse(user);
+  if (suspended) return suspended;
 
   const { channelId } = await params;
 

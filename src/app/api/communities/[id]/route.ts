@@ -4,7 +4,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, suspendedResponse } from "@/lib/session";
 import { prisma } from "@/lib/db";
 import { CommunityError, effectiveRole } from "@/lib/community";
 import { updateCommunity } from "@/lib/communityDirectory";
@@ -14,6 +14,8 @@ import { handleCommunityError, jsonBody } from "@/lib/communityHttp";
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "You must be signed in." }, { status: 401 });
+  const suspended = suspendedResponse(user);
+  if (suspended) return suspended;
   const { id } = await params;
   try {
     const community = await prisma.community.findUnique({ where: { id } });
@@ -30,6 +32,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "You must be signed in." }, { status: 401 });
+  const suspended = suspendedResponse(user);
+  if (suspended) return suspended;
   const { id } = await params;
   try {
     await closeCommunity(id, user);

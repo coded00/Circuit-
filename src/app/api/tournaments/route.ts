@@ -10,7 +10,7 @@
 
 import { NextResponse, after } from "next/server";
 import { prisma } from "@/lib/db";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, suspendedResponse } from "@/lib/session";
 import { parseOptionalUrl, parseOptionalImageUrl } from "@/lib/validation";
 import { parseLobbyGroups, parseLobbyRounds, type LobbyGroupsConfig } from "@/lib/lobbyScoring";
 import { getStructure } from "@/lib/competitionStructures";
@@ -49,6 +49,8 @@ export async function POST(request: Request) {
       { status: 401 }
     );
   }
+  const suspended = suspendedResponse(user);
+  if (suspended) return suspended;
 
   const rateLimitKey = `tournament-create:${user.id}`;
   const { limited, retryAfterSeconds } = await isRateLimited(rateLimitKey, {

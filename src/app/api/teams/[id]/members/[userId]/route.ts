@@ -7,7 +7,7 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, suspendedResponse } from "@/lib/session";
 
 export async function DELETE(
   _request: Request,
@@ -17,6 +17,8 @@ export async function DELETE(
   if (!user) {
     return NextResponse.json({ error: "You must be signed in." }, { status: 401 });
   }
+  const suspended = suspendedResponse(user);
+  if (suspended) return suspended;
 
   const { id, userId: targetUserId } = await params;
   const team = await prisma.team.findUnique({ where: { id } });

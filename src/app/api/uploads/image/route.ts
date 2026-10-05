@@ -5,7 +5,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, suspendedResponse } from "@/lib/session";
 import { isRateLimited, recordAttempt } from "@/lib/rateLimit";
 import { IMAGE_PURPOSES, MAX_PUBLIC_IMAGE_BYTES, UploadError, isImagePurpose, storePublicImage } from "@/lib/uploads";
 
@@ -16,6 +16,8 @@ const UPLOAD_RATE_LIMIT = { max: 30, windowMs: 10 * 60 * 1000 };
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "You must be signed in." }, { status: 401 });
+  const suspended = suspendedResponse(user);
+  if (suspended) return suspended;
 
   const form = await request.formData().catch(() => null);
   const file = form?.get("file");

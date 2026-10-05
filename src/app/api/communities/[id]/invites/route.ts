@@ -1,7 +1,7 @@
 /** Circuit — create an invite link: POST { expiresInHours?, maxUses? }. */
 
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, suspendedResponse } from "@/lib/session";
 import { createInvite } from "@/lib/communityModeration";
 import { handleCommunityError, jsonBody } from "@/lib/communityHttp";
 import { isRateLimited, recordAttempt } from "@/lib/rateLimit";
@@ -9,6 +9,8 @@ import { isRateLimited, recordAttempt } from "@/lib/rateLimit";
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "You must be signed in." }, { status: 401 });
+  const suspended = suspendedResponse(user);
+  if (suspended) return suspended;
   const { id } = await params;
   const key = `community-invite:${user.id}`;
   if ((await isRateLimited(key, { max: 30, windowMs: 60 * 60 * 1000 })).limited) {

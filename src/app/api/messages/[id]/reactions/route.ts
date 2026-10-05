@@ -7,7 +7,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, suspendedResponse } from "@/lib/session";
 import { setReaction, CommunityError } from "@/lib/community";
 import { communityErrorResponse } from "@/lib/communityHttp";
 import { isRateLimited, recordAttempt } from "@/lib/rateLimit";
@@ -18,6 +18,8 @@ const REACTION_RATE_LIMIT = { max: 120, windowMs: 60 * 1000 };
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "You must be signed in." }, { status: 401 });
+  const suspended = suspendedResponse(user);
+  if (suspended) return suspended;
 
   const body = await request.json().catch(() => null);
   if (!body || typeof body.on !== "boolean") {

@@ -5,12 +5,14 @@
  */
 
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, suspendedResponse } from "@/lib/session";
 import { LobbyError, saveRoomDetails } from "@/lib/lobby";
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string; number: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
+  const suspended = suspendedResponse(user);
+  if (suspended) return suspended;
   const { id, number } = await params;
   const body = await request.json().catch(() => null);
   try {

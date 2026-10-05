@@ -25,6 +25,10 @@ import { prisma } from "@/lib/db";
  * strictly safer than not limiting them at all.
  */
 export function getClientIp(request: Request): string {
+  // Behind Cloudflare the real visitor address arrives in CF-Connecting-IP, which Cloudflare sets itself.
+  // X-Forwarded-For's first entry is whatever the client chose to send, so it is only the fallback.
+  const cloudflare = request.headers.get("cf-connecting-ip")?.trim();
+  if (cloudflare) return cloudflare;
   const forwardedFor = request.headers.get("x-forwarded-for");
   const first = forwardedFor?.split(",")[0]?.trim();
   return first || "unknown";

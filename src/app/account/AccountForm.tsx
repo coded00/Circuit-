@@ -25,6 +25,7 @@ export default function AccountForm({
   initialEmail,
   initialNotifyNewContent,
   initialRegion,
+  hasPassword,
 }: {
   initialDisplayName: string;
   initialAvatarUrl: string;
@@ -35,6 +36,7 @@ export default function AccountForm({
   initialEmail: string;
   initialNotifyNewContent: boolean;
   initialRegion: string;
+  hasPassword: boolean;
 }) {
   const router = useRouter();
   const [displayName, setDisplayName] = useState(initialDisplayName);
@@ -45,6 +47,7 @@ export default function AccountForm({
   const [bio, setBio] = useState(initialBio);
   const [favoriteGames, setFavoriteGames] = useState(initialFavoriteGames.join(", "));
   const [email, setEmail] = useState(initialEmail);
+  const [currentPassword, setCurrentPassword] = useState("");
   const [notifyNewContent, setNotifyNewContent] = useState(initialNotifyNewContent);
   const [region, setRegion] = useState(initialRegion);
   const [error, setError] = useState<string | null>(null);
@@ -142,6 +145,7 @@ export default function AccountForm({
           .filter(Boolean)
           .slice(0, MAX_FAVORITE_GAMES),
         email: email || null,
+        ...(currentPassword ? { currentPassword } : {}),
         notifyNewContent,
         region: region || null,
       }),
@@ -214,6 +218,23 @@ export default function AccountForm({
         />
         <span className="field-hint">Used only to notify you about new tournaments and Challenges.</span>
       </div>
+
+      {hasPassword && (email !== initialEmail || payoutMethodRef !== initialPayoutMethodRef) && (
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="currentPassword" className="field-label">
+            Current password
+          </label>
+          <input
+            id="currentPassword"
+            type="password"
+            autoComplete="current-password"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+            className="field-input"
+          />
+          <span className="field-hint">Needed to change your email or payout account.</span>
+        </div>
+      )}
 
       <label className="flex items-start gap-2 text-sm text-muted">
         <input
