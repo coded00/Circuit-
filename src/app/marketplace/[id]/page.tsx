@@ -33,9 +33,9 @@ export default async function ListingPage({ params }: { params: Promise<{ id: st
   }
 
   const isOwner = user?.id === listing.sellerId;
-  // Everyone else only sees a live listing from a seller they can reach.
+  // Everyone else sees a live or sold-out listing from a seller they can reach (a sold one reads "Sold out", not "not found").
   if (!isOwner) {
-    if (listing.status !== "ACTIVE" || listing.seller.isSuspended) notFound();
+    if ((listing.status !== "ACTIVE" && listing.status !== "SOLD") || listing.seller.isSuspended) notFound();
     if (user && (await blockedBetween(user.id, listing.sellerId))) notFound();
   }
 

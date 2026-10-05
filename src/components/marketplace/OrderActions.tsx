@@ -2,17 +2,26 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useConfirmDialog } from "@/components/ConfirmDialogProvider";
 
 /** Staff: deliver a paid order (with a note the buyer reads), or cancel it and refund the buyer's wallet. */
 /** `delivered`: the order is already marked delivered, so the only action left is a refund. */
 export function OrderActions({ id, delivered = false }: { id: string; delivered?: boolean }) {
   const router = useRouter();
+  const confirmDialog = useConfirmDialog();
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function act(action: "fulfil" | "cancel" | "refund") {
-    if ((action === "cancel" || action === "refund") && !confirm("Refund the buyer's wallet" + (action === "refund" ? " and stop their download?" : " and cancel this order?"))) return;
+    if (action === "cancel" || action === "refund") {
+      const ok = await confirmDialog(
+        action === "refund"
+          ? { title: "Refund this order?", message: "The buyer's wallet is refunded and their download stops.", confirmLabel: "Refund" }
+          : { title: "Cancel this order?", message: "The buyer's wallet is refunded in full.", confirmLabel: "Cancel and refund" }
+      );
+      if (!ok) return;
+    }
     setBusy(true);
     setError(null);
     const res = await fetch(`/api/admin/marketplace/orders/${id}`, {

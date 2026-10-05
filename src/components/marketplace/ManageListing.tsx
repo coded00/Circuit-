@@ -3,15 +3,17 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ListingStatus } from "@prisma/client";
+import { useConfirmDialog } from "@/components/ConfirmDialogProvider";
 
 /** The seller's own controls for a listing: pause/resume, mark sold, remove. */
 export function ManageListing({ id, status, admin = false }: { id: string; status: ListingStatus; admin?: boolean }) {
   const router = useRouter();
+  const confirmDialog = useConfirmDialog();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function set(next: ListingStatus) {
-    if (next === "REMOVED" && !confirm("Remove this listing? It disappears from the Marketplace.")) return;
+    if (next === "REMOVED" && !(await confirmDialog({ title: "Remove this listing?", message: "It disappears from the Marketplace.", confirmLabel: "Remove" }))) return;
     setBusy(true);
     setError(null);
     const res = await fetch(`/api/marketplace/listings/${id}`, {
