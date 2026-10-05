@@ -64,6 +64,30 @@ const nextConfig: NextConfig = {
             value: "object-src 'none'; base-uri 'self'; frame-ancestors 'self'",
           },
           {
+            // The full policy, in report-only mode first: nothing is blocked, but every violation is reported to
+            // /api/csp-report so the allow-list can be checked against real traffic before it is enforced.
+            // Inline scripts stay allowed ('unsafe-inline') because the framework emits them without a per-request
+            // nonce; what this policy limits is where scripts load from and where the page can send data.
+            key: "Content-Security-Policy-Report-Only",
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline' https://cdn.onesignal.com",
+              "style-src 'self' 'unsafe-inline'",
+              "img-src 'self' data: blob: https:",
+              "font-src 'self' data:",
+              "connect-src 'self' https://onesignal.com https://*.onesignal.com",
+              "frame-src https://www.youtube.com https://www.youtube-nocookie.com",
+              "media-src 'self' blob: https:",
+              "worker-src 'self' blob:",
+              "manifest-src 'self'",
+              "object-src 'none'",
+              "base-uri 'self'",
+              "form-action 'self'",
+              "frame-ancestors 'self'",
+              "report-uri /api/csp-report",
+            ].join("; "),
+          },
+          {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=()",
           },

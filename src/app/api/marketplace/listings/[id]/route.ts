@@ -32,6 +32,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ ok: true });
   }
 
+  if (user.isSuspended && !user.isStaff) return NextResponse.json({ error: "Your account is suspended." }, { status: 403 });
   const parsed = parseListingInput(body);
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
   await prisma.listing.update({ where: { id }, data: parsed.value });

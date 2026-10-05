@@ -13,6 +13,7 @@ import { getCurrentUser } from "@/lib/session";
 import { getFriendIds } from "@/lib/friends";
 import { getTeammateIds } from "@/lib/teams";
 import { parseCommunityPostContent } from "@/lib/validation";
+import { limitOrRespond } from "@/lib/rateLimitHttp";
 
 const DEFAULT_TAKE = 20;
 const MAX_TAKE = 50;
@@ -60,6 +61,9 @@ export async function POST(request: Request) {
       { status: 403 }
     );
   }
+
+  const tooMany = await limitOrRespond(`community-post:${user.id}`, { max: 20, windowMs: 10 * 60 * 1000 }, "You're posting too fast. Try again in a few minutes.");
+  if (tooMany) return tooMany;
 
   const body = await request.json().catch(() => null);
   const parsed = parseCommunityPostContent(body?.content);

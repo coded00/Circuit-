@@ -9,6 +9,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser, suspendedResponse } from "@/lib/session";
 import { notify } from "@/lib/notifications";
+import { limitOrRespond } from "@/lib/rateLimitHttp";
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -17,6 +18,8 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   }
   const suspended = suspendedResponse(user);
   if (suspended) return suspended;
+  const tooMany = await limitOrRespond(`team-request:${user.id}`, { max: 20, windowMs: 60 * 60 * 1000 }, "You've asked to join a lot of teams. Try again later.");
+  if (tooMany) return tooMany;
 
   const { id } = await params;
   const team = await prisma.team.findUnique({ where: { id } });

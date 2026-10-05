@@ -8,6 +8,7 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser, suspendedResponse } from "@/lib/session";
 import { notify } from "@/lib/notifications";
 import { blockedBetween } from "@/lib/blocks";
+import { limitOrRespond } from "@/lib/rateLimitHttp";
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
@@ -16,6 +17,8 @@ export async function POST(request: Request) {
   }
   const suspended = suspendedResponse(user);
   if (suspended) return suspended;
+  const tooMany = await limitOrRespond(`friend-request:${user.id}`, { max: 30, windowMs: 60 * 60 * 1000 }, "You've sent a lot of friend requests. Try again later.");
+  if (tooMany) return tooMany;
 
   const body = await request.json().catch(() => null);
   const handle = typeof body?.handle === "string" ? body.handle.trim() : "";

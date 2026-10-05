@@ -90,7 +90,7 @@ export async function POST(request: Request) {
   }
   if (phoneTaken) {
     await recordAttempt(rateLimitKey);
-    return fail("phone", "That phone number is already on an account. If it's yours, try logging in instead.", 409);
+    return fail("phone", EXISTING_ACCOUNT_MESSAGE, 409);
   }
 
   const passwordHash = await hashPassword(password);
@@ -115,7 +115,7 @@ export async function POST(request: Request) {
       await recordAttempt(rateLimitKey);
       const target = (err.meta?.target as string[] | undefined) ?? [];
       if (target.includes("handle")) return fail("handle", "That username is already taken.", 409);
-      if (target.includes("phone")) return fail("phone", "That phone number is already on an account. If it's yours, try logging in instead.", 409);
+      if (target.includes("phone")) return fail("phone", EXISTING_ACCOUNT_MESSAGE, 409);
       return fail("email", EXISTING_ACCOUNT_MESSAGE, 409);
     }
     throw err;

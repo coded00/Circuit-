@@ -71,7 +71,7 @@ type ConflictField = "email" | "handle" | "phone";
 const CONFLICT_TITLE: Record<ConflictField, string> = {
   email: "This email may already have an account",
   handle: "That gamertag is taken",
-  phone: "That phone number is already in use",
+  phone: "This phone number may already have an account",
 };
 
 type HandleStatus = { state: "idle" | "checking" | "available" | "taken" | "invalid"; message?: string };

@@ -11,12 +11,12 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { verifyPasswordTimingSafe } from "@/lib/auth";
+import { resolveDobChange } from "@/lib/dateOfBirth";
 import { isRateLimited, recordAttempt, clearAttempts } from "@/lib/rateLimit";
 import { parseOptionalEmail, parseOptionalImageUrl } from "@/lib/validation";
 import type { DirectChallengePolicy } from "@prisma/client";
 import { parseDirectPolicy } from "@/lib/privacy";
 
-const MIN_AGE_PLAUSIBLE_YEARS = 130;
 
 export async function PATCH(request: Request) {
   const user = await getCurrentUser();
@@ -106,21 +106,15 @@ export async function PATCH(request: Request) {
   }
 
   if (body.dateOfBirth !== undefined) {
-    if (body.dateOfBirth === null || body.dateOfBirth === "") {
-      data.dateOfBirth = null;
-    } else {
-      const dob = new Date(body.dateOfBirth);
-      const now = new Date();
-      if (
-        typeof body.dateOfBirth !== "string" ||
-        Number.isNaN(dob.getTime()) ||
-        dob > now ||
-        dob < new Date(now.getFullYear() - MIN_AGE_PLAUSIBLE_YEARS, now.getMonth(), now.getDate())
-      ) {
-        return NextResponse.json({ error: "Date of birth isn't valid." }, { status: 400 });
-      }
-      data.dateOfBirth = dob;
+    const change = resolveDobChange(user.dateOfBirth, body.dateOfBirth);
+    if (change.kind === "invalid") return NextResponse.json({ error: "Date of birth isn't valid." }, { status: 400 });
+    if (change.kind === "locked") {
+      return NextResponse.json(
+        { error: "Your date of birth can't be changed once it's set. If it's wrong, contact support and we'll correct it.", field: "dateOfBirth" },
+        { status: 403 }
+      );
     }
+    if (change.kind === "set") data.dateOfBirth = change.date;
   }
 
   if (body.email !== undefined) {
@@ -184,7 +178,7 @@ export async function PATCH(request: Request) {
     updated = await prisma.user.update({ where: { id: user.id }, data });
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
-      return NextResponse.json({ error: "That email is already in use." }, { status: 409 });
+      return NextResponse.json({ error: "We couldn't use that email. If it's yours, it may already be on another account.", field: "email" }, { status: 409 });
     }
     throw err;
   }

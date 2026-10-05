@@ -7,6 +7,7 @@
 import { prisma } from "@/lib/db";
 import { getPaymentProvider } from "@/lib/payments";
 import { captureException } from "@/lib/observability";
+import { notifyStaff } from "@/lib/notifications";
 
 export async function refundCardOrder(orderId: string) {
   const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
@@ -17,6 +18,8 @@ export async function refundCardOrder(orderId: string) {
     return prisma.order.update({ where: { id: orderId }, data: { refundStatus: result.status === "SUCCESS" ? "COMPLETE" : "PENDING" } });
   } catch (err) {
     captureException(err, { source: "marketplace:cardRefund", orderId, amount: order.amountKobo });
+    // A person has to look at this: tell staff now, and it also shows on the admin Overview.
+    await notifyStaff("CARD_REFUND_FAILED", { orderId, title: order.listingTitle, amount: order.amountKobo }).catch(() => undefined);
     return prisma.order.update({ where: { id: orderId }, data: { refundStatus: "FAILED" } });
   }
 }

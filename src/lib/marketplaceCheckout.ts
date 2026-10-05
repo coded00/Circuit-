@@ -16,6 +16,7 @@ import { prisma } from "@/lib/db";
 import { withKeyedLock } from "@/lib/keyedLock";
 import { getDefaultPaymentProvider, getPaymentProvider, toCheckoutEmail } from "@/lib/payments";
 import { captureException } from "@/lib/observability";
+import { notify } from "@/lib/notifications";
 import { OrderError, loadPurchasableListing } from "@/lib/marketplaceOrders";
 import { refundCardOrder } from "@/lib/marketplaceCardRefund";
 import { emailOrderReceipt } from "@/lib/orderEmails";
@@ -132,6 +133,7 @@ export async function confirmMarketplacePayment(reference: string): Promise<Paym
     });
     if (claimed.count === 0) return "ALREADY_SETTLED";
     void emailOrderReceipt({ ...order, status: instant ? "FULFILLED" : "PAID" }, instant);
+    await notify(order.buyerId, "ORDER_PAID", { orderId: order.id, title: order.listingTitle, instant }).catch(() => undefined);
     return "CONFIRMED";
   }
 

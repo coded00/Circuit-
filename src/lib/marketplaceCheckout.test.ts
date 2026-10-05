@@ -213,3 +213,28 @@ describe("cancelling a card order", () => {
     expect(await applyMarketplaceRefundOutcome("not-ours", "SUCCESS")).toBe("UNKNOWN");
   });
 });
+
+describe("marketplace notifications", () => {
+  it("tells the buyer when their card payment is confirmed, once", async () => {
+    const { buyer, listing } = await setup();
+    const { orderId } = await startCardCheckout(buyer, { listingId: listing.id });
+    const ref = (await prisma.order.findUniqueOrThrow({ where: { id: orderId } })).paymentRef!;
+    mockCharge("SUCCESS");
+    await Promise.all([confirmMarketplacePayment(ref), confirmMarketplacePayment(ref)]);
+    const alerts = await prisma.notification.findMany({ where: { userId: buyer.id, type: "ORDER_PAID" } });
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0].payload).toMatchObject({ orderId, title: "TEST-Card tee", instant: false });
+  });
+
+  it("alerts staff when a card refund fails", async () => {
+    const { seller, buyer, listing } = await setup();
+    const { orderId } = await startCardCheckout(buyer, { listingId: listing.id });
+    mockCharge("SUCCESS");
+    await confirmMarketplacePayment((await prisma.order.findUniqueOrThrow({ where: { id: orderId } })).paymentRef!);
+    vi.spyOn(paystackClient, "refundCharge").mockRejectedValueOnce(new Error("provider down"));
+    await cancelOrder(orderId, null);
+    const alerts = await prisma.notification.findMany({ where: { userId: seller.id, type: "CARD_REFUND_FAILED" } });
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0].payload).toMatchObject({ orderId, amount: PRICE });
+  });
+});

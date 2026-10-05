@@ -13,6 +13,7 @@ import { ArrowUpRight } from "lucide-react";
 import { matchStatusInfo, battleStatusInfo } from "@/components/StatusPill";
 import { Avatar, EmptyState, KeyValue, naira, PageHeader, Panel, RegistrationBadge, Section, StatStrip, StatusBadge, toneFor } from "@/components/admin/ui";
 import { SuspendControl } from "@/components/admin/SuspendControl";
+import { CorrectDateOfBirthControl } from "@/components/admin/CorrectDateOfBirthControl";
 
 function formatDate(date: Date): string {
   return date.toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" });
@@ -128,6 +129,12 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
       </Panel>
 
       <div className="grid grid-cols-1 gap-8 xl:grid-cols-2">
+        <Section title="Account">
+          <Panel>
+            <CorrectDateOfBirthControl userId={user.id} current={user.dateOfBirth ? user.dateOfBirth.toISOString().slice(0, 10) : null} />
+          </Panel>
+        </Section>
+
         <Section title="Competitions">
           {registrations.length === 0 ? (
             <EmptyState title="No competitions entered" />

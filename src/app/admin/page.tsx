@@ -63,6 +63,8 @@ export default async function AdminOverviewPage() {
     weekUsers,
     weekRegistrations,
     weekBattles,
+    cardRefundsFailed,
+    cardRefundsStuck,
   ] = await Promise.all([
     prisma.user.count(),
     prisma.tournament.count({ where: { status: { in: ["OPEN", "LIVE"] } } }),
@@ -95,6 +97,8 @@ export default async function AdminOverviewPage() {
     prisma.user.findMany({ where: { createdAt: { gte: weekStart } }, select: { createdAt: true } }),
     prisma.registration.findMany({ where: { createdAt: { gte: weekStart } }, select: { createdAt: true } }),
     prisma.battle.findMany({ where: { createdAt: { gte: weekStart } }, select: { createdAt: true } }),
+    prisma.order.count({ where: { paymentMethod: "CARD", status: "CANCELLED", refundStatus: "FAILED" } }),
+    prisma.order.count({ where: { paymentMethod: "CARD", status: "CANCELLED", refundStatus: "PENDING", updatedAt: { lt: new Date(now.getTime() - 5 * 24 * 60 * 60_000) } } }),
   ]);
 
   const queues = [
@@ -129,6 +133,19 @@ export default async function AdminOverviewPage() {
       label: "Refunds processing over a day",
       count: stuckRefunds,
       href: "/admin/finance?tab=escrow&etype=REFUND&estatus=PENDING",
+      tone: "attention" as const,
+    },
+    {
+      // The card refund for a cancelled Marketplace order was refused: staff retry it from the orders page.
+      label: "Marketplace card refunds that failed",
+      count: cardRefundsFailed,
+      href: "/admin/marketplace/orders?show=cancelled",
+      tone: "danger" as const,
+    },
+    {
+      label: "Marketplace card refunds pending over 5 days",
+      count: cardRefundsStuck,
+      href: "/admin/marketplace/orders?show=cancelled",
       tone: "attention" as const,
     },
     { label: "Tournaments with frozen funds", count: frozenTournaments, href: "/admin/competitions?frozen=1", tone: "neutral" as const },

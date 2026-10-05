@@ -20,6 +20,7 @@ import {
   type SendMessageInput,
 } from "@/lib/community";
 import { isRateLimited, recordAttempt } from "@/lib/rateLimit";
+import { limitOrRespond } from "@/lib/rateLimitHttp";
 
 /** Image uploads cost real storage, so they get their own per-user cap —
  *  generous for real chat, tight enough to stop someone scripting a
@@ -67,6 +68,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ cha
   if (!user) return NextResponse.json({ error: "You must be signed in." }, { status: 401 });
   const suspended = suspendedResponse(user);
   if (suspended) return suspended;
+
+  const tooMany = await limitOrRespond(`chat-message:${user.id}`, { max: 40, windowMs: 60 * 1000 }, "You're sending messages too fast. Slow down for a moment.");
+  if (tooMany) return tooMany;
 
   const { channelId } = await params;
 

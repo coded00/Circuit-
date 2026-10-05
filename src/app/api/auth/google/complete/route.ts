@@ -60,7 +60,7 @@ export async function POST(request: Request) {
     if (err instanceof NewAccountError) {
       if (err.code === "handle_taken") return NextResponse.json({ error: "That username is already taken.", field: "handle" }, { status: 409 });
       if (err.code === "phone_taken") {
-        return NextResponse.json({ error: "That phone number is already on an account. If it's yours, log in with it instead.", field: "phone" }, { status: 409 });
+        return NextResponse.json({ error: "Couldn't use that phone number. If it's yours, it may already have an account: try logging in with it instead.", field: "phone" }, { status: 409 });
       }
       // Someone registered this email (or this Google account) meanwhile —
       // start over so the normal existing-account path takes it.

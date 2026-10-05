@@ -284,11 +284,13 @@ export default function AccountForm({
           type="date"
           value={dateOfBirth}
           onChange={(e) => setDateOfBirth(e.target.value)}
+          disabled={!!initialDateOfBirth}
           className="field-input"
         />
         <span className="field-hint">
-          Required before any paid registration or prize payout (ACC-3) — never checked for free
-          browsing or free tournaments.
+          {initialDateOfBirth
+            ? "This can't be changed once it's set. If it's wrong, contact support and we'll correct it."
+            : "Required before any paid registration or prize payout. Once you set it, it can't be changed. Never checked for free browsing or free tournaments."}
         </span>
       </div>
 

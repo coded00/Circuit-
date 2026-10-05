@@ -78,6 +78,13 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
         message: `${str(p, "byName") || "The player you challenged"} declined your ${str(p, "game") || ""} challenge.`.replace("  ", " "),
         href: `/battles/${str(p, "battleId")}`,
       };
+    case "ORDER_PAID":
+      return {
+        message: p.instant === true ? `Payment received for ${str(p, "title") || "your order"}. Your download is ready.` : `Payment received for ${str(p, "title") || "your order"}. Circuit will deliver it and let you know.`,
+        href: `/marketplace/orders/${str(p, "orderId")}`,
+      };
+    case "CARD_REFUND_FAILED":
+      return { message: `A ${money(p, "amount")} card refund for ${str(p, "title") || "an order"} failed. Retry it from the orders page.`, href: "/admin/marketplace/orders?show=cancelled" };
     case "ORDER_FULFILLED":
       return { message: `Order delivered: ${str(p, "title") || "see the details"}.`, href: "/marketplace/orders" };
     case "ORDER_CANCELLED":
