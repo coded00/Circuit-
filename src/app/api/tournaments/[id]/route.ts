@@ -60,9 +60,16 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
+  // Locked once someone has paid, and also while someone is partway through paying (checkout open in the
+  // last 2 hours): changing the fee under them would leave their payment unmatched.
   const hasPaidRegistration =
     tournament.entryFee > 0 &&
-    (await prisma.registration.count({ where: { tournamentId: id, status: "CONFIRMED" } })) > 0;
+    (await prisma.registration.count({
+      where: {
+        tournamentId: id,
+        OR: [{ status: "CONFIRMED" }, { status: "PENDING_PAYMENT", updatedAt: { gt: new Date(Date.now() - 2 * 60 * 60 * 1000) } }],
+      },
+    })) > 0;
 
   if (hasPaidRegistration && (body.entryFee !== undefined || body.prizeAmount !== undefined)) {
     return NextResponse.json(

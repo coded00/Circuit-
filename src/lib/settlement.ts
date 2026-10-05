@@ -33,6 +33,8 @@ export async function settleOrganizerRevenue(): Promise<{ settled: number; error
     where: {
       completedAt: { lte: new Date(now.getTime() - settlementHours * 60 * 60 * 1000) },
       fundsFrozen: false,
+      // Staff have reviewed the results and the money collected (admin Payouts page).
+      payoutApprovedAt: { not: null },
       escrowTxns: { some: { type: "ORGANIZER_REVENUE", status: "PENDING" } },
       // A dispute still open/under review/escalated on any of this
       // tournament's matches means the final result isn't settled yet —

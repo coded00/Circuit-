@@ -697,6 +697,11 @@ model Tournament {
   /// than duplicating actor/reason/timestamp fields here — same "reuse
   /// the existing audit log" reasoning as every other admin action.
   fundsFrozen         Boolean          @default(false)
+  /// Set when staff review a completed tournament's results and its collected money and approve the payout.
+  /// Until then neither the prizes can be claimed nor the organizer's share released (see the admin Payouts page).
+  payoutApprovedAt    DateTime?
+  payoutApprovedById  String?
+  payoutApprovalNote  String?
   /// Set once, the moment this tournament's final bracket match completes
   /// (applyWinnerAdvancement in src/lib/matches.ts) — the anchor
   /// settleOrganizerRevenue() waits PlatformSetting.

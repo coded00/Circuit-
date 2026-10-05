@@ -36,6 +36,7 @@ import {
   Scale,
   Flag,
   Store,
+  BadgeCheck,
   type LucideIcon,
 } from "lucide-react";
 
@@ -67,6 +68,7 @@ export const ADMIN_NAV_GROUPS: { label: string; items: AdminNavItem[] }[] = [
     label: "Platform",
     items: [
       { href: "/admin/finance", label: "Finance", icon: Banknote },
+      { href: "/admin/payouts", label: "Payouts", icon: BadgeCheck },
       { href: "/admin/settings", label: "Settings", icon: Settings },
     ],
   },

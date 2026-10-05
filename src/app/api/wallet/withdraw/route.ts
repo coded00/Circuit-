@@ -28,6 +28,7 @@ import { trackEvent } from "@/lib/analytics";
 import { applyTransferOutcome } from "@/lib/payments/transfers";
 import { captureException } from "@/lib/observability";
 import { emailVerificationRequired } from "@/lib/emailGate";
+import { isDefiniteRejection } from "@/lib/payments/errors";
 
 const MIN_WITHDRAW_AMOUNT = 10000; // ₦100
 
@@ -138,6 +139,15 @@ export async function POST(request: Request) {
     // (a Paystack/Flutterwave outage mid-withdrawal) was invisible to
     // any error-monitoring dashboard.
     captureException(err, { route: "wallet/withdraw", userId: user.id, walletTransactionId: txnId, amount, provider: provider.name });
+    if (!isDefiniteRejection(err)) {
+      // Timeout or dropped connection: the provider may have accepted the transfer. Restoring the balance now
+      // could pay the money out and return it too, so the withdrawal stays PENDING and the sweep asks the
+      // provider about this reference, then settles it either way.
+      return NextResponse.json(
+        { status: "PENDING", message: "Your withdrawal is being processed. We'll confirm it shortly. Don't try again." },
+        { status: 202 }
+      );
+    }
     await applyTransferOutcome(reference, "FAILED");
     return NextResponse.json(
       { error: "We couldn't send your withdrawal right now. Your balance has been restored. Please try again later." },

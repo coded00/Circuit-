@@ -86,6 +86,43 @@ describe("confirmEntryFeePayment", () => {
     }
   });
 
+  async function pendingEntry(tournamentOver: Record<string, unknown>, chargeAmount: number) {
+    const reference = `test-confirm-late-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    vi.spyOn(paystackClient, "verifyCharge").mockResolvedValue({ status: "SUCCESS", amount: chargeAmount, currency: "NGN", providerReference: reference, paidAt: new Date() });
+    vi.spyOn(paystackClient, "refundCharge").mockResolvedValue({ status: "SUCCESS", providerReference: reference });
+    const organizer = await createTestOrganizer();
+    const player = await createTestUser();
+    const tournament = await prisma.tournament.create({
+      data: {
+        organizerId: organizer.id, name: `TEST-Tournament-${Date.now()}`, game: "Test Game", participantCap: 8, entryFee: 100_000,
+        registrationOpenAt: new Date(Date.now() - 3_600_000), registrationCloseAt: new Date(Date.now() + 3_600_000), startAt: new Date(Date.now() + 7_200_000),
+        ...tournamentOver,
+      },
+    });
+    const registration = await prisma.registration.create({ data: { tournamentId: tournament.id, userId: player.id, inGameId: "TestIGN", status: "PENDING_PAYMENT", paymentRef: reference } });
+    await prisma.escrowTransaction.create({ data: { tournamentId: tournament.id, registrationId: registration.id, type: "ENTRY_FEE", provider: "PAYSTACK", providerRef: reference, amount: chargeAmount, status: "PENDING" } });
+    return { reference, tournament, registration };
+  }
+
+  it("refunds a payment that completes after the tournament was cancelled, and confirms nothing", async () => {
+    const { reference, tournament, registration } = await pendingEntry({ status: "CANCELLED" }, 100_000);
+    await confirmEntryFeePayment(reference);
+    expect((await prisma.registration.findUniqueOrThrow({ where: { id: registration.id } })).status).not.toBe("CONFIRMED");
+    const rows = await prisma.escrowTransaction.findMany({ where: { tournamentId: tournament.id } });
+    expect(rows.filter((r) => r.type === "REFUND")).toHaveLength(1);
+    expect(rows.filter((r) => r.type === "ORGANIZER_REVENUE" || r.type === "PLATFORM_FEE")).toHaveLength(0);
+    expect(paystackClient.refundCharge).toHaveBeenCalledTimes(1);
+  });
+
+  it("refunds a payment whose amount no longer matches the entry fee (the fee was changed mid-checkout)", async () => {
+    const { reference, tournament, registration } = await pendingEntry({ entryFee: 150_000 }, 100_000);
+    await confirmEntryFeePayment(reference);
+    expect((await prisma.registration.findUniqueOrThrow({ where: { id: registration.id } })).status).toBe("PENDING_PAYMENT"); // free to check out again at the new fee
+    const rows = await prisma.escrowTransaction.findMany({ where: { tournamentId: tournament.id } });
+    expect(rows.filter((r) => r.type === "REFUND")).toHaveLength(1);
+    expect(rows.filter((r) => r.type === "ORGANIZER_REVENUE")).toHaveLength(0);
+  });
+
   it("is a safe no-op for an unknown reference", async () => {
     await expect(confirmEntryFeePayment(`test-unknown-ref-${Date.now()}`)).resolves.toBeUndefined();
   });

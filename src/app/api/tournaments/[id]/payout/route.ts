@@ -21,6 +21,7 @@ import { applyTransferOutcome } from "@/lib/payments/transfers";
 import { captureException, captureMessage } from "@/lib/observability";
 import { emailVerificationRequired } from "@/lib/emailGate";
 import { payableFraction, releaseDelayHours } from "@/lib/prizePool";
+import { isDefiniteRejection } from "@/lib/payments/errors";
 
 // A row still PENDING or already COMPLETE means this prize is spoken for;
 // a FAILED row (the transfer call itself errored, or the provider reported
@@ -59,6 +60,13 @@ export async function POST(
   }
   if (tournament.fundsFrozen) {
     return NextResponse.json({ error: "Funds for this tournament are frozen pending review." }, { status: 409 });
+  }
+  // Staff review the results and the money collected before any prize is released.
+  if (!tournament.payoutApprovedAt) {
+    return NextResponse.json(
+      { error: "Prizes are released after Circuit staff review the results and the money collected. Check back soon." },
+      { status: 409 }
+    );
   }
   // Nothing moves until the tournament is over and the settlement wait (T+1, same as Paystack) has passed.
   const delayHours = await releaseDelayHours();
@@ -237,6 +245,15 @@ export async function POST(
     // throw below (a generic framework 500 log, no monitoring context) —
     // a real Paystack/Flutterwave outage mid-payout was invisible.
     captureException(err, { route: "tournaments/[id]/payout", userId: user.id, tournamentId: tournament.id, escrowTransactionId: txnId, amount: prizeAmount, provider: provider.name });
+    if (!isDefiniteRejection(err)) {
+      // A timeout or dropped connection: Paystack may have accepted the transfer. Marking it failed would let
+      // the winner claim again and be paid twice, so the claim stays reserved (PENDING) and the sweep asks
+      // Paystack what happened to this reference, then settles it either way.
+      return NextResponse.json(
+        { status: "PENDING", message: "Your prize is being processed. We'll confirm it shortly. Don't claim again." },
+        { status: 202 }
+      );
+    }
     await prisma.escrowTransaction.updateMany({ where: { id: txnId, status: "PENDING" }, data: { status: "FAILED" } });
     return NextResponse.json(
       { error: "We couldn't send your prize right now. Nothing has been taken. Your prize is still yours to claim, so please try again later." },

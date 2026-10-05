@@ -48,6 +48,7 @@ import ClaimPrizeButton from "./ClaimPrizeButton";
 import { buildMetadata, parseIdSegment, tournamentPath, gamePath, organiserPath, absoluteUrl, DEFAULT_DESCRIPTION } from "@/lib/seo";
 import { ArenaGlow } from "@/components/ArenaBackdrop";
 import { safeJsonLd } from "@/lib/jsonLd";
+import { releaseDelayHours } from "@/lib/prizePool";
 
 function formatNaira(kobo: number): string {
   return `₦${(kobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 0 })}`;
@@ -214,7 +215,16 @@ export default async function TournamentPage({ params, searchParams }: { params:
     const mine = prizeResults.find((x) => x.share.userId === user?.id);
     myShare = mine && !mine.claimed ? mine.share : null;
   }
-  const canClaimPrize = !!myShare;
+  // A prize can't be claimed until staff approve the payout and the T+1 wait has passed. Say so instead of
+  // showing a button that would only refuse.
+  let prizeWaitNote: string | null = null;
+  if (myShare) {
+    const delayHours = await releaseDelayHours();
+    const releaseAt = tournament.completedAt ? new Date(tournament.completedAt.getTime() + delayHours * 60 * 60 * 1000) : null;
+    if (!tournament.payoutApprovedAt) prizeWaitNote = "Your prize is waiting for Circuit staff to review the results. You can claim it here once they approve.";
+    else if (releaseAt && releaseAt > now) prizeWaitNote = `Your prize can be claimed from ${formatDate(releaseAt)}.`;
+  }
+  const canClaimPrize = !!myShare && !prizeWaitNote;
 
   const aboutText = `${tournament.name} is a ${formatText.toLowerCase()} ${tournament.game} tournament for up to ${tournament.participantCap} ${entrantWord} (${tournament.teamSize}). ${
     tournament.prizeAmount
@@ -803,6 +813,7 @@ export default async function TournamentPage({ params, searchParams }: { params:
             </PanelBody>
           </Panel>
 
+          {myShare && prizeWaitNote && <p className="cut-sm bg-surface-elevated p-3 text-sm text-muted">{prizeWaitNote}</p>}
           {canClaimPrize && myShare && (
             <ClaimPrizeButton
               tournamentId={tournament.id}

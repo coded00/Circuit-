@@ -48,13 +48,19 @@ export async function confirmEntryFeePayment(reference: string): Promise<void> {
   const provider = getPaymentProvider(escrowTxn.provider!); // always set for an ENTRY_FEE row
   const result = await provider.verifyCharge(reference);
 
-  if (result.status !== "SUCCESS" || result.amount !== registration.tournament.entryFee) {
-    if (result.status === "FAILED") {
-      await prisma.escrowTransaction.update({
-        where: { id: escrowTxn.id },
-        data: { status: "FAILED" },
-      });
-    }
+  if (result.status === "FAILED") {
+    await prisma.escrowTransaction.update({
+      where: { id: escrowTxn.id },
+      data: { status: "FAILED" },
+    });
+    return;
+  }
+  if (result.status !== "SUCCESS") return;
+  // The player paid, but the entry can't be confirmed as things now stand: the tournament was cancelled, or
+  // its entry fee changed after checkout began. Their money goes straight back instead of sitting here
+  // unconfirmed (they can start a fresh checkout at the new fee).
+  if (result.amount !== registration.tournament.entryFee || registration.tournament.status === "CANCELLED") {
+    await refundOrphanedCharge(escrowTxn.id, reference);
     return;
   }
 
@@ -88,6 +94,9 @@ export async function confirmEntryFeePayment(reference: string): Promise<void> {
     // The tournament lock makes two payments for the last slot take turns,
     // so the count below sees the other one (src/lib/registrationCapacity.ts).
     await lockTournament(tx, registration.tournamentId);
+    // Re-read under the lock: a cancel or fee change that landed while the charge was being verified.
+    const live = await tx.tournament.findUnique({ where: { id: registration.tournamentId }, select: { status: true, entryFee: true } });
+    if (!live || live.status === "CANCELLED" || live.entryFee !== registration.tournament.entryFee) return "STALE" as const;
     const claimed = await tx.registration.updateMany({
       where: { id: registration.id, status: "PENDING_PAYMENT" },
       data: { status: "CONFIRMED" },
@@ -174,6 +183,11 @@ export async function confirmEntryFeePayment(reference: string): Promise<void> {
     // A concurrent call already confirmed (or refunded) this exact
     // registration — its own success/refund path already ran once.
     // Nothing left for this call to do.
+    return;
+  }
+
+  if (confirmed === "STALE") {
+    await refundOrphanedCharge(escrowTxn.id, reference);
     return;
   }
 

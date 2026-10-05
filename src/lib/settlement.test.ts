@@ -28,6 +28,7 @@ async function makeReadyTournament(organizerId: string) {
       startAt: new Date(Date.now() - 900_000),
       status: "COMPLETE",
       completedAt: new Date(Date.now() - 48 * 3600_000), // well past the 24h default window
+      payoutApprovedAt: new Date(), // staff have approved the payout
     },
   });
 }
@@ -156,6 +157,22 @@ describe("settleOrganizerRevenue", () => {
     await settleOrganizerRevenue();
     const after = await prisma.user.findUniqueOrThrow({ where: { id: organizer.id } });
     expect(after.walletBalance).toBe(before.walletBalance);
+  });
+
+
+  it("holds the organizer's share until staff approve the payout", async () => {
+    const organizer = await createTestOrganizer();
+    const tournament = await makeReadyTournament(organizer.id);
+    await prisma.tournament.update({ where: { id: tournament.id }, data: { payoutApprovedAt: null } });
+    await prisma.escrowTransaction.create({ data: { tournamentId: tournament.id, userId: organizer.id, type: "ORGANIZER_REVENUE", amount: 20_000, status: "PENDING" } });
+
+    const before = await prisma.user.findUniqueOrThrow({ where: { id: organizer.id } });
+    await settleOrganizerRevenue();
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: organizer.id } })).walletBalance).toBe(before.walletBalance);
+
+    await prisma.tournament.update({ where: { id: tournament.id }, data: { payoutApprovedAt: new Date() } });
+    await settleOrganizerRevenue();
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: organizer.id } })).walletBalance).toBe(before.walletBalance + 20_000);
   });
 
   describe("prizes come out of entry fees", () => {

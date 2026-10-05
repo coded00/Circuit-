@@ -92,6 +92,11 @@ export async function POST(
     return NextResponse.json({ error: "This tournament can no longer be cancelled." }, { status: 409 });
   }
 
+  // Players partway through paying have no confirmed entry to refund yet. Closing those registrations means a
+  // payment that completes after this point is recognised as one for a cancelled tournament and refunded
+  // (confirmEntryFeePayment; the sweep also re-checks any that were missed).
+  await prisma.registration.updateMany({ where: { tournamentId: id, status: "PENDING_PAYMENT" }, data: { status: "WITHDRAWN" } });
+
   const confirmedRegistrations = await prisma.registration.findMany({
     where: { tournamentId: id, status: "CONFIRMED" },
     include: { escrowTxns: true },

@@ -6,6 +6,7 @@
  * issue a transfer. https://paystack.com/docs/api/
  */
 
+import { ProviderRequestError } from "./errors";
 import type {
   InitializeChargeInput,
   InitializeChargeResult,
@@ -44,7 +45,7 @@ async function paystackFetch<T>(path: string, init?: RequestInit): Promise<T> {
   });
   const body = await res.json();
   if (!res.ok || body.status === false) {
-    throw new Error(`Paystack request failed: ${body.message ?? res.statusText}`);
+    throw new ProviderRequestError(`Paystack request failed: ${body.message ?? res.statusText}`, res.status);
   }
   return body.data as T;
 }
@@ -169,8 +170,16 @@ export const paystackClient: PaymentProviderClient = {
   },
 
   async verifyTransfer(reference: string): Promise<TransferStatus> {
-    const data = await paystackFetch<{ status: string }>(`/transfer/verify/${encodeURIComponent(reference)}`);
-    return mapPaystackTransferStatus(data.status);
+    try {
+      const data = await paystackFetch<{ status: string }>(`/transfer/verify/${encodeURIComponent(reference)}`);
+      return mapPaystackTransferStatus(data.status);
+    } catch (err) {
+      // Paystack has no transfer under this reference: it never received it (the call that created it
+      // failed before reaching them). Callers only ask about transfers that are already old, so this is
+      // a transfer that did not happen and the money can go back.
+      if (err instanceof ProviderRequestError && err.status === 404) return "FAILED";
+      throw err;
+    }
   },
 
   async initiateTransfer(input: InitiateTransferInput): Promise<InitiateTransferResult> {
