@@ -48,7 +48,8 @@ describe("createSessionToken / verifySessionToken", () => {
   it("round-trips a userId through a signed token", async () => {
     const token = await createSessionToken({ userId: "user_abc123" });
     const payload = await verifySessionToken(token);
-    expect(payload).toEqual({ userId: "user_abc123" });
+    // A user that does not exist yet has session version 0.
+    expect(payload).toEqual({ userId: "user_abc123", sv: 0 });
   });
 
   it("rejects a malformed token", async () => {
