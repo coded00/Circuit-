@@ -47,6 +47,7 @@ import DeleteUpdateButton from "./DeleteUpdateButton";
 import ClaimPrizeButton from "./ClaimPrizeButton";
 import { buildMetadata, parseIdSegment, tournamentPath, gamePath, organiserPath, absoluteUrl, DEFAULT_DESCRIPTION } from "@/lib/seo";
 import { ArenaGlow } from "@/components/ArenaBackdrop";
+import { safeJsonLd } from "@/lib/jsonLd";
 
 function formatNaira(kobo: number): string {
   return `₦${(kobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 0 })}`;
@@ -610,7 +611,7 @@ export default async function TournamentPage({ params, searchParams }: { params:
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-8 sm:py-10">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(eventJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(eventJsonLd) }} />
       {/* Poller-driven refresh keeps capacity, FULL state and status live
           while someone else registers with this page open. */}
       <Poller />

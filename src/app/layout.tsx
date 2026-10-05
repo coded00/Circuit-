@@ -19,6 +19,7 @@ import { QuickMatchIncomingListener } from "@/components/QuickMatchIncomingListe
 import { SITE_NAME, SITE_URL, DEFAULT_DESCRIPTION } from "@/lib/seo";
 import { gameImageMap } from "@/lib/gameCatalogQueries";
 import { GameImageProvider } from "@/components/GameImageProvider";
+import { safeJsonLd } from "@/lib/jsonLd";
 
 // Phase 14: Inter for UI text, Barlow Condensed ExtraBold for display/hero
 // headlines — a tall, condensed weight suited to the CIRCUIT wordmark's
@@ -136,9 +137,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             pages, etc.) lives on those pages themselves, not here. */}
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(ORGANIZATION_JSON_LD) }}
+          dangerouslySetInnerHTML={{ __html: safeJsonLd(ORGANIZATION_JSON_LD) }}
         />
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(WEBSITE_JSON_LD) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(WEBSITE_JSON_LD) }} />
         {/* Phase 1: left nav + flexible main content. The persistent 330px
             right rail is homepage-specific composition (Phases 5/10-12 all
             describe homepage widgets), not a universal shell column — other

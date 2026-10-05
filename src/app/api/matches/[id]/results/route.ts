@@ -11,6 +11,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/session";
 import { MatchError, submitResult } from "@/lib/matches";
+import { PROOF_TYPE_ERROR, sniffProofType } from "@/lib/imageSniff";
 
 const MAX_PROOF_BYTES = 10 * 1024 * 1024;
 
@@ -81,6 +82,8 @@ export async function POST(
   }
 
   const proofBuffer = Buffer.from(await proofFile.arrayBuffer());
+  const proofType = sniffProofType(proofBuffer);
+  if (!proofType) return NextResponse.json({ error: PROOF_TYPE_ERROR }, { status: 400 });
 
   try {
     const result = await submitResult({
@@ -90,7 +93,7 @@ export async function POST(
       score: score.trim(),
       kills,
       proofBuffer,
-      proofContentType: proofFile.type || "application/octet-stream",
+      proofContentType: proofType,
     });
     return NextResponse.json({ status: result.outcome });
   } catch (err) {

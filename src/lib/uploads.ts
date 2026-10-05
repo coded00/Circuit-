@@ -61,8 +61,22 @@ export async function readPublicImage(ref: string): Promise<{ buffer: Buffer; co
  * Returns null if an upload can't be read, so the card falls back to its
  * no-image look rather than failing to render.
  */
+// next/og fetches an image URL from the server. An arbitrary user-set avatar or poster URL would let
+// anyone make this server request internal addresses (a metadata service, localhost), so only https
+// URLs on these hosts pass through; everything else renders the card without that image.
+const TRUSTED_IMAGE_HOSTS = new Set(["lh3.googleusercontent.com", "i.ytimg.com"]);
+function isTrustedImageHost(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.protocol === "https:" && !u.port && TRUSTED_IMAGE_HOSTS.has(u.hostname);
+  } catch {
+    return false;
+  }
+}
+
 export async function resolveImageForOg(url: string | null): Promise<string | null> {
-  if (!url?.startsWith(PUBLIC_IMAGE_PATH)) return url;
+  if (!url) return url;
+  if (!url.startsWith(PUBLIC_IMAGE_PATH)) return isTrustedImageHost(url) ? url : null;
   try {
     const { buffer, contentType } = await readPublicImage(url.slice(PUBLIC_IMAGE_PATH.length));
     // next/og throws on WebP (it would crash the whole card). Uploads are

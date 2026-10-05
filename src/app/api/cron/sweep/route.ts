@@ -13,6 +13,14 @@
 import { NextResponse } from "next/server";
 import { runScheduledSweep } from "@/lib/matches";
 import { captureException } from "@/lib/observability";
+import { timingSafeEqual } from "crypto";
+
+// Constant-time comparison, so response timing can't be used to guess the secret byte by byte.
+function safeEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  return bufA.length === bufB.length && timingSafeEqual(bufA, bufB);
+}
 
 async function handleSweep(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -20,7 +28,7 @@ async function handleSweep(request: Request) {
 
   // Vercel Cron automatically includes `Authorization: Bearer <CRON_SECRET>`
   // when CRON_SECRET is configured in project environment variables.
-  if (!secret || authHeader !== `Bearer ${secret}`) {
+  if (!secret || !authHeader || !safeEqual(authHeader, `Bearer ${secret}`)) {
     return NextResponse.json(
       { error: "Unauthorized. Provide valid Bearer token in Authorization header." },
       { status: 401 }

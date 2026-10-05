@@ -112,6 +112,17 @@ export async function cleanupAll(): Promise<void> {
   // Marketplace: orders (RESTRICT on buyer/listing) before listings before users.
   await prisma.order.deleteMany({ where: { OR: [{ buyerId: { in: userIds } }, { listing: { sellerId: { in: userIds } } }] } });
   await prisma.listing.deleteMany({ where: { sellerId: { in: userIds } } });
+  // Community, social and team rows a test user can leave behind (all RESTRICT on the user).
+  const mine = { in: userIds };
+  await prisma.communityPost.deleteMany({ where: { authorId: mine } });
+  await prisma.friendship.deleteMany({ where: { OR: [{ requesterId: mine }, { addresseeId: mine }] } });
+  await prisma.message.deleteMany({ where: { authorId: mine } });
+  await prisma.communityMember.deleteMany({ where: { userId: mine } });
+  await prisma.videoLike.deleteMany({ where: { userId: mine } });
+  await prisma.videoSave.deleteMany({ where: { userId: mine } });
+  await prisma.report.deleteMany({ where: { OR: [{ reportedUserId: mine }, { reportedById: mine }] } });
+  await prisma.teamMembership.deleteMany({ where: { userId: mine } });
+  await prisma.team.deleteMany({ where: { captainId: mine } });
   await prisma.walletTransaction.deleteMany({ where: { userId: { in: userIds } } });
   await prisma.notification.deleteMany({ where: { userId: { in: userIds } } });
   await prisma.rateLimitAttempt.deleteMany({ where: { key: { contains: "test-" } } });

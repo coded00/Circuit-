@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { proofStorage } from "@/lib/storage";
 import { notifyStaff } from "@/lib/notifications";
+import { PROOF_TYPE_ERROR, sniffProofType } from "@/lib/imageSniff";
 
 const MAX_EVIDENCE_BYTES = 10 * 1024 * 1024;
 const VALID_REASON_CODES = [
@@ -54,6 +55,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "You can't report yourself." }, { status: 400 });
   }
 
+  // Check the evidence file (size and real type) before anything is filed or staff are notified.
+  let evidenceBuffer: Buffer | null = null;
+  let evidenceType: ReturnType<typeof sniffProofType> = null;
+  if (evidence instanceof File && evidence.size > 0) {
+    if (evidence.size > MAX_EVIDENCE_BYTES) {
+      return NextResponse.json({ error: "Evidence file is too large (10MB max)." }, { status: 400 });
+    }
+    evidenceBuffer = Buffer.from(await evidence.arrayBuffer());
+    evidenceType = sniffProofType(evidenceBuffer);
+    if (!evidenceType) return NextResponse.json({ error: PROOF_TYPE_ERROR }, { status: 400 });
+  }
+
   const reason = details ? `${reasonCode}: ${details}` : reasonCode;
 
   const report = await prisma.report.create({
@@ -61,12 +74,8 @@ export async function POST(request: Request) {
   });
   await notifyStaff("REPORT_FILED", { reportId: report.id });
 
-  if (evidence instanceof File && evidence.size > 0) {
-    if (evidence.size > MAX_EVIDENCE_BYTES) {
-      return NextResponse.json({ error: "Evidence file is too large (10MB max)." }, { status: 400 });
-    }
-    const buffer = Buffer.from(await evidence.arrayBuffer());
-    const ref = await proofStorage.store(report.id, buffer, evidence.type || "application/octet-stream");
+  if (evidenceBuffer && evidenceType) {
+    const ref = await proofStorage.store(report.id, evidenceBuffer, evidenceType);
     await prisma.report.update({ where: { id: report.id }, data: { evidenceRef: ref } });
   }
 

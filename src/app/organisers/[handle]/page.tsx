@@ -21,6 +21,7 @@ import { prisma } from "@/lib/db";
 import { buildMetadata, tournamentPath, absoluteUrl, organiserPath } from "@/lib/seo";
 import { StatusPill, tournamentStatusInfo } from "@/components/StatusPill";
 import { GameArtTile } from "@/components/GameArtTile";
+import { safeJsonLd } from "@/lib/jsonLd";
 
 function formatShortDate(date: Date): string {
   return date.toLocaleDateString("en-NG", { dateStyle: "medium" });
@@ -104,7 +105,7 @@ export default async function OrganiserPage({ params }: { params: Promise<{ hand
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-6 sm:px-8 sm:py-10">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(personJsonLd) }} />
 
       <div className="card flex flex-col items-center gap-3 py-8 text-center sm:flex-row sm:items-center sm:gap-5 sm:py-6 sm:text-left">
         {organiser.avatarUrl ? (

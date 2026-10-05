@@ -33,7 +33,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ ref:
   const width = IMAGE_WIDTHS.find((w) => w === want);
   if (width && image.contentType !== "image/gif") {
     try {
-      const resized = await sharp(image.buffer).rotate().resize({ width, withoutEnlargement: true }).webp({ quality: 78 }).toBuffer();
+      const resized = await sharp(image.buffer, { limitInputPixels: 40_000_000 }).rotate().resize({ width, withoutEnlargement: true }).webp({ quality: 78 }).toBuffer();
       return new NextResponse(new Uint8Array(resized), { headers: { ...HEADERS, "Content-Type": "image/webp" } });
     } catch {
       // A file sharp can't read falls through to the original.

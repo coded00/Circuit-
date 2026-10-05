@@ -28,4 +28,12 @@ export async function register() {
         "Copy .env.example to .env and set real values before running the app."
     );
   }
+
+  // A session-signing secret that is short or published in the repo lets anyone forge a login
+  // for any user, admins included. Refuse to run production with one.
+  const jwt = process.env.JWT_SECRET ?? "";
+  const publishedDefaults = ["change_this_to_a_random_32_byte_secret", "change_me", "secret"];
+  if (process.env.NODE_ENV === "production" && (jwt.length < 32 || publishedDefaults.includes(jwt))) {
+    throw new Error("Circuit can't start: JWT_SECRET is too short or a published default. Set a random value, e.g. openssl rand -base64 48.");
+  }
 }

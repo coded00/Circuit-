@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { proofStorage } from "@/lib/storage";
+import { proofResponse } from "@/lib/proofResponse";
 
 export async function GET(
   request: Request,
@@ -25,5 +26,5 @@ export async function GET(
   }
 
   const { buffer, contentType } = await proofStorage.read(report.evidenceRef);
-  return new NextResponse(new Uint8Array(buffer), { headers: { "Content-Type": contentType } });
+  return proofResponse(buffer, contentType);
 }

@@ -9,10 +9,7 @@ import { NextResponse } from "next/server";
 import type { Prisma, WalletTransactionStatus, WalletTransactionType } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireStaff } from "@/lib/session";
-
-function csvEscape(value: string): string {
-  return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
-}
+import { csvEscape } from "@/lib/csv";
 
 function typeLabel(type: string): string {
   if (type === "FUND") return "Deposit";
