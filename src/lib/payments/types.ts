@@ -81,4 +81,6 @@ export interface PaymentProviderClient {
   /** Looks up a transfer we initiated, by our own reference — the backstop
    *  for a transfer webhook that never arrives (src/lib/payments/transfers.ts). */
   verifyTransfer(reference: string): Promise<TransferStatus>;
+  /** Money the provider can send out right now (settled, spendable), in kobo. Null if it can't be read. */
+  availableBalance(): Promise<number | null>;
 }

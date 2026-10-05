@@ -48,7 +48,7 @@ import ClaimPrizeButton from "./ClaimPrizeButton";
 import { buildMetadata, parseIdSegment, tournamentPath, gamePath, organiserPath, absoluteUrl, DEFAULT_DESCRIPTION } from "@/lib/seo";
 import { ArenaGlow } from "@/components/ArenaBackdrop";
 import { safeJsonLd } from "@/lib/jsonLd";
-import { releaseDelayHours } from "@/lib/prizePool";
+import { payableFraction, releaseDelayHours } from "@/lib/prizePool";
 
 function formatNaira(kobo: number): string {
   return `₦${(kobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 0 })}`;
@@ -218,7 +218,10 @@ export default async function TournamentPage({ params, searchParams }: { params:
   // A prize can't be claimed until staff approve the payout and the T+1 wait has passed. Say so instead of
   // showing a button that would only refuse.
   let prizeWaitNote: string | null = null;
+  // What the winner will actually be paid: the promised share, scaled down if the entry fees collected did not cover the whole prize.
+  let myPayable = myShare?.amount ?? 0;
   if (myShare) {
+    myPayable = Math.floor(myShare.amount * (await payableFraction(tournament)));
     const delayHours = await releaseDelayHours();
     const releaseAt = tournament.completedAt ? new Date(tournament.completedAt.getTime() + delayHours * 60 * 60 * 1000) : null;
     if (!tournament.payoutApprovedAt) prizeWaitNote = "Your prize is waiting for Circuit staff to review the results. You can claim it here once they approve.";
@@ -813,11 +816,16 @@ export default async function TournamentPage({ params, searchParams }: { params:
             </PanelBody>
           </Panel>
 
+          {myShare && myPayable < myShare.amount && (
+            <p className="cut-sm bg-surface-elevated p-3 text-sm text-muted">
+              Your prize is {formatNaira(myPayable)}, not the {formatNaira(myShare.amount)} that was promised: the entry fees collected didn&apos;t cover the full prize.
+            </p>
+          )}
           {myShare && prizeWaitNote && <p className="cut-sm bg-surface-elevated p-3 text-sm text-muted">{prizeWaitNote}</p>}
           {canClaimPrize && myShare && (
             <ClaimPrizeButton
               tournamentId={tournament.id}
-              label={prizeResults.length > 1 ? `Claim ${formatNaira(myShare.amount)}, ${placeLabel(myShare.place)} place` : undefined}
+              label={prizeResults.length > 1 ? `Claim ${formatNaira(myPayable)}, ${placeLabel(myShare.place)} place` : myPayable < myShare.amount ? `Claim ${formatNaira(myPayable)}` : undefined}
             />
           )}
 

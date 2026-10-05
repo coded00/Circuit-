@@ -37,6 +37,7 @@ export function startFakePaystack(port = 4010) {
           return send(200, { status: true, data: { status: "success", reference: ref } });
         }
         if (req.method === "POST" && url.pathname === "/refund") return send(200, { status: true, data: { status: "processed", transaction: { reference: body.transaction } } });
+        if (url.pathname === "/balance") return send(200, { status: true, data: [{ currency: "NGN", balance: 1_000_000_000_000 }] });
         if (url.pathname.startsWith("/_transfer/")) return send(200, { reference: latestByRecipient.get(decodeURIComponent(url.pathname.split("/").pop())) ?? null });
         send(404, { status: false, message: "not found" });
       }, 40); // a little provider latency

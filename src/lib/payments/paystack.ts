@@ -169,6 +169,16 @@ export const paystackClient: PaymentProviderClient = {
     };
   },
 
+  async availableBalance(): Promise<number | null> {
+    try {
+      const data = await paystackFetch<{ currency: string; balance: number }[]>("/balance");
+      const ngn = Array.isArray(data) ? data.find((b) => b.currency === "NGN") : undefined;
+      return typeof ngn?.balance === "number" ? ngn.balance : null;
+    } catch {
+      return null; // unknown, not "empty": callers carry on rather than blocking every payout on a lookup failure
+    }
+  },
+
   async verifyTransfer(reference: string): Promise<TransferStatus> {
     try {
       const data = await paystackFetch<{ status: string }>(`/transfer/verify/${encodeURIComponent(reference)}`);

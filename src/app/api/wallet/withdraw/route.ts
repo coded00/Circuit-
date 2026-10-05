@@ -29,6 +29,8 @@ import { applyTransferOutcome } from "@/lib/payments/transfers";
 import { captureException } from "@/lib/observability";
 import { emailVerificationRequired } from "@/lib/emailGate";
 import { isDefiniteRejection } from "@/lib/payments/errors";
+import { hasSettledFunds } from "@/lib/payments/balance";
+import { logAdminAction } from "@/lib/auditLog";
 
 const MIN_WITHDRAW_AMOUNT = 10000; // ₦100
 
@@ -84,6 +86,15 @@ export async function POST(request: Request) {
   const reference = `wallet_withdraw_${randomUUID().slice(0, 12)}`;
   const provider = getDefaultPaymentProvider();
 
+  // Settled money to send? If not, decline before taking anything from the wallet; they can try again later.
+  const funds = await hasSettledFunds(provider, amount);
+  if (!funds.ok) {
+    return NextResponse.json(
+      { error: "Withdrawals are briefly delayed while incoming payments finish settling. Your balance is untouched. Please try again in a few hours." },
+      { status: 503, headers: { "Retry-After": "3600" } }
+    );
+  }
+
   let txnId: string;
   try {
     txnId = await prisma.$transaction(async (tx) => {
@@ -111,6 +122,14 @@ export async function POST(request: Request) {
     }
     throw err;
   }
+
+  await logAdminAction({
+    actorId: user.id,
+    action: "wallet.withdraw",
+    targetType: "WalletTransaction",
+    targetId: txnId,
+    metadata: { amount, reference },
+  }).catch((err) => captureException(err, { source: "withdraw:audit", userId: user.id }));
 
   try {
     const transfer = await provider.initiateTransfer({

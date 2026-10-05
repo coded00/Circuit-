@@ -16,6 +16,7 @@ import type {
   TransferStatus,
   VerifyChargeResult,
 } from "./types";
+import { ProviderRequestError } from "./errors";
 
 const FLUTTERWAVE_BASE_URL = "https://api.flutterwave.com/v3";
 
@@ -38,7 +39,7 @@ async function flutterwaveFetch<T>(path: string, init?: RequestInit): Promise<T>
   });
   const body = await res.json();
   if (!res.ok || body.status === "error") {
-    throw new Error(`Flutterwave request failed: ${body.message ?? res.statusText}`);
+    throw new ProviderRequestError(`Flutterwave request failed: ${body.message ?? res.statusText}`, res.status);
   }
   return body.data as T;
 }
@@ -103,10 +104,22 @@ export const flutterwaveClient: PaymentProviderClient = {
 
   async verifyTransfer(reference: string): Promise<TransferStatus> {
     const data = await flutterwaveFetch<{ status: string }[]>(`/transfers?reference=${encodeURIComponent(reference)}`);
+    // No transfer under this reference: Flutterwave never received it. Callers only ask about transfers that
+    // are already old, so this is one that did not happen and the money can go back.
+    if (Array.isArray(data) && data.length === 0) return "FAILED";
     const status = Array.isArray(data) ? data[0]?.status : undefined;
     if (status === "SUCCESSFUL") return "SUCCESS";
     if (status === "FAILED") return "FAILED";
     return "PENDING";
+  },
+
+  async availableBalance(): Promise<number | null> {
+    try {
+      const data = await flutterwaveFetch<{ available_balance: number }>("/balances/NGN");
+      return typeof data?.available_balance === "number" ? Math.round(data.available_balance * 100) : null; // naira -> kobo
+    } catch {
+      return null;
+    }
   },
 
   async initiateTransfer(input: InitiateTransferInput): Promise<InitiateTransferResult> {

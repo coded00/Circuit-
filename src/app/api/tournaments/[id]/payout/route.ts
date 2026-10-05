@@ -22,6 +22,8 @@ import { captureException, captureMessage } from "@/lib/observability";
 import { emailVerificationRequired } from "@/lib/emailGate";
 import { payableFraction, releaseDelayHours } from "@/lib/prizePool";
 import { isDefiniteRejection } from "@/lib/payments/errors";
+import { hasSettledFunds } from "@/lib/payments/balance";
+import { logAdminAction } from "@/lib/auditLog";
 
 // A row still PENDING or already COMPLETE means this prize is spoken for;
 // a FAILED row (the transfer call itself errored, or the provider reported
@@ -145,6 +147,14 @@ export async function POST(
   if (prizeAmount <= 0) {
     return NextResponse.json({ error: "No entry fees were collected for this tournament, so there is no prize to pay out." }, { status: 409 });
   }
+  // Is there settled money to send? If not (Paystack settles T+1), decline now: nothing is reserved, so the winner just claims again later.
+  const funds = await hasSettledFunds(provider, prizeAmount);
+  if (!funds.ok) {
+    return NextResponse.json(
+      { error: "Payouts are briefly delayed while the entry fees finish settling. Your prize is safe. Please try again in a few hours." },
+      { status: 503, headers: { "Retry-After": "3600" } }
+    );
+  }
 
   // Reserve the claim — a PENDING row created inside a Serializable
   // transaction that re-checks for an existing claim first. Two concurrent
@@ -205,6 +215,15 @@ export async function POST(
     await prisma.escrowTransaction.update({ where: { id: txnId }, data: { status: "FAILED" } });
     return NextResponse.json({ error: "Funds for this tournament are frozen pending review." }, { status: 409 });
   }
+
+  // A permanent record that this claim was made, before any money is sent (the escrow row alone can change status).
+  await logAdminAction({
+    actorId: user.id,
+    action: "payout.prizeClaim",
+    targetType: "Tournament",
+    targetId: tournament.id,
+    metadata: { amount: prizeAmount, declared: share.amount, place: share.place, reference, escrowTransactionId: txnId },
+  }).catch((err) => captureException(err, { source: "payout:audit", tournamentId: tournament.id }));
 
   try {
     const transfer = await provider.initiateTransfer({
