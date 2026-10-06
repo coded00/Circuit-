@@ -38,6 +38,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       const clash = await prisma.game.findUnique({ where: { name: parsed.value.name } });
       if (clash) return NextResponse.json({ error: "A game with that name already exists." }, { status: 409 });
     }
+    if (parsed.value.slug) {
+      const slugClash = await prisma.game.findFirst({ where: { slug: parsed.value.slug, NOT: { id } } });
+      if (slugClash) return NextResponse.json({ error: "Another game already uses that page address." }, { status: 409 });
+    }
     Object.assign(data, parsed.value);
   }
   if (typeof body.enabled === "boolean") data.enabled = body.enabled;

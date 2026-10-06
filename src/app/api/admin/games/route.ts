@@ -28,6 +28,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "A game with that name already exists." }, { status: 409 });
   }
 
+  if (parsed.value.slug && (await prisma.game.findUnique({ where: { slug: parsed.value.slug } }))) {
+    return NextResponse.json({ error: "Another game already uses that page address." }, { status: 409 });
+  }
+
   const game = await prisma.game.create({ data: parsed.value });
 
   await logAdminAction({ actorId: admin.id, action: "game.create", targetType: "Game", targetId: game.id, metadata: { name: game.name } });

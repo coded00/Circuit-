@@ -75,7 +75,12 @@ export type GameInput = {
   category: string | null;
   platforms: string[];
   publisher: string | null;
+  slug: string | null;
+  seoName: string | null;
+  aliases: string[];
 };
+
+const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 export function parseGameInput(body: Record<string, unknown>): Result<GameInput> {
   const name = str(body.name, MAX_NAME);
@@ -83,10 +88,17 @@ export function parseGameInput(body: Record<string, unknown>): Result<GameInput>
   const platforms = Array.isArray(body.platforms)
     ? Array.from(new Set(body.platforms.map((p) => str(p, 30)).filter((p): p is string => !!p))).slice(0, 12)
     : [];
+  const slug = str(body.slug, 60)?.toLowerCase() ?? null;
+  if (slug && !SLUG_PATTERN.test(slug)) return { ok: false, error: "The page address can only use lowercase letters, numbers and single dashes, like call-of-duty-mobile." };
+  const aliasList = Array.isArray(body.aliases) ? body.aliases : typeof body.aliases === "string" ? body.aliases.split(",") : [];
+  const aliases = Array.from(new Set(aliasList.map((a) => str(a, 40)).filter((a): a is string => !!a))).slice(0, 8);
   return {
     ok: true,
     value: {
       name,
+      slug,
+      seoName: str(body.seoName, 80),
+      aliases,
       description: str(body.description, MAX_TEXT),
       iconUrl: str(body.iconUrl, 500),
       coverUrl: str(body.coverUrl, 500),

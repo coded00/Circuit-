@@ -45,7 +45,8 @@ import WithdrawButton from "./WithdrawButton";
 import UpdateForm from "./UpdateForm";
 import DeleteUpdateButton from "./DeleteUpdateButton";
 import ClaimPrizeButton from "./ClaimPrizeButton";
-import { buildMetadata, parseIdSegment, tournamentPath, gamePath, organiserPath, absoluteUrl, DEFAULT_DESCRIPTION } from "@/lib/seo";
+import { canonicalGamePath } from "@/lib/gameSeo";
+import { buildMetadata, parseIdSegment, tournamentPath, organiserPath, absoluteUrl, DEFAULT_DESCRIPTION } from "@/lib/seo";
 import { ArenaGlow } from "@/components/ArenaBackdrop";
 import { safeJsonLd } from "@/lib/jsonLd";
 import { payableFraction, releaseDelayHours } from "@/lib/prizePool";
@@ -199,6 +200,7 @@ export default async function TournamentPage({ params, searchParams }: { params:
   ];
   const hasBracket = tournament.status === "LIVE" || tournament.status === "COMPLETE";
   // Something to watch: the tournament's own stream, or a player stream (the first page of participants is enough to know).
+  const gameHref = await canonicalGamePath(tournament.game);
   const hasWatch = !!tournament.streamUrl || (modeAllowsPlayerStreams(tournament.streamMode) && participants.some((p) => !!p.streamUrl));
   // A real countdown only makes sense before the bracket actually starts.
   const startingSoon = !hasBracket && tournament.status !== "CANCELLED" && isStartingSoon(tournament.startAt, now);
@@ -352,7 +354,7 @@ export default async function TournamentPage({ params, searchParams }: { params:
 
           <Panel title="Game & host">
             <PanelRows>
-              <Link href={gamePath(tournament.game)} className={panelRowClass}>
+              <Link href={gameHref} className={panelRowClass}>
                 <GameArtTile thumb game={tournament.game} className="h-11 w-11 shrink-0 cut-avatar" hideLabel imgWidth={120} />
                 <div className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-sm font-medium">{tournament.game}</span>
@@ -685,7 +687,7 @@ export default async function TournamentPage({ params, searchParams }: { params:
               </div>
             )}
             <span className="text-xs text-muted">
-              <Link href={gamePath(tournament.game)} className="font-medium text-foreground/80 transition hover:text-accent-volt">
+              <Link href={gameHref} className="font-medium text-foreground/80 transition hover:text-accent-volt">
                 {tournament.game}
               </Link>{" "}
               · {formatText} · {tournament.teamSize}

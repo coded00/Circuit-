@@ -235,6 +235,7 @@ export async function POST(request: Request) {
   const tournament = await prisma.tournament.create({
     data: {
       organizerId: organizerProfile.userId,
+      country: user.country,
       name,
       ...competition.fields,
       ...leagueData,

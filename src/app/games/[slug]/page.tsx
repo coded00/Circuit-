@@ -15,13 +15,14 @@
 
 import { cache } from "react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
 import { Trophy, Swords, Users } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { findGameBySlug, realGameNames } from "@/lib/games";
 import { gameStandings } from "@/lib/standings";
-import { buildMetadata, gamePath } from "@/lib/seo";
+import { buildMetadata } from "@/lib/seo";
+import { canonicalGamePath, displayGameName, gameSeoForName } from "@/lib/gameSeo";
 import { GameArtTile } from "@/components/GameArtTile";
 import { FeaturedCompetitions } from "@/components/FeaturedCompetitions";
 import { UpcomingCompetitions } from "@/components/UpcomingCompetitions";
@@ -65,13 +66,17 @@ const getGamePageData = cache(async (slug: string) => {
     realGameNames(),
   ]);
 
+  const info = await gameSeoForName(game);
+  const related = allNames.filter((n) => n !== game).slice(0, 6);
   return {
     game,
+    displayName: displayGameName(game, info),
+    canonicalPath: await canonicalGamePath(game),
+    relatedGames: await Promise.all(related.map(async (name) => ({ name, path: await canonicalGamePath(name) }))),
     active,
     completedCount,
     totalPrize: prizeSum._sum.prizeAmount ?? 0,
     standings: standings.slice(0, 5),
-    relatedGames: allNames.filter((n) => n !== game).slice(0, 6),
   };
 });
 
@@ -80,16 +85,16 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const data = await getGamePageData(slug);
   if (!data) return buildMetadata({ title: "Game not found", description: "", path: `/games/${slug}`, noindex: true });
 
-  const { game, active, standings } = data;
+  const { displayName, canonicalPath, active, standings } = data;
   const description =
     active.length > 0
-      ? `${active.length} open ${game} tournament${active.length === 1 ? "" : "s"} on Circuit right now. Register, compete, and climb the ${game} leaderboard.`
-      : `Real ${game} tournaments and 1v1 Challenges on Circuit. Esports competitions with real prizes.${standings.length ? ` See the current ${game} leaderboard.` : ""}`;
+      ? `${active.length} open ${displayName} tournament${active.length === 1 ? "" : "s"} on Circuit right now. Register, compete, and climb the ${displayName} leaderboard.`
+      : `Real ${displayName} tournaments and 1v1 Challenges on Circuit. Esports competitions with real prizes.${standings.length ? ` See the current ${displayName} leaderboard.` : ""}`;
 
   return buildMetadata({
-    title: `${game} Tournaments & Esports Competitions`,
+    title: `${displayName} Tournaments & Esports Competitions`,
     description,
-    path: gamePath(game),
+    path: canonicalPath,
   });
 }
 
@@ -98,7 +103,10 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
   const data = await getGamePageData(slug);
   if (!data) notFound();
 
-  const { game, active, completedCount, totalPrize, standings, relatedGames } = data;
+  // An old or alternate address (/games/codm) goes to the canonical one.
+  if (`/games/${slug}` !== data.canonicalPath) permanentRedirect(data.canonicalPath);
+
+  const { game, displayName, active, completedCount, totalPrize, standings, relatedGames } = data;
   const openNow = active.filter((t) => t.status === "OPEN" || t.status === "LIVE");
   const announced = active.filter((t) => t.status === "DRAFT");
 
@@ -116,7 +124,7 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
         />
         <div className="relative z-10 flex flex-col gap-2">
           <h1 className="font-display text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-            {game} Tournaments
+            {displayName} Tournaments
           </h1>
           <div className="flex flex-wrap gap-2 pt-1">
             <span className="badge badge-neutral bg-surface-elevated/80 text-foreground">
@@ -191,8 +199,8 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
         <div className="flex flex-col gap-3 border-t border-border pt-6">
           <h2 className="text-section-heading">Other Games on Circuit</h2>
           <div className="flex flex-wrap gap-2">
-            {relatedGames.map((name) => (
-              <Link key={name} href={gamePath(name)} className="badge badge-neutral bg-surface-elevated">
+            {relatedGames.map(({ name, path }) => (
+              <Link key={name} href={path} className="badge badge-neutral bg-surface-elevated">
                 {name}
               </Link>
             ))}

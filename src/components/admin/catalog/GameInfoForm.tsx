@@ -24,6 +24,9 @@ export type GameInfo = {
   category: string | null;
   platforms: string[];
   publisher: string | null;
+  slug: string | null;
+  seoName: string | null;
+  aliases: string[];
 };
 
 export function GameInfoForm({ game }: { game?: GameInfo }) {
@@ -32,6 +35,9 @@ export function GameInfoForm({ game }: { game?: GameInfo }) {
   const [description, setDescription] = useState(game?.description ?? "");
   const [category, setCategory] = useState(game?.category ?? "");
   const [publisher, setPublisher] = useState(game?.publisher ?? "");
+  const [slug, setSlug] = useState(game?.slug ?? "");
+  const [seoName, setSeoName] = useState(game?.seoName ?? "");
+  const [aliases, setAliases] = useState((game?.aliases ?? []).join(", "));
   const [platforms, setPlatforms] = useState<string[]>(game?.platforms ?? []);
   const [otherPlatform, setOtherPlatform] = useState("");
   const [iconUrl, setIconUrl] = useState(game?.iconUrl ?? "");
@@ -56,7 +62,7 @@ export function GameInfoForm({ game }: { game?: GameInfo }) {
     setSaving(true);
     setError(null);
     setSaved(false);
-    const body = { name, description, category, publisher, platforms, iconUrl: iconUrl || null, coverUrl: coverUrl || null };
+    const body = { name, slug, seoName, aliases, description, category, publisher, platforms, iconUrl: iconUrl || null, coverUrl: coverUrl || null };
     if (game) {
       const err = await catalogRequest("PATCH", `/api/admin/games/${game.id}`, body);
       setSaving(false);
@@ -78,6 +84,20 @@ export function GameInfoForm({ game }: { game?: GameInfo }) {
         <label className="flex flex-col gap-1.5 sm:col-span-2">
           <span className="field-label">Game name</span>
           <input required value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. PUBG Mobile" className="field-input" />
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="field-label">Full name for search <span className="text-muted">(optional)</span></span>
+          <input value={seoName} onChange={(e) => setSeoName(e.target.value)} placeholder="e.g. Call of Duty: Mobile" className="field-input" />
+          <span className="text-xs text-muted">Used in page titles when the game name above is an abbreviation.</span>
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="field-label">Page address <span className="text-muted">(optional)</span></span>
+          <input value={slug} onChange={(e) => setSlug(e.target.value.toLowerCase())} placeholder="e.g. call-of-duty-mobile" className="field-input" />
+          <span className="text-xs text-muted">The game page lives at /games/this-address. Changing it later redirects the old one.</span>
+        </label>
+        <label className="flex flex-col gap-1.5 sm:col-span-2">
+          <span className="field-label">Also known as <span className="text-muted">(optional, separate with commas)</span></span>
+          <input value={aliases} onChange={(e) => setAliases(e.target.value)} placeholder="e.g. CODM, COD Mobile" className="field-input" />
         </label>
         <label className="flex flex-col gap-1.5 sm:col-span-2">
           <span className="field-label">Description <span className="text-muted">(optional)</span></span>

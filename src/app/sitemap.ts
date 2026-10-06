@@ -20,8 +20,9 @@
 
 import type { MetadataRoute } from "next";
 import { prisma } from "@/lib/db";
-import { SITE_URL, tournamentPath, battlePath, gamePath, organiserPath, videoPath } from "@/lib/seo";
+import { SITE_URL, tournamentPath, battlePath, organiserPath, videoPath } from "@/lib/seo";
 import { realGameNames } from "@/lib/games";
+import { canonicalGamePath } from "@/lib/gameSeo";
 import { isProfileIndexable } from "@/lib/profileSeo";
 import { LISTED_WHERE } from "@/lib/communityDirectory";
 
@@ -48,7 +49,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [tournaments, battles, gameNames, organizedByCounts, videos, communities, optedInPlayers] = await Promise.all([
     prisma.tournament.findMany({
       where: { status: { in: [...TOURNAMENT_STATUSES] } },
-      select: { id: true, name: true, createdAt: true },
+      select: { id: true, name: true, createdAt: true, updatedAt: true },
       orderBy: { createdAt: "asc" },
     }),
     prisma.battle.findMany({
@@ -100,17 +101,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.5,
   }));
 
-  // No `updatedAt` column on Tournament — createdAt is the only real
-  // timestamp available, a reasonable but imperfect lastModified proxy.
   const tournamentEntries: MetadataRoute.Sitemap = tournaments.map((t) => ({
     url: `${SITE_URL}${tournamentPath(t)}`,
-    lastModified: t.createdAt,
+    lastModified: t.updatedAt,
     changeFrequency: "daily",
     priority: 0.8,
   }));
 
-  const gameEntries: MetadataRoute.Sitemap = gameNames.map((name) => ({
-    url: `${SITE_URL}${gamePath(name)}`,
+  // A game appears once, at its canonical address.
+  const gamePaths = [...new Set(await Promise.all(gameNames.map((name) => canonicalGamePath(name))))];
+  const gameEntries: MetadataRoute.Sitemap = gamePaths.map((path) => ({
+    url: `${SITE_URL}${path}`,
     changeFrequency: "daily",
     priority: 0.7,
   }));

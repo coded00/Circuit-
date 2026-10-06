@@ -491,6 +491,12 @@ model Game {
   /// e.g. ["Mobile", "PC", "PlayStation"]. Free text, admin-entered.
   platforms   String[]  @default([])
   publisher   String?
+  /// SEO: the address of the game's public page (/games/<slug>), e.g. "call-of-duty-mobile". Null = derived from the name.
+  slug        String?   @unique
+  /// SEO: the full name used in page titles when `name` is an abbreviation (name "CODM", seoName "Call of Duty: Mobile").
+  seoName     String?
+  /// SEO: other names people search for. Old or alternate addresses built from these redirect to the canonical one.
+  aliases     String[]  @default([])
   /// Active/inactive — an inactive game is hidden from creation forms.
   enabled     Boolean   @default(true)
   /// Null = draft. Organizers only see games that are both enabled and
@@ -719,6 +725,8 @@ model Tournament {
   /// (cancellation voids the whole event before it ever reaches this
   /// flip — see tournaments/[id]/cancel/route.ts).
   completedAt         DateTime?
+  /// ISO 3166-1 alpha-2 country, taken from the organizer's country when the tournament is created (SEO country pages).
+  country             String?
   createdAt           DateTime         @default(now())
   /// V1 audit follow-up — status/fundsFrozen/cancellationLockAt all
   /// mutate after creation; useful for reconciliation and for spotting
@@ -740,6 +748,7 @@ model Tournament {
   hostCommunity   Community?          @relation("TournamentHostCommunity", fields: [hostCommunityId], references: [id], onDelete: SetNull)
 
   @@index([game, status])
+  @@index([country])
   // V1 audit follow-up — dashboard/payouts, dashboard's own overview, and
   // the community route all filter by organizerId alone (no game/status
   // alongside it), so the composite index above doesn't help those reads.
