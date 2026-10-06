@@ -28,7 +28,8 @@ import { countryName, isCountryCode } from "@/lib/countries";
 import { hasBlocked } from "@/lib/blocks";
 import { openBattleFilter } from "@/lib/battles";
 import type { Metadata } from "next";
-import { buildMetadata } from "@/lib/seo";
+import { absoluteUrl, buildMetadata } from "@/lib/seo";
+import { safeJsonLd } from "@/lib/jsonLd";
 import { isProfileIndexable } from "@/lib/profileSeo";
 import { ProfileView, type AttentionItem, type MatchSummary, type ProfileData } from "./ProfileView";
 
@@ -359,5 +360,14 @@ export default async function PlayerProfilePage({
     initialTab: tab ? TAB_ALIASES[tab] : undefined,
   };
 
-  return <ProfileView data={data} viewerId={viewer?.id ?? null} />;
+  // Structured data only on a profile that's allowed to be indexed (see lib/profileSeo.ts).
+  const personLd = isProfileIndexable(player, matches.length > 0)
+    ? { "@context": "https://schema.org", "@type": "Person", name: player.displayName, url: absoluteUrl(`/players/${player.handle}`), ...(player.avatarUrl ? { image: player.avatarUrl } : {}) }
+    : null;
+  return (
+    <>
+      {personLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(personLd) }} />}
+      <ProfileView data={data} viewerId={viewer?.id ?? null} />
+    </>
+  );
 }

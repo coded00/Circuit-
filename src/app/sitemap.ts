@@ -24,6 +24,8 @@ import { SITE_URL, tournamentPath, battlePath, organiserPath, videoPath } from "
 import { realGameNames } from "@/lib/games";
 import { canonicalGamePath } from "@/lib/gameSeo";
 import { isProfileIndexable } from "@/lib/profileSeo";
+import { gameIsIndexable, leaderboardIsIndexable, teamIsIndexable } from "@/lib/seoEligibility";
+import { gameStandings } from "@/lib/standings";
 import { LISTED_WHERE } from "@/lib/communityDirectory";
 
 // Without this, Next prerenders sitemap.xml once at build time (it has no
@@ -46,10 +48,10 @@ const STATIC_ROUTES: { path: string; changeFrequency: MetadataRoute.Sitemap[numb
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [tournaments, battles, gameNames, organizedByCounts, videos, communities, optedInPlayers] = await Promise.all([
+  const [tournaments, battles, gameNames, organizedByCounts, videos, communities, optedInPlayers, teams, completedForGames] = await Promise.all([
     prisma.tournament.findMany({
       where: { status: { in: [...TOURNAMENT_STATUSES] } },
-      select: { id: true, name: true, createdAt: true, updatedAt: true },
+      select: { id: true, name: true, game: true, createdAt: true, updatedAt: true },
       orderBy: { createdAt: "asc" },
     }),
     prisma.battle.findMany({
@@ -75,6 +77,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       select: { id: true, handle: true, dateOfBirth: true, searchEngineIndexable: true, isSuspended: true, deletionRequestedAt: true },
       take: 5000,
     }),
+    prisma.team.findMany({
+      where: { registrations: { some: {} } },
+      select: { id: true, name: true, _count: { select: { registrations: true, members: { where: { accepted: true } } } } },
+      take: 5000,
+    }),
+    prisma.tournament.findMany({ where: { status: "COMPLETE" }, select: { game: true, _count: { select: { registrations: { where: { status: "CONFIRMED" } } } } } }),
   ]);
   const playedIds = new Set(
     (
@@ -108,13 +116,29 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.8,
   }));
 
-  // A game appears once, at its canonical address.
-  const gamePaths = [...new Set(await Promise.all(gameNames.map((name) => canonicalGamePath(name))))];
+  // A game appears once, at its canonical address, and only once it has enough activity (src/lib/seoEligibility.ts).
+  const publicCountByGame = new Map<string, number>();
+  for (const t of tournaments) publicCountByGame.set(t.game, (publicCountByGame.get(t.game) ?? 0) + 1);
+  const bigCompletedByGame = new Map<string, number>();
+  for (const t of completedForGames) if (t._count.registrations >= 8) bigCompletedByGame.set(t.game, (bigCompletedByGame.get(t.game) ?? 0) + 1);
+  const indexableGames = gameNames.filter((name) => gameIsIndexable({ publicTournaments: publicCountByGame.get(name) ?? 0, completedWithEightEntrants: bigCompletedByGame.get(name) ?? 0 }));
+  const gamePaths = [...new Set(await Promise.all(indexableGames.map((name) => canonicalGamePath(name))))];
   const gameEntries: MetadataRoute.Sitemap = gamePaths.map((path) => ({
     url: `${SITE_URL}${path}`,
     changeFrequency: "daily",
     priority: 0.7,
   }));
+
+  // A game's leaderboard page, once ten players are ranked.
+  const boardEntries: MetadataRoute.Sitemap = [];
+  for (const name of gameNames) {
+    if (!leaderboardIsIndexable((await gameStandings(name)).length)) continue;
+    boardEntries.push({ url: `${SITE_URL}/leaderboard/${(await canonicalGamePath(name)).replace("/games/", "")}`, changeFrequency: "daily", priority: 0.6 });
+  }
+
+  const teamEntries: MetadataRoute.Sitemap = teams
+    .filter((t) => teamIsIndexable({ acceptedMembers: t._count.members, tournamentEntries: t._count.registrations }))
+    .map((t) => ({ url: `${SITE_URL}/teams/${t.id}`, changeFrequency: "weekly", priority: 0.4 }));
 
   const organiserEntries: MetadataRoute.Sitemap = organizedByCounts.map((o) => ({
     url: `${SITE_URL}${organiserPath(o.user.handle)}`,
@@ -136,5 +160,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.5,
   }));
 
-  return [...staticEntries, ...gameEntries, ...organiserEntries, ...battleEntries, ...tournamentEntries, ...videoEntries, ...communityEntries, ...playerEntries];
+  return [...staticEntries, ...gameEntries, ...organiserEntries, ...battleEntries, ...tournamentEntries, ...videoEntries, ...communityEntries, ...playerEntries, ...boardEntries, ...teamEntries];
 }

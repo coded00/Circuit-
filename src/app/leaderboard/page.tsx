@@ -44,14 +44,22 @@ import { gameStandings, globalStandings, type Standing } from "@/lib/standings";
 import { getFriendIds } from "@/lib/friends";
 import { GameArtTile } from "@/components/GameArtTile";
 import { CountUp } from "@/components/CountUp";
-import { buildMetadata } from "@/lib/seo";
+import type { Metadata } from "next";
+import { buildMetadata, slugify } from "@/lib/seo";
+import { gameSeoForName } from "@/lib/gameSeo";
 
-export const metadata = buildMetadata({
-  title: "Esports Leaderboard: Top Players",
-  description:
-    "See the top players on Circuit by rank, wins and earnings across Call of Duty, eFootball, PUBG Mobile and more.",
-  path: "/leaderboard",
-});
+/** `?game=` is the same data as the per-game page, so it points there; a date scope is a view, not a page. */
+export async function generateMetadata({ searchParams }: { searchParams: Promise<{ game?: string; scope?: string }> }): Promise<Metadata> {
+  const { game, scope } = await searchParams;
+  const info = game ? await gameSeoForName(game) : null;
+  const path = game ? `/leaderboard/${info?.slug ?? slugify(game)}` : "/leaderboard";
+  return buildMetadata({
+    title: "Esports Leaderboard: Top Players",
+    description: "See the top players on Circuit by rank, wins and earnings across Call of Duty, eFootball, PUBG Mobile and more.",
+    path,
+    noindex: !!scope,
+  });
+}
 
 
 const RANK_COLORS = ["#eab308", "#9ca3af", "#b45309"]; // gold, silver, bronze
