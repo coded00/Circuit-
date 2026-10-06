@@ -10,6 +10,9 @@
 import type { MetadataRoute } from "next";
 import { SITE_URL } from "@/lib/seo";
 
+// Read at request time: prerendered at build, the sitemap line would carry the build machine's address (localhost).
+export const dynamic = "force-dynamic";
+
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: {
@@ -26,6 +29,11 @@ export default function robots(): MetadataRoute.Robots {
         "/notifications",
         "/staff/",
         "/friends",
+        "/marketplace/mine",
+        "/marketplace/orders",
+        "/marketplace/new",
+        "/tournaments/new",
+        "/battles/new",
         // Utility-only, zero search value; reset-password's own query
         // param can carry a one-time token, which must never be crawled.
         // /login and /signup stay allowed — real, searched-for entry

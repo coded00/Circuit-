@@ -28,6 +28,15 @@ import { tournamentPath } from "@/lib/seo";
 import { FilterMenu } from "./FilterMenu";
 import { FilterDisclosure } from "./FilterDisclosure";
 import { competitionKind, formatsForType, pickFeatured, spotsLabel, timeUntil, TYPE_GROUPS } from "@/lib/competeView";
+import { buildMetadata } from "@/lib/seo";
+
+export const metadata = buildMetadata({
+  title: "Browse Gaming Tournaments in Nigeria",
+  description:
+    "Find open gaming tournaments and esports competitions in Nigeria. Filter by game, entry fee and prize pool, register in minutes and win real prizes.",
+  path: "/compete",
+});
+
 
 type SearchParams = {
   q?: string;

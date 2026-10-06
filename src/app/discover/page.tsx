@@ -21,6 +21,16 @@ import { LoadMorePlayers } from "@/components/discover/LoadMorePlayers";
 import { TeamDiscoveryCard } from "@/components/discover/TeamDiscoveryCard";
 import { LoadMoreTeams } from "@/components/discover/LoadMoreTeams";
 import { DiscoverySectionRow } from "@/components/discover/DiscoverySectionRow";
+import { buildMetadata } from "@/lib/seo";
+
+export const metadata = buildMetadata({
+  title: "Discover Players and Tournaments",
+  description:
+    "Discover gamers, teams and tournaments to follow on Circuit.",
+  path: "/discover",
+  noindex: true,
+});
+
 
 type SearchParams = { tab?: string; q?: string; game?: string; region?: string };
 

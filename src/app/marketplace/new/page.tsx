@@ -4,6 +4,16 @@ import { loginPath } from "@/lib/safeRedirect";
 import { getCurrentUser } from "@/lib/session";
 import { prisma } from "@/lib/db";
 import ListingForm from "@/components/marketplace/ListingForm";
+import { buildMetadata } from "@/lib/seo";
+
+export const metadata = buildMetadata({
+  title: "List an Item",
+  description:
+    "List an item on the Circuit marketplace.",
+  path: "/marketplace/new",
+  noindex: true,
+});
+
 
 export default async function NewListingPage() {
   const user = await getCurrentUser();

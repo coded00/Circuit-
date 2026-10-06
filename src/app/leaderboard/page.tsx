@@ -44,6 +44,15 @@ import { gameStandings, globalStandings, type Standing } from "@/lib/standings";
 import { getFriendIds } from "@/lib/friends";
 import { GameArtTile } from "@/components/GameArtTile";
 import { CountUp } from "@/components/CountUp";
+import { buildMetadata } from "@/lib/seo";
+
+export const metadata = buildMetadata({
+  title: "Esports Leaderboard: Top Nigerian Players",
+  description:
+    "See the top players on Circuit by rank, wins and earnings across Call of Duty, eFootball, PUBG Mobile and more.",
+  path: "/leaderboard",
+});
+
 
 const RANK_COLORS = ["#eab308", "#9ca3af", "#b45309"]; // gold, silver, bronze
 

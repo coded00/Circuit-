@@ -7,6 +7,16 @@ import { prisma } from "@/lib/db";
 import { canSell } from "@/lib/marketplace";
 import { categoryLabel, formatListingPrice } from "@/lib/marketplace";
 import { ManageListing } from "@/components/marketplace/ManageListing";
+import { buildMetadata } from "@/lib/seo";
+
+export const metadata = buildMetadata({
+  title: "My Listings",
+  description:
+    "Your Circuit marketplace listings.",
+  path: "/marketplace/mine",
+  noindex: true,
+});
+
 
 const STATUS_LABEL = { ACTIVE: "Live", PAUSED: "Paused", SOLD: "Sold", REMOVED: "Removed" } as const;
 

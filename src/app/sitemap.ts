@@ -40,6 +40,8 @@ const STATIC_ROUTES: { path: string; changeFrequency: MetadataRoute.Sitemap[numb
   { path: "/battles", changeFrequency: "hourly", priority: 0.7 },
   { path: "/calendar", changeFrequency: "daily", priority: 0.6 },
   { path: "/communities", changeFrequency: "daily", priority: 0.6 },
+  { path: "/watch", changeFrequency: "hourly", priority: 0.6 },
+  { path: "/marketplace", changeFrequency: "daily", priority: 0.5 },
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {

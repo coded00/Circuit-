@@ -150,6 +150,7 @@ async function HomeContent({ searchParams }: { searchParams: Promise<{ leaderboa
 
   return (
     <div className="flex w-full flex-1 flex-col gap-8 px-4 py-6 sm:px-8 sm:py-10">
+      <h1 className="sr-only">Gaming tournaments and esports competitions in Nigeria</h1>
       {activeAnnouncement && <AnnouncementBanner title={activeAnnouncement.title} body={activeAnnouncement.body} />}
 
       <CircuitHero

@@ -26,6 +26,15 @@ import { Panel, PanelEmpty } from "@/components/ui/Panel";
 import { ChallengeCard } from "@/components/ChallengeCard";
 import { challengeRecords } from "@/lib/standings";
 import { recordKey } from "@/lib/challengeView";
+import { buildMetadata } from "@/lib/seo";
+
+export const metadata = buildMetadata({
+  title: "1v1 Challenges: Play for Real Money",
+  description:
+    "Open 1v1 challenges on Circuit. Pick a game, accept a challenge, play your match and get paid, with every result verified.",
+  path: "/battles",
+});
+
 
 export default async function BattleBoardPage({ searchParams }: { searchParams: Promise<{ game?: string }> }) {
   const { game } = await searchParams;

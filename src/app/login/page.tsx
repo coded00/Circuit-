@@ -10,6 +10,15 @@ import { AuthModeSwitch } from "@/components/auth/AuthModeSwitch";
 import { AuthMethods } from "@/components/auth/AuthMethods";
 import { isGoogleSignInEnabled } from "@/lib/oauth/google";
 import LoginForm from "./LoginForm";
+import { buildMetadata } from "@/lib/seo";
+
+export const metadata = buildMetadata({
+  title: "Log In",
+  description:
+    "Log in to Circuit to register for tournaments, play challenges and track your rank.",
+  path: "/login",
+});
+
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string | string[] }> }) {
   // Already signed in: this page has nothing to offer, so continue to

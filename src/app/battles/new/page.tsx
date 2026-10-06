@@ -4,6 +4,16 @@ import { getCurrentUser } from "@/lib/session";
 import { prisma } from "@/lib/db";
 import { getFriendIds } from "@/lib/friends";
 import BattleForm from "./BattleForm";
+import { buildMetadata } from "@/lib/seo";
+
+export const metadata = buildMetadata({
+  title: "Open a Challenge",
+  description:
+    "Create a 1v1 challenge on Circuit.",
+  path: "/battles/new",
+  noindex: true,
+});
+
 
 export default async function NewBattlePage() {
   const user = await getCurrentUser();

@@ -130,7 +130,7 @@ export function CircuitHero({
                         {tournament.game} · {tournament.teamSize}
                       </span>
                     </div>
-                    <h1 className="text-hero line-clamp-2">{tournament.name}</h1>
+                    <h2 className="text-hero line-clamp-2">{tournament.name}</h2>
                     <p className="max-w-[440px] text-sm text-muted sm:text-base">
                       {tournament.prizeAmount
                         ? `₦${(tournament.prizeAmount / 100).toLocaleString("en-NG")} prize pool · `
@@ -166,7 +166,7 @@ export function CircuitHero({
             </>
           ) : banner ? (
             <>
-              <h1 className="text-hero line-clamp-2">{banner.headline}</h1>
+              <h2 className="text-hero line-clamp-2">{banner.headline}</h2>
               {banner.description && <p className="max-w-[440px] text-sm text-muted sm:text-base">{banner.description}</p>}
               {banner.ctaLabel && banner.ctaHref && (
                 <div className="flex flex-wrap gap-3 pt-1">
@@ -178,9 +178,9 @@ export function CircuitHero({
             </>
           ) : (
             <>
-              <h1 className="text-hero line-clamp-3 text-[26px] normal-case sm:text-[38px] lg:text-[46px]">
+              <h2 className="text-hero line-clamp-3 text-[26px] normal-case sm:text-[38px] lg:text-[46px]">
                 This is where <span className="text-accent-volt">your name takes shape.</span>
-              </h1>
+              </h2>
               <p className="max-w-[440px] text-sm text-muted sm:text-base">Enter the competition. Find your rivals. Build your legacy, one match at a time.</p>
               {/* Side by side on a phone too, so the pair takes one row instead of two and stays clear of the slide dots. */}
               <div className="flex gap-2 pt-1">

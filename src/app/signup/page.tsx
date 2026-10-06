@@ -10,6 +10,15 @@ import { isGoogleSignInEnabled } from "@/lib/oauth/google";
 import { prisma } from "@/lib/db";
 import { countryOptions } from "@/lib/countries";
 import SignupForm from "./SignupForm";
+import { buildMetadata } from "@/lib/seo";
+
+export const metadata = buildMetadata({
+  title: "Sign Up Free",
+  description:
+    "Create a free Circuit account and start competing in gaming tournaments and 1v1 challenges in Nigeria.",
+  path: "/signup",
+});
+
 
 export default async function SignupPage({ searchParams }: { searchParams: Promise<{ next?: string | string[] }> }) {
   // Already signed in: this page has nothing to offer, so continue to

@@ -6,13 +6,14 @@ import Link from "next/link";
 import { Tv } from "lucide-react";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { buildMetadata } from "@/lib/seo";
 import { GameArtTile } from "@/components/GameArtTile";
 
-export const metadata = {
-  title: "Watch | Circuit",
-  description:
-    "Watch the game from every angle: live tournaments, every stream in one place.",
-};
+export const metadata = buildMetadata({
+  title: "Watch Live Gaming Tournaments",
+  description: "Watch Nigerian gaming tournaments live. Every stream of a tournament in one place, from the main stage to each player.",
+  path: "/watch",
+});
 
 const hasStreams: Prisma.TournamentWhereInput = {
   OR: [

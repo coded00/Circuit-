@@ -4,6 +4,16 @@ import { safeNextPath } from "@/lib/safeRedirect";
 import { AuthSplitLayout } from "@/components/auth/AuthSplitLayout";
 import { AuthHeading } from "@/components/auth/AuthHeading";
 import ForgotPasswordForm from "./ForgotPasswordForm";
+import { buildMetadata } from "@/lib/seo";
+
+export const metadata = buildMetadata({
+  title: "Forgot Password",
+  description:
+    "Reset your Circuit password.",
+  path: "/forgot-password",
+  noindex: true,
+});
+
 
 export default async function ForgotPasswordPage({ searchParams }: { searchParams: Promise<{ next?: string | string[] }> }) {
   // Already signed in: this page has nothing to offer, so continue to

@@ -49,6 +49,15 @@ import { CalendarListView } from "@/components/calendar/CalendarListView";
 import { GameFilterSelect } from "@/components/calendar/GameFilterSelect";
 import { FeaturedCompetitions } from "@/components/FeaturedCompetitions";
 import { EVENT_KIND_META, type CalendarEvent, type EventKind } from "@/components/calendar/types";
+import { buildMetadata } from "@/lib/seo";
+
+export const metadata = buildMetadata({
+  title: "Gaming Tournament Calendar",
+  description:
+    "Upcoming gaming tournaments and esports events on Circuit, by date. Plan your week and register before spots fill.",
+  path: "/calendar",
+});
+
 
 type SearchParams = {
   y?: string;

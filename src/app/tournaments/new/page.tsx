@@ -4,6 +4,16 @@ import { getCurrentUser } from "@/lib/session";
 import { hostableCommunities } from "@/lib/communityDirectory";
 import { loadOrganizerCatalog } from "@/lib/competitionConfig";
 import TournamentForm from "./TournamentForm";
+import { buildMetadata } from "@/lib/seo";
+
+export const metadata = buildMetadata({
+  title: "Host a Tournament",
+  description:
+    "Create a tournament on Circuit.",
+  path: "/tournaments/new",
+  noindex: true,
+});
+
 
 export default async function NewTournamentPage({ searchParams }: { searchParams: Promise<{ community?: string }> }) {
   const { community } = await searchParams;
