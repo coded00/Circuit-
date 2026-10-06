@@ -26,3 +26,14 @@ describe("breadcrumbJsonLd", () => {
     expect(ld.itemListElement[1].item).toMatch(/^https?:\/\/.+\/games\/x$/);
   });
 });
+
+describe("country thresholds", () => {
+  it("indexes a country from three tournaments and ten players", async () => {
+    const { countryIsIndexable, gameCountryIsIndexable } = await import("@/lib/seoEligibility");
+    expect(countryIsIndexable({ publicTournaments: 3, players: 10 })).toBe(true);
+    expect(countryIsIndexable({ publicTournaments: 2, players: 50 })).toBe(false);
+    expect(countryIsIndexable({ publicTournaments: 9, players: 9 })).toBe(false);
+    expect(gameCountryIsIndexable(3)).toBe(true);
+    expect(gameCountryIsIndexable(2)).toBe(false);
+  });
+});

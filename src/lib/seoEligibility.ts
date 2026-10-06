@@ -20,3 +20,13 @@ export function leaderboardIsIndexable(rankedPlayers: number): boolean {
 export function teamIsIndexable(stats: { acceptedMembers: number; tournamentEntries: number }): boolean {
   return stats.acceptedMembers >= 2 && stats.tournamentEntries >= 1;
 }
+
+/** A country page: three public tournaments from the country, and ten players who live there. */
+export function countryIsIndexable(stats: { publicTournaments: number; players: number }): boolean {
+  return stats.publicTournaments >= 3 && stats.players >= 10;
+}
+
+/** A game in a country: three public tournaments of that game from that country. */
+export function gameCountryIsIndexable(publicTournaments: number): boolean {
+  return publicTournaments >= 3;
+}

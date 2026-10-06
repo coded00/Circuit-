@@ -24,7 +24,8 @@ import { SITE_URL, tournamentPath, battlePath, organiserPath, videoPath } from "
 import { realGameNames } from "@/lib/games";
 import { canonicalGamePath } from "@/lib/gameSeo";
 import { isProfileIndexable } from "@/lib/profileSeo";
-import { gameIsIndexable, leaderboardIsIndexable, teamIsIndexable } from "@/lib/seoEligibility";
+import { countryIsIndexable, gameCountryIsIndexable, gameIsIndexable, leaderboardIsIndexable, teamIsIndexable } from "@/lib/seoEligibility";
+import { countrySlug } from "@/lib/countrySeo";
 import { gameStandings } from "@/lib/standings";
 import { LISTED_WHERE } from "@/lib/communityDirectory";
 
@@ -48,7 +49,7 @@ const STATIC_ROUTES: { path: string; changeFrequency: MetadataRoute.Sitemap[numb
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [tournaments, battles, gameNames, organizedByCounts, videos, communities, optedInPlayers, teams, completedForGames] = await Promise.all([
+  const [tournaments, battles, gameNames, organizedByCounts, videos, communities, optedInPlayers, teams, completedForGames, countryTournamentCounts, countryPlayerCounts, gameCountryCounts] = await Promise.all([
     prisma.tournament.findMany({
       where: { status: { in: [...TOURNAMENT_STATUSES] } },
       select: { id: true, name: true, game: true, createdAt: true, updatedAt: true },
@@ -83,6 +84,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       take: 5000,
     }),
     prisma.tournament.findMany({ where: { status: "COMPLETE" }, select: { game: true, _count: { select: { registrations: { where: { status: "CONFIRMED" } } } } } }),
+    prisma.tournament.groupBy({ by: ["country"], where: { country: { not: null }, status: { in: [...TOURNAMENT_STATUSES] } }, _count: { _all: true } }),
+    prisma.user.groupBy({ by: ["country"], where: { country: { not: null } }, _count: { _all: true } }),
+    prisma.tournament.groupBy({ by: ["game", "country"], where: { country: { not: null }, status: { in: [...TOURNAMENT_STATUSES] } }, _count: { _all: true } }),
   ]);
   const playedIds = new Set(
     (
@@ -136,6 +140,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     boardEntries.push({ url: `${SITE_URL}/leaderboard/${(await canonicalGamePath(name)).replace("/games/", "")}`, changeFrequency: "daily", priority: 0.6 });
   }
 
+  // Country pages (and a game within a country) once there's enough real activity there.
+  const playersByCountry = new Map(countryPlayerCounts.map((c) => [c.country, c._count._all]));
+  const countryEntries: MetadataRoute.Sitemap = countryTournamentCounts
+    .filter((c) => c.country && countryIsIndexable({ publicTournaments: c._count._all, players: playersByCountry.get(c.country) ?? 0 }))
+    .map((c) => ({ url: `${SITE_URL}/countries/${countrySlug(c.country!)}`, changeFrequency: "daily", priority: 0.6 }));
+  const gameCountryEntries: MetadataRoute.Sitemap = [];
+  for (const row of gameCountryCounts) {
+    if (!row.country || !gameCountryIsIndexable(row._count._all)) continue;
+    gameCountryEntries.push({ url: `${SITE_URL}${await canonicalGamePath(row.game)}/${countrySlug(row.country)}`, changeFrequency: "daily", priority: 0.6 });
+  }
+
   const teamEntries: MetadataRoute.Sitemap = teams
     .filter((t) => teamIsIndexable({ acceptedMembers: t._count.members, tournamentEntries: t._count.registrations }))
     .map((t) => ({ url: `${SITE_URL}/teams/${t.id}`, changeFrequency: "weekly", priority: 0.4 }));
@@ -160,5 +175,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.5,
   }));
 
-  return [...staticEntries, ...gameEntries, ...organiserEntries, ...battleEntries, ...tournamentEntries, ...videoEntries, ...communityEntries, ...playerEntries, ...boardEntries, ...teamEntries];
+  return [...staticEntries, ...gameEntries, ...organiserEntries, ...battleEntries, ...tournamentEntries, ...videoEntries, ...communityEntries, ...playerEntries, ...boardEntries, ...teamEntries, ...countryEntries, ...gameCountryEntries];
 }

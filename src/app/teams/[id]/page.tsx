@@ -22,6 +22,7 @@ import { TeamActionButton } from "@/components/teams/TeamActionButton";
 import { TeamInviteBanner } from "@/components/teams/TeamInviteBanner";
 import { TeamMembershipButton } from "@/components/teams/TeamMembershipButton";
 import { teamIsIndexable } from "@/lib/seoEligibility";
+import { publicProfileIds } from "@/lib/leaderboardSeo";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
@@ -33,7 +34,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const members = team._count.members;
   return buildMetadata({
     title: `${team.name}${team.tag ? ` [${team.tag}]` : ""} | Circuit team`,
-    description: `${team.name}${team.game ? `, a ${team.game} team` : ""} on Circuit. ${members} player${members === 1 ? "" : "s"}, captained by @${team.captain.handle}. See the roster and join the Circuit.`,
+    description: `${team.name}${team.game ? `, a ${team.game} team` : ""} on Circuit. ${members} player${members === 1 ? "" : "s"}. See the roster and join the Circuit.`,
     path: `/teams/${id}`,
     // A team nobody has played for yet is a thin page.
     noindex: !teamIsIndexable({ acceptedMembers: members, tournamentEntries: team._count.registrations }),
@@ -64,6 +65,9 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ id:
   const role: Awaited<ReturnType<typeof teamRoleFor>> = user ? await teamRoleFor(id, user.id) : { role: "none" };
   const isCaptain = role.role === "captain";
   const isInvited = role.role === "invited";
+  // Signed out (which is what a search engine is): only players who made their profile public are named.
+  const namedIds = user ? null : await publicProfileIds([team.captainId, ...team.members.map((m) => m.userId)]);
+  const hiddenFor = (userId: string) => !!namedIds && !namedIds.has(userId);
 
   const acceptedMembers = team.members.filter((m) => m.accepted && m.userId !== team.captainId);
   // Invites and join requests are private: the captain sees them all, an invited or requesting player sees their own.
@@ -123,9 +127,9 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ id:
       <div className="flex flex-col gap-2">
         <h2 className="text-section-heading">Roster</h2>
         <div className="flex flex-col gap-2">
-          <MemberRow teamId={id} person={team.captain} isCaptain isPending={false} canRemove={false} />
+          <MemberRow teamId={id} person={team.captain} isCaptain isPending={false} canRemove={false} hidden={hiddenFor(team.captainId)} />
           {acceptedMembers.map((m) => (
-            <MemberRow key={m.id} teamId={id} person={m.user} isCaptain={false} isPending={false} canRemove={isCaptain} />
+            <MemberRow key={m.id} teamId={id} person={m.user} isCaptain={false} isPending={false} canRemove={isCaptain} hidden={hiddenFor(m.userId)} />
           ))}
           {pendingMembers.map((m) => (
             <MemberRow

@@ -9,13 +9,18 @@ import type { Standing } from "@/lib/standings";
 
 export type PublicStanding = { rank: number; displayName: string; handle: string | null; wins: number; losses: number };
 
-export async function standingsForViewer(standings: Standing[], signedIn: boolean): Promise<PublicStanding[]> {
-  if (signedIn) return standings.map((s, i) => ({ rank: i + 1, displayName: s.displayName, handle: s.handle, wins: s.wins, losses: s.losses }));
+/** Which of these players are open to being named on a page a search engine reads: opted in, an adult, in good standing. */
+export async function publicProfileIds(userIds: string[]): Promise<Set<string>> {
   const users = await prisma.user.findMany({
-    where: { id: { in: standings.map((s) => s.userId) } },
+    where: { id: { in: userIds } },
     select: { id: true, searchEngineIndexable: true, dateOfBirth: true, isSuspended: true, deletionRequestedAt: true },
   });
-  const open = new Set(users.filter((u) => isProfileIndexable(u, true)).map((u) => u.id));
+  return new Set(users.filter((u) => isProfileIndexable(u, true)).map((u) => u.id));
+}
+
+export async function standingsForViewer(standings: Standing[], signedIn: boolean): Promise<PublicStanding[]> {
+  if (signedIn) return standings.map((s, i) => ({ rank: i + 1, displayName: s.displayName, handle: s.handle, wins: s.wins, losses: s.losses }));
+  const open = await publicProfileIds(standings.map((s) => s.userId));
   return standings.map((s, i) =>
     open.has(s.userId)
       ? { rank: i + 1, displayName: s.displayName, handle: s.handle, wins: s.wins, losses: s.losses }

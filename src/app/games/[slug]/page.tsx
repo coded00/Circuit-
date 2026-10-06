@@ -25,7 +25,9 @@ import { buildMetadata, tournamentPath } from "@/lib/seo";
 import { getCurrentUser } from "@/lib/session";
 import { safeJsonLd } from "@/lib/jsonLd";
 import { breadcrumbJsonLd } from "@/lib/breadcrumbs";
-import { gameIsIndexable, leaderboardIsIndexable } from "@/lib/seoEligibility";
+import { gameCountryIsIndexable, gameIsIndexable, leaderboardIsIndexable } from "@/lib/seoEligibility";
+import { countryName } from "@/lib/countries";
+import { countrySlug } from "@/lib/countrySeo";
 import { standingsForViewer } from "@/lib/leaderboardSeo";
 import { canonicalGamePath, displayGameName, gameSeoForName } from "@/lib/gameSeo";
 import { GameArtTile } from "@/components/GameArtTile";
@@ -58,7 +60,7 @@ const getGamePageData = cache(async (slug: string) => {
   const game = await findGameBySlug(slug);
   if (!game) return null;
 
-  const [active, completedCount, prizeSum, standings, allNames, publicTournaments, recentResults, watchable] = await Promise.all([
+  const [active, completedCount, prizeSum, standings, allNames, publicTournaments, recentResults, watchable, countryRows] = await Promise.all([
     prisma.tournament.findMany({
       where: { game, status: { in: ["OPEN", "LIVE", "DRAFT"] } },
       orderBy: { startAt: "asc" },
@@ -80,6 +82,7 @@ const getGamePageData = cache(async (slug: string) => {
       where: { game, status: "LIVE", OR: [{ streamUrl: { not: null } }, { registrations: { some: { status: "CONFIRMED", streamUrl: { not: null } } } }] },
       select: { id: true, name: true },
     }),
+    prisma.tournament.groupBy({ by: ["country"], where: { game, country: { not: null }, status: { in: ["OPEN", "CLOSED", "LIVE", "COMPLETE"] } }, _count: { _all: true } }),
   ]);
 
   const info = await gameSeoForName(game);
@@ -96,6 +99,7 @@ const getGamePageData = cache(async (slug: string) => {
     publicTournaments,
     recentResults,
     watchable,
+    countries: countryRows.filter((r) => r.country && gameCountryIsIndexable(r._count._all)).map((r) => r.country as string),
     indexable: gameIsIndexable({ publicTournaments, completedWithEightEntrants: recentResults.filter((t) => t._count.registrations >= 8).length }),
   };
 });
@@ -127,7 +131,7 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
   // An old or alternate address (/games/codm) goes to the canonical one.
   if (`/games/${slug}` !== data.canonicalPath) permanentRedirect(data.canonicalPath);
 
-  const { game, displayName, active, completedCount, totalPrize, standings, relatedGames, recentResults, watchable } = data;
+  const { game, displayName, active, completedCount, totalPrize, standings, relatedGames, recentResults, watchable, countries } = data;
   const viewer = await getCurrentUser();
   const topPlayers = await standingsForViewer(standings.slice(0, 5), !!viewer);
   const boardPath = `/leaderboard/${data.canonicalPath.replace("/games/", "")}`;
@@ -204,6 +208,21 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
             Find a {game} Challenge instead
           </Link>
         </div>
+      )}
+
+      {countries.length > 0 && (
+        <section className="flex flex-col gap-2">
+          <h2 className="text-section-heading">{displayName} by country</h2>
+          <ul className="flex flex-wrap gap-2">
+            {countries.map((code) => (
+              <li key={code}>
+                <Link href={`${data.canonicalPath}/${countrySlug(code)}`} className="badge badge-neutral bg-surface-elevated">
+                  {countryName(code)}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {recentResults.length > 0 && (
