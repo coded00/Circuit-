@@ -6,7 +6,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { ChevronLeft, Tv } from "lucide-react";
-import { loadWatchHub } from "@/lib/watchHub";
+import { loadChannelStatuses, loadWatchHub } from "@/lib/watchHub";
 import { WatchHub } from "@/components/streams/WatchHub";
 
 export const metadata = { title: "Circuit Watch", robots: { index: false, follow: true } };
@@ -18,6 +18,7 @@ export default async function TournamentWatchPage({ params }: { params: Promise<
   const hub = await loadWatchHub(id, parentHost);
   if (!hub) notFound();
   const live = hub.tournament.status === "LIVE";
+  const statuses = await loadChannelStatuses(hub.channels);
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-5 px-4 py-6 sm:px-8 sm:py-10">
@@ -47,7 +48,7 @@ export default async function TournamentWatchPage({ params }: { params: Promise<
           </Link>
         </div>
       ) : (
-        <WatchHub channels={hub.channels} matches={hub.matches} />
+        <WatchHub tournamentId={hub.tournament.id} channels={hub.channels} matches={hub.matches} initialStatuses={statuses} />
       )}
     </div>
   );

@@ -64,3 +64,37 @@ export function embedFor(platform: StreamPlatform | null, url: string, parentHos
 
   return null;
 }
+
+/**
+ * What to ask a platform's API about to learn whether a stream is live: a Twitch channel login, or a YouTube video
+ * id. Only values that passed the same strict patterns as the embeds are returned. Kick and YouTube channel
+ * addresses have no cheap, key-free way to be checked, so they return null and show no live status.
+ */
+export type StatusTarget = { platform: "TWITCH" | "YOUTUBE"; id: string };
+
+export function statusTargetFor(platform: StreamPlatform | null, url: string): StatusTarget | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== "https:") return null;
+  const host = parsed.hostname.toLowerCase().replace(/^www\./, "").replace(/^m\./, "");
+  const parts = parsed.pathname.split("/").filter(Boolean);
+  if (platform === "TWITCH" && host === "twitch.tv") {
+    const channel = parts[0];
+    if (!channel || TWITCH_RESERVED.has(channel.toLowerCase()) || !TWITCH_CHANNEL.test(channel)) return null;
+    return { platform: "TWITCH", id: channel.toLowerCase() };
+  }
+  if (platform === "YOUTUBE") {
+    let videoId: string | undefined;
+    if (host === "youtu.be") videoId = parts[0];
+    else if (host === "youtube.com") {
+      if (parts[0] === "watch") videoId = parsed.searchParams.get("v") ?? undefined;
+      else if (parts[0] === "live" || parts[0] === "embed") videoId = parts[1];
+    }
+    if (videoId && YOUTUBE_VIDEO.test(videoId)) return { platform: "YOUTUBE", id: videoId };
+  }
+  return null;
+}

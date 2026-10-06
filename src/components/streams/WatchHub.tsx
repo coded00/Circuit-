@@ -5,6 +5,11 @@ import Link from "next/link";
 import { ExternalLink, Tv } from "lucide-react";
 import { platformDisplayName } from "@/lib/streams";
 import type { WatchChannel, WatchMatch } from "@/lib/watchHub";
+import type { StreamStatus } from "@/lib/streamStatus";
+
+const POLL_MS = 30_000;
+const viewersLabel = (n: number) =>
+  n >= 1000 ? `${(n / 1000).toFixed(n >= 10_000 ? 0 : 1)}K` : String(n);
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -13,12 +18,38 @@ const pad = (n: number) => String(n).padStart(2, "0");
  * (Twitch, YouTube, Kick, ...); Circuit is the broadcast layer that puts every angle on one screen.
  */
 export function WatchHub({
+  tournamentId,
   channels,
   matches,
+  initialStatuses,
 }: {
+  tournamentId: string;
   channels: WatchChannel[];
   matches: WatchMatch[];
+  initialStatuses: Record<string, StreamStatus>;
 }) {
+  const [statuses, setStatuses] = useState(initialStatuses);
+  // Live badges stay current while the page is open and visible; a failed check just keeps what was shown.
+  useEffect(() => {
+    const tick = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const res = await fetch(
+          `/api/tournaments/${tournamentId}/watch-status`,
+          { cache: "no-store" },
+        );
+        if (res.ok)
+          setStatuses(
+            ((await res.json()) as { statuses: Record<string, StreamStatus> })
+              .statuses,
+          );
+      } catch {
+        /* keep the last known status */
+      }
+    };
+    const t = setInterval(tick, POLL_MS);
+    return () => clearInterval(t);
+  }, [tournamentId]);
   const [activeId, setActiveId] = useState(channels[0]?.id ?? "");
   const [bug, setBug] = useState(true);
   const active = channels.find((c) => c.id === activeId) ?? channels[0];
@@ -214,6 +245,18 @@ export function WatchHub({
                           : platformDisplayName(c.platform, c.platformName))}
                     </span>
                   </span>
+                  {statuses[c.id]?.live && (
+                    <span className="ml-auto flex shrink-0 flex-col items-end text-[11px] leading-tight">
+                      <span className="font-bold tracking-wide text-danger">
+                        LIVE
+                      </span>
+                      {statuses[c.id].viewers !== null && (
+                        <span className="font-mono text-muted">
+                          {viewersLabel(statuses[c.id].viewers!)} watching
+                        </span>
+                      )}
+                    </span>
+                  )}
                 </button>
               </li>
             );
