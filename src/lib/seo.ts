@@ -10,7 +10,7 @@ import type { Metadata } from "next";
 export const SITE_NAME = "Circuit";
 export const SITE_URL = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
 export const DEFAULT_DESCRIPTION =
-  "Join gaming tournaments and esports competitions on Circuit. Nigeria-first tournaments, 1v1 Challenges, real prizes, and a real gaming community.";
+  "Join gaming tournaments and esports competitions on Circuit. 1v1 Challenges, rankings, real prizes, and a real gaming community.";
 /** Falls back to the wordmark only when a page has no real artwork of its
  *  own (a poster, game art) to share instead — see each caller's own
  *  `image` argument. */

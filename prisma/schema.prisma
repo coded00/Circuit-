@@ -196,6 +196,9 @@ model User {
   /// Privacy: false hides them from search and Discover (their profile is
   /// still reachable by direct link). See src/lib/privacy.ts.
   searchable          Boolean               @default(true)
+  /// SEO: true lets search engines index their public profile (opt-in; never for under-18s or suspended accounts).
+  /// See src/lib/profileSeo.ts.
+  searchEngineIndexable Boolean             @default(false)
   /// Privacy: who may send them a direct challenge (a challenge aimed at
   /// them, or a Quick Match request).
   directChallenges    DirectChallengePolicy @default(ANYONE)

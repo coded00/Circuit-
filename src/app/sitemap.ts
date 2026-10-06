@@ -22,6 +22,7 @@ import type { MetadataRoute } from "next";
 import { prisma } from "@/lib/db";
 import { SITE_URL, tournamentPath, battlePath, gamePath, organiserPath, videoPath } from "@/lib/seo";
 import { realGameNames } from "@/lib/games";
+import { isProfileIndexable } from "@/lib/profileSeo";
 import { LISTED_WHERE } from "@/lib/communityDirectory";
 
 // Without this, Next prerenders sitemap.xml once at build time (it has no
@@ -34,7 +35,6 @@ const TOURNAMENT_STATUSES = ["OPEN", "CLOSED", "LIVE", "COMPLETE"] as const;
 const STATIC_ROUTES: { path: string; changeFrequency: MetadataRoute.Sitemap[number]["changeFrequency"]; priority: number }[] = [
   { path: "/", changeFrequency: "daily", priority: 1 },
   { path: "/compete", changeFrequency: "hourly", priority: 0.9 },
-  { path: "/ladder", changeFrequency: "hourly", priority: 0.7 },
   { path: "/activity", changeFrequency: "hourly", priority: 0.6 },
   { path: "/leaderboard", changeFrequency: "daily", priority: 0.6 },
   { path: "/battles", changeFrequency: "hourly", priority: 0.7 },
@@ -45,7 +45,7 @@ const STATIC_ROUTES: { path: string; changeFrequency: MetadataRoute.Sitemap[numb
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [tournaments, battles, gameNames, organizedByCounts, videos, communities] = await Promise.all([
+  const [tournaments, battles, gameNames, organizedByCounts, videos, communities, optedInPlayers] = await Promise.all([
     prisma.tournament.findMany({
       where: { status: { in: [...TOURNAMENT_STATUSES] } },
       select: { id: true, name: true, createdAt: true },
@@ -68,7 +68,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }),
     // Listed communities only (invite-only ones are private).
     prisma.community.findMany({ where: LISTED_WHERE, select: { slug: true, lastActivityAt: true, createdAt: true } }),
+    // Players who opted in to being found on Google; the rest of the rule (adult, played) is checked below.
+    prisma.user.findMany({
+      where: { searchEngineIndexable: true, isSuspended: false, deletionRequestedAt: null, dateOfBirth: { not: null } },
+      select: { id: true, handle: true, dateOfBirth: true, searchEngineIndexable: true, isSuspended: true, deletionRequestedAt: true },
+      take: 5000,
+    }),
   ]);
+  const playedIds = new Set(
+    (
+      await prisma.match.findMany({
+        where: { OR: [{ playerAId: { in: optedInPlayers.map((p) => p.id) } }, { playerBId: { in: optedInPlayers.map((p) => p.id) } }] },
+        select: { playerAId: true, playerBId: true },
+      })
+    ).flatMap((m) => [m.playerAId, m.playerBId]),
+  );
+  const playerEntries: MetadataRoute.Sitemap = optedInPlayers
+    .filter((p) => isProfileIndexable(p, playedIds.has(p.id)))
+    .map((p) => ({ url: `${SITE_URL}/players/${p.handle}`, changeFrequency: "weekly", priority: 0.4 }));
 
   const staticEntries: MetadataRoute.Sitemap = STATIC_ROUTES.map(({ path, changeFrequency, priority }) => ({
     url: `${SITE_URL}${path}`,
@@ -118,5 +135,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.5,
   }));
 
-  return [...staticEntries, ...gameEntries, ...organiserEntries, ...battleEntries, ...tournamentEntries, ...videoEntries, ...communityEntries];
+  return [...staticEntries, ...gameEntries, ...organiserEntries, ...battleEntries, ...tournamentEntries, ...videoEntries, ...communityEntries, ...playerEntries];
 }

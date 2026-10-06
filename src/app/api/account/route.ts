@@ -46,6 +46,7 @@ export async function PATCH(request: Request) {
     oneSignalPlayerId?: string | null;
     region?: string | null;
     searchable?: boolean;
+    searchEngineIndexable?: boolean;
     directChallenges?: DirectChallengePolicy;
   } = {};
 
@@ -149,6 +150,10 @@ export async function PATCH(request: Request) {
     if (typeof body.searchable !== "boolean") return NextResponse.json({ error: "Searchable must be on or off." }, { status: 400 });
     data.searchable = body.searchable;
   }
+  if (body.searchEngineIndexable !== undefined) {
+    if (typeof body.searchEngineIndexable !== "boolean") return NextResponse.json({ error: "That setting must be on or off." }, { status: 400 });
+    data.searchEngineIndexable = body.searchEngineIndexable;
+  }
   if (body.directChallenges !== undefined) {
     const policy = parseDirectPolicy(body.directChallenges);
     if (!policy) return NextResponse.json({ error: "Choose who can challenge you: anyone, friends or nobody." }, { status: 400 });
@@ -195,6 +200,7 @@ export async function PATCH(request: Request) {
     notifyNewContent: updated.notifyNewContent,
     region: updated.region,
     searchable: updated.searchable,
+    searchEngineIndexable: updated.searchEngineIndexable,
     directChallenges: updated.directChallenges,
   });
 }

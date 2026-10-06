@@ -29,9 +29,9 @@ import { recordKey } from "@/lib/challengeView";
 import { buildMetadata } from "@/lib/seo";
 
 export const metadata = buildMetadata({
-  title: "1v1 Challenges: Play for Real Money",
+  title: "1v1 Gaming Challenges",
   description:
-    "Open 1v1 challenges on Circuit. Pick a game, accept a challenge, play your match and get paid, with every result verified.",
+    "Challenge other players to 1v1 gaming battles, play your match, and build your competitive record on Circuit. Every result is verified.",
   path: "/battles",
 });
 

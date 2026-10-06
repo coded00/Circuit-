@@ -11,7 +11,7 @@ import { GameArtTile } from "@/components/GameArtTile";
 
 export const metadata = buildMetadata({
   title: "Watch Live Gaming Tournaments",
-  description: "Watch Nigerian gaming tournaments live. Every stream of a tournament in one place, from the main stage to each player.",
+  description: "Watch gaming tournaments live. Every stream of a tournament in one place, from the main stage to each player.",
   path: "/watch",
 });
 

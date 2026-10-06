@@ -47,7 +47,7 @@ import { CountUp } from "@/components/CountUp";
 import { buildMetadata } from "@/lib/seo";
 
 export const metadata = buildMetadata({
-  title: "Esports Leaderboard: Top Nigerian Players",
+  title: "Esports Leaderboard: Top Players",
   description:
     "See the top players on Circuit by rank, wins and earnings across Call of Duty, eFootball, PUBG Mobile and more.",
   path: "/leaderboard",

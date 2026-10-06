@@ -23,6 +23,7 @@ export const metadata: Metadata = buildMetadata({
   title: "Feed",
   description: "Short-form gaming clips, highlights, and news | Circuit tournaments and official channels in one feed.",
   path: "/ladder",
+  noindex: true,
 });
 
 export default async function FeedPage() {

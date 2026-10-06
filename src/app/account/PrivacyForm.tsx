@@ -15,13 +15,14 @@ const POLICY_OPTIONS: { value: Policy; title: string; hint: string }[] = [
   { value: "NOBODY", title: "Nobody", hint: "No direct challenges. You can still accept challenges from the open board." },
 ];
 
-export default function PrivacyForm({ initialSearchable, initialPolicy }: { initialSearchable: boolean; initialPolicy: Policy }) {
+export default function PrivacyForm({ initialSearchable, initialSearchEngineIndexable, initialPolicy }: { initialSearchable: boolean; initialSearchEngineIndexable: boolean; initialPolicy: Policy }) {
   const toast = useToast();
   const [searchable, setSearchable] = useState(initialSearchable);
+  const [indexable, setIndexable] = useState(initialSearchEngineIndexable);
   const [policy, setPolicy] = useState<Policy>(initialPolicy);
   const [saving, setSaving] = useState(false);
 
-  async function save(change: { searchable?: boolean; directChallenges?: Policy }, revert: () => void) {
+  async function save(change: { searchable?: boolean; searchEngineIndexable?: boolean; directChallenges?: Policy }, revert: () => void) {
     setSaving(true);
     const res = await fetch("/api/account", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(change) }).catch(() => null);
     const ok = res?.ok ?? false;
@@ -47,6 +48,22 @@ export default function PrivacyForm({ initialSearchable, initialPolicy }: { init
           onChange={(next) => {
             setSearchable(next);
             void save({ searchable: next }, () => setSearchable(!next));
+          }}
+        />
+      </section>
+
+      <section className="card flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-[15px] font-semibold">Show my profile on Google</h2>
+          <p className="text-sm text-muted">Let search engines list your public profile, so people can find you by name. Off by default, and only available to players 18 and over who have played a match. Your profile still opens from its link either way.</p>
+        </div>
+        <Switch
+          checked={indexable}
+          label="Show my profile on Google"
+          disabled={saving}
+          onChange={(next) => {
+            setIndexable(next);
+            void save({ searchEngineIndexable: next }, () => setIndexable(!next));
           }}
         />
       </section>

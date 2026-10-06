@@ -84,7 +84,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const description =
     active.length > 0
       ? `${active.length} open ${game} tournament${active.length === 1 ? "" : "s"} on Circuit right now. Register, compete, and climb the ${game} leaderboard.`
-      : `Real ${game} tournaments and 1v1 Challenges on Circuit. Nigeria-first esports competitions with real prizes.${standings.length ? ` See the current ${game} leaderboard.` : ""}`;
+      : `Real ${game} tournaments and 1v1 Challenges on Circuit. Esports competitions with real prizes.${standings.length ? ` See the current ${game} leaderboard.` : ""}`;
 
   return buildMetadata({
     title: `${game} Tournaments & Esports Competitions`,

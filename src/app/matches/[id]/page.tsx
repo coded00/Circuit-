@@ -19,12 +19,20 @@ import Poller from "@/app/Poller";
 import { teamEntryLabels } from "@/lib/teamEntries";
 import { isRoundRobinStructure, isSwissStructure } from "@/lib/roundRobinStandings";
 import { isDoubleElimStructure, nodeByMatch, nodeLabel } from "@/lib/doubleElim";
+import type { Metadata } from "next";
+import { buildMetadata } from "@/lib/seo";
 import { MatchView, type MatchPlayer, type MatchViewData } from "./MatchView";
 
 type ResultPayload = { winnerId: string; score: string };
 
 function formatBattleFormat(format: string): string {
   return format === "BEST_OF_3" ? "Best of 3" : "Single match";
+}
+
+/** A match is mostly two names and a score, so it stays out of search results. The tournament page carries the results. */
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  return buildMetadata({ title: "Match", description: "A match on Circuit.", path: `/matches/${id}`, noindex: true });
 }
 
 export default async function MatchPage({ params }: { params: Promise<{ id: string }> }) {

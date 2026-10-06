@@ -27,6 +27,9 @@ import { matchStatusInfo } from "@/components/StatusPill";
 import { countryName, isCountryCode } from "@/lib/countries";
 import { hasBlocked } from "@/lib/blocks";
 import { openBattleFilter } from "@/lib/battles";
+import type { Metadata } from "next";
+import { buildMetadata } from "@/lib/seo";
+import { isProfileIndexable } from "@/lib/profileSeo";
 import { ProfileView, type AttentionItem, type MatchSummary, type ProfileData } from "./ProfileView";
 
 const ACTIVE_MATCH_PRIORITY: Record<string, number> = { DISPUTED: 0, NEEDS_RESULT: 1, UPCOMING: 2 };
@@ -42,6 +45,24 @@ const TAB_ALIASES: Record<string, string> = {
   teams: "teams",
   wallet: "wallet",
 };
+
+/** Indexed only when the player opted in, is an adult and has played; every other profile is noindex. */
+export async function generateMetadata({ params }: { params: Promise<{ handle: string }> }): Promise<Metadata> {
+  const { handle } = await params;
+  const player = await prisma.user.findUnique({
+    where: { handle },
+    select: { id: true, displayName: true, handle: true, bio: true, searchEngineIndexable: true, dateOfBirth: true, isSuspended: true, deletionRequestedAt: true },
+  });
+  const path = `/players/${handle}`;
+  if (!player) return buildMetadata({ title: "Player not found", description: "", path, noindex: true });
+  const played = player.searchEngineIndexable ? (await prisma.match.count({ where: { OR: [{ playerAId: player.id }, { playerBId: player.id }] } })) > 0 : false;
+  return buildMetadata({
+    title: `${player.displayName} (@${player.handle}) | Player Profile`,
+    description: player.bio?.slice(0, 155) || `${player.displayName}'s competitive record on Circuit: matches, tournaments, teams and ranking.`,
+    path,
+    noindex: !isProfileIndexable(player, played),
+  });
+}
 
 export default async function PlayerProfilePage({
   params,

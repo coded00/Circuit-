@@ -82,7 +82,7 @@ export async function generateMetadata({ params }: { params: Promise<{ handle: s
 
   return buildMetadata({
     title: `${organiser.displayName} | Tournament Organiser`,
-    description: `${organiser.displayName} has organized ${organiser.tournaments.length} tournament${organiser.tournaments.length === 1 ? "" : "s"} on Circuit, hosting ${organiser.totalPlayersHosted} player${organiser.totalPlayersHosted === 1 ? "" : "s"}. Real Nigeria-first esports competitions.`,
+    description: `${organiser.displayName} has organized ${organiser.tournaments.length} tournament${organiser.tournaments.length === 1 ? "" : "s"} on Circuit, hosting ${organiser.totalPlayersHosted} player${organiser.totalPlayersHosted === 1 ? "" : "s"}. Real esports competitions.`,
     path: organiserPath(organiser.handle),
     // Uploaded avatars are site-relative (/api/images/...); structured data needs an absolute URL.
     image: organiser.avatarUrl ? (organiser.avatarUrl.startsWith("/") ? absoluteUrl(organiser.avatarUrl) : organiser.avatarUrl) : undefined,

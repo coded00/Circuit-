@@ -31,9 +31,9 @@ import { competitionKind, formatsForType, pickFeatured, spotsLabel, timeUntil, T
 import { buildMetadata } from "@/lib/seo";
 
 export const metadata = buildMetadata({
-  title: "Browse Gaming Tournaments in Nigeria",
+  title: "Browse Gaming Tournaments",
   description:
-    "Find open gaming tournaments and esports competitions in Nigeria. Filter by game, entry fee and prize pool, register in minutes and win real prizes.",
+    "Find open gaming tournaments and esports competitions. Filter by game, entry fee and prize pool, register in minutes and win real prizes.",
   path: "/compete",
 });
 

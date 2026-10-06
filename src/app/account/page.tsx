@@ -89,7 +89,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         </div>
       ),
     },
-    { key: "privacy", label: "Privacy", content: <PrivacyForm initialSearchable={user.searchable} initialPolicy={user.directChallenges} /> },
+    { key: "privacy", label: "Privacy", content: <PrivacyForm initialSearchable={user.searchable} initialSearchEngineIndexable={user.searchEngineIndexable} initialPolicy={user.directChallenges} /> },
     { key: "preferences", label: "Preferences", content: <PreferencesForm /> },
     { key: "blocked", label: "Blocked", count: blocked.length, content: <BlockedList blocked={blocked} /> },
     { key: "account", label: "Account", content: <DeleteAccountCard requestedAt={user.deletionRequestedAt?.toISOString() ?? null} /> },

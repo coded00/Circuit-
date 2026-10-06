@@ -14,7 +14,7 @@ import { AuthSplitLayout } from "@/components/auth/AuthSplitLayout";
 
 export const metadata: Metadata = {
   title: "Welcome to Circuit",
-  description: "Play. Compete. Build your name. Tournaments, 1v1 challenges and real prizes for Nigerian gamers.",
+  description: "Play. Compete. Build your name. Tournaments, 1v1 challenges and real prizes for competitive gamers.",
 };
 
 export default async function StartPage() {

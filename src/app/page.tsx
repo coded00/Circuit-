@@ -37,9 +37,9 @@ import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
 import { buildMetadata } from "@/lib/seo";
 
 export const metadata = buildMetadata({
-  title: "Gaming Tournaments & Esports Competitions in Nigeria",
+  title: "Gaming Tournaments & Esports Competitions",
   description:
-    "Compete in real gaming tournaments and esports competitions on Circuit. Register for Call of Duty, eFootball, PUBG Mobile and more, climb the leaderboard, win real prizes, and join a real gaming community.",
+    "Circuit is a competitive gaming platform where players enter tournaments, challenge opponents, climb the rankings, watch live matches and build their name. Register for Call of Duty, eFootball, PUBG Mobile and more.",
   path: "/",
 });
 
@@ -150,7 +150,7 @@ async function HomeContent({ searchParams }: { searchParams: Promise<{ leaderboa
 
   return (
     <div className="flex w-full flex-1 flex-col gap-8 px-4 py-6 sm:px-8 sm:py-10">
-      <h1 className="sr-only">Gaming tournaments and esports competitions in Nigeria</h1>
+      <h1 className="sr-only">Gaming tournaments and esports competitions</h1>
       {activeAnnouncement && <AnnouncementBanner title={activeAnnouncement.title} body={activeAnnouncement.body} />}
 
       <CircuitHero

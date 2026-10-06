@@ -15,7 +15,7 @@ import { buildMetadata } from "@/lib/seo";
 export const metadata = buildMetadata({
   title: "Sign Up Free",
   description:
-    "Create a free Circuit account and start competing in gaming tournaments and 1v1 challenges in Nigeria.",
+    "Create a free Circuit account and start competing in gaming tournaments and 1v1 challenges.",
   path: "/signup",
 });
 

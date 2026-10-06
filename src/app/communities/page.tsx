@@ -27,7 +27,7 @@ import { DiscoverySectionRow } from "@/components/discover/DiscoverySectionRow";
 
 export const metadata: Metadata = {
   title: "Communities",
-  description: "Find your scene on Circuit. Official game hubs, campus crews and city communities for Nigerian gamers.",
+  description: "Find your scene on Circuit. Official game hubs, campus crews and city communities for gamers.",
 };
 
 type SearchParams = { q?: string; game?: string; region?: string; sort?: string; category?: string };
