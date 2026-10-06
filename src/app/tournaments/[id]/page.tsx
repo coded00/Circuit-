@@ -46,6 +46,8 @@ import UpdateForm from "./UpdateForm";
 import DeleteUpdateButton from "./DeleteUpdateButton";
 import ClaimPrizeButton from "./ClaimPrizeButton";
 import { canonicalGamePath } from "@/lib/gameSeo";
+import { loadChampion } from "@/lib/champion";
+import { publicProfileIds } from "@/lib/leaderboardSeo";
 import { buildMetadata, parseIdSegment, tournamentPath, organiserPath, absoluteUrl, DEFAULT_DESCRIPTION } from "@/lib/seo";
 import { ArenaGlow } from "@/components/ArenaBackdrop";
 import { safeJsonLd } from "@/lib/jsonLd";
@@ -90,6 +92,18 @@ const getTournament = cache(async (id: string) =>
   })
 );
 
+/**
+ * The winner's name for a description a search engine reads: a team's name, or a player's name only if they made
+ * their profile public (lib/profileSeo.ts). Otherwise no name, and the description just doesn't say who won.
+ */
+async function publicWinnerName(tournament: { id: string; entryType: string }): Promise<string | null> {
+  const card = await loadChampion(tournament.id).catch(() => null);
+  if (!card) return null;
+  if (tournament.entryType === "TEAM") return card.champion.displayName;
+  const user = await prisma.user.findUnique({ where: { handle: card.champion.handle }, select: { id: true } });
+  return user && (await publicProfileIds([user.id])).has(user.id) ? card.champion.displayName : null;
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id: rawId } = await params;
   const tournament = await getTournament(parseIdSegment(rawId));
@@ -101,6 +115,18 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       ? "free entry"
       : `₦${(tournament.entryFee / 100).toLocaleString("en-NG")} entry`;
   const path = tournamentPath(tournament);
+
+  // A finished tournament is found by its results, so that's what the title and description say.
+  if (tournament.status === "COMPLETE") {
+    const [entrants, winner] = await Promise.all([prisma.registration.count({ where: { tournamentId: tournament.id, status: "CONFIRMED" } }), publicWinnerName(tournament)]);
+    return buildMetadata({
+      title: `${tournament.name} Results | ${tournament.game} Tournament`,
+      description: `Results of ${tournament.name}, a ${tournament.game} tournament on Circuit.${winner ? ` Won by ${winner}.` : ""} ${entrants} ${tournament.entryType === "TEAM" ? "team" : "player"}${entrants === 1 ? "" : "s"} competed. See the final standings and match results.`,
+      path,
+      image: tournament.posterUrl ?? undefined,
+      imageAlt: `${tournament.name} tournament artwork`,
+    });
+  }
 
   return buildMetadata({
     title: `${tournament.name} | ${tournament.game} Tournament`,

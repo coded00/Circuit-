@@ -60,7 +60,7 @@ const getGamePageData = cache(async (slug: string) => {
   const game = await findGameBySlug(slug);
   if (!game) return null;
 
-  const [active, completedCount, prizeSum, standings, allNames, publicTournaments, recentResults, watchable, countryRows] = await Promise.all([
+  const [active, completedCount, prizeSum, standings, allNames, publicTournaments, recentResults, watchable, countryRows, streamedCount] = await Promise.all([
     prisma.tournament.findMany({
       where: { game, status: { in: ["OPEN", "LIVE", "DRAFT"] } },
       orderBy: { startAt: "asc" },
@@ -83,6 +83,7 @@ const getGamePageData = cache(async (slug: string) => {
       select: { id: true, name: true },
     }),
     prisma.tournament.groupBy({ by: ["country"], where: { game, country: { not: null }, status: { in: ["OPEN", "CLOSED", "LIVE", "COMPLETE"] } }, _count: { _all: true } }),
+    prisma.tournament.count({ where: { game, status: { in: ["OPEN", "CLOSED", "LIVE", "COMPLETE"] }, OR: [{ streamUrl: { not: null } }, { registrations: { some: { status: "CONFIRMED", streamUrl: { not: null } } } }] } }),
   ]);
 
   const info = await gameSeoForName(game);
@@ -99,6 +100,7 @@ const getGamePageData = cache(async (slug: string) => {
     publicTournaments,
     recentResults,
     watchable,
+    streamedCount,
     countries: countryRows.filter((r) => r.country && gameCountryIsIndexable(r._count._all)).map((r) => r.country as string),
     indexable: gameIsIndexable({ publicTournaments, completedWithEightEntrants: recentResults.filter((t) => t._count.registrations >= 8).length }),
   };
@@ -131,7 +133,7 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
   // An old or alternate address (/games/codm) goes to the canonical one.
   if (`/games/${slug}` !== data.canonicalPath) permanentRedirect(data.canonicalPath);
 
-  const { game, displayName, active, completedCount, totalPrize, standings, relatedGames, recentResults, watchable, countries } = data;
+  const { game, displayName, active, completedCount, totalPrize, standings, relatedGames, recentResults, watchable, countries, streamedCount } = data;
   const viewer = await getCurrentUser();
   const topPlayers = await standingsForViewer(standings.slice(0, 5), !!viewer);
   const boardPath = `/leaderboard/${data.canonicalPath.replace("/games/", "")}`;
@@ -178,6 +180,12 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
           </div>
         </div>
       </div>
+
+      {!watchable && streamedCount > 0 && (
+        <Link href={`/watch/${data.canonicalPath.replace("/games/", "")}`} className="btn-secondary self-start">
+          Watch {displayName} tournaments
+        </Link>
+      )}
 
       {watchable && (
         <Link href={`/tournaments/${watchable.id}/watch`} className="btn-primary watch-attn self-start">
