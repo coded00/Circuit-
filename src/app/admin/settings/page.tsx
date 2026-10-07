@@ -25,6 +25,7 @@ import { MaintenanceModeToggle } from "@/components/admin/MaintenanceModeToggle"
 import { PlatformFeeControl } from "@/components/admin/PlatformFeeControl";
 import { OrganizerRevenueSettlementControl } from "@/components/admin/OrganizerRevenueSettlementControl";
 import { PayoutAutoApproveControl } from "@/components/admin/PayoutAutoApproveControl";
+import { StakedBattlesControl } from "@/components/admin/StakedBattlesControl";
 import { ArrowUpRight } from "lucide-react";
 import { EmptyState, PageHeader, Panel, PanelRow, Section } from "@/components/admin/ui";
 
@@ -64,6 +65,10 @@ const ACTION_LABELS: Record<string, string> = {
   "settings.platformFeeChange": "changed the platform fee",
   "settings.organizerRevenueSettlementHoursChange": "changed the revenue settlement window",
   "settings.maintenanceModeChange": "changed maintenance mode",
+  "settings.stakedBattlesOn": "turned staked Battles on",
+  "settings.stakedBattlesOff": "turned staked Battles off",
+  "settings.maxLockedStakeChange": "changed the at-once stake limit",
+  "settings.maxDailyStakeChange": "changed the daily stake limit",
   "staff.grant": "granted admin access",
   "staff.revoke": "revoked admin access",
   "staff.roleChange": "changed an admin's role",
@@ -155,6 +160,16 @@ export default async function AdminSettingsPage() {
               <PanelRow>
                 <div className="w-full">
                   <PayoutAutoApproveControl enabled={platformSetting?.payoutAutoApprove ?? true} maxKobo={platformSetting?.payoutAutoApproveMaxKobo ?? 50_000_000} canEdit={isSuperAdmin} />
+                </div>
+              </PanelRow>
+              <PanelRow>
+                <div className="w-full">
+                  <StakedBattlesControl
+                    enabled={platformSetting?.stakedBattlesEnabled ?? true}
+                    maxLockedKobo={platformSetting?.maxLockedStakeKobo ?? 50_000_000}
+                    maxDailyKobo={platformSetting?.maxDailyStakeKobo ?? 100_000_000}
+                    canEdit={isSuperAdmin}
+                  />
                 </div>
               </PanelRow>
             </Panel>

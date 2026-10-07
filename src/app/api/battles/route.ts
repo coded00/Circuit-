@@ -3,12 +3,12 @@
  *
  * `stakeAmount` above zero locks that amount from the creator's wallet
  * right here, in the same transaction as the Battle row itself — see
- * `EscrowType.STAKE`. Core escrow mechanics only (no per-account stake
- * limits, collusion detection, or self-exclusion tooling yet) — see that
- * enum's own schema comment on why this isn't yet what
- * docs/circuit-strategy.md considers a launch-ready staked-Battles
- * feature. Shipped as the underlying mechanism only, per explicit
- * product decision.
+ * `EscrowType.STAKE`. That lock goes through `lockStake` (src/lib/stakes.ts),
+ * which is where the kill switch and the per-account stake limits live — this
+ * route no longer carries its own stake cap. Collusion detection and
+ * self-exclusion tooling are still unbuilt; see that enum's own schema
+ * comment for what docs/circuit-strategy.md still requires before this is a
+ * launch-ready staked-Battles feature.
  */
 
 import { NextResponse, after } from "next/server";
@@ -22,6 +22,7 @@ import { captureException } from "@/lib/observability";
 import { parseExpiryHours } from "@/lib/battles";
 import { canSendDirectChallenge } from "@/lib/privacy";
 import { emailVerificationRequired } from "@/lib/emailGate";
+import { InsufficientWalletBalanceError, StakeLimitError, lockStake } from "@/lib/stakes";
 
 const VALID_FORMATS = ["SINGLE", "BEST_OF_3"];
 const VALID_VISIBILITIES = ["OPEN", "TARGETED", "FRIENDS"];
@@ -34,14 +35,10 @@ const VALID_VISIBILITIES = ["OPEN", "TARGETED", "FRIENDS"];
 const OPEN_BATTLE_CREATE_MAX_ATTEMPTS = 10;
 const OPEN_BATTLE_CREATE_WINDOW_MS = 60 * 60 * 1000;
 
-// V1 audit follow-up: staked Battles shipped with the core escrow
-// mechanism only (see this file's own top comment) — no per-account
-// stake limits, collusion detection, or self-exclusion tooling yet. Pending
-// that, cap a single stake so one Battle's exposure stays bounded while
-// those responsible-gambling controls are still unbuilt.
-const MAX_STAKE_AMOUNT = 10_000_000; // ₦100,000
-
-class InsufficientWalletBalanceError extends Error {}
+// The per-stake cap used to live here as a local constant, duplicated in
+// src/lib/quickMatch.ts and mirrored in BattleForm.tsx. It (and the
+// per-account limits that bound what one account can run at once) now live in
+// src/lib/stakes.ts, enforced at the one point every stake is locked from.
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
@@ -86,12 +83,6 @@ export async function POST(request: Request) {
   }
   if (!VALID_FORMATS.includes(format)) {
     return NextResponse.json({ error: "Format must be a single match or best of three." }, { status: 400 });
-  }
-  if (stakeAmount > MAX_STAKE_AMOUNT) {
-    return NextResponse.json(
-      { error: `Stake amount can't exceed ₦${(MAX_STAKE_AMOUNT / 100).toLocaleString("en-NG")}.` },
-      { status: 400 }
-    );
   }
   const expiryHours = parseExpiryHours(body?.expiresInHours);
   if (expiryHours === null) {
@@ -147,16 +138,6 @@ export async function POST(request: Request) {
 
   try {
     const battle = await prisma.$transaction(async (tx) => {
-      if (stakeAmount > 0) {
-        // Atomic guard: a single conditional UPDATE, not a read-then-write
-        // — same pattern as paid tournament registration.
-        const debited = await tx.user.updateMany({
-          where: { id: user.id, walletBalance: { gte: stakeAmount } },
-          data: { walletBalance: { decrement: stakeAmount } },
-        });
-        if (debited.count === 0) throw new InsufficientWalletBalanceError();
-      }
-
       const created = await tx.battle.create({
         data: {
           creatorId: user.id,
@@ -170,14 +151,10 @@ export async function POST(request: Request) {
         },
       });
 
-      if (stakeAmount > 0) {
-        await tx.escrowTransaction.create({
-          data: { battleId: created.id, userId: user.id, type: "STAKE", amount: stakeAmount, status: "COMPLETE" },
-        });
-        await tx.walletTransaction.create({
-          data: { userId: user.id, type: "STAKE_DEBIT", amount: stakeAmount, status: "COMPLETE" },
-        });
-      }
+      // After the row it hangs off, so lockStake can write the escrow row's
+      // battleId — and inside this transaction, so a refusal here takes the
+      // Battle row back with it.
+      await lockStake(tx, { userId: user.id, amount: stakeAmount, battleId: created.id });
 
       return created;
     });
@@ -207,6 +184,10 @@ export async function POST(request: Request) {
   } catch (err) {
     if (err instanceof InsufficientWalletBalanceError) {
       return NextResponse.json({ error: "Insufficient wallet balance for that stake." }, { status: 402 });
+    }
+    // A limit or the kill switch. `message` is written for the player.
+    if (err instanceof StakeLimitError) {
+      return NextResponse.json({ error: err.message }, { status: 403 });
     }
     throw err;
   }

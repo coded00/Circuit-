@@ -1,8 +1,9 @@
 /**
  * Circuit — platform-wide settings (maintenance mode, the platform fee
- * rate, the organizer-revenue settlement window). SUPER_ADMIN only — all
- * three affect every visitor/transaction, not a single record. Any subset
- * of fields may be sent together; at least one is required.
+ * rate, the organizer-revenue settlement window, payout auto-approval, and
+ * the staked-Battles switch and per-account stake limits). SUPER_ADMIN only
+ * — all of these affect every visitor/transaction, not a single record. Any
+ * subset of fields may be sent together; at least one is required.
  */
 
 import { NextResponse } from "next/server";
@@ -21,7 +22,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const data: { maintenanceMode?: boolean; platformFeeBps?: number; organizerRevenueSettlementHours?: number; payoutAutoApprove?: boolean; payoutAutoApproveMaxKobo?: number } = {};
+  const data: { maintenanceMode?: boolean; platformFeeBps?: number; organizerRevenueSettlementHours?: number; payoutAutoApprove?: boolean; payoutAutoApproveMaxKobo?: number; stakedBattlesEnabled?: boolean; maxLockedStakeKobo?: number; maxDailyStakeKobo?: number } = {};
   const actions: { action: string; metadata?: Prisma.InputJsonValue }[] = [];
 
   if (body.maintenanceMode !== undefined) {
@@ -80,6 +81,40 @@ export async function PATCH(request: Request) {
     actions.push({ action: "settings.payoutAutoApproveLimitChange", metadata: { payoutAutoApproveMaxKobo: max } });
   }
 
+  if (body.stakedBattlesEnabled !== undefined) {
+    if (typeof body.stakedBattlesEnabled !== "boolean") {
+      return NextResponse.json({ error: "stakedBattlesEnabled must be a boolean." }, { status: 400 });
+    }
+    data.stakedBattlesEnabled = body.stakedBattlesEnabled;
+    actions.push({ action: body.stakedBattlesEnabled ? "settings.stakedBattlesOn" : "settings.stakedBattlesOff" });
+  }
+
+  if (body.maxLockedStakeKobo !== undefined) {
+    const max = Number(body.maxLockedStakeKobo);
+    // Whole naira only: a stake is a whole number of kobo the player typed,
+    // and a limit in fractional kobo is a value nobody can reason about.
+    // Zero is allowed — it stops staking without turning the feature off,
+    // which is the softer version of the kill switch.
+    // A ceiling here is only a guard against a mistyped amount, same as the
+    // payout limit's — NGN 1bn is far above any real setting. Setting this
+    // below the per-Battle cap is allowed and simply makes the per-Battle cap
+    // unreachable, which is a legitimate way to tighten.
+    if (!Number.isInteger(max) || max < 0 || max % 100 !== 0 || max > 100_000_000_000) {
+      return NextResponse.json({ error: "The at-once stake limit must be a whole number of naira, 0 or more." }, { status: 400 });
+    }
+    data.maxLockedStakeKobo = max;
+    actions.push({ action: "settings.maxLockedStakeChange", metadata: { maxLockedStakeKobo: max } });
+  }
+
+  if (body.maxDailyStakeKobo !== undefined) {
+    const max = Number(body.maxDailyStakeKobo);
+    if (!Number.isInteger(max) || max < 0 || max % 100 !== 0 || max > 100_000_000_000) {
+      return NextResponse.json({ error: "The daily stake limit must be a whole number of naira, 0 or more." }, { status: 400 });
+    }
+    data.maxDailyStakeKobo = max;
+    actions.push({ action: "settings.maxDailyStakeChange", metadata: { maxDailyStakeKobo: max } });
+  }
+
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
   }
@@ -100,5 +135,8 @@ export async function PATCH(request: Request) {
     organizerRevenueSettlementHours: updated.organizerRevenueSettlementHours,
     payoutAutoApprove: updated.payoutAutoApprove,
     payoutAutoApproveMaxKobo: updated.payoutAutoApproveMaxKobo,
+    stakedBattlesEnabled: updated.stakedBattlesEnabled,
+    maxLockedStakeKobo: updated.maxLockedStakeKobo,
+    maxDailyStakeKobo: updated.maxDailyStakeKobo,
   });
 }

@@ -1424,6 +1424,29 @@ model PlatformSetting {
   /// The most (winners' prizes plus the organizer's share) that is approved automatically, in kobo. Bigger
   /// payouts always wait for staff. Default NGN 500,000.
   payoutAutoApproveMaxKobo         Int     @default(50000000)
+  /// Staked Battles' kill switch. The feature deliberately shipped with the
+  /// escrow mechanism only and none of the responsible-gambling controls
+  /// docs/circuit-strategy.md §10 requires, so this exists to stop it
+  /// instantly if the collusion/laundering risk behind that section needs
+  /// to halt while a fix lands. Gates LOCKING a new stake only (see
+  /// lockStake in src/lib/stakes.ts): an open Battle or a pending Quick
+  /// Match challenge still expires and refunds normally, so switching this
+  /// off drains the feature rather than stranding money in it.
+  stakedBattlesEnabled             Boolean @default(true)
+  /// The most a single account may have locked across every open Battle and
+  /// every pending Quick Match challenge at once, in kobo. Default NGN
+  /// 500,000 — 5x the per-Battle cap (MAX_STAKE_AMOUNT), so it only bites
+  /// an account running several stakes at once. This is the control the
+  /// per-Battle cap structurally cannot provide: twenty concurrent NGN
+  /// 100,000 Battles are within every per-Battle rule and are still a NGN
+  /// 2,000,000 exposure between two colluding accounts.
+  maxLockedStakeKobo               Int     @default(50000000)
+  /// The most a single account may stake in any rolling 24 hours, in kobo,
+  /// whether or not those stakes have since settled or been refunded.
+  /// Default NGN 1,000,000. Counted by creation time and not by outcome on
+  /// purpose: if a refund handed back the throughput budget, a pair could
+  /// move any amount by opening and cancelling in a loop.
+  maxDailyStakeKobo                Int     @default(100000000)
 }
 
 /// Every real write an admin makes anywhere in `/admin` appends one row
