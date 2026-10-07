@@ -9,10 +9,12 @@
  */
 
 import { NextResponse } from "next/server";
+import type { Match } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { createBattleMatch } from "@/lib/matches";
 import { notify } from "@/lib/notifications";
+import { captureException } from "@/lib/observability";
 import { getFriendIds } from "@/lib/friends";
 import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
 import { battleExpiresAt } from "@/lib/battles";
@@ -99,6 +101,7 @@ export async function POST(
   }
 
   let stakeLocked = false;
+  let match: Match | null = null;
   try {
     if (battle.stakeAmount > 0) {
       await prisma.$transaction(async (tx) => {
@@ -118,32 +121,69 @@ export async function POST(
       stakeLocked = true;
     }
 
-    const match = await createBattleMatch(battle, user.id);
-    await Promise.all([
-      notify(battle.creatorId, "BATTLE_ACCEPTED", { battleId: battle.id }),
-      notify(battle.creatorId, "MATCH_READY", { matchId: match.id }),
-      notify(user.id, "MATCH_READY", { matchId: match.id }),
-    ]);
-    return NextResponse.json({ matchId: match.id }, { status: 201 });
+    match = await createBattleMatch(battle, user.id);
   } catch (err) {
-    // Don't leave the Battle stuck ACCEPTED with no Match behind it — and
-    // if the accepter's stake was already locked, give it back, since
-    // nothing was actually matched against it.
-    await prisma.$transaction(async (tx) => {
-      await tx.battle.update({ where: { id: battle.id }, data: { status: "OPEN" } });
-      if (stakeLocked) {
-        await tx.user.update({ where: { id: user.id }, data: { walletBalance: { increment: battle.stakeAmount } } });
-        await tx.escrowTransaction.create({
-          data: { battleId: battle.id, userId: user.id, type: "REFUND", amount: battle.stakeAmount, status: "COMPLETE" },
-        });
-        await tx.walletTransaction.create({
-          data: { userId: user.id, type: "STAKE_CREDIT", amount: battle.stakeAmount, status: "COMPLETE" },
-        });
+    // Compensate only while no Match exists — the Match is the point of no
+    // return. Once it exists the accept has succeeded and the Battle is
+    // correctly ACCEPTED with the stake correctly locked; reopening the
+    // Battle and handing the stake back would leave a live Match behind an
+    // OPEN Battle, which is the first half of a double payout: a second
+    // accepter takes the still-open Battle, gets a second Match, and both
+    // Matches settle the same pot on completion. (src/app/api/quick-match/
+    // [id]/accept/route.ts's second catch states the same rule for the same
+    // reason.) `match` is assigned only when createBattleMatch resolved, and
+    // that is a single `match.create` (createMatchWithUniqueCode), so a
+    // throw from it cannot have left a Match behind.
+    if (!match) {
+      // Compare-and-swap the reopen rather than a plain update: only put the
+      // Battle back if it is still the ACCEPTED this request set, so a
+      // concurrent close isn't stomped back to OPEN. The refund happens
+      // either way — no Match exists, so nothing was ever matched against
+      // this stake.
+      await prisma.$transaction(async (tx) => {
+        await tx.battle.updateMany({ where: { id: battle.id, status: "ACCEPTED" }, data: { status: "OPEN" } });
+        if (stakeLocked) {
+          await tx.user.update({ where: { id: user.id }, data: { walletBalance: { increment: battle.stakeAmount } } });
+          await tx.escrowTransaction.create({
+            data: { battleId: battle.id, userId: user.id, type: "REFUND", amount: battle.stakeAmount, status: "COMPLETE" },
+          });
+          await tx.walletTransaction.create({
+            data: { userId: user.id, type: "STAKE_CREDIT", amount: battle.stakeAmount, status: "COMPLETE" },
+          });
+        }
+      });
+      if (err instanceof InsufficientWalletBalanceError) {
+        return NextResponse.json({ error: "Insufficient wallet balance to match this Battle's stake." }, { status: 402 });
       }
-    });
-    if (err instanceof InsufficientWalletBalanceError) {
-      return NextResponse.json({ error: "Insufficient wallet balance to match this Battle's stake." }, { status: 402 });
+      throw err;
     }
-    throw err;
+    // A Match exists — the failure was downstream of it. Fall through and
+    // report the Match rather than undoing a successful accept.
   }
+
+  // TypeScript can't prove the assignment above ran (the catch may complete
+  // without one, which is why the catch itself refuses to fall through in
+  // that case); this is a real guard, not a formality. Binding it to a const
+  // also keeps the narrowing inside the callback below.
+  const acceptedMatch = match;
+  if (!acceptedMatch) {
+    throw new Error(`Battle ${battle.id} reached accept completion without a Match.`);
+  }
+
+  // Notification fan-out is deliberately best-effort, and deliberately after
+  // the Match exists. `notify` rejects on any delivery error (InAppChannel is
+  // a bare prisma.notification.create and Promise.all rejects on the first
+  // one), and a failed notification must never undo a Match that was created
+  // and a stake that was locked — that exact failure mode, a notify()
+  // rejection landing in the catch above, is what used to reopen the Battle
+  // and refund the stake while the Match lived on.
+  await Promise.all([
+    notify(battle.creatorId, "BATTLE_ACCEPTED", { battleId: battle.id }),
+    notify(battle.creatorId, "MATCH_READY", { matchId: acceptedMatch.id }),
+    notify(user.id, "MATCH_READY", { matchId: acceptedMatch.id }),
+  ]).catch((err) => {
+    captureException(err, { source: "battles/[id]/accept:notify", battleId: battle.id, matchId: acceptedMatch.id });
+  });
+
+  return NextResponse.json({ matchId: acceptedMatch.id }, { status: 201 });
 }

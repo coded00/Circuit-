@@ -909,7 +909,13 @@ model Match {
   id           String      @id @default(cuid())
   tournamentId String?
   tournament   Tournament? @relation(fields: [tournamentId], references: [id])
-  battleId     String?
+  /// One Match per Battle. A Battle is a single head-to-head, so a second Match pointing at the same
+  /// battleId can only ever mean the Battle was matched twice — which would settle the pot twice
+  /// (`settleBattleOnComplete` pays `stakeAmount * 2` per Match, and the second payout is unbacked
+  /// because the second accepter's stake was refunded when the first accept failed). Tournament
+  /// matches leave this null, and Postgres permits many nulls in a unique index, so this constrains
+  /// Battles only.
+  battleId     String?     @unique
   battle       Battle?     @relation(fields: [battleId], references: [id])
   round        Int?
 
@@ -952,7 +958,6 @@ model Match {
   dispute Dispute?
 
   @@index([tournamentId])
-  @@index([battleId])
   @@index([status])
   // V1 audit follow-up — the homepage's "your upcoming matches", a
   // player's public profile, admin's user detail page, the wallet-history
