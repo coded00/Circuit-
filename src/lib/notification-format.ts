@@ -243,6 +243,22 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
         href: "/account?tab=responsible",
       };
     }
+    case "STAKE_PATTERN_FLAGGED": {
+      // Staff-facing. Names the pair and the numbers so the bell alone can
+      // say whether it needs opening now — same reasoning as REPORT_FILED
+      // carrying a link straight to its queue.
+      const a = str(p, "handleA");
+      const b = str(p, "handleB");
+      const battles = typeof p.battleCount === "number" ? p.battleCount : 0;
+      const net = money(p, "netKobo");
+      // netKobo is signed from A's side, so this names which account is up
+      // rather than making a staff member work it out from the sign.
+      const up = net ? `, ${net} in @${typeof p.netKobo === "number" && p.netKobo < 0 ? b : a}'s favour` : "";
+      return {
+        message: `@${a} and @${b}: ${battles} settled staked Battle${battles === 1 ? "" : "s"} between them${up}. Queued for review.`,
+        href: "/admin/stakes",
+      };
+    }
     case "ENTRY_FEE_REFUND": {
       const what = `${money(p, "amount")} entry fee for ${str(p, "tournamentName") || "a tournament"}`;
       const stage = str(p, "stage");

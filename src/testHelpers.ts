@@ -123,6 +123,10 @@ export async function cleanupAll(): Promise<void> {
   await prisma.report.deleteMany({ where: { OR: [{ reportedUserId: mine }, { reportedById: mine }] } });
   await prisma.teamMembership.deleteMany({ where: { userId: mine } });
   await prisma.team.deleteMany({ where: { captainId: mine } });
+  // Cascades off the user delete below anyway (StakePatternFlag's two user
+  // FKs are ON DELETE CASCADE), but deleted explicitly so this file stays a
+  // readable list of everything a fixture can leave behind.
+  await prisma.stakePatternFlag.deleteMany({ where: { OR: [{ userAId: mine }, { userBId: mine }] } });
   await prisma.walletTransaction.deleteMany({ where: { userId: { in: userIds } } });
   await prisma.notification.deleteMany({ where: { userId: { in: userIds } } });
   await prisma.rateLimitAttempt.deleteMany({ where: { key: { contains: "test-" } } });

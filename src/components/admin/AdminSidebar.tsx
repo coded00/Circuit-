@@ -37,6 +37,7 @@ import {
   Flag,
   Store,
   BadgeCheck,
+  ShieldAlert,
   type LucideIcon,
 } from "lucide-react";
 
@@ -53,6 +54,7 @@ export const ADMIN_NAV_GROUPS: { label: string; items: AdminNavItem[] }[] = [
       { href: "/admin/communities", label: "Communities", icon: MessagesSquare },
       { href: "/admin/disputes", label: "Disputes", icon: Scale },
       { href: "/admin/reports", label: "Reports", icon: Flag },
+      { href: "/admin/stakes", label: "Stakes", icon: ShieldAlert },
     ],
   },
   {

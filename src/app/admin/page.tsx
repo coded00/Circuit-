@@ -50,6 +50,7 @@ export default async function AdminOverviewPage() {
     escalatedDisputes,
     escalatedFlags,
     openReports,
+    openStakePatterns,
     openCommunityReports,
     openAppeals,
     pendingPayouts,
@@ -75,6 +76,7 @@ export default async function AdminOverviewPage() {
     prisma.dispute.count({ where: { status: "ESCALATED" } }),
     prisma.lobbyFlag.count({ where: { status: "ESCALATED" } }),
     prisma.report.count({ where: { status: "OPEN" } }),
+    prisma.stakePatternFlag.count({ where: { status: "OPEN" } }),
     prisma.communityReport.count({ where: { status: { in: ["OPEN", "ESCALATED"] } } }),
     prisma.appeal.count({ where: { status: "OPEN" } }),
     prisma.escrowTransaction.aggregate({ where: { type: "PRIZE_PAYOUT", status: "PENDING" }, _count: true, _sum: { amount: true } }),
@@ -105,6 +107,9 @@ export default async function AdminOverviewPage() {
     { label: "Escalated match disputes", count: escalatedDisputes, href: "/admin/disputes", tone: "danger" as const },
     { label: "Escalated lobby result flags", count: escalatedFlags, href: "/admin/disputes?tab=flags", tone: "danger" as const },
     { label: "Open abuse reports", count: openReports, href: "/admin/reports", tone: "attention" as const },
+    // Pairs whose staked Battles look one-sided, or have moved a lot of
+    // money between the same two accounts — see src/lib/stakePatterns.ts.
+    { label: "Staked-Battle patterns to review", count: openStakePatterns, href: "/admin/stakes", tone: "attention" as const },
     { label: "Open community reports", count: openCommunityReports, href: "/admin/reports?tab=communities", tone: "attention" as const },
     { label: "Open appeals", count: openAppeals, href: "/admin/reports?tab=appeals", tone: "attention" as const },
     {
