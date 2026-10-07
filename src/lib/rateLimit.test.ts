@@ -54,13 +54,43 @@ describe("isRateLimited / recordAttempt", () => {
 });
 
 describe("getClientIp", () => {
-  it("returns the first entry of x-forwarded-for", () => {
-    const request = new Request("http://localhost", { headers: { "x-forwarded-for": "1.2.3.4, 5.6.7.8" } });
-    expect(getClientIp(request)).toBe("1.2.3.4");
+  const request = (headers: Record<string, string>) => new Request("http://localhost", { headers });
+
+  afterEach(() => {
+    delete process.env.TRUSTED_PROXY_SECRET;
+    delete process.env.TRUSTED_PROXY_IP_HEADER;
   });
 
-  it("falls back to 'unknown' when the header is absent", () => {
-    const request = new Request("http://localhost");
-    expect(getClientIp(request)).toBe("unknown");
+  it("reads the last x-forwarded-for entry — the one the proxy appended — not the caller's own", () => {
+    // This asserted `[0]` before the fix, which is the entry a caller controls: they pick the front of the
+    // chain and the proxy appends the address it actually saw behind it.
+    expect(getClientIp(request({ "x-forwarded-for": "1.2.3.4, 5.6.7.8" }))).toBe("5.6.7.8");
+    expect(getClientIp(request({ "x-forwarded-for": "9.9.9.9" }))).toBe("9.9.9.9");
+    // A trailing empty hop (some proxies leave ", ") is skipped, not returned as the answer.
+    expect(getClientIp(request({ "x-forwarded-for": "5.6.7.8, " }))).toBe("5.6.7.8");
+  });
+
+  it("ignores a caller-supplied direct-IP header unless the request proved it came through the proxy", () => {
+    // The regression: cf-connecting-ip used to be believed from anyone, so varying it took a fresh bucket
+    // per request on every IP-keyed limit in the app.
+    expect(getClientIp(request({ "cf-connecting-ip": "1.2.3.4" }))).toBe("unknown");
+    expect(getClientIp(request({ "cf-connecting-ip": "1.2.3.4", "x-forwarded-for": "5.6.7.8" }))).toBe("5.6.7.8");
+
+    process.env.TRUSTED_PROXY_SECRET = "s3cret";
+    expect(getClientIp(request({ "cf-connecting-ip": "1.2.3.4" }))).toBe("unknown"); // no secret presented
+    expect(getClientIp(request({ "cf-connecting-ip": "1.2.3.4", "x-circuit-proxy-secret": "wrong" }))).toBe("unknown");
+    expect(getClientIp(request({ "cf-connecting-ip": "1.2.3.4", "x-circuit-proxy-secret": "s3cret" }))).toBe("1.2.3.4");
+  });
+
+  it("reads whichever header the operator names, once the secret proves the proxy", () => {
+    process.env.TRUSTED_PROXY_SECRET = "s3cret";
+    process.env.TRUSTED_PROXY_IP_HEADER = "x-real-ip";
+    const headers = { "x-real-ip": "1.2.3.4", "cf-connecting-ip": "9.9.9.9", "x-circuit-proxy-secret": "s3cret" };
+    expect(getClientIp(request(headers))).toBe("1.2.3.4");
+  });
+
+  it("falls back to 'unknown' when there is nothing to read", () => {
+    expect(getClientIp(request({}))).toBe("unknown");
+    expect(getClientIp(request({ "x-forwarded-for": "   " }))).toBe("unknown");
   });
 });

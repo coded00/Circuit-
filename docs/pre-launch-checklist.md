@@ -18,6 +18,23 @@ withdrawals or prizes are switched on.
       address in `X-Forwarded-For`. Rate limits (sign-in, sign-up, uploads)
       key on that header. Without it every visitor shares one limit, and a
       few failed logins lock everyone out. Don't expose port 3000 directly.
+      The rate limiter reads the **last** entry of the chain, which is the
+      address your proxy saw — so the proxy must **append** (`Caddy`'s
+      default; nginx's `$proxy_add_x_forwarded_for`, *not*
+      `proxy_set_header X-Forwarded-For $remote_addr`), never pass a
+      caller-supplied value through untouched.
+- [ ] **`TRUSTED_PROXY_SECRET` set, if you front the app with Cloudflare.**
+      Cloudflare puts the visitor's real address in `CF-Connecting-IP` and
+      overwrites anything the client sent — but only for traffic that went
+      through Cloudflare. Anything that can reach the app directly could
+      send that header itself, so the app believes it only when the request
+      also carries the secret. Have Cloudflare inject a static header
+      (Transform Rules → *Set static* → `x-circuit-proxy-secret`) with the
+      same value, and set `TRUSTED_PROXY_SECRET` to it. Generate one with
+      `openssl rand -base64 32`. Without it, Cloudflare-fronted deployments
+      fall back to `X-Forwarded-For` — which, behind Cloudflare *and* a
+      local proxy, names the Cloudflare edge rather than the visitor, so
+      every visitor shares one limit.
 - [ ] **The app restarts on its own** after a crash or reboot (pm2,
       systemd, or Docker `restart: unless-stopped`). It runs as
       `npm run build` then `npm start`.
