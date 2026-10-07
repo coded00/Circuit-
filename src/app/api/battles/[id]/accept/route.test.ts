@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { cleanupAll, createTestUser } from "@/testHelpers";
 import { MAX_STAKE_AMOUNT } from "@/lib/stakes";
+import { DAY_MS } from "@/lib/selfExclusion";
 import { POST } from "./route";
 
 /**
@@ -131,6 +132,25 @@ describe("accepting a staked Battle under the per-account limits", () => {
     expect(response.status).toBe(403);
     expect(await stakeRowsFor(accepter.id, battle.id)).toBe(0);
     expect((await prisma.battle.findUniqueOrThrow({ where: { id: battle.id } })).status).toBe("OPEN");
+  });
+
+  it("refuses an accepter whose own cool-off is running, and reopens the Battle", async () => {
+    // The cool-off is enforced in `lockStake`, the same place the limits are,
+    // so it covers accepting someone else's stake for the same reason it
+    // covers opening your own. This is the test that says so out loud: a
+    // second enforcement point would be a second place to forget.
+    const creator = await stakeReadyUser();
+    const accepter = await stakeReadyUser({ selfExcludedUntil: new Date(Date.now() + DAY_MS) });
+    const battle = await openStakedBattle(creator.id);
+    vi.mocked(getCurrentUser).mockResolvedValue(accepter);
+
+    const response = await accept(battle.id);
+
+    expect(response.status).toBe(403);
+    expect(((await response.json()) as { error: string }).error).toMatch(/paused staked Battles/i);
+    expect(await stakeRowsFor(accepter.id, battle.id)).toBe(0);
+    expect((await prisma.battle.findUniqueOrThrow({ where: { id: battle.id } })).status).toBe("OPEN");
+    expect(await prisma.match.count({ where: { battleId: battle.id } })).toBe(0);
   });
 
   it("still accepts normally when the accepter is within their limits", async () => {

@@ -78,6 +78,7 @@ const ACTION_LABELS: Record<string, string> = {
   "tournament.unfreezeFunds": "unfroze a tournament's funds",
   "user.suspend": "suspended a user",
   "user.unsuspend": "restored a user",
+  "user.selfExclusionLift": "lifted a player's staking cool-off",
   "videos.import": "imported feed videos",
   "videos.publish_all": "published all video drafts",
 };
