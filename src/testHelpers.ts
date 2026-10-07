@@ -153,6 +153,10 @@ export async function cleanupAll(): Promise<void> {
   await prisma.rateLimitAttempt.deleteMany({ where: { key: { contains: "test-" } } });
   await prisma.auditLogEntry.deleteMany({ where: { actorId: { in: userIds } } });
   await prisma.bracket.deleteMany({ where: { tournamentId: { in: tournamentIds } } });
+  // Cascades off the tournament delete below anyway, and off the user delete after that (both FKs are
+  // ON DELETE CASCADE), but deleted explicitly so this file stays a readable list of everything a fixture
+  // can leave behind.
+  await prisma.tournamentSponsorship.deleteMany({ where: { OR: [{ tournamentId: { in: tournamentIds } }, { recordedById: { in: userIds } }] } });
   await prisma.tournament.deleteMany({ where: { id: { in: tournamentIds } } });
   await prisma.organizerProfile.deleteMany({ where: { userId: { in: userIds } } });
   // The catalogue fixtures (createTestCompetition), after the tournaments that point at them. Modes and

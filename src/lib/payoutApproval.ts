@@ -12,6 +12,8 @@
  * - An automatic approval (`actorId: null`) never releases money the entry fees didn't cover. A sponsorship
  *   is a decision someone makes, so it has to be a named person who makes it, and the audit row has to name
  *   them (see the note on `unbackedAmount` in payoutReview.ts).
+ * - That person is approving a stated amount from a stated source. A sponsored payout whose unbacked amount
+ *   isn't covered by a recorded TournamentSponsorship is refused outright, for everyone (src/lib/sponsorship.ts).
  */
 import { prisma } from "@/lib/db";
 import { logAdminAction } from "@/lib/auditLog";
@@ -19,6 +21,7 @@ import { notify } from "@/lib/notifications";
 import { captureException } from "@/lib/observability";
 import { releaseDelayHours } from "@/lib/prizePool";
 import { reviewTournamentPayout } from "@/lib/payoutReview";
+import { sponsorshipRefusal } from "@/lib/sponsorship";
 
 export type ApprovalResult = { ok: true } | { ok: false; error: string; status: number };
 
@@ -55,6 +58,16 @@ export async function approveTournamentPayout(opts: { tournamentId: string; acto
     return { ok: false, error: "This payout is bigger than the entry fees collected, so it needs a named staff member to approve it.", status: 409 };
   }
 
+  // And even a named person has to be approving something specific. Money from Circuit's balance needs a
+  // recorded statement of where it is coming from (TournamentSponsorship) covering the unbacked amount —
+  // otherwise the separation-of-duties rule above only guarantees a second person agreed, without either
+  // of them having written down what to. There is no override, deliberately, and no exception for a super
+  // admin: the point is the record, and a role that can skip it is a role that will.
+  const sponsorshipRefusalMessage = sponsorshipRefusal({ unbackedAmount: review.unbackedAmount, sponsorship: review.sponsorship });
+  if (sponsorshipRefusalMessage) {
+    return { ok: false, error: sponsorshipRefusalMessage, status: 409 };
+  }
+
   // Only the call that flips it from "not approved" records the approval and sends the alerts, so two
   // approvals at once (two staff, or staff and the sweep) cannot both go through.
   const claimed = await prisma.tournament.updateMany({
@@ -77,6 +90,11 @@ export async function approveTournamentPayout(opts: { tournamentId: string; acto
         organizerId: tournament.organizerId,
         sponsored: review.sponsored,
         unbackedAmount: review.unbackedAmount,
+        // What the approver was agreeing to, when it was platform money: the source and the amount they
+        // were shown. Without this the row names who said yes and still not what they said yes to.
+        sponsorship: review.sponsorship
+          ? { source: review.sponsorship.source, amountKobo: review.sponsorship.amountKobo, recordedByName: review.sponsorship.recordedByName }
+          : null,
         collectedForPrizes: review.collectedForPrizes,
         declaredPrize: review.declaredPrize,
         payablePrize: review.payablePrize,
