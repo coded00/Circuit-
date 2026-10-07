@@ -1523,6 +1523,16 @@ model PlatformSetting {
   /// The most (winners' prizes plus the organizer's share) that is approved automatically, in kobo. Bigger
   /// payouts always wait for staff. Default NGN 500,000.
   payoutAutoApproveMaxKobo         Int     @default(50000000)
+  /// The largest cash prize a staff-run (sponsored) tournament may declare, in kobo. Default NGN 5,000,000.
+  ///
+  /// An ordinary tournament's prize is capped at the entry fees it could collect, because that is where the
+  /// money comes from (prizePool.ts). A sponsored one is paid from Circuit's own balance, and that exemption
+  /// used to have no ceiling at all — a staff organizer could declare any prize, collect nothing, and have
+  /// it paid to a confederate. This is the ceiling the exemption was missing. It does not need to be tight to
+  /// do its job: its work is bounding a mistyped or bad-faith declaration, and the separation-of-duties rule
+  /// in payoutApproval.ts is what puts a second person in front of the money. Zero is allowed and means staff
+  /// may not declare a cash prize at all, which is the kill switch rather than a nonsense value.
+  maxSponsoredPrizeKobo            Int     @default(500000000)
   /// Staked Battles' kill switch. The feature deliberately shipped with the
   /// escrow mechanism only and none of the responsible-gambling controls
   /// docs/circuit-strategy.md §10 requires, so this exists to stop it

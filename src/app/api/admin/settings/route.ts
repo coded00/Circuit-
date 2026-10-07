@@ -36,7 +36,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const data: { maintenanceMode?: boolean; platformFeeBps?: number; organizerRevenueSettlementHours?: number; payoutAutoApprove?: boolean; payoutAutoApproveMaxKobo?: number; stakedBattlesEnabled?: boolean; maxLockedStakeKobo?: number; maxDailyStakeKobo?: number; stakePatternWindowDays?: number; stakePatternMinBattles?: number; stakePatternWinShareBps?: number; stakePatternNetAlertKobo?: number } = {};
+  const data: { maintenanceMode?: boolean; platformFeeBps?: number; organizerRevenueSettlementHours?: number; payoutAutoApprove?: boolean; payoutAutoApproveMaxKobo?: number; stakedBattlesEnabled?: boolean; maxLockedStakeKobo?: number; maxDailyStakeKobo?: number; maxSponsoredPrizeKobo?: number; stakePatternWindowDays?: number; stakePatternMinBattles?: number; stakePatternWinShareBps?: number; stakePatternNetAlertKobo?: number } = {};
   const actions: { action: string; metadata?: Prisma.InputJsonValue }[] = [];
 
   if (body.maintenanceMode !== undefined) {
@@ -93,6 +93,18 @@ export async function PATCH(request: Request) {
     }
     data.payoutAutoApproveMaxKobo = max;
     actions.push({ action: "settings.payoutAutoApproveLimitChange", metadata: { payoutAutoApproveMaxKobo: max } });
+  }
+
+  if (body.maxSponsoredPrizeKobo !== undefined) {
+    const max = Number(body.maxSponsoredPrizeKobo);
+    // Whole naira only, same as the stake limits — nobody reasons about a prize ceiling in fractional
+    // kobo. Zero is allowed and is the kill switch: staff may not declare a cash prize at all, which is
+    // a legitimate tightening rather than a nonsense value.
+    if (!Number.isInteger(max) || max < 0 || max % 100 !== 0 || max > MAX_KOBO_SETTING) {
+      return NextResponse.json({ error: "The sponsored-prize ceiling must be a whole number of naira, 0 or more." }, { status: 400 });
+    }
+    data.maxSponsoredPrizeKobo = max;
+    actions.push({ action: "settings.maxSponsoredPrizeChange", metadata: { maxSponsoredPrizeKobo: max } });
   }
 
   if (body.stakedBattlesEnabled !== undefined) {
@@ -201,6 +213,7 @@ export async function PATCH(request: Request) {
     stakedBattlesEnabled: updated.stakedBattlesEnabled,
     maxLockedStakeKobo: updated.maxLockedStakeKobo,
     maxDailyStakeKobo: updated.maxDailyStakeKobo,
+    maxSponsoredPrizeKobo: updated.maxSponsoredPrizeKobo,
     stakePatternWindowDays: updated.stakePatternWindowDays,
     stakePatternMinBattles: updated.stakePatternMinBattles,
     stakePatternWinShareBps: updated.stakePatternWinShareBps,

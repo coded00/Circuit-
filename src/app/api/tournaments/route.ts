@@ -23,7 +23,7 @@ import { hostableCommunities } from "@/lib/communityDirectory";
 import { trackEvent } from "@/lib/analytics";
 import { isRateLimited, recordAttempt } from "@/lib/rateLimit";
 import { captureException } from "@/lib/observability";
-import { prizeFundingError } from "@/lib/prizePool";
+import { prizeCapError } from "@/lib/prizePool";
 import { resolveTournamentStream } from "@/lib/streams";
 
 const MAX_PARTICIPANT_CAP = 128; // D2: V1 bracket ceiling.
@@ -171,12 +171,11 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
-  // The prize comes out of entry fees, so it can't promise more than they could collect (staff-run tournaments may be sponsored).
-  if (!user.isStaff) {
-    const feeSetting = await prisma.platformSetting.findUnique({ where: { id: "singleton" } });
-    const fundingError = prizeFundingError({ prizeAmount, entryFee, participantCap, platformFeeBps: feeSetting?.platformFeeBps ?? 0 });
-    if (fundingError) return NextResponse.json({ error: fundingError }, { status: 400 });
-  }
+  // The prize comes out of entry fees, so it can't promise more than they could collect. A staff-run
+  // tournament is sponsored instead — its prize is Circuit's own money — which is a different rule with
+  // its own ceiling, not the absence of one (src/lib/prizePool.ts).
+  const capError = await prizeCapError({ prizeAmount, entryFee, participantCap, sponsored: user.isStaff });
+  if (capError) return NextResponse.json({ error: capError }, { status: 400 });
   if (!registrationOpenAt || !registrationCloseAt || !startAt) {
     return NextResponse.json(
       { error: "Registration open, registration close, and start dates must all be valid." },
