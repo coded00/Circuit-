@@ -97,6 +97,7 @@ const CATEGORY_BY_TYPE: Record<NotificationType, NotificationCategory> = {
   LOBBY_FINAL_SET: TOURNAMENT,
   SWISS_BYE: TOURNAMENT,
   SELF_EXCLUSION_SET: SAFETY,
+  STAKE_PATTERN_FLAGGED: MODERATION,
 };
 
 export function getNotificationCategory(type: string): NotificationCategory {

@@ -65,6 +65,18 @@ enum LobbyFlagStatus {
   DISMISSED
 }
 
+/// The life of one repeated-pair flag: OPEN until a person has looked at it,
+/// then either DISMISSED (nothing here) or ACTIONED (something was done about
+/// it — a suspension, a wallet freeze, a conversation). Deliberately not
+/// ReportStatus's four: a flag has no "reviewed but not decided" state, and no
+/// separate ESCALATED step because a flag is already in front of staff the
+/// moment it exists.
+enum StakePatternStatus {
+  OPEN
+  DISMISSED
+  ACTIONED
+}
+
 enum DisputeStatus {
   OPEN
   ORGANIZER_REVIEW
@@ -298,6 +310,9 @@ model User {
   rosterMemberships       RosterMember[]           @relation("RosterMemberships")
   gameNames               UserGameName[]
   lobbyFlags              LobbyFlag[]              @relation("LobbyFlagsRaised")
+  stakePatternFlagsAsA    StakePatternFlag[]       @relation("StakePatternFlagsOnA")
+  stakePatternFlagsAsB    StakePatternFlag[]       @relation("StakePatternFlagsOnB")
+  stakePatternReviews     StakePatternFlag[]       @relation("StakePatternFlagsReviewed")
   walletTransactions      WalletTransaction[]
   auditLogEntries         AuditLogEntry[]
   friendshipsSent         Friendship[]             @relation("FriendshipRequester")
@@ -905,6 +920,74 @@ model LobbyFlag {
   @@index([roundId, status])
 }
 
+/// One row per unordered pair of accounts whose *settled, staked* Battles
+/// against each other look like they are moving money one way — the control
+/// docs/circuit-strategy.md §10 names as the thing that makes peer-to-peer
+/// stakes safe to run ("pattern detection on repeated losses between the same
+/// two accounts"). See src/lib/stakePatterns.ts for the two rules and
+/// src/lib/matches.ts's sweep for where this gets written.
+///
+/// This is a queue, not a verdict. Two friends who play each other constantly
+/// will show up here eventually, and a 5-0 run between evenly matched players
+/// happens roughly 6% of the time by chance alone, in either direction — so
+/// nothing here suspends anyone, moves any money, or is shown to a player. It
+/// puts a pair in front
+/// of a person with the numbers that caused it, and a person decides.
+///
+/// `userAId` is always the lexicographically smaller of the two ids, so a pair
+/// has exactly one spelling and one row. That plus the partial unique index on
+/// open flags (hand-written in the migration — Prisma's schema language can't
+/// express a WHERE clause on an index) is what keeps the sweep from opening a
+/// second flag for a pair every two minutes; the sweep refreshes the evidence
+/// below on the flag it already has instead, and only alerts once.
+model StakePatternFlag {
+  id          String             @id @default(cuid())
+  userAId     String
+  userA       User               @relation("StakePatternFlagsOnA", fields: [userAId], references: [id], onDelete: Cascade)
+  userBId     String
+  userB       User               @relation("StakePatternFlagsOnB", fields: [userBId], references: [id], onDelete: Cascade)
+  status      StakePatternStatus @default(OPEN)
+  /// Which rules fired, as `StakePatternReason` values from
+  /// src/lib/stakePatterns.ts. Kept as a list rather than a single value
+  /// because both rules fire on the same pair often, and "one-sided AND
+  /// high-value" is a different thing to look at than either alone. The
+  /// staff queue prints these, so the reason a pair is here is never a
+  /// number someone has to re-derive.
+  reasons     String[]
+  /// The evidence as it stood on the most recent sweep that looked at this
+  /// pair — not frozen at creation, because a pair still playing while the
+  /// flag waits in the queue is exactly when the numbers matter most. A
+  /// snapshot rather than a live re-query so the queue can render without
+  /// re-walking every Battle, and so what staff acted on stays readable
+  /// after the window has moved past it.
+  battleCount Int
+  /// Settled staked Battles in the window that `userA`/`userB` won.
+  userAWins   Int
+  userBWins   Int
+  /// Kobo that crossed from one account to the other over those Battles,
+  /// signed from `userA`'s side: positive means A is up on B. The per-Battle
+  /// amount is the stake (the pot is both stakes, so the winner's own comes
+  /// back — see settleBattleOnComplete), so this is the net the loser is
+  /// actually down, not the gross the winner's wallet saw.
+  netKobo     Int
+  /// The lookback this was measured over, so a row still reads correctly
+  /// after someone changes the settings that produced it.
+  windowDays  Int
+  firstBattleAt DateTime?
+  lastBattleAt  DateTime?
+  /// Who looked at it and what they concluded. Null until then.
+  reviewedById String?
+  reviewedBy   User?              @relation("StakePatternFlagsReviewed", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewNote   String?
+  reviewedAt   DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@index([status, createdAt])
+  @@index([userAId, status])
+  @@index([userBId, status])
+}
+
 /// 1:1 with Tournament. Maps to BRK-1.
 model Bracket {
   id           String     @id @default(cuid())
@@ -1463,6 +1546,35 @@ model PlatformSetting {
   /// purpose: if a refund handed back the throughput budget, a pair could
   /// move any amount by opening and cancelling in a loop.
   maxDailyStakeKobo                Int     @default(100000000)
+  /// How far back the repeated-pair collusion sweep looks when it counts a
+  /// pair's settled staked Battles (src/lib/stakePatterns.ts). Default 90
+  /// days. A rolling window rather than a lifetime total on purpose: two
+  /// accounts that played each other honestly two years ago and have since
+  /// started throwing games should still surface, and a lifetime count would
+  /// wash that signal out in old noise. Read fresh at sweep time like the
+  /// settlement window above, so changing it re-measures every pair on the
+  /// next run.
+  stakePatternWindowDays           Int     @default(90)
+  /// The fewest settled staked Battles a pair needs before the win-record
+  /// rule will look at them. Default 5. This is the sample floor, and it is
+  /// the knob that decides how much noise the queue carries: at a 5-Battle
+  /// floor and an 80% share, an honest pair sweeps 5-0 (or 0-5) about 6% of
+  /// the time, so a busy platform will hand staff some innocent pairs. Raise
+  /// it to trade earlier detection for a quieter queue.
+  stakePatternMinBattles           Int     @default(5)
+  /// How lopsided a pair's win record has to be before that rule fires, in
+  /// basis points (8000 = 80.00%) — same bps convention as platformFeeBps.
+  /// Ignored below `stakePatternMinBattles`. One side winning 80% of five
+  /// games is unremarkable; one side winning 80% of forty is not, which is
+  /// why this and the floor are read together rather than either alone.
+  stakePatternWinShareBps          Int     @default(8000)
+  /// The net kobo a pair has to have moved between them, over the window,
+  /// for the high-value rule to fire on its own — whatever their win record.
+  /// Default NGN 500,000. This is the rule for a pair quietly recycling
+  /// large amounts at a near-even record: a slow drain needs many Battles to
+  /// move real money, so it never produces a lopsided record for the other
+  /// rule to catch, and the size itself is the reason to look.
+  stakePatternNetAlertKobo         Int     @default(50000000)
 }
 
 /// Every real write an admin makes anywhere in `/admin` appends one row

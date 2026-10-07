@@ -34,6 +34,7 @@ import { trackEvent } from "@/lib/analytics";
 import { captureException } from "@/lib/observability";
 import { logAdminAction } from "@/lib/auditLog";
 import { sweepQuickMatchChallenges } from "@/lib/quickMatch";
+import { detectStakePatterns } from "@/lib/stakePatterns";
 import { startLobby } from "@/lib/lobby";
 import { buildRoundRobinTable, roundRobinOutcome, roundRobinSchedule } from "@/lib/roundRobin";
 import {
@@ -1434,6 +1435,7 @@ export async function runScheduledSweep(): Promise<{
   quickMatchExpired: number;
   quickMatchRecoveredStuck: number;
   battlesExpired: number;
+  stakePatternsFlagged: number;
   transfersSettled: number;
   latePaymentsChecked: number;
   errors?: string[];
@@ -1551,6 +1553,14 @@ export async function runScheduledSweep(): Promise<{
   const repair = await repairStalledAdvancement();
   if (repair.errors.length > 0) errors.push(...repair.errors);
 
+  // The other half of the staked-Battles controls: the per-account limits in
+  // src/lib/stakes.ts bound how much one account can move, and this reads
+  // who it keeps moving it to. Same "one sweep, several unrelated concerns
+  // folded in" reasoning as everything above — see stakePatterns.ts for the
+  // rules, and for why this queues a pair for a person rather than acting.
+  const stakePatterns = await detectStakePatterns(now);
+  if (stakePatterns.errors.length > 0) errors.push(...stakePatterns.errors);
+
   // Money backstop for webhooks that never arrive — see src/lib/payments/transfers.ts.
   let money = { transfersSettled: 0, latePaymentsChecked: 0 };
   try {
@@ -1573,6 +1583,7 @@ export async function runScheduledSweep(): Promise<{
     quickMatchExpired: quickMatchSweep.expired,
     quickMatchRecoveredStuck: quickMatchSweep.recoveredStuck,
     battlesExpired: battleExpiry.expired,
+    stakePatternsFlagged: stakePatterns.flagged,
     ...money,
     ...(errors.length > 0 ? { errors } : {}),
   };
