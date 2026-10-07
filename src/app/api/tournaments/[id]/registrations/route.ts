@@ -24,7 +24,7 @@ import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
-import { getDefaultPaymentProvider, toCheckoutEmail } from "@/lib/payments";
+import { getDefaultPaymentProvider, initializeChargeWithFallback, toCheckoutEmail } from "@/lib/payments";
 import { maybeGenerateBracketOnCapFill } from "@/lib/matches";
 import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
 import { computePlatformFee } from "@/lib/platformFee";
@@ -290,18 +290,18 @@ export async function POST(
   if (roster) await saveRoster(registration.id, roster.members);
 
   const reference = `reg_${registration.id}_${randomUUID().slice(0, 8)}`;
-  const provider = getDefaultPaymentProvider();
 
   let chargeResult;
+  let provider;
   try {
-    chargeResult = await provider.initializeCharge({
+    ({ provider, charge: chargeResult } = await initializeChargeWithFallback({
       amount: tournament.entryFee,
       currency: "NGN",
       email: toCheckoutEmail(user.emailOrPhone, user.id),
       reference,
       callbackUrl: `${process.env.NEXT_PUBLIC_APP_URL}/tournaments/${tournamentId}/register/callback?ref=${reference}`,
       metadata: { tournamentId, userId: user.id },
-    });
+    }));
   } catch (err) {
     // Don't leave a fresh PENDING_PAYMENT row with no charge behind it —
     // only rolls back if we just created it (a reused row predates this

@@ -53,6 +53,7 @@ export async function GET() {
       integrations: {
         paystack: Boolean(process.env.PAYSTACK_SECRET_KEY),
         flutterwave: Boolean(process.env.FLUTTERWAVE_SECRET_KEY),
+        bachs: Boolean(process.env.BACHS_API_KEY),
         resend: Boolean(process.env.RESEND_API_KEY),
         onesignal: Boolean(process.env.ONESIGNAL_API_KEY),
         cronSecret: Boolean(process.env.CRON_SECRET),

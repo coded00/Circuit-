@@ -110,6 +110,7 @@ enum EscrowStatus {
 enum PaymentProviderName {
   PAYSTACK
   FLUTTERWAVE
+  BACHS
 }
 
 enum BattleVisibility {

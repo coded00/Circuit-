@@ -14,7 +14,7 @@ import { Prisma, EscrowStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { tournamentPrizeShares } from "@/lib/prizePlaces";
 import { getCurrentUser, suspendedResponse } from "@/lib/session";
-import { getDefaultPaymentProvider } from "@/lib/payments";
+import { getPayoutProvider } from "@/lib/payments";
 import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
 import { trackEvent } from "@/lib/analytics";
 import { applyTransferOutcome } from "@/lib/payments/transfers";
@@ -136,7 +136,7 @@ export async function POST(
     );
   }
 
-  const provider = getDefaultPaymentProvider();
+  const provider = getPayoutProvider();
   // Unique per attempt: a retry after a failed transfer needs a fresh
   // reference (Paystack rejects a reused one, and providerRef is unique).
   // Stored on the row up front so the transfer webhook can always find it.

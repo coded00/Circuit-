@@ -14,7 +14,7 @@
 import { randomUUID } from "crypto";
 import { prisma } from "@/lib/db";
 import { withKeyedLock } from "@/lib/keyedLock";
-import { getDefaultPaymentProvider, getPaymentProvider, toCheckoutEmail } from "@/lib/payments";
+import { getDefaultPaymentProvider, getPaymentProvider, initializeChargeWithFallback, toCheckoutEmail } from "@/lib/payments";
 import { captureException } from "@/lib/observability";
 import { notify } from "@/lib/notifications";
 import { OrderError, loadPurchasableListing } from "@/lib/marketplaceOrders";
@@ -73,7 +73,7 @@ export async function startCardCheckout(
   );
 
   try {
-    const charge = await provider.initializeCharge({
+    const { provider: used, charge } = await initializeChargeWithFallback({
       amount: order.amountKobo,
       currency: "NGN",
       email: toCheckoutEmail(buyer.emailOrPhone, buyer.id),
@@ -81,6 +81,8 @@ export async function startCardCheckout(
       callbackUrl: `${process.env.NEXT_PUBLIC_APP_URL}/marketplace/orders/${order.id}?paid=1`,
       metadata: { orderId: order.id, userId: buyer.id, purpose: "marketplace_order" },
     });
+    // The order was saved against the primary; if the fallback took the charge, later verify/refund must go there.
+    if (used.name !== provider.name) await prisma.order.update({ where: { id: order.id }, data: { paymentProvider: used.name } });
     return { orderId: order.id, authorizationUrl: charge.authorizationUrl };
   } catch (err) {
     captureException(err, { source: "marketplace:startCardCheckout", orderId: order.id });

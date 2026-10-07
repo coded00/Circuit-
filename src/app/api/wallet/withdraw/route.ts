@@ -22,7 +22,7 @@ import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
-import { getDefaultPaymentProvider } from "@/lib/payments";
+import { getPayoutProvider } from "@/lib/payments";
 import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
 import { trackEvent } from "@/lib/analytics";
 import { applyTransferOutcome } from "@/lib/payments/transfers";
@@ -84,7 +84,7 @@ export async function POST(request: Request) {
   }
 
   const reference = `wallet_withdraw_${randomUUID().slice(0, 12)}`;
-  const provider = getDefaultPaymentProvider();
+  const provider = getPayoutProvider();
 
   // Settled money to send? If not, decline before taking anything from the wallet; they can try again later.
   const funds = await hasSettledFunds(provider, amount);

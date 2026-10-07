@@ -8,6 +8,8 @@
  * bank number. Maps to D5 and NFR-3.
  */
 
+export type ProviderName = "PAYSTACK" | "FLUTTERWAVE" | "BACHS";
+
 export type MinorAmount = number; // always minor currency units (kobo), never a float
 
 export type InitializeChargeInput = {
@@ -70,7 +72,7 @@ export type TransferStatus = "SUCCESS" | "PENDING" | "FAILED" | "REVERSED";
  * interface, not on either provider's SDK/REST shape directly.
  */
 export interface PaymentProviderClient {
-  readonly name: "PAYSTACK" | "FLUTTERWAVE";
+  readonly name: ProviderName;
   initializeCharge(input: InitializeChargeInput): Promise<InitializeChargeResult>;
   verifyCharge(providerReference: string): Promise<VerifyChargeResult>;
   initiateTransfer(input: InitiateTransferInput): Promise<InitiateTransferResult>;

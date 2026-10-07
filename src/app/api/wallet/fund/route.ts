@@ -12,7 +12,7 @@ import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
-import { getDefaultPaymentProvider, toCheckoutEmail } from "@/lib/payments";
+import { initializeChargeWithFallback, toCheckoutEmail } from "@/lib/payments";
 import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
 
 const MIN_FUND_AMOUNT = 10000; // ₦100
@@ -57,9 +57,8 @@ export async function POST(request: Request) {
   }
 
   const reference = `wallet_fund_${randomUUID().slice(0, 12)}`;
-  const provider = getDefaultPaymentProvider();
 
-  const chargeResult = await provider.initializeCharge({
+  const { provider, charge: chargeResult } = await initializeChargeWithFallback({
     amount,
     currency: "NGN",
     email: toCheckoutEmail(user.emailOrPhone, user.id),
