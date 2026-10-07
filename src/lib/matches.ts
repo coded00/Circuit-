@@ -167,7 +167,15 @@ async function createMatchWithUniqueCode(
         data: { ...data, matchCode: generateMatchCode(), status: "UPCOMING" },
       });
     } catch (err) {
-      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") continue;
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+        // A collision on `battleId` is not the matchCode collision this retry exists for, and no
+        // retry can fix it: Match.battleId is unique, so a P2002 there means this Battle already has
+        // a Match — which is exactly the state a double pot payout comes from. Surface that reason
+        // instead of burning two more attempts and reporting a misleading "could not generate a
+        // unique match code" (stringified because the driver reports the target as an array).
+        if (data.battleId && String(err.meta?.target ?? "").includes("battleId")) throw err;
+        continue;
+      }
       throw err;
     }
   }
@@ -1058,33 +1066,45 @@ async function completeMatch(match: Match, winnerId: string): Promise<Match> {
  * launch-ready staked-Battles feature.
  */
 async function settleBattleOnComplete(battleId: string, winnerId: string): Promise<void> {
-  const battle = await prisma.battle.findUniqueOrThrow({ where: { id: battleId } });
+  // The Battle's own status is the latch: only the call that actually flips it to COMPLETE pays out,
+  // and the flip and the payout share one transaction, so nobody can observe (or pay against) a
+  // COMPLETE Battle whose pot was never released.
+  //
+  // This has to be a conditional write rather than a read-then-write. A Battle can have more than one
+  // Match — a Battle that was reopened after a Match already existed would get a second one — and
+  // every Match that completes calls this. A plain read of `status` here would let two calls both see
+  // "not COMPLETE", both pay `stakeAmount * 2`, and the second payout would be unbacked: the second
+  // accepter's stake was refunded when the first accept attempt "failed". Match.battleId is unique
+  // now, so a second Match cannot be created again; this guard is the second lock, covering the one
+  // Match that already exists plus any future caller of this function.
+  const settled = await prisma.$transaction(async (tx) => {
+    const claimed = await tx.battle.updateMany({
+      where: { id: battleId, status: { not: "COMPLETE" } },
+      data: { status: "COMPLETE" },
+    });
+    // Someone else settled this Battle first. They released the pot; this call must not release it again.
+    if (claimed.count === 0) return null;
 
-  const writes: Prisma.PrismaPromise<unknown>[] = [
-    prisma.battle.update({ where: { id: battleId }, data: { status: "COMPLETE" } }),
-  ];
+    const battle = await tx.battle.findUniqueOrThrow({ where: { id: battleId } });
+    if (battle.stakeAmount <= 0) return battle;
 
-  if (battle.stakeAmount > 0) {
     const pot = battle.stakeAmount * 2;
-    writes.push(
-      prisma.user.update({ where: { id: winnerId }, data: { walletBalance: { increment: pot } } }),
-      prisma.escrowTransaction.create({
-        data: { battleId, userId: winnerId, type: "STAKE_PAYOUT", amount: pot, status: "COMPLETE" },
-      }),
-      prisma.walletTransaction.create({
-        data: { userId: winnerId, type: "STAKE_CREDIT", amount: pot, status: "COMPLETE" },
-      })
-    );
-  }
+    await tx.user.update({ where: { id: winnerId }, data: { walletBalance: { increment: pot } } });
+    await tx.escrowTransaction.create({
+      data: { battleId, userId: winnerId, type: "STAKE_PAYOUT", amount: pot, status: "COMPLETE" },
+    });
+    await tx.walletTransaction.create({
+      data: { userId: winnerId, type: "STAKE_CREDIT", amount: pot, status: "COMPLETE" },
+    });
+    return battle;
+  });
 
-  await prisma.$transaction(writes);
-
-  if (battle.stakeAmount > 0) {
+  if (settled && settled.stakeAmount > 0) {
     trackEvent("escrow_payout_released", {
       userId: winnerId,
-      amountMinor: battle.stakeAmount * 2,
+      amountMinor: settled.stakeAmount * 2,
       currency: "NGN",
-      game: battle.game,
+      game: settled.game,
     });
   }
 }
