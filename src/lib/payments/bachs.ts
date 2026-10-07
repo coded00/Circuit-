@@ -99,15 +99,21 @@ type BachsPayment = {
   created_at?: string;
 };
 
-/** ASSUMPTION: GET /v1/payments?reference= returns a bare array or a { data: [...] } wrapper. */
-function firstPayment(body: unknown): BachsPayment | null {
+/**
+ * ASSUMPTION: GET /v1/payments?reference= returns a bare array or a { data: [...] } wrapper.
+ * One checkout can hold several attempts (a declined card, then a good one), so a paid attempt always wins
+ * over whatever came first in the list: reading only the first would call a customer who did pay "failed".
+ */
+function pickPayment(body: unknown): BachsPayment | null {
   const list = Array.isArray(body) ? body : ((body as { data?: unknown; items?: unknown })?.data ?? (body as { items?: unknown })?.items);
-  return Array.isArray(list) && list.length > 0 ? (list[0] as BachsPayment) : null;
+  if (!Array.isArray(list) || list.length === 0) return null;
+  const payments = list as BachsPayment[];
+  return payments.find((p) => mapBachsPaymentStatus(p.status) === "SUCCESS") ?? payments[0];
 }
 
 async function findPayment(reference: string): Promise<BachsPayment | null> {
   const body = await bachsFetch<unknown>(`/v1/payments?reference=${encodeURIComponent(reference)}`);
-  return firstPayment(body);
+  return pickPayment(body);
 }
 
 /** collection.succeeded does not carry our reference: look it up from the checkout it belongs to. */
@@ -116,12 +122,15 @@ export async function referenceForCheckout(checkoutId: string): Promise<string |
   return data?.reference ?? null;
 }
 
-/** ASSUMPTION: payment statuses are SUCCEEDED / FAILED (as in collection.succeeded); anything unrecognised stays PENDING. */
+/**
+ * ASSUMPTION: a paid payment reads SUCCEEDED (as in collection.succeeded).
+ * Everything else stays PENDING, never FAILED: FAILED is terminal for every caller, so a declined attempt the
+ * customer then retries on the same checkout, or a state we don't recognise, would otherwise lose a real
+ * payment. Wrong in that direction costs one more look; wrong the other way keeps someone's money.
+ */
 export function mapBachsPaymentStatus(status: string | undefined): VerifyChargeResult["status"] {
   const s = (status ?? "").toLowerCase();
-  if (["succeeded", "success", "paid", "completed"].includes(s)) return "SUCCESS";
-  if (["failed", "expired", "cancelled", "canceled"].includes(s)) return "FAILED";
-  return "PENDING";
+  return ["succeeded", "success", "paid", "completed"].includes(s) ? "SUCCESS" : "PENDING";
 }
 
 export const bachsClient: PaymentProviderClient = {

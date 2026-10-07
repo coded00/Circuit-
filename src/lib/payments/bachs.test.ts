@@ -48,9 +48,9 @@ describe("refund references", () => {
 });
 
 describe("mapBachsPaymentStatus", () => {
-  it("maps known states and leaves unknown ones pending", () => {
+  it("reads only a paid state as success and leaves everything else pending", () => {
     expect(mapBachsPaymentStatus("SUCCEEDED")).toBe("SUCCESS");
-    expect(mapBachsPaymentStatus("FAILED")).toBe("FAILED");
+    expect(mapBachsPaymentStatus("FAILED")).toBe("PENDING"); // terminal states are never assumed: see the doc comment
     expect(mapBachsPaymentStatus("processing")).toBe("PENDING");
     expect(mapBachsPaymentStatus(undefined)).toBe("PENDING");
   });
@@ -79,6 +79,14 @@ describe("bachsClient", () => {
 
     vi.stubGlobal("fetch", vi.fn(async () => json(200, { data: [] })));
     expect((await bachsClient.verifyCharge("reg_2")).status).toBe("PENDING");
+  });
+
+  it("counts a customer who failed once and then paid as paid", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => json(200, { data: [
+      { charge_id: "ch_a", status: "FAILED", amount: "5000.00" },
+      { charge_id: "ch_b", status: "SUCCEEDED", amount: "5000.00" },
+    ] })));
+    expect((await bachsClient.verifyCharge("reg_1")).status).toBe("SUCCESS");
   });
 
   it("refunds against the charge id Bachs holds, with an idempotency key", async () => {
