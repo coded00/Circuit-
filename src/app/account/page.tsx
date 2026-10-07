@@ -14,6 +14,7 @@ import { SectionTabs, type SectionTab } from "@/components/ui/SectionTabs";
 import AccountForm from "./AccountForm";
 import { SignInMethods } from "./SignInMethods";
 import PrivacyForm from "./PrivacyForm";
+import ResponsiblePlayForm from "./ResponsiblePlayForm";
 import BlockedList from "./BlockedList";
 import ChangePasswordForm from "./ChangePasswordForm";
 import SignOutButton from "./SignOutButton";
@@ -90,6 +91,16 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
       ),
     },
     { key: "privacy", label: "Privacy", content: <PrivacyForm initialSearchable={user.searchable} initialSearchEngineIndexable={user.searchEngineIndexable} initialPolicy={user.directChallenges} /> },
+    {
+      key: "responsible",
+      label: "Responsible play",
+      content: (
+        <ResponsiblePlayForm
+          initialUntil={user.selfExcludedUntil?.toISOString() ?? null}
+          initialStartedAt={user.selfExcludedAt?.toISOString() ?? null}
+        />
+      ),
+    },
     { key: "preferences", label: "Preferences", content: <PreferencesForm /> },
     { key: "blocked", label: "Blocked", count: blocked.length, content: <BlockedList blocked={blocked} /> },
     { key: "account", label: "Account", content: <DeleteAccountCard requestedAt={user.deletionRequestedAt?.toISOString() ?? null} /> },

@@ -6,6 +6,7 @@
  */
 
 import type { NotificationType } from "@/lib/notifications";
+import { formatSelfExclusionDate } from "@/lib/selfExclusion";
 
 export type FormattedNotification = { message: string; href: string };
 
@@ -232,6 +233,16 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
         message: `Your entry for ${str(p, "tournamentName") || "a tournament"} couldn't be confirmed: another player took the in-game name "${str(p, "inGameName")}" while you were paying. Your payment is being refunded. Register again with a different name.`,
         href: `/tournaments/${str(p, "tournamentId")}`,
       };
+    case "SELF_EXCLUSION_SET": {
+      const until = new Date(str(p, "until"));
+      const when = Number.isNaN(until.getTime()) ? "" : ` until ${formatSelfExclusionDate(until)}`;
+      return {
+        message: p.extended
+          ? `Your cool-off from staked Battles now runs${when}. You can extend it again, but only support can end it early.`
+          : `You've paused staked Battles${when}. Free Battles still work, and only support can end this early.`,
+        href: "/account?tab=responsible",
+      };
+    }
     case "ENTRY_FEE_REFUND": {
       const what = `${money(p, "amount")} entry fee for ${str(p, "tournamentName") || "a tournament"}`;
       const stage = str(p, "stage");

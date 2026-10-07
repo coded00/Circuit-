@@ -228,6 +228,22 @@ model User {
   /// (same "don't touch the read path" discipline as the age gate, TRU-5).
   isSuspended         Boolean               @default(false)
   suspensionReason    String?
+  /// Self-exclusion / cool-off — the player asked to be barred from staking,
+  /// and this is when that bar lifts. The staff-imposed counterpart of
+  /// `isSuspended` above; nothing but the player sets it, and only staff can
+  /// end it early. Enforced in `lockStake` (src/lib/stakes.ts), so it stops
+  /// locking a stake and nothing else: free Battles, tournaments and browsing
+  /// are untouched, because staking is the only gambling-shaped thing Circuit
+  /// has (docs/circuit-strategy.md §10). An absolute timestamp rather than a
+  /// duration, because a cool-off whose end nobody can name is one a player
+  /// can talk themselves out of; expired means not excluded, so no cleanup
+  /// job is needed to end one. Players may push it further out but never pull
+  /// it in — an early lift is a staff action, and `logAdminAction` records it.
+  selfExcludedUntil   DateTime?
+  /// When this run of exclusion began. Kept separately from `updatedAt`
+  /// because an extension overwrites that, and "on a break since X" is the
+  /// fact worth showing — including after an extension moves the end date.
+  selfExcludedAt      DateTime?
   /// Real, spendable Circuit balance (kobo) — funded via Fund Wallet,
   /// spent on entry fees, cashed out via Withdraw. The authoritative
   /// running total; `WalletTransaction` below is the immutable ledger

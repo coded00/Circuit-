@@ -4,9 +4,10 @@
  * Staking money is the closest thing on Circuit to gambling
  * (docs/circuit-strategy.md §10), and the controls that make it safe are
  * per-account, not per-Battle: how much one account can have at risk at
- * once, and how much it can put through in a day. A per-Battle cap cannot
- * express either. Twenty concurrent ₦100,000 Battles break no per-Battle
- * rule and are a ₦2,000,000 exposure between two colluding accounts.
+ * once, how much it can put through in a day, and whether the player has
+ * asked to be barred from staking entirely. A per-Battle cap cannot express
+ * any of them. Twenty concurrent ₦100,000 Battles break no per-Battle rule
+ * and are a ₦2,000,000 exposure between two colluding accounts.
  *
  * Every path that takes a stake goes through `lockStake` below. There are
  * exactly four, and before this module they each carried their own copy of
@@ -27,6 +28,7 @@
  */
 
 import type { Prisma } from "@prisma/client";
+import { isSelfExcluded, selfExclusionMessage } from "@/lib/selfExclusion";
 
 /** ₦100,000 — the most a single Battle or Quick Match challenge may stake. */
 export const MAX_STAKE_AMOUNT = 10_000_000;
@@ -45,7 +47,7 @@ export const STAKE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export class InsufficientWalletBalanceError extends Error {}
 
-export type StakeLimitCode = "DISABLED" | "PER_BATTLE" | "LOCKED_TOTAL" | "DAILY_TOTAL";
+export type StakeLimitCode = "DISABLED" | "SELF_EXCLUDED" | "PER_BATTLE" | "LOCKED_TOTAL" | "DAILY_TOTAL";
 
 /**
  * A stake that the limits refuse. Every one of these is a deliberate "no",
@@ -97,18 +99,31 @@ export async function lockStake(tx: Prisma.TransactionClient, target: StakeTarge
     );
   }
 
+  const now = Date.now();
+
+  // Take the account's row lock BEFORE anything that reads this account's own
+  // state. Without it, two requests staking at the same instant both read the
+  // pre-stake total, both find room, and both debit — a limit that a
+  // double-click defeats. This is the same serialization the conditional
+  // wallet debit below gets for free, moved ahead of the reads that need it.
+  //
+  // It reads the cool-off in the same statement rather than in a query of its
+  // own, so a lift or an extension landing mid-request is serialized against
+  // this stake instead of racing it. The check sits ahead of the per-Battle
+  // cap on purpose: an excluded player should be told they're excluded, not
+  // told their amount is too large.
+  const [account] = await tx.$queryRaw<{ selfExcludedUntil: Date | null }[]>`
+    SELECT "selfExcludedUntil" FROM "User" WHERE id = ${userId} FOR UPDATE
+  `;
+  const excludedUntil = account?.selfExcludedUntil ?? null;
+  if (isSelfExcluded(excludedUntil, now)) {
+    throw new StakeLimitError("SELF_EXCLUDED", selfExclusionMessage(excludedUntil));
+  }
+
   if (amount > MAX_STAKE_AMOUNT) {
     throw new StakeLimitError("PER_BATTLE", `Stake amount can't exceed ${naira(MAX_STAKE_AMOUNT)}.`);
   }
 
-  // Take the account's row lock BEFORE reading the totals below. Without it,
-  // two requests staking at the same instant both read the pre-stake total,
-  // both find room, and both debit — a limit that a double-click defeats.
-  // This is the same serialization the conditional wallet debit below gets
-  // for free, moved ahead of the reads that need it.
-  await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${userId} FOR UPDATE`;
-
-  const now = Date.now();
   const [locked, daily] = await Promise.all([
     tx.escrowTransaction.aggregate({
       where: {
