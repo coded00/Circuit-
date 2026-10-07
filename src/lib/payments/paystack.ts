@@ -58,6 +58,29 @@ export function mapPaystackTransferStatus(status: string): TransferStatus {
   return "PENDING";
 }
 
+/**
+ * Paystack charge (transaction) states → ours — the same shape as the transfer mapping above, for the same
+ * reason, and it matters more here.
+ *
+ * `/transaction/verify` reports "success", "failed" and "reversed", and — while a charge is still settling —
+ * "abandoned", "ongoing", "pending", "processing" and "queued". This used to send everything that wasn't
+ * "success" or "abandoned" to FAILED, which made a settling charge look permanently failed.
+ *
+ * FAILED is terminal for every caller: confirmWalletFunding and confirmEntryFeePayment flip the row and stop
+ * looking at it, the webhook replay and the redirect callback both return early on a row that is no longer
+ * PENDING, and reconcilePendingMoney only revisits PENDING rows. So calling an in-flight charge FAILED meant
+ * that if the charge then completed, Circuit held the customer's money with the wallet never credited and no
+ * refund — silently. Nothing may become FAILED unless Paystack has said it will not succeed; being wrong in
+ * the other direction (PENDING) costs one more look.
+ *
+ * Anything unrecognised is therefore PENDING, not FAILED.
+ */
+export function mapPaystackChargeStatus(status: string): VerifyChargeResult["status"] {
+  if (status === "success") return "SUCCESS";
+  if (["failed", "reversed"].includes(status)) return "FAILED";
+  return "PENDING";
+}
+
 export type BankItem = {
   name: string;
   code: string;
@@ -146,8 +169,7 @@ export const paystackClient: PaymentProviderClient = {
       paid_at: string | null;
     }>(`/transaction/verify/${encodeURIComponent(providerReference)}`);
     return {
-      status:
-        data.status === "success" ? "SUCCESS" : data.status === "abandoned" ? "PENDING" : "FAILED",
+      status: mapPaystackChargeStatus(data.status),
       amount: data.amount,
       currency: "NGN",
       providerReference: data.reference,
