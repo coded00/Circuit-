@@ -13,17 +13,21 @@
  * email on file can't be reached yet (no SMS provider — see
  * docs/circuit-stack.md's Notifications section).
  *
- * Rate limited per identifier (3 requests per 15 minutes) — same
+ * Rate limited per account (3 requests per 15 minutes) — same
  * Postgres-attempts-table design as login (see rateLimit.ts). Every call
  * counts here, not just "failures": this route always returns the same
  * generic response regardless of what happened internally, so there's no
  * success/failure signal to gate the count on the way login has one.
+ *
+ * Per account rather than per identifier-as-typed, for the reason
+ * throttleKeyFor sets out — one account answers to several spellings of
+ * its phone number, and a bucket per spelling is unbounded reset mail.
  */
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { generatePasswordResetToken } from "@/lib/auth";
-import { findUserByIdentifier } from "@/lib/accountLookup";
+import { findUserByIdentifier, throttleKeyFor } from "@/lib/accountLookup";
 import { SITE_URL } from "@/lib/seo";
 import { sendEmail } from "@/lib/email";
 import { isRateLimited, recordAttempt } from "@/lib/rateLimit";
@@ -40,7 +44,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Email or phone is required." }, { status: 400 });
   }
 
-  const rateLimitKey = `forgot-password:${emailOrPhone.toLowerCase()}`;
+  const user = await findUserByIdentifier(emailOrPhone);
+
+  // Keyed on the account, not on how it was typed — the same reason as login (see throttleKeyFor), and it
+  // matters more here: a fresh bucket per re-spelling of a phone number is not password guesses, it is
+  // unbounded reset mail into a victim's inbox, sent by whoever knows their number.
+  const rateLimitKey = `forgot-password:${throttleKeyFor(user, emailOrPhone)}`;
   const { limited, retryAfterSeconds } = await isRateLimited(rateLimitKey, {
     max: MAX_ATTEMPTS,
     windowMs: WINDOW_MS,
@@ -53,7 +62,6 @@ export async function POST(request: Request) {
   }
   await recordAttempt(rateLimitKey);
 
-  const user = await findUserByIdentifier(emailOrPhone);
   const deliverTo = user?.email ?? (user?.emailOrPhone.includes("@") ? user.emailOrPhone : null);
   if (user && deliverTo) {
     const { raw, hash, expiresAt } = generatePasswordResetToken();

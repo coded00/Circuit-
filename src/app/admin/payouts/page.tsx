@@ -60,7 +60,11 @@ export default async function AdminPayoutsPage({ searchParams }: { searchParams:
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     {t.fundsFrozen && <StatusBadge tone="danger">Frozen</StatusBadge>}
-                    {r.blockers.length === 0 && !t.payoutApprovedAt && <StatusBadge tone="success">Ready</StatusBadge>}
+                    {/* "Ready" would be misleading for these: nothing is wrong with them, but the money
+                        isn't the tournament's own, so a person has to decide (never the sweep) — see
+                        unbackedAmount in src/lib/payoutReview.ts. */}
+                    {r.unbackedAmount > 0 && <StatusBadge tone="attention">Platform-funded</StatusBadge>}
+                    {r.blockers.length === 0 && r.unbackedAmount === 0 && !t.payoutApprovedAt && <StatusBadge tone="success">Ready</StatusBadge>}
                     {r.blockers.length > 0 && <StatusBadge tone="attention">{r.blockers.length} to resolve</StatusBadge>}
                   </div>
                 </div>
@@ -75,6 +79,9 @@ export default async function AdminPayoutsPage({ searchParams }: { searchParams:
                       { label: "Prize promised", value: naira(r.declaredPrize) },
                       { label: "Prize payable", value: naira(r.payablePrize) },
                       { label: "Organizer's share", value: naira(r.organizerShare) },
+                      // Only ever non-zero for a staff-run (sponsored) tournament. Shown because it is the
+                      // one number here that isn't the players' money — approving it spends Circuit's own.
+                      ...(r.unbackedAmount > 0 ? [{ label: "From Circuit's balance", value: naira(r.unbackedAmount) }] : []),
                     ]}
                   />
                   <div>
@@ -99,6 +106,13 @@ export default async function AdminPayoutsPage({ searchParams }: { searchParams:
                   </div>
                 </div>
 
+                {r.unbackedAmount > 0 && (
+                  <p className="mt-3 text-xs text-muted">
+                    {naira(r.unbackedAmount)} of this is more than the tournament&apos;s entry fees collected, so it comes out of
+                    Circuit&apos;s own balance. It can only be approved by a staff member who is neither the organizer nor in a
+                    prize place here, and never automatically.
+                  </p>
+                )}
                 {r.blockers.length > 0 && (
                   <ul className="mt-3 list-disc pl-5 text-xs text-muted">
                     {r.blockers.map((b) => (
