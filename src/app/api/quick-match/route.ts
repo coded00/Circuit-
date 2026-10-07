@@ -16,14 +16,13 @@ import { isRateLimited, recordAttempt } from "@/lib/rateLimit";
 import { trackEvent } from "@/lib/analytics";
 import {
   DEFAULT_TIMEOUT_MS,
-  InsufficientWalletBalanceError,
-  MAX_STAKE_AMOUNT,
   MAX_TIMEOUT_MS,
   MIN_TIMEOUT_MS,
   VALID_FORMATS,
   getEligibleRecipients,
 } from "@/lib/quickMatch";
 import { emailVerificationRequired } from "@/lib/emailGate";
+import { InsufficientWalletBalanceError, StakeLimitError, lockStake } from "@/lib/stakes";
 
 const QUICK_MATCH_CREATE_MAX_ATTEMPTS = 10;
 const QUICK_MATCH_CREATE_WINDOW_MS = 60 * 60 * 1000;
@@ -71,13 +70,6 @@ export async function POST(request: Request) {
   if (!VALID_FORMATS.includes(format)) {
     return NextResponse.json({ error: "Format must be a single match or best of three." }, { status: 400 });
   }
-  if (stakeAmount > MAX_STAKE_AMOUNT) {
-    return NextResponse.json(
-      { error: `Stake amount can't exceed ₦${(MAX_STAKE_AMOUNT / 100).toLocaleString("en-NG")}.` },
-      { status: 400 }
-    );
-  }
-
   if (stakeAmount > 0) {
     const unverified = emailVerificationRequired(user);
     if (unverified) return unverified;
@@ -109,14 +101,6 @@ export async function POST(request: Request) {
 
   try {
     const challenge = await prisma.$transaction(async (tx) => {
-      if (stakeAmount > 0) {
-        const debited = await tx.user.updateMany({
-          where: { id: user.id, walletBalance: { gte: stakeAmount } },
-          data: { walletBalance: { decrement: stakeAmount } },
-        });
-        if (debited.count === 0) throw new InsufficientWalletBalanceError();
-      }
-
       const created = await tx.quickMatchChallenge.create({
         data: {
           hostId: user.id,
@@ -131,20 +115,11 @@ export async function POST(request: Request) {
         data: recipients.map((r) => ({ challengeId: created.id, recipientUserId: r.id })),
       });
 
-      if (stakeAmount > 0) {
-        await tx.escrowTransaction.create({
-          data: {
-            quickMatchChallengeId: created.id,
-            userId: user.id,
-            type: "STAKE",
-            amount: stakeAmount,
-            status: "COMPLETE",
-          },
-        });
-        await tx.walletTransaction.create({
-          data: { userId: user.id, type: "STAKE_DEBIT", amount: stakeAmount, status: "COMPLETE" },
-        });
-      }
+      // The host's stake is locked here, at challenge creation rather than at
+      // acceptance (see QuickMatchChallenge.stakeAmount's own schema comment)
+      // — which is also why it has to count toward the host's per-account
+      // limits while it is still only a pending challenge.
+      await lockStake(tx, { userId: user.id, amount: stakeAmount, quickMatchChallengeId: created.id });
 
       return created;
     });
@@ -163,6 +138,9 @@ export async function POST(request: Request) {
   } catch (err) {
     if (err instanceof InsufficientWalletBalanceError) {
       return NextResponse.json({ error: "Insufficient wallet balance for that stake." }, { status: 402 });
+    }
+    if (err instanceof StakeLimitError) {
+      return NextResponse.json({ error: err.message }, { status: 403 });
     }
     throw err;
   }
