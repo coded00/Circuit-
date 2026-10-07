@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/db";
 import { cleanupAll, createTestUser } from "@/testHelpers";
 import { InsufficientWalletBalanceError, MAX_STAKE_AMOUNT, lockStake } from "./stakes";
+import { DAY_MS } from "./selfExclusion";
 
 /**
  * Staked Battles are the closest thing on Circuit to gambling, and the limits
@@ -180,6 +181,37 @@ describe("lockStake refusals", () => {
 
     expect(await walletOf(user.id)).toBe(before);
     expect(await escrowCount(user.id)).toBe(0);
+  });
+
+  it("refuses a stake while the player's own cool-off is running, and writes nothing", async () => {
+    const user = await createTestUser({ walletBalance: 100_000_000, selfExcludedUntil: new Date(Date.now() + DAY_MS) });
+    const battle = await newBattle(user.id, CAP);
+    const before = await walletOf(user.id);
+
+    await expect(lock(user.id, CAP, { battleId: battle.id })).rejects.toMatchObject({ code: "SELF_EXCLUDED" });
+
+    expect(await walletOf(user.id)).toBe(before);
+    expect(await escrowCount(user.id)).toBe(0);
+  });
+
+  it("refuses an over-cap stake from an excluded player as an exclusion, not as a cap", async () => {
+    // Both limits would refuse this. The exclusion is checked first because it
+    // is the one the player chose — answering "your stake is too large" to
+    // someone who asked to be stopped is the wrong answer.
+    const user = await createTestUser({ walletBalance: 100_000_000, selfExcludedUntil: new Date(Date.now() + DAY_MS) });
+    const battle = await newBattle(user.id, CAP + 1);
+
+    await expect(lock(user.id, CAP + 1, { battleId: battle.id })).rejects.toMatchObject({ code: "SELF_EXCLUDED" });
+  });
+
+  it("lets the player stake again once the cool-off has run out", async () => {
+    // The other half: an expired timestamp is not an exclusion, and nothing
+    // has to run to clear it. A column that stayed set would bar them forever.
+    const user = await createTestUser({ walletBalance: 100_000_000, selfExcludedUntil: new Date(Date.now() - DAY_MS) });
+    const battle = await newBattle(user.id, CAP);
+
+    await expect(lock(user.id, CAP, { battleId: battle.id })).resolves.toBeUndefined();
+    expect(await escrowCount(user.id)).toBe(1);
   });
 
   it("refuses a stake the wallet can't cover", async () => {

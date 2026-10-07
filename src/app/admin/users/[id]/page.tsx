@@ -13,6 +13,8 @@ import { ArrowUpRight } from "lucide-react";
 import { matchStatusInfo, battleStatusInfo } from "@/components/StatusPill";
 import { Avatar, EmptyState, KeyValue, naira, PageHeader, Panel, RegistrationBadge, Section, StatStrip, StatusBadge, toneFor } from "@/components/admin/ui";
 import { SuspendControl } from "@/components/admin/SuspendControl";
+import { SelfExclusionLiftControl } from "@/components/admin/SelfExclusionLiftControl";
+import { formatSelfExclusionDateShort, isSelfExcluded } from "@/lib/selfExclusion";
 import { CorrectDateOfBirthControl } from "@/components/admin/CorrectDateOfBirthControl";
 
 function formatDate(date: Date): string {
@@ -72,6 +74,10 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
 
   const totalMatches = user._count.matchesAsPlayerA + user._count.matchesAsPlayerB;
 
+  // A cool-off in force — the same test `lockStake` makes, so this badge and
+  // the refusal a player would hit agree. An expired exclusion is not one.
+  const stakingPausedUntil = isSelfExcluded(user.selfExcludedUntil) ? user.selfExcludedUntil : null;
+
   const row = "flex items-center gap-3 border-b border-border px-4 py-2.5 text-[13px] last:border-b-0 sm:px-5";
 
   return (
@@ -90,6 +96,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
               {user.isSuspended ? "Suspended" : "Active"}
             </StatusBadge>
             {user.deletionRequestedAt && <StatusBadge tone="attention">Deletion requested</StatusBadge>}
+            {stakingPausedUntil && <StatusBadge tone="attention">Staking paused to {formatSelfExclusionDateShort(stakingPausedUntil)}</StatusBadge>}
             {user.adminRole && <StatusBadge tone="info">{user.adminRole === "SUPER_ADMIN" ? "Super admin" : "Moderator"}</StatusBadge>}
             <span>
               @{user.handle} · {user.emailOrPhone} · Joined {formatDate(user.createdAt)}
@@ -102,6 +109,10 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
               Public profile <ArrowUpRight size={14} />
             </Link>
             <SuspendControl userId={user.id} isSuspended={user.isSuspended} suspensionReason={null} />
+            <SelfExclusionLiftControl
+              userId={user.id}
+              selfExcludedUntil={stakingPausedUntil?.toISOString() ?? null}
+            />
           </>
         }
       />
