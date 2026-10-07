@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { prisma } from "@/lib/db";
 import { submitResult, runScheduledSweep, ruleDispute, MatchError } from "./matches";
-import { createTestUser, createTestStaff, cleanupAll } from "@/testHelpers";
+import { createTestUser, createTestStaff, cleanupAll, uniqueSuffix } from "@/testHelpers";
 
 /**
  * Regression tests for the Phase 8 fix: completeMatch()/ruleDispute() had
@@ -178,5 +178,144 @@ describe("ruleDispute race: two concurrent winner rulings on the same dispute", 
     await ruleDispute({ disputeId: staffDispute.id, rulingUserId: staff.id, isStaffRuling: true, ruling: "Player A wins", winnerId: playerA.id });
     const staffLog = await prisma.auditLogEntry.findFirst({ where: { actorId: staff.id, action: "dispute.rule", targetId: staffDispute.id } });
     expect(staffLog).not.toBeNull();
+  });
+});
+
+/**
+ * One Battle, one Match, one pot.
+ *
+ * A Battle used to be able to acquire a second Match: accepting a Battle
+ * refunded the accepter's stake and reopened the Battle to OPEN whenever
+ * anything after the Match insert threw — including a failed notification —
+ * while the Match it had already created lived on. A second accepter could
+ * then take the reopened Battle, get a second Match, and both Matches paid
+ * `stakeAmount * 2` on completion. The second payout had nothing behind it:
+ * that accepter's stake had been handed back.
+ *
+ * Two independent guards stop it now, and each is tested here on its own —
+ * Match.battleId is unique (no second Match can exist), and settlement is
+ * gated on the Battle's own status flipping (nothing that does reach
+ * settleBattleOnComplete twice can pay twice).
+ */
+
+async function acceptedBattle(stakeAmount: number) {
+  const playerA = await createTestUser();
+  const playerB = await createTestUser();
+  const battle = await prisma.battle.create({
+    data: { creatorId: playerA.id, game: "Test Game", format: "SINGLE", stakeAmount, status: "ACCEPTED" },
+  });
+  const match = await prisma.match.create({
+    data: {
+      battleId: battle.id,
+      matchCode: `TEST-SETTLE-${uniqueSuffix()}`,
+      playerAId: playerA.id,
+      playerBId: playerB.id,
+      status: "NEEDS_RESULT",
+    },
+  });
+  return { playerA, playerB, battle, match };
+}
+
+describe("a Battle is matched once", () => {
+  it("refuses a second Match for the same Battle", async () => {
+    const { playerA, playerB, battle } = await acceptedBattle(50_000);
+
+    await expect(
+      prisma.match.create({
+        data: {
+          battleId: battle.id,
+          matchCode: `TEST-SETTLE-DUP-${uniqueSuffix()}`,
+          playerAId: playerA.id,
+          playerBId: playerB.id,
+          status: "UPCOMING",
+        },
+      })
+    ).rejects.toMatchObject({ code: "P2002" });
+
+    expect(await prisma.match.count({ where: { battleId: battle.id } })).toBe(1);
+  });
+
+  it("still allows many tournament matches, which have no battleId", async () => {
+    // The unique index only bites on non-null battleId — Postgres treats
+    // nulls as distinct, so bracket matches are unaffected.
+    const playerA = await createTestUser();
+    const playerB = await createTestUser();
+    await prisma.match.create({
+      data: { matchCode: `TEST-NULL-A-${uniqueSuffix()}`, playerAId: playerA.id, playerBId: playerB.id, status: "UPCOMING" },
+    });
+    await prisma.match.create({
+      data: { matchCode: `TEST-NULL-B-${uniqueSuffix()}`, playerAId: playerA.id, playerBId: playerB.id, status: "UPCOMING" },
+    });
+    expect(await prisma.match.count({ where: { playerAId: playerA.id } })).toBe(2);
+  });
+});
+
+describe("a Battle settles once", () => {
+  it("pays the pot once, even when settlement is reached a second time", async () => {
+    const stakeAmount = 25_000;
+    const { playerA, playerB, battle, match } = await acceptedBattle(stakeAmount);
+
+    // First settlement, by the ordinary route: both sides report the same winner.
+    for (const player of [playerA, playerB]) {
+      await submitResult({
+        matchId: match.id,
+        submittingUserId: player.id,
+        winnerId: playerA.id,
+        score: "2-0",
+        proofBuffer: Buffer.from(`proof-${player.id}`),
+        proofContentType: "image/png",
+      });
+    }
+
+    expect((await prisma.battle.findUniqueOrThrow({ where: { id: battle.id } })).status).toBe("COMPLETE");
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: playerA.id } })).walletBalance).toBe(stakeAmount * 2);
+
+    // Force a second, independent settlement of the same Battle. A second
+    // Match used to do exactly this — it reached completeMatch →
+    // settleBattleOnComplete for a Battle that had already paid out. A
+    // second Match can't exist any more, so reopening the completed Match
+    // is the synthetic version of that state, and the only way left to
+    // reach the second settlement.
+    // resultA is the one the sweep reads (`resultA ?? resultB`), so
+    // overwriting just it is enough to make the second attempt report a
+    // different winner than the first settlement paid.
+    await prisma.match.update({
+      where: { id: match.id },
+      data: {
+        status: "NEEDS_RESULT",
+        winnerId: null,
+        resultA: { winnerId: playerB.id, score: "2-0", submittedAt: new Date().toISOString() },
+        reportWindowExpiresAt: new Date(Date.now() - 60_000), // already lapsed — sweep-eligible
+      },
+    });
+    await runScheduledSweep();
+
+    const payouts = await prisma.escrowTransaction.findMany({ where: { battleId: battle.id, type: "STAKE_PAYOUT" } });
+    expect(payouts).toHaveLength(1);
+    expect(payouts[0].amount).toBe(stakeAmount * 2);
+    // The second settlement named the OTHER player the winner — without the
+    // status latch on Battle, this is the wallet that would have been paid
+    // a second, unbacked pot.
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: playerB.id } })).walletBalance).toBe(0);
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: playerA.id } })).walletBalance).toBe(stakeAmount * 2);
+  });
+
+  it("leaves an unstaked Battle COMPLETE without touching any wallet", async () => {
+    const { playerA, playerB, battle, match } = await acceptedBattle(0);
+
+    for (const player of [playerA, playerB]) {
+      await submitResult({
+        matchId: match.id,
+        submittingUserId: player.id,
+        winnerId: playerA.id,
+        score: "2-0",
+        proofBuffer: Buffer.from(`proof-${player.id}`),
+        proofContentType: "image/png",
+      });
+    }
+
+    expect((await prisma.battle.findUniqueOrThrow({ where: { id: battle.id } })).status).toBe("COMPLETE");
+    expect(await prisma.escrowTransaction.count({ where: { battleId: battle.id } })).toBe(0);
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: playerA.id } })).walletBalance).toBe(0);
   });
 });
