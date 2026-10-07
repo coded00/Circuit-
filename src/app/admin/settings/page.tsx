@@ -25,6 +25,7 @@ import { MaintenanceModeToggle } from "@/components/admin/MaintenanceModeToggle"
 import { PlatformFeeControl } from "@/components/admin/PlatformFeeControl";
 import { OrganizerRevenueSettlementControl } from "@/components/admin/OrganizerRevenueSettlementControl";
 import { PayoutAutoApproveControl } from "@/components/admin/PayoutAutoApproveControl";
+import { SponsoredPrizeControl } from "@/components/admin/SponsoredPrizeControl";
 import { StakedBattlesControl } from "@/components/admin/StakedBattlesControl";
 import { StakePatternControl } from "@/components/admin/StakePatternControl";
 import { ArrowUpRight } from "lucide-react";
@@ -70,6 +71,7 @@ const ACTION_LABELS: Record<string, string> = {
   "settings.stakedBattlesOff": "turned staked Battles off",
   "settings.maxLockedStakeChange": "changed the at-once stake limit",
   "settings.maxDailyStakeChange": "changed the daily stake limit",
+  "settings.maxSponsoredPrizeChange": "changed the sponsored-prize ceiling",
   "settings.stakePatternWindowChange": "changed the stake-pattern lookback window",
   "settings.stakePatternMinBattlesChange": "changed the stake-pattern sample floor",
   "settings.stakePatternWinShareChange": "changed the stake-pattern win share",
@@ -167,6 +169,11 @@ export default async function AdminSettingsPage() {
               <PanelRow>
                 <div className="w-full">
                   <PayoutAutoApproveControl enabled={platformSetting?.payoutAutoApprove ?? true} maxKobo={platformSetting?.payoutAutoApproveMaxKobo ?? 50_000_000} canEdit={isSuperAdmin} />
+                </div>
+              </PanelRow>
+              <PanelRow>
+                <div className="w-full">
+                  <SponsoredPrizeControl maxKobo={platformSetting?.maxSponsoredPrizeKobo ?? 500_000_000} canEdit={isSuperAdmin} />
                 </div>
               </PanelRow>
               <PanelRow>

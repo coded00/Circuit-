@@ -28,6 +28,12 @@ let original: Record<string, unknown> | null = null;
 
 beforeEach(async () => {
   original = await prisma.platformSetting.findUnique({ where: { id: "singleton" } });
+  // Several tests read the row back to prove a refusal left it alone, which needs it to exist before the
+  // first PATCH. It is the upsert in the route that normally creates it, so a test file that only ever
+  // reads would depend on a row left behind by something else — which is exactly the order-dependence
+  // these assertions are meant to rule out. `original` still records whether it was there, so afterEach
+  // restores "absent" as absent rather than inventing a row.
+  if (!original) await prisma.platformSetting.create({ data: { id: "singleton" } });
 });
 
 afterEach(async () => {
@@ -138,6 +144,49 @@ describe("stake-pattern thresholds", () => {
   });
 });
 
+describe("the sponsored-prize ceiling", () => {
+  it("saves it and records the audit entry", async () => {
+    const admin = await asSuperAdmin();
+
+    const response = await patch({ maxSponsoredPrizeKobo: 1_000_000_000 });
+
+    expect(response.status).toBe(200);
+    expect((await settings()).maxSponsoredPrizeKobo).toBe(1_000_000_000);
+    const actions = await prisma.auditLogEntry.findMany({ where: { actorId: admin.id } });
+    expect(actions.map((a) => a.action)).toEqual(["settings.maxSponsoredPrizeChange"]);
+  });
+
+  it("allows zero, which stops staff declaring cash prizes at all", async () => {
+    // A real tightening rather than a nonsense value: the ceiling's own kill switch.
+    await asSuperAdmin();
+
+    const response = await patch({ maxSponsoredPrizeKobo: 0 });
+
+    expect(response.status).toBe(200);
+    expect((await settings()).maxSponsoredPrizeKobo).toBe(0);
+  });
+
+  it("refuses an amount that is not whole naira", async () => {
+    await asSuperAdmin();
+    const before = await settings();
+
+    const response = await patch({ maxSponsoredPrizeKobo: 1_234 });
+
+    expect(response.status).toBe(400);
+    expect((await settings()).maxSponsoredPrizeKobo).toBe(before.maxSponsoredPrizeKobo);
+  });
+
+  it("refuses a non-staff caller", async () => {
+    asNobody();
+    const before = await settings();
+
+    const response = await patch({ maxSponsoredPrizeKobo: 1_000_000_000 });
+
+    expect(response.status).toBe(403);
+    expect((await settings()).maxSponsoredPrizeKobo).toBe(before.maxSponsoredPrizeKobo);
+  });
+});
+
 describe("kobo ceilings", () => {
   // ₦20,000,000 — round, inside INT4, far above any real setting.
   const OVER = 2_000_000_001;
@@ -159,6 +208,7 @@ describe("kobo ceilings", () => {
     ["maxDailyStakeKobo", { maxDailyStakeKobo: ABSURD }],
     ["payoutAutoApproveMaxKobo", { payoutAutoApproveMaxKobo: ABSURD }],
     ["stakePatternNetAlertKobo", { stakePatternNetAlertKobo: ABSURD }],
+    ["maxSponsoredPrizeKobo", { maxSponsoredPrizeKobo: ABSURD }],
   ])("holds the line for %s", async (_field, body) => {
     await asSuperAdmin();
 

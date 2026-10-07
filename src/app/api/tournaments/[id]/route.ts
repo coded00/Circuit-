@@ -18,7 +18,7 @@ import { parseLeagueSettings } from "@/lib/leagueTable";
 import { getStructure } from "@/lib/competitionStructures";
 import { maxPrizePlaces, parsePrizeSplit } from "@/lib/prizes";
 import { resolveCompetition } from "@/lib/competitionConfig";
-import { prizeFundingError } from "@/lib/prizePool";
+import { prizeCapError } from "@/lib/prizePool";
 import { resolveTournamentStream } from "@/lib/streams";
 
 const MAX_PARTICIPANT_CAP = 128;
@@ -251,16 +251,17 @@ export async function PATCH(
   const nextFormat = (data.format as string | undefined) ?? tournament.format;
   const nextCap = (data.participantCap as number | undefined) ?? tournament.participantCap;
   const nextPrize = data.prizeAmount !== undefined ? (data.prizeAmount as number | null) : tournament.prizeAmount;
-  // The prize must stay fundable from entry fees whichever of the three numbers changed.
-  if (!user.isStaff && (data.prizeAmount !== undefined || data.entryFee !== undefined || data.participantCap !== undefined)) {
-    const feeSetting = await prisma.platformSetting.findUnique({ where: { id: "singleton" } });
-    const fundingError = prizeFundingError({
+  // The prize has to stay within its cap whichever of the three numbers changed. This is the second of
+  // the two doors onto a prize — the create route is the other — and both call the same helper so they
+  // cannot drift: an edit is just as good a way to declare an oversized sponsored prize as a create is.
+  if (data.prizeAmount !== undefined || data.entryFee !== undefined || data.participantCap !== undefined) {
+    const capError = await prizeCapError({
       prizeAmount: nextPrize,
       entryFee: (data.entryFee as number | undefined) ?? tournament.entryFee,
       participantCap: nextCap,
-      platformFeeBps: feeSetting?.platformFeeBps ?? 0,
+      sponsored: user.isStaff,
     });
-    if (fundingError) return NextResponse.json({ error: fundingError }, { status: 400 });
+    if (capError) return NextResponse.json({ error: capError }, { status: 400 });
   }
   if (body.prizeSplit !== undefined || data.format !== undefined || data.participantCap !== undefined || data.prizeAmount !== undefined) {
     const split = parsePrizeSplit(body.prizeSplit ?? tournament.prizeSplit, maxPrizePlaces(nextFormat, nextCap, finalists));
