@@ -2,6 +2,13 @@
  * Circuit — what staff look at before approving a tournament's payout: the money actually collected
  * (not the money promised), what winners would be paid out of it, what is left for the organizer, and
  * anything that should stop a release (open disputes, a funds freeze).
+ *
+ * It also works out, separately from the blockers, whether the money being released is actually *backed*.
+ * An ordinary tournament can only ever pay out what it collected, but a staff-run one is sponsored: the
+ * entry-fee cap doesn't apply to it (prizePool.ts), so its declared prize can be larger than anything its
+ * entry fees paid for. The difference comes out of Circuit's own balance, and `unbackedAmount` is how much.
+ * That is a legitimate arrangement, so it is deliberately not a blocker — a person can approve it — but it
+ * is the thing a person has to be looking at, so it is reported rather than left to be worked out by hand.
  */
 import type { Tournament } from "@prisma/client";
 import { prisma } from "@/lib/db";
@@ -16,6 +23,17 @@ export type PayoutReview = {
   declaredPrize: number;
   payablePrize: number;
   organizerShare: number;
+  /**
+   * The organizer is staff, so the tournament is sponsored: the rule that a prize can't exceed the entry
+   * fees it collects doesn't apply to it (prizePool.ts). The prize may therefore be platform money.
+   */
+  sponsored: boolean;
+  /**
+   * Kobo of (prizes + the organizer's share) that the entry fees collected do not cover — money that would
+   * leave Circuit's own balance rather than this tournament's players'. 0 for every tournament that paid for
+   * itself, which is all of them except a sponsored one.
+   */
+  unbackedAmount: number;
   shares: { userId: string; name: string; place: number; declared: number; payable: number }[];
   openDisputes: number;
   openLobbyFlags: number;
@@ -41,7 +59,13 @@ export async function reviewTournamentPayout(tournament: Pick<Tournament, "id" |
   const declaredPrize = tournament.prizeAmount ?? 0;
   const rows = shares.map((s) => ({ userId: s.userId, name: names.get(s.userId) ?? "Unknown", place: s.place, declared: s.amount, payable: Math.floor(s.amount * fraction) }));
   const payablePrize = rows.reduce((total, r) => total + r.payable, 0);
-  const prizeHold = organizer?.isStaff ? 0 : Math.min(declaredPrize, collected);
+  const sponsored = organizer?.isStaff ?? false;
+  const prizeHold = sponsored ? 0 : Math.min(declaredPrize, collected);
+  const organizerShare = Math.max(0, collected - prizeHold);
+  // For an ordinary tournament this is always 0: the prize is capped at what was collected, and the
+  // organizer's share is whatever is left of it, so the two together can never exceed `collected`. A
+  // sponsored tournament is the only way past that, and the excess is the platform's own money.
+  const unbackedAmount = Math.max(0, payablePrize + organizerShare - collected);
   const blockers: string[] = [];
   if (tournament.status !== "COMPLETE") blockers.push("The tournament isn't complete yet.");
   if (tournament.fundsFrozen) blockers.push("Funds are frozen.");
@@ -55,7 +79,9 @@ export async function reviewTournamentPayout(tournament: Pick<Tournament, "id" |
     refundedEntries: refund._count,
     declaredPrize,
     payablePrize,
-    organizerShare: Math.max(0, collected - prizeHold),
+    organizerShare,
+    sponsored,
+    unbackedAmount,
     shares: rows,
     openDisputes,
     openLobbyFlags,
