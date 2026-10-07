@@ -19,6 +19,9 @@ import { createTestOrganizer, createTestUser, cleanupAll } from "@/testHelpers";
 
 afterEach(async () => {
   vi.restoreAllMocks();
+  // The settling-charge test below stubs the global fetch; without this it would leak into the tests that
+  // follow it.
+  vi.unstubAllGlobals();
   await cleanupAll();
 });
 
@@ -125,5 +128,39 @@ describe("confirmEntryFeePayment", () => {
 
   it("is a safe no-op for an unknown reference", async () => {
     await expect(confirmEntryFeePayment(`test-unknown-ref-${Date.now()}`)).resolves.toBeUndefined();
+  });
+
+  it("leaves a still-settling charge PENDING, so it can still be confirmed when it completes", async () => {
+    // The money this guards. Paystack reports a charge as "ongoing"/"processing"/"queued" while it settles,
+    // and treating any of those as FAILED flips this row terminally: the webhook replay returns early, and
+    // reconcilePendingMoney only revisits PENDING rows. The charge then completes with Circuit holding the
+    // player's money and the entry never confirmed — not collected, and not refunded either. PENDING leaves
+    // every one of those paths open.
+    //
+    // Deliberately NOT stubbing verifyCharge (which pendingEntry does, and the other tests here want): the
+    // bug is in that function's status mapping, so stubbing it would test nothing. fetch is stubbed instead,
+    // and the real paystackClient.verifyCharge maps what Paystack really answers.
+    const { reference, tournament, registration } = await pendingEntry({}, 100_000);
+    vi.mocked(paystackClient.verifyCharge).mockRestore();
+    const paystackSays = (status: string) =>
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response(JSON.stringify({ status: true, data: { status, amount: 100_000, currency: "NGN", reference, paid_at: null } }), { status: 200 }))
+      );
+
+    paystackSays("processing"); // still settling
+    await confirmEntryFeePayment(reference);
+
+    const row = await prisma.escrowTransaction.findFirstOrThrow({ where: { providerRef: reference } });
+    expect(row.status).toBe("PENDING"); // not FAILED — nothing terminal has happened
+    expect((await prisma.registration.findUniqueOrThrow({ where: { id: registration.id } })).status).toBe("PENDING_PAYMENT");
+    expect(await prisma.escrowTransaction.count({ where: { tournamentId: tournament.id, type: "REFUND" } })).toBe(0);
+
+    // It settles: the same reference now confirms, and the fee is collected exactly once.
+    paystackSays("success");
+    await confirmEntryFeePayment(reference);
+
+    expect((await prisma.registration.findUniqueOrThrow({ where: { id: registration.id } })).status).toBe("CONFIRMED");
+    expect(await prisma.escrowTransaction.count({ where: { registrationId: registration.id, type: "ORGANIZER_REVENUE" } })).toBe(1);
   });
 });
