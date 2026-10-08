@@ -171,6 +171,71 @@ export async function recordCallerAttempt(keys: CallerThrottleKeys): Promise<voi
   await prisma.rateLimitAttempt.createMany({ data: [{ key: keys.ip }, { key: keys.global }] });
 }
 
+// ---------------------------------------------------------------------------
+// Per-caller throttling for the unauthenticated public read routes
+// ---------------------------------------------------------------------------
+
+/** The public read routes where an anonymous caller can make the origin do real work. */
+export type PublicScope = "search" | "images";
+
+const MINUTE_MS = 60 * 1000;
+
+/**
+ * Every number a public read route is throttled by, in one table.
+ *
+ * One layer, not three, and that is the difference from `AUTH_LIMITS`: those bound a *credential* attack, so
+ * they key on the account and add a platform ceiling on top. Nothing here is being guessed. These two routes
+ * are public reads with no account in the picture, so the only question is how much work one caller may ask
+ * the origin to do.
+ *
+ * Neither number is reached by a real browser, and the reasoning is worth writing down because they look
+ * arbitrary otherwise:
+ *
+ * - **search** fires on a 300ms debounce (src/components/SearchInput.tsx), so the most a single person can
+ *   produce is one query per pause — a key-by-key typist pausing between every character reaches roughly 200
+ *   a minute. 600 leaves room for three of those at once, and a caller still cannot get more than 10 queries
+ *   a second out of the origin. With the trigram index that came in with this fix, each query is cheap;
+ *   without it, these queries were four sequential scans apiece, which is why the limit and the index are
+ *   the same finding.
+ * - **images** is the more delicate one, because image requests *are* bursty by nature — one page load can
+ *   ask for dozens. What makes a loose number safe here is that the route serves `Cache-Control: immutable`,
+ *   so a browser fetches a given ref exactly once and never asks again. A real client's requests are
+ *   therefore spread across first visits, not repeated. 1200 a minute bounds a hammering caller to 20
+ *   `sharp` operations a second while leaving a shared carrier address far more headroom than its first
+ *   visits need.
+ *
+ * Both are deliberately loose for the same reason the auth caller limits are: on a Nigerian mobile network
+ * most traffic arrives from a handful of carrier-grade NAT addresses, so a tight per-address limit would
+ * take a whole carrier's users down to inconvenience one attacker. These bound throughput; they do not try
+ * to identify anyone.
+ *
+ * There is deliberately no platform-wide ceiling here, unlike `AUTH_LIMITS`. A global cap on public reads
+ * would fail on a genuinely busy day, which is an availability risk rather than a security control — and
+ * unlike a login flood, a flood of searches and image requests is not itself an attack signature.
+ */
+export const PUBLIC_LIMITS: Record<PublicScope, Limit> = {
+  search: { max: 600, windowMs: MINUTE_MS },
+  images: { max: 1200, windowMs: MINUTE_MS },
+};
+
+/**
+ * Check a public read caller against its limit, and count the request if it is allowed through.
+ *
+ * One call rather than a separate check and record, because the two are never wanted apart here: every
+ * request these routes accept costs the origin work, so every one counts — the opposite of the auth routes,
+ * where only failures do and a route has to be trusted to decide which. A refused request is not recorded,
+ * so a caller over the line does not extend its own block by retrying.
+ */
+export async function throttlePublicRequest(
+  scope: PublicScope,
+  request: Request
+): Promise<{ limited: boolean; retryAfterSeconds: number }> {
+  const key = `public-ip:${scope}:${getClientIp(request)}`;
+  const check = await isRateLimited(key, PUBLIC_LIMITS[scope]);
+  if (!check.limited) await recordAttempt(key);
+  return check;
+}
+
 export async function isRateLimited(
   key: string,
   { max, windowMs }: { max: number; windowMs: number }

@@ -172,5 +172,10 @@ export async function cleanupAll(): Promise<void> {
   // needs clearing for the same reason.
   await prisma.rateLimitAttempt.deleteMany({ where: { key: { startsWith: "auth-ip:" } } });
   await prisma.rateLimitAttempt.deleteMany({ where: { key: { startsWith: "auth-global:" } } });
+  // The public read buckets (rateLimit.ts) have the same shape and the same leak: a test request carries no
+  // headers, so every one is filed under "public-ip:<scope>:unknown", and the 1-minute windows outlive the
+  // test file. The images limit is 1200, so this only matters for a file that makes a lot of requests — but
+  // it is the same one-line fix as the two above and this file is meant to be the full list.
+  await prisma.rateLimitAttempt.deleteMany({ where: { key: { startsWith: "public-ip:" } } });
   await prisma.user.deleteMany({ where: { id: { in: userIds } } });
 }

@@ -338,6 +338,11 @@ model User {
 
   @@index([emailOrPhone])
   @@index([lastActiveAt])
+  // /api/search's `contains` on displayName and handle (finding #11). The
+  // @unique on handle above is a btree, which a leading-wildcard ILIKE
+  // cannot use either.
+  @@index([displayName(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([handle(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 /// The admin dashboard's two fixed roles (no per-permission matrix — a
@@ -787,6 +792,12 @@ model Tournament {
   // the community route all filter by organizerId alone (no game/status
   // alongside it), so the composite index above doesn't help those reads.
   @@index([organizerId])
+  // /api/search's `contains`/insensitive predicates (finding #11 of the
+  // security audit). These compile to ILIKE '%q%', which no btree — this
+  // model's own (game, status) included — can serve; they were sequential
+  // scans. Needs pg_trgm, created by the migration alongside them.
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([game(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 /// Where the money for a sponsored prize is coming from. One at most per tournament.
@@ -1153,6 +1164,10 @@ model Battle {
   // Match.playerAId/playerBId above.
   @@index([creatorId])
   @@index([targetUserId])
+  // /api/search's `contains` on game (finding #11) — see the note on
+  // Tournament's trigram indexes. The (game, status) btree above cannot
+  // serve a leading-wildcard ILIKE.
+  @@index([game(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 enum QuickMatchStatus {
@@ -1816,6 +1831,9 @@ model Community {
 
   @@index([kind, enabled])
   @@index([gameId])
+  // /api/search's `contains` on name (finding #11) — see the note on
+  // Tournament's trigram indexes.
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 /// What a community is for. GLOBAL: the single platform-wide "Circuit"
