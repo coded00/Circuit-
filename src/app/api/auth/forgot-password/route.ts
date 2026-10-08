@@ -13,11 +13,11 @@
  * email on file can't be reached yet (no SMS provider — see
  * docs/circuit-stack.md's Notifications section).
  *
- * Rate limited per account (3 requests per 15 minutes) — same
- * Postgres-attempts-table design as login (see rateLimit.ts). Every call
- * counts here, not just "failures": this route always returns the same
- * generic response regardless of what happened internally, so there's no
- * success/failure signal to gate the count on the way login has one.
+ * Throttled on three layers (rateLimit.ts, `AUTH_LIMITS["forgot-password"]`): 3 requests per account per
+ * 15 minutes, 30 per caller, 500 platform-wide — same Postgres-attempts-table design as login. Every call
+ * counts on every layer, not just "failures": this route always returns the same generic response
+ * regardless of what happened internally, so there's no success/failure signal to gate the count on the
+ * way login has one.
  *
  * Per account rather than per identifier-as-typed, for the reason
  * throttleKeyFor sets out — one account answers to several spellings of
@@ -30,11 +30,15 @@ import { generatePasswordResetToken } from "@/lib/auth";
 import { findUserByIdentifier, throttleKeyFor } from "@/lib/accountLookup";
 import { SITE_URL } from "@/lib/seo";
 import { sendEmail } from "@/lib/email";
-import { isRateLimited, recordAttempt } from "@/lib/rateLimit";
+import { AUTH_LIMITS, callerThrottleKeys, isCallerThrottled, isRateLimited, recordAttempt, recordCallerAttempt } from "@/lib/rateLimit";
 
 const GENERIC_MESSAGE = "If an account exists for that email, we've sent password reset instructions.";
-const MAX_ATTEMPTS = 3;
-const WINDOW_MS = 15 * 60 * 1000;
+
+const tooManyRequests = (retryAfterSeconds: number) =>
+  NextResponse.json(
+    { error: `Too many requests. Try again in ${Math.ceil(retryAfterSeconds / 60)} minute(s).` },
+    { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } }
+  );
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -44,23 +48,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Email or phone is required." }, { status: 400 });
   }
 
+  // Checked before the lookup, like login's: a caller already over the line is refused without the
+  // account query. This matters more here than anywhere else — every call this route lets through is
+  // either a query or an email, and the attack it bounds is mailing a stranger's inbox.
+  const callerKeys = callerThrottleKeys("forgot-password", request);
+  const callerThrottle = await isCallerThrottled("forgot-password", callerKeys);
+  if (callerThrottle.limited) return tooManyRequests(callerThrottle.retryAfterSeconds);
+
   const user = await findUserByIdentifier(emailOrPhone);
 
   // Keyed on the account, not on how it was typed — the same reason as login (see throttleKeyFor), and it
   // matters more here: a fresh bucket per re-spelling of a phone number is not password guesses, it is
   // unbounded reset mail into a victim's inbox, sent by whoever knows their number.
   const rateLimitKey = `forgot-password:${throttleKeyFor(user, emailOrPhone)}`;
-  const { limited, retryAfterSeconds } = await isRateLimited(rateLimitKey, {
-    max: MAX_ATTEMPTS,
-    windowMs: WINDOW_MS,
-  });
-  if (limited) {
-    return NextResponse.json(
-      { error: `Too many requests. Try again in ${Math.ceil(retryAfterSeconds / 60)} minute(s).` },
-      { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } }
-    );
-  }
+  const { limited, retryAfterSeconds } = await isRateLimited(rateLimitKey, AUTH_LIMITS["forgot-password"].identifier);
+  if (limited) return tooManyRequests(retryAfterSeconds);
+
   await recordAttempt(rateLimitKey);
+  await recordCallerAttempt(callerKeys);
 
   const deliverTo = user?.email ?? (user?.emailOrPhone.includes("@") ? user.emailOrPhone : null);
   if (user && deliverTo) {
