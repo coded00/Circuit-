@@ -165,5 +165,12 @@ export async function cleanupAll(): Promise<void> {
   // Rate-limit rows are keyed by the user's id, not by anything matching "test-" above, so a route with
   // a 5-per-hour throttle would start answering 429 partway through a file without this.
   await prisma.rateLimitAttempt.deleteMany({ where: { key: { startsWith: "tournament-create:" } } });
+  // The caller-wide auth buckets (rateLimit.ts). These are the ones that would leak *between runs* rather
+  // than between tests: a test request carries no headers, so every one of them is filed under the single
+  // key "auth-ip:<scope>:unknown", and the 15-minute windows outlive the test process. Without this the
+  // suite answers 429 on the fourth run of the day. The global counter is one shared row by design, so it
+  // needs clearing for the same reason.
+  await prisma.rateLimitAttempt.deleteMany({ where: { key: { startsWith: "auth-ip:" } } });
+  await prisma.rateLimitAttempt.deleteMany({ where: { key: { startsWith: "auth-global:" } } });
   await prisma.user.deleteMany({ where: { id: { in: userIds } } });
 }

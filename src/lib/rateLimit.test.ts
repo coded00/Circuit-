@@ -1,6 +1,15 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { prisma } from "@/lib/db";
-import { isRateLimited, recordAttempt, clearAttempts, getClientIp } from "./rateLimit";
+import {
+  AUTH_LIMITS,
+  callerThrottleKeys,
+  clearAttempts,
+  getClientIp,
+  isCallerThrottled,
+  isRateLimited,
+  recordAttempt,
+  recordCallerAttempt,
+} from "./rateLimit";
 
 const TEST_KEY_PREFIX = "test-ratelimit-";
 
@@ -92,5 +101,74 @@ describe("getClientIp", () => {
   it("falls back to 'unknown' when there is nothing to read", () => {
     expect(getClientIp(request({}))).toBe("unknown");
     expect(getClientIp(request({ "x-forwarded-for": "   " }))).toBe("unknown");
+  });
+});
+
+/**
+ * The caller layer: the two buckets that bound an auth route without depending on which account is being
+ * attempted. Rows are seeded directly rather than by looping the real limits (100 and 1000 for login),
+ * because what is under test is the arithmetic and the keying, not how many times a loop can run.
+ */
+describe("the caller layer", () => {
+  const request = (headers: Record<string, string> = {}) => new Request("http://localhost", { headers });
+  const fill = (key: string, times: number) =>
+    prisma.rateLimitAttempt.createMany({ data: Array.from({ length: times }, () => ({ key })) });
+
+  afterEach(async () => {
+    delete process.env.TRUSTED_PROXY_SECRET;
+    await prisma.rateLimitAttempt.deleteMany({ where: { key: { startsWith: "auth-ip:" } } });
+    await prisma.rateLimitAttempt.deleteMany({ where: { key: { startsWith: "auth-global:" } } });
+  });
+
+  it("keys the caller bucket on the address and the global bucket on nothing at all", () => {
+    expect(callerThrottleKeys("login", request({ "x-forwarded-for": "5.6.7.8" }))).toEqual({
+      ip: "auth-ip:login:5.6.7.8",
+      global: "auth-global:login",
+    });
+    // Scopes don't share: a signup flood at one address must not spend that address's login budget, or a
+    // stranger's spam would lock people out of the thing they actually need.
+    expect(callerThrottleKeys("signup", request({ "x-forwarded-for": "5.6.7.8" })).ip).toBe("auth-ip:signup:5.6.7.8");
+    expect(callerThrottleKeys("signup", request({ "x-forwarded-for": "5.6.7.8" })).global).toBe("auth-global:signup");
+  });
+
+  it("refuses a caller that has spent its own budget, and nobody else", async () => {
+    const spent = callerThrottleKeys("login", request({ "x-forwarded-for": "5.6.7.8" }));
+    await fill(spent.ip, AUTH_LIMITS.login.caller.max);
+
+    expect((await isCallerThrottled("login", spent)).limited).toBe(true);
+    expect((await isCallerThrottled("login", spent)).retryAfterSeconds).toBeGreaterThan(0);
+    // A different address is untouched — this is a per-source bound, not a platform-wide one, and getting
+    // that the wrong way round would take the whole site's login down for one attacker.
+    expect((await isCallerThrottled("login", callerThrottleKeys("login", request({ "x-forwarded-for": "9.9.9.9" })))).limited).toBe(false);
+  });
+
+  it("refuses every address once the global bucket is spent", async () => {
+    // The layer a botnet meets: it does not depend on the attacker's address, only on the volume.
+    await fill("auth-global:login", AUTH_LIMITS.login.global.max);
+    for (const ip of ["1.1.1.1", "2.2.2.2", "3.3.3.3"]) {
+      expect((await isCallerThrottled("login", callerThrottleKeys("login", request({ "x-forwarded-for": ip })))).limited).toBe(true);
+    }
+  });
+
+  it("allows exactly `max` recordings, then limits — and counts both buckets", async () => {
+    const keys = callerThrottleKeys("login", request({ "x-forwarded-for": "5.6.7.8" }));
+    for (let i = 0; i < AUTH_LIMITS.login.caller.max; i++) {
+      expect((await isCallerThrottled("login", keys)).limited).toBe(false);
+      await recordCallerAttempt(keys);
+    }
+    expect((await isCallerThrottled("login", keys)).limited).toBe(true);
+    // Both written by the one call, so a route cannot record one and forget the other.
+    expect(await prisma.rateLimitAttempt.count({ where: { key: keys.ip } })).toBe(AUTH_LIMITS.login.caller.max);
+    expect(await prisma.rateLimitAttempt.count({ where: { key: keys.global } })).toBe(AUTH_LIMITS.login.caller.max);
+  });
+
+  it("cannot be handed a fresh bucket by a header the caller invented", () => {
+    // This is the first IP-keyed limit in the app, which makes finding #13's fix load-bearing rather than
+    // theoretical: the header below used to be believed from anyone, so varying it was a new bucket per
+    // request and this whole layer would have been decorative.
+    const first = callerThrottleKeys("login", request({ "cf-connecting-ip": "1.2.3.4" }));
+    const second = callerThrottleKeys("login", request({ "cf-connecting-ip": "5.6.7.8" }));
+    expect(first.ip).toBe(second.ip);
+    expect(first.ip).toBe("auth-ip:login:unknown");
   });
 });

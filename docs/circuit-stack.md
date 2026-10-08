@@ -128,6 +128,22 @@ Upstash Redis (serverless, pay-per-request, so it doesn't violate the
 "minimize moving parts" bias either) is the right upgrade if login volume
 ever makes that query path a real cost — not before.
 
+**Three layers, because one leaves a way through.** The auth routes
+(login, signup, forgot-password) are each throttled on the account, on the
+caller, and platform-wide — the numbers live together in `AUTH_LIMITS`
+(src/lib/rateLimit.ts), and a route is refused if any layer trips. The
+account layer alone does not bound an attacker working through a leaked
+list, since every address they try opens a window of its own; the caller
+layer does not bound a botnet; and the global layer does not care who is
+asking, which is both the point of it and the reason it is set loose enough
+that tripping it is an attack signature rather than a busy day.
+
+The caller layer keys on `getClientIp`, which is only as good as what sits
+in front of the app — see the deployment requirements in
+docs/self-hosting.md. On a Nigerian mobile network most traffic arrives from
+a handful of carrier-grade NAT addresses, so these limits are shared by
+strangers; they bound throughput rather than identify anyone.
+
 ## Request validation
 
 **zod for new routes only — existing routes are not being retrofitted.**

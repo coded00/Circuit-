@@ -76,6 +76,101 @@ export function getClientIp(request: Request): string {
   return "unknown";
 }
 
+// ---------------------------------------------------------------------------
+// Caller-wide throttling for the public auth routes
+// ---------------------------------------------------------------------------
+
+/** The public auth routes that get throttled. Each has its own numbers below. */
+export type AuthScope = "login" | "signup" | "forgot-password";
+
+type Limit = { max: number; windowMs: number };
+
+const QUARTER_HOUR_MS = 15 * 60 * 1000;
+
+/**
+ * Every number a public auth route is throttled by, in one table.
+ *
+ * Three layers, because each one alone leaves a way through:
+ *
+ * - `identifier` bounds one account. It is the oldest of the three and it is what stops someone guessing
+ *   one password. It does **not** bound an attacker working through a leaked list, because each address
+ *   they try opens a fresh window of its own.
+ * - `caller` bounds one source, whatever accounts it is working through. That is the hole the identifier
+ *   layer left: without it, ten thousand addresses buy ten thousand windows.
+ * - `global` bounds the platform. A per-caller limit alone is defeated by a botnet, and this is the only
+ *   layer that does not depend on the attacker's address at all.
+ *
+ * The numbers are deliberately loose, and the reason is the same for both extra layers: on a Nigerian
+ * mobile network most traffic arrives from a handful of carrier-grade NAT addresses, so every limit here
+ * is shared by strangers who have never met. A tight per-caller limit would let one attacker lock a whole
+ * carrier's customers out of logging in. So these bound *throughput* — an attacker gets a few hundred
+ * guesses an hour instead of tens of thousands — rather than trying to identify anyone. The global layer
+ * being hit at all is an attack signature, not a busy day, which is why it is set where it is.
+ *
+ * Only the identifier layer counts successes' opposite; see `recordCallerAttempt` for what counts where.
+ */
+export const AUTH_LIMITS: Record<AuthScope, { identifier: Limit; caller: Limit; global: Limit }> = {
+  login: {
+    identifier: { max: 5, windowMs: QUARTER_HOUR_MS },
+    caller: { max: 100, windowMs: QUARTER_HOUR_MS },
+    global: { max: 1000, windowMs: QUARTER_HOUR_MS },
+  },
+  signup: {
+    identifier: { max: 5, windowMs: QUARTER_HOUR_MS },
+    caller: { max: 30, windowMs: QUARTER_HOUR_MS },
+    global: { max: 500, windowMs: QUARTER_HOUR_MS },
+  },
+  "forgot-password": {
+    identifier: { max: 3, windowMs: QUARTER_HOUR_MS },
+    caller: { max: 30, windowMs: QUARTER_HOUR_MS },
+    global: { max: 500, windowMs: QUARTER_HOUR_MS },
+  },
+};
+
+export type CallerThrottleKeys = { ip: string; global: string };
+
+/**
+ * The two buckets that bound an auth route without depending on which account is being attempted.
+ *
+ * They are built and checked separately from the identifier bucket because they need nothing from the
+ * database — so a route can refuse a caller that is already over the line *before* it does the account
+ * lookup, which is the whole point of a limit under attack: shedding load rather than doing the work and
+ * then deciding not to.
+ */
+export function callerThrottleKeys(scope: AuthScope, request: Request): CallerThrottleKeys {
+  return { ip: `auth-ip:${scope}:${getClientIp(request)}`, global: `auth-global:${scope}` };
+}
+
+/** Is the caller over either of its limits? Reports the first that trips, with its own retry-after. */
+export async function isCallerThrottled(
+  scope: AuthScope,
+  keys: CallerThrottleKeys
+): Promise<{ limited: boolean; retryAfterSeconds: number }> {
+  const byCaller = await isRateLimited(keys.ip, AUTH_LIMITS[scope].caller);
+  if (byCaller.limited) return byCaller;
+  return isRateLimited(keys.global, AUTH_LIMITS[scope].global);
+}
+
+/**
+ * Count one attempt against both caller buckets.
+ *
+ * What counts is the route's decision, and the routes disagree on purpose:
+ *
+ * - login counts only *failed* passwords, because a correct one is not an attack and counting it would
+ *   spend a shared carrier's budget on its own customers.
+ * - signup counts every attempt, because the attack this bounds is mass account creation that *succeeds*.
+ * - forgot-password counts every call, because it always answers the same thing and so has no
+ *   success/failure signal to gate on.
+ *
+ * Called after `isCallerThrottled` has passed, so a request that was refused does not extend its own
+ * block. Note that a *success* never clears these buckets — `clearAttempts` is for the identifier bucket
+ * only. An attacker who knows one valid credential would otherwise reset their own budget by logging in
+ * with it between guesses.
+ */
+export async function recordCallerAttempt(keys: CallerThrottleKeys): Promise<void> {
+  await prisma.rateLimitAttempt.createMany({ data: [{ key: keys.ip }, { key: keys.global }] });
+}
+
 export async function isRateLimited(
   key: string,
   { max, windowMs }: { max: number; windowMs: number }
