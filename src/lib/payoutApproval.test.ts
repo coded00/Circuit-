@@ -131,6 +131,11 @@ async function sponsoredTournament(over: { entryFee?: number; prizeAmount?: numb
   return { organizer, champion, runnerUp, t };
 }
 
+/** What the organizer would do on the Payouts page before anyone can approve: state where the money is coming from. */
+async function recordSponsorship(tournamentId: string, recordedById: string, amountKobo: number, source = "Q3 marketing budget") {
+  return prisma.tournamentSponsorship.create({ data: { tournamentId, recordedById, amountKobo, source } });
+}
+
 describe("who may approve a sponsored payout", () => {
   it("refuses the organizer approving their own tournament, and approves nothing", async () => {
     const { organizer, t } = await sponsoredTournament();
@@ -147,14 +152,53 @@ describe("who may approve a sponsored payout", () => {
   it("lets a staff member who is neither approve it, and records the organizer alongside the amount", async () => {
     const staff = await createTestStaff();
     const { organizer, t } = await sponsoredTournament();
+    await recordSponsorship(t.id, organizer.id, 50_000);
     expect((await approveTournamentPayout({ tournamentId: t.id, actorId: staff.id })).ok).toBe(true);
 
     const row = await prisma.tournament.findUniqueOrThrow({ where: { id: t.id } });
     expect(row.payoutApprovedById).toBe(staff.id);
     // The audit row is what ties a human to platform money leaving — so it has to name both ends of the
-    // separation-of-duties check, not just the approver.
+    // separation-of-duties check, not just the approver, and now also what they were agreeing to: the
+    // source and figure from the sponsorship record. Without that the row names who said yes and still not
+    // what they said yes to.
     const log = await prisma.auditLogEntry.findFirst({ where: { actorId: staff.id, action: "tournament.approvePayout", targetId: t.id } });
-    expect(log?.metadata).toMatchObject({ organizerId: organizer.id, sponsored: true, unbackedAmount: 50_000 });
+    expect(log?.metadata).toMatchObject({
+      organizerId: organizer.id,
+      sponsored: true,
+      unbackedAmount: 50_000,
+      sponsorship: { source: "Q3 marketing budget", amountKobo: 50_000, recordedByName: organizer.displayName },
+    });
+  });
+
+  // The two ways the funding record can be wrong — absent, or too small — and the reason this is a rule
+  // rather than a reminder: the separation-of-duties check above already guarantees a second person agreed,
+  // and without this it guarantees nothing about what they agreed to. Neither may let money out, and the
+  // record must be the thing that is asked for — never the payout quietly approved anyway.
+  it("refuses an unbacked payout with no sponsorship recorded, by anyone", async () => {
+    const staff = await createTestStaff();
+    const { t } = await sponsoredTournament();
+    const result = await approveTournamentPayout({ tournamentId: t.id, actorId: staff.id });
+    expect(result).toMatchObject({ ok: false, status: 409 });
+    expect(await approvedAt(t.id)).toBeNull();
+  });
+
+  it("refuses one whose recorded sponsorship doesn't cover the amount, and says by how much", async () => {
+    const staff = await createTestStaff();
+    const { organizer, t } = await sponsoredTournament();
+    await recordSponsorship(t.id, organizer.id, 20_000);
+    const result = await approveTournamentPayout({ tournamentId: t.id, actorId: staff.id });
+    expect(result).toMatchObject({ ok: false, status: 409 });
+    if (!result.ok) expect(result.error).toMatch(/₦300/); // 50,000 unbacked less the 20,000 recorded
+    expect(await approvedAt(t.id)).toBeNull();
+  });
+
+  it("approves once a sponsorship that covers the amount is recorded", async () => {
+    // The rule has to be passable by the ordinary course of action, or it is a wall rather than a control.
+    const staff = await createTestStaff();
+    const { organizer, t } = await sponsoredTournament();
+    await recordSponsorship(t.id, organizer.id, 50_000);
+    expect((await approveTournamentPayout({ tournamentId: t.id, actorId: staff.id })).ok).toBe(true);
+    expect(await approvedAt(t.id)).not.toBeNull();
   });
 
   it("refuses a system approval of an unbacked payout even when called directly", async () => {
