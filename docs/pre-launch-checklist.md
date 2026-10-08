@@ -63,9 +63,17 @@ withdrawals or prizes are switched on.
 | `R2_*` / `S3_*` | Optional | Proof screenshots go to `storage/proof/` on the server's disk unless a bucket is set. That's fine on one server; just back the folder up (§6). |
 | `FLUTTERWAVE_*` | No | Paystack is the only provider in use. |
 
-- [ ] Every **Yes** above is set. Then open `https://<domain>/api/health`:
-      it should say `"healthy"`, the database `"connected"`, and
-      `paystack` and `resend` `true`.
+- [ ] Every **Yes** above is set. Open `https://<domain>/api/health`: signed
+      out it says `"healthy"` and nothing more, which is all an uptime monitor
+      needs and all anyone else gets (security audit #16 — it used to describe
+      the deployment to whoever asked).
+- [ ] **Sign in as the admin, then reload it.** A staff session gets the rest:
+      the database `"connected"`, and `paystack` and `resend` `true`. This is
+      the step that catches a variable you set with a typo in its name — the
+      app is running, but it can't see the key.
+- [ ] Also worth a glance while you're there: `cronSecret` should be `true`.
+      `false` means `/api/cron/sweep` refuses everyone, so the sweep in §4 is
+      not running.
 
 ## 3. Database
 
