@@ -13,7 +13,7 @@
 import type { Tournament } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { tournamentPrizeShares } from "@/lib/prizePlaces";
-import { collectedForPrizes, payableFraction } from "@/lib/prizePool";
+import { collectedForPrizes, payableFraction, DEFAULT_MAX_SPONSORED_PRIZE_KOBO } from "@/lib/prizePool";
 
 export type PayoutReview = {
   entryFeesCollected: number;
@@ -43,7 +43,7 @@ export type PayoutReview = {
 export async function reviewTournamentPayout(tournament: Pick<Tournament, "id" | "organizerId" | "status" | "prizeAmount" | "prizeSplit" | "fundsFrozen" | "format" | "competitionStyle" | "placementPoints" | "killPoints" | "lobbyGroups" | "lobbyQualifiers" | "lobbyFinalRounds" | "leagueWinPoints" | "leagueDrawPoints">): Promise<PayoutReview> {
   const sum = (type: "ENTRY_FEE" | "PLATFORM_FEE" | "REFUND", statuses: ("PENDING" | "COMPLETE")[]) =>
     prisma.escrowTransaction.aggregate({ where: { tournamentId: tournament.id, type, status: { in: statuses } }, _sum: { amount: true }, _count: true });
-  const [entry, fee, refund, collected, fraction, shares, openDisputes, openLobbyFlags, organizer] = await Promise.all([
+  const [entry, fee, refund, collected, fraction, shares, openDisputes, openLobbyFlags, organizer, setting] = await Promise.all([
     sum("ENTRY_FEE", ["COMPLETE"]),
     sum("PLATFORM_FEE", ["COMPLETE"]),
     sum("REFUND", ["PENDING", "COMPLETE"]),
@@ -53,6 +53,7 @@ export async function reviewTournamentPayout(tournament: Pick<Tournament, "id" |
     prisma.dispute.count({ where: { match: { tournamentId: tournament.id }, status: { in: ["OPEN", "ORGANIZER_REVIEW", "ESCALATED"] } } }),
     prisma.lobbyFlag.count({ where: { round: { tournamentId: tournament.id }, status: { in: ["OPEN", "ESCALATED"] } } }),
     prisma.user.findUnique({ where: { id: tournament.organizerId }, select: { isStaff: true } }),
+    prisma.platformSetting.findUnique({ where: { id: "singleton" }, select: { maxSponsoredPrizeKobo: true } }),
   ]);
   const users = await prisma.user.findMany({ where: { id: { in: shares.map((s) => s.userId) } }, select: { id: true, displayName: true } });
   const names = new Map(users.map((u) => [u.id, u.displayName]));
@@ -69,6 +70,17 @@ export async function reviewTournamentPayout(tournament: Pick<Tournament, "id" |
   const blockers: string[] = [];
   if (tournament.status !== "COMPLETE") blockers.push("The tournament isn't complete yet.");
   if (tournament.fundsFrozen) blockers.push("Funds are frozen.");
+  // The sponsored-prize ceiling (maxSponsoredPrizeKobo), checked again here rather than only where the
+  // prize was declared. The declaration check is the first line, but a ceiling can be lowered after a
+  // tournament was created, and a prize declared under a looser one would otherwise sail straight past
+  // it. Blocking here means it stops the money at the door instead — and shows on the Payouts page,
+  // where the person about to approve it can see why and what to do about it.
+  const sponsoredCap = setting?.maxSponsoredPrizeKobo ?? DEFAULT_MAX_SPONSORED_PRIZE_KOBO;
+  if (sponsored && unbackedAmount > sponsoredCap) {
+    blockers.push(
+      `₦${Math.floor(unbackedAmount / 100).toLocaleString("en-NG")} of this payout is sponsored money and is above the ₦${Math.floor(sponsoredCap / 100).toLocaleString("en-NG")} ceiling for a sponsored prize. Lower the prize, or raise the ceiling in Settings.`
+    );
+  }
   if (openDisputes > 0) blockers.push(`${openDisputes} dispute${openDisputes === 1 ? "" : "s"} still open.`);
   if (openLobbyFlags > 0) blockers.push(`${openLobbyFlags} lobby result flag${openLobbyFlags === 1 ? "" : "s"} still open.`);
   if (declaredPrize > 0 && rows.length === 0) blockers.push("No winners could be worked out from the results.");

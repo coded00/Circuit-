@@ -18,7 +18,8 @@ import { notify } from "@/lib/notifications";
 import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
 import { trackEvent } from "@/lib/analytics";
 import { captureException } from "@/lib/observability";
-import { InsufficientWalletBalanceError, recoverFailedAccept, resolveQuickMatchAcceptance } from "@/lib/quickMatch";
+import { recoverFailedAccept, resolveQuickMatchAcceptance } from "@/lib/quickMatch";
+import { InsufficientWalletBalanceError, StakeLimitError } from "@/lib/stakes";
 import { emailVerificationRequired } from "@/lib/emailGate";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -116,6 +117,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     await recoverFailedAccept(id, challenge.expiresAt.getTime() > Date.now());
     if (err instanceof InsufficientWalletBalanceError) {
       return NextResponse.json({ error: "Insufficient wallet balance to match this stake." }, { status: 402 });
+    }
+    // A limit or the kill switch, raised by lockStake inside the same
+    // all-or-nothing transaction. recoverFailedAccept has already put the
+    // challenge back, so this reads to the player as "you can't take this
+    // one" rather than as a failure.
+    if (err instanceof StakeLimitError) {
+      return NextResponse.json({ error: err.message }, { status: 403 });
     }
     throw err;
   }

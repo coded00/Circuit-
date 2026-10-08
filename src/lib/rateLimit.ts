@@ -14,24 +14,66 @@
  * identifier instead of leaving stale failures sitting in the window.
  */
 
+import { timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/db";
 
+/** Where a trusted reverse proxy puts the visitor's address, and the shared secret proving the request came
+ *  through it. Both are operator-set — see docs/self-hosting.md. */
+const PROXY_SECRET_HEADER = "x-circuit-proxy-secret";
+const DEFAULT_PROXY_IP_HEADER = "cf-connecting-ip";
+
+function proxyIpHeader(): string {
+  return process.env.TRUSTED_PROXY_IP_HEADER?.trim() || DEFAULT_PROXY_IP_HEADER;
+}
+
+/** Did this request present the configured proxy secret? Same length-checked compare as the webhook
+ *  verifiers (src/lib/payments/webhookVerification.ts) — timingSafeEqual throws on unequal lengths. */
+function cameThroughTrustedProxy(request: Request): boolean {
+  const expected = process.env.TRUSTED_PROXY_SECRET;
+  const provided = request.headers.get(PROXY_SECRET_HEADER);
+  if (!expected || !provided) return false;
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
 /**
- * Best-effort client IP for rate-limiting an unauthenticated route (no
- * userId to key on) — `x-forwarded-for`'s first entry is the original
- * client on Vercel's proxy chain. Falls back to a fixed key when absent
- * (local dev, or a header-stripping proxy) rather than throwing; worst
- * case that shares one rate-limit bucket across such requests, which is
- * strictly safer than not limiting them at all.
+ * Best-effort client IP for rate-limiting an unauthenticated route (no userId to key on).
+ *
+ * **Nothing in a request is trustworthy on its own.** Every header this reads is just text a caller can
+ * set, so the value is only as good as what sits in front of the app:
+ *
+ * - A header naming the visitor directly (`cf-connecting-ip`, `x-real-ip`) has no chain to reason about.
+ *   Cloudflare sets it itself and overwrites whatever the client sent — but only for traffic that actually
+ *   went through Cloudflare. On an origin that is *also* reachable directly (a Vercel deployment, or a box
+ *   with the app port open) a caller sends it themselves. So it is believed only when the request also
+ *   carries `TRUSTED_PROXY_SECRET`, which the proxy injects and a caller cannot guess.
+ * - Otherwise it reads the **last** entry of `x-forwarded-for`. A proxy that appends (Caddy's default, and
+ *   nginx's `$proxy_add_x_forwarded_for`) leaves the caller's own claimed entries on the left and adds the
+ *   address it actually saw on the right, so the last entry is the real one and the first is whatever the
+ *   caller wrote. Reading `[0]` — which this function used to do — handed every caller a free choice of
+ *   rate-limit bucket, one per entry they invented.
+ *
+ * The fallback assumes the single reverse proxy docs/pre-launch-checklist.md asks for. With two proxies in
+ * the chain the entry you want is further left, which is exactly why a Cloudflare-fronted deployment should
+ * set the secret above rather than lean on this.
+ *
+ * With neither available the answer is `"unknown"`, which shares one bucket across such requests — coarse,
+ * but coarse is the failure mode to prefer: it over-limits rather than under-limits.
  */
 export function getClientIp(request: Request): string {
-  // Behind Cloudflare the real visitor address arrives in CF-Connecting-IP, which Cloudflare sets itself.
-  // X-Forwarded-For's first entry is whatever the client chose to send, so it is only the fallback.
-  const cloudflare = request.headers.get("cf-connecting-ip")?.trim();
-  if (cloudflare) return cloudflare;
-  const forwardedFor = request.headers.get("x-forwarded-for");
-  const first = forwardedFor?.split(",")[0]?.trim();
-  return first || "unknown";
+  if (cameThroughTrustedProxy(request)) {
+    const direct = request.headers.get(proxyIpHeader())?.trim();
+    if (direct) return direct;
+  }
+
+  // Walk from the right: the last non-empty hop is the one our own proxy appended.
+  const chain = request.headers.get("x-forwarded-for")?.split(",") ?? [];
+  for (let i = chain.length - 1; i >= 0; i--) {
+    const hop = chain[i].trim();
+    if (hop) return hop;
+  }
+  return "unknown";
 }
 
 export async function isRateLimited(

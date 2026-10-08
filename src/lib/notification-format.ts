@@ -6,6 +6,7 @@
  */
 
 import type { NotificationType } from "@/lib/notifications";
+import { formatSelfExclusionDate } from "@/lib/selfExclusion";
 
 export type FormattedNotification = { message: string; href: string };
 
@@ -232,6 +233,32 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
         message: `Your entry for ${str(p, "tournamentName") || "a tournament"} couldn't be confirmed: another player took the in-game name "${str(p, "inGameName")}" while you were paying. Your payment is being refunded. Register again with a different name.`,
         href: `/tournaments/${str(p, "tournamentId")}`,
       };
+    case "SELF_EXCLUSION_SET": {
+      const until = new Date(str(p, "until"));
+      const when = Number.isNaN(until.getTime()) ? "" : ` until ${formatSelfExclusionDate(until)}`;
+      return {
+        message: p.extended
+          ? `Your cool-off from staked Battles now runs${when}. You can extend it again, but only support can end it early.`
+          : `You've paused staked Battles${when}. Free Battles still work, and only support can end this early.`,
+        href: "/account?tab=responsible",
+      };
+    }
+    case "STAKE_PATTERN_FLAGGED": {
+      // Staff-facing. Names the pair and the numbers so the bell alone can
+      // say whether it needs opening now — same reasoning as REPORT_FILED
+      // carrying a link straight to its queue.
+      const a = str(p, "handleA");
+      const b = str(p, "handleB");
+      const battles = typeof p.battleCount === "number" ? p.battleCount : 0;
+      const net = money(p, "netKobo");
+      // netKobo is signed from A's side, so this names which account is up
+      // rather than making a staff member work it out from the sign.
+      const up = net ? `, ${net} in @${typeof p.netKobo === "number" && p.netKobo < 0 ? b : a}'s favour` : "";
+      return {
+        message: `@${a} and @${b}: ${battles} settled staked Battle${battles === 1 ? "" : "s"} between them${up}. Queued for review.`,
+        href: "/admin/stakes",
+      };
+    }
     case "ENTRY_FEE_REFUND": {
       const what = `${money(p, "amount")} entry fee for ${str(p, "tournamentName") || "a tournament"}`;
       const stage = str(p, "stage");

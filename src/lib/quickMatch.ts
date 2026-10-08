@@ -9,13 +9,15 @@ import { prisma } from "@/lib/db";
 import { captureException } from "@/lib/observability";
 import type { Prisma, QuickMatchChallenge, User } from "@prisma/client";
 import { reachableUsersWhere } from "@/lib/privacy";
+import { InsufficientWalletBalanceError, lockStake } from "@/lib/stakes";
+
+// Re-exported rather than defined here: since every stake now goes through
+// lockStake, the class the accepter's route catches (and this file throws)
+// has to be the one src/lib/stakes.ts raises, or `instanceof` stops matching
+// across the two modules and the 402 silently becomes a 500.
+export { InsufficientWalletBalanceError };
 
 export const VALID_FORMATS = ["SINGLE", "BEST_OF_3"];
-
-// Mirrors MAX_STAKE_AMOUNT in src/app/api/battles/route.ts — same
-// duplicate-with-comment convention already used for this constant
-// (see BattleForm.tsx's own copy) rather than a shared constants module.
-export const MAX_STAKE_AMOUNT = 10_000_000; // ₦100,000
 
 // "Online" for eligibility means a heartbeat within this window — see
 // User.lastActiveAt's own schema comment. A little slack over the ~25s
@@ -35,7 +37,6 @@ export const MAX_TIMEOUT_MS = 5 * 60_000;
 // building cheap.
 export const MAX_RECIPIENTS = 30;
 
-export class InsufficientWalletBalanceError extends Error {}
 export class ChallengeUnavailableError extends Error {}
 
 type EligibleUser = Pick<User, "id" | "displayName" | "handle" | "avatarUrl" | "walletBalance">;
@@ -112,14 +113,6 @@ export async function resolveQuickMatchAcceptance(
   accepterId: string
 ): Promise<{ battleId: string }> {
   return prisma.$transaction(async (tx) => {
-    if (challenge.stakeAmount > 0) {
-      const debited = await tx.user.updateMany({
-        where: { id: accepterId, walletBalance: { gte: challenge.stakeAmount } },
-        data: { walletBalance: { decrement: challenge.stakeAmount } },
-      });
-      if (debited.count === 0) throw new InsufficientWalletBalanceError();
-    }
-
     const battle = await tx.battle.create({
       data: {
         creatorId: challenge.hostId,
@@ -142,18 +135,16 @@ export async function resolveQuickMatchAcceptance(
         where: { quickMatchChallengeId: challenge.id, userId: challenge.hostId, type: "STAKE" },
         data: { battleId: battle.id },
       });
-      await tx.escrowTransaction.create({
-        data: {
-          battleId: battle.id,
-          quickMatchChallengeId: challenge.id,
-          userId: accepterId,
-          type: "STAKE",
-          amount: challenge.stakeAmount,
-          status: "COMPLETE",
-        },
-      });
-      await tx.walletTransaction.create({
-        data: { userId: accepterId, type: "STAKE_DEBIT", amount: challenge.stakeAmount, status: "COMPLETE" },
+
+      // The accepter's stake, through lockStake like every other — matching
+      // someone's Quick Match is staking, so their own per-account limits and
+      // the kill switch have to apply here too. A refusal throws, and the
+      // transaction above takes the Battle and the host's backfill with it.
+      await lockStake(tx, {
+        userId: accepterId,
+        amount: challenge.stakeAmount,
+        battleId: battle.id,
+        quickMatchChallengeId: challenge.id,
       });
     }
 

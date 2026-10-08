@@ -319,3 +319,53 @@ describe("a Battle settles once", () => {
     expect((await prisma.user.findUniqueOrThrow({ where: { id: playerA.id } })).walletBalance).toBe(0);
   });
 });
+
+describe("runScheduledSweep's stake-pattern branch", () => {
+  /**
+   * The collusion sweep (src/lib/stakePatterns.ts) has its own tests, and
+   * they call `detectStakePatterns` directly. This one exists for the join
+   * between the two: the whole control is worthless if the branch is not
+   * actually wired into the sweep that runs every two minutes, and nothing
+   * in stakePatterns.test.ts would notice if that one line were deleted.
+   */
+  it("runs repeated-pair detection and reports how many pairs it queued", async () => {
+    const alice = await createTestUser();
+    const bob = await createTestUser();
+    // Five settled staked Battles, all to alice — a one-sided record over a
+    // meaningful amount, which is the record rule's whole shape.
+    for (let i = 0; i < 5; i += 1) {
+      const battle = await prisma.battle.create({
+        data: {
+          creatorId: alice.id,
+          targetUserId: bob.id,
+          game: "Test Game",
+          format: "SINGLE",
+          visibility: "OPEN",
+          stakeAmount: 2_000_000, // ₦20,000
+          status: "COMPLETE",
+          expiresAt: new Date(Date.now() + 3_600_000),
+        },
+      });
+      await prisma.match.create({
+        data: {
+          battleId: battle.id,
+          matchCode: `TEST-SWEEP-PATTERN-${uniqueSuffix()}`,
+          playerAId: alice.id,
+          playerBId: bob.id,
+          status: "COMPLETE",
+          winnerId: alice.id,
+        },
+      });
+    }
+
+    const result = await runScheduledSweep();
+
+    expect(result.stakePatternsFlagged).toBe(1);
+  });
+
+  it("reports zero when no pair has done anything worth queueing", async () => {
+    // Guard: the counter above must not be a constant.
+    const result = await runScheduledSweep();
+    expect(result.stakePatternsFlagged).toBe(0);
+  });
+});

@@ -11,7 +11,7 @@
  * doesn't need to repeat it.
  */
 import type { ComponentType } from "react";
-import { Trophy, Swords, Flag, Users, Wallet, Bell, AtSign, MessagesSquare, ShieldAlert, Store } from "lucide-react";
+import { Trophy, Swords, Flag, Users, Wallet, Bell, AtSign, MessagesSquare, ShieldAlert, ShieldCheck, Store } from "lucide-react";
 import type { NotificationType } from "@/lib/notifications";
 
 export type NotificationCategory = {
@@ -30,6 +30,7 @@ const WALLET: NotificationCategory = { label: "Wallet", Icon: Wallet };
 const COMMUNITY: NotificationCategory = { label: "Community", Icon: MessagesSquare };
 const MENTION: NotificationCategory = { label: "Mention", Icon: AtSign };
 const MODERATION: NotificationCategory = { label: "Moderation", Icon: ShieldAlert };
+const SAFETY: NotificationCategory = { label: "Responsible play", Icon: ShieldCheck };
 const DEFAULT: NotificationCategory = { label: "Notification", Icon: Bell };
 
 const CATEGORY_BY_TYPE: Record<NotificationType, NotificationCategory> = {
@@ -95,6 +96,8 @@ const CATEGORY_BY_TYPE: Record<NotificationType, NotificationCategory> = {
   LEAGUE_RESULT_AWARDED: TOURNAMENT,
   LOBBY_FINAL_SET: TOURNAMENT,
   SWISS_BYE: TOURNAMENT,
+  SELF_EXCLUSION_SET: SAFETY,
+  STAKE_PATTERN_FLAGGED: MODERATION,
 };
 
 export function getNotificationCategory(type: string): NotificationCategory {

@@ -1,8 +1,9 @@
 /**
  * Circuit — platform-wide settings (maintenance mode, the platform fee
- * rate, the organizer-revenue settlement window). SUPER_ADMIN only — all
- * three affect every visitor/transaction, not a single record. Any subset
- * of fields may be sent together; at least one is required.
+ * rate, the organizer-revenue settlement window, payout auto-approval, and
+ * the staked-Battles switch and per-account stake limits). SUPER_ADMIN only
+ * — all of these affect every visitor/transaction, not a single record. Any
+ * subset of fields may be sent together; at least one is required.
  */
 
 import { NextResponse } from "next/server";
@@ -10,6 +11,20 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireSuperAdmin } from "@/lib/session";
 import { logAdminAction } from "@/lib/auditLog";
+
+/**
+ * The most any kobo-valued setting may be — ₦20,000,000.
+ *
+ * Every one of these columns is a Prisma `Int`, which is a PostgreSQL INT4
+ * topping out at 2,147,483,647 (₦21,474,836.47). This ceiling used to be
+ * 100,000,000,000 on all four fields, which is not a value the column can
+ * hold: a super admin typing a big number got a Prisma conversion error and
+ * a 500 from a route whose whole job is validating that number, instead of
+ * the 400 the check above it was written to give. ₦20m is round, safely
+ * inside INT4, and far above any real setting — the largest default here is
+ * ₦1,000,000, and a single Battle stake caps at ₦100,000.
+ */
+const MAX_KOBO_SETTING = 2_000_000_000;
 
 export async function PATCH(request: Request) {
   const superAdminAuth = await requireSuperAdmin("Only a Super Admin can change platform settings.");
@@ -21,7 +36,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const data: { maintenanceMode?: boolean; platformFeeBps?: number; organizerRevenueSettlementHours?: number; payoutAutoApprove?: boolean; payoutAutoApproveMaxKobo?: number } = {};
+  const data: { maintenanceMode?: boolean; platformFeeBps?: number; organizerRevenueSettlementHours?: number; payoutAutoApprove?: boolean; payoutAutoApproveMaxKobo?: number; stakedBattlesEnabled?: boolean; maxLockedStakeKobo?: number; maxDailyStakeKobo?: number; maxSponsoredPrizeKobo?: number; stakePatternWindowDays?: number; stakePatternMinBattles?: number; stakePatternWinShareBps?: number; stakePatternNetAlertKobo?: number } = {};
   const actions: { action: string; metadata?: Prisma.InputJsonValue }[] = [];
 
   if (body.maintenanceMode !== undefined) {
@@ -73,11 +88,106 @@ export async function PATCH(request: Request) {
   if (body.payoutAutoApproveMaxKobo !== undefined) {
     const max = Number(body.payoutAutoApproveMaxKobo);
     // Kobo; 0 sends every payout to staff. The ceiling is only a guard against a mistyped amount.
-    if (!Number.isInteger(max) || max < 0 || max > 100_000_000_000) {
+    if (!Number.isInteger(max) || max < 0 || max > MAX_KOBO_SETTING) {
       return NextResponse.json({ error: "The automatic approval limit must be a whole number of kobo, 0 or more." }, { status: 400 });
     }
     data.payoutAutoApproveMaxKobo = max;
     actions.push({ action: "settings.payoutAutoApproveLimitChange", metadata: { payoutAutoApproveMaxKobo: max } });
+  }
+
+  if (body.maxSponsoredPrizeKobo !== undefined) {
+    const max = Number(body.maxSponsoredPrizeKobo);
+    // Whole naira only, same as the stake limits — nobody reasons about a prize ceiling in fractional
+    // kobo. Zero is allowed and is the kill switch: staff may not declare a cash prize at all, which is
+    // a legitimate tightening rather than a nonsense value.
+    if (!Number.isInteger(max) || max < 0 || max % 100 !== 0 || max > MAX_KOBO_SETTING) {
+      return NextResponse.json({ error: "The sponsored-prize ceiling must be a whole number of naira, 0 or more." }, { status: 400 });
+    }
+    data.maxSponsoredPrizeKobo = max;
+    actions.push({ action: "settings.maxSponsoredPrizeChange", metadata: { maxSponsoredPrizeKobo: max } });
+  }
+
+  if (body.stakedBattlesEnabled !== undefined) {
+    if (typeof body.stakedBattlesEnabled !== "boolean") {
+      return NextResponse.json({ error: "stakedBattlesEnabled must be a boolean." }, { status: 400 });
+    }
+    data.stakedBattlesEnabled = body.stakedBattlesEnabled;
+    actions.push({ action: body.stakedBattlesEnabled ? "settings.stakedBattlesOn" : "settings.stakedBattlesOff" });
+  }
+
+  if (body.maxLockedStakeKobo !== undefined) {
+    const max = Number(body.maxLockedStakeKobo);
+    // Whole naira only: a stake is a whole number of kobo the player typed,
+    // and a limit in fractional kobo is a value nobody can reason about.
+    // Zero is allowed — it stops staking without turning the feature off,
+    // which is the softer version of the kill switch.
+    // A ceiling here is only a guard against a mistyped amount, same as the
+    // payout limit's — NGN 1bn is far above any real setting. Setting this
+    // below the per-Battle cap is allowed and simply makes the per-Battle cap
+    // unreachable, which is a legitimate way to tighten.
+    if (!Number.isInteger(max) || max < 0 || max % 100 !== 0 || max > MAX_KOBO_SETTING) {
+      return NextResponse.json({ error: "The at-once stake limit must be a whole number of naira, 0 or more." }, { status: 400 });
+    }
+    data.maxLockedStakeKobo = max;
+    actions.push({ action: "settings.maxLockedStakeChange", metadata: { maxLockedStakeKobo: max } });
+  }
+
+  if (body.maxDailyStakeKobo !== undefined) {
+    const max = Number(body.maxDailyStakeKobo);
+    if (!Number.isInteger(max) || max < 0 || max % 100 !== 0 || max > MAX_KOBO_SETTING) {
+      return NextResponse.json({ error: "The daily stake limit must be a whole number of naira, 0 or more." }, { status: 400 });
+    }
+    data.maxDailyStakeKobo = max;
+    actions.push({ action: "settings.maxDailyStakeChange", metadata: { maxDailyStakeKobo: max } });
+  }
+
+  // The repeated-pair detection thresholds (src/lib/stakePatterns.ts). Read
+  // fresh at sweep time like the settlement window, so a change re-measures
+  // every pair on the next run rather than only affecting new flags.
+  if (body.stakePatternWindowDays !== undefined) {
+    const days = Number(body.stakePatternWindowDays);
+    // 0 is allowed and means "stop measuring" — the sweep returns early
+    // rather than treating an empty window as every pair being clean, which
+    // is the honest reading of "look back zero days".
+    if (!Number.isInteger(days) || days < 0 || days > 365) {
+      return NextResponse.json({ error: "The lookback window must be a whole number of days between 0 and 365." }, { status: 400 });
+    }
+    data.stakePatternWindowDays = days;
+    actions.push({ action: "settings.stakePatternWindowChange", metadata: { stakePatternWindowDays: days } });
+  }
+
+  if (body.stakePatternMinBattles !== undefined) {
+    const min = Number(body.stakePatternMinBattles);
+    // At least 2: a "pattern" between two accounts cannot be read off a
+    // single Battle, and one win is not a win record.
+    if (!Number.isInteger(min) || min < 2 || min > 500) {
+      return NextResponse.json({ error: "The minimum Battles must be a whole number between 2 and 500." }, { status: 400 });
+    }
+    data.stakePatternMinBattles = min;
+    actions.push({ action: "settings.stakePatternMinBattlesChange", metadata: { stakePatternMinBattles: min } });
+  }
+
+  if (body.stakePatternWinShareBps !== undefined) {
+    const bps = Number(body.stakePatternWinShareBps);
+    // Same 0-10000 bps convention as the platform fee. Anything under 5000
+    // is below an even split and would flag every pair that has ever played
+    // twice, so 5000 is the floor — it is a real boundary, not arbitrary.
+    if (!Number.isInteger(bps) || bps < 5000 || bps > 10000) {
+      return NextResponse.json({ error: "The win share must be a whole number of basis points between 5000 and 10000 (50-100%)." }, { status: 400 });
+    }
+    data.stakePatternWinShareBps = bps;
+    actions.push({ action: "settings.stakePatternWinShareChange", metadata: { stakePatternWinShareBps: bps } });
+  }
+
+  if (body.stakePatternNetAlertKobo !== undefined) {
+    const max = Number(body.stakePatternNetAlertKobo);
+    // Whole naira only, same as the stake limits — nobody reasons about a
+    // threshold in fractional kobo.
+    if (!Number.isInteger(max) || max < 0 || max % 100 !== 0 || max > MAX_KOBO_SETTING) {
+      return NextResponse.json({ error: "The net-transfer threshold must be a whole number of naira, 0 or more." }, { status: 400 });
+    }
+    data.stakePatternNetAlertKobo = max;
+    actions.push({ action: "settings.stakePatternNetAlertChange", metadata: { stakePatternNetAlertKobo: max } });
   }
 
   if (Object.keys(data).length === 0) {
@@ -100,5 +210,13 @@ export async function PATCH(request: Request) {
     organizerRevenueSettlementHours: updated.organizerRevenueSettlementHours,
     payoutAutoApprove: updated.payoutAutoApprove,
     payoutAutoApproveMaxKobo: updated.payoutAutoApproveMaxKobo,
+    stakedBattlesEnabled: updated.stakedBattlesEnabled,
+    maxLockedStakeKobo: updated.maxLockedStakeKobo,
+    maxDailyStakeKobo: updated.maxDailyStakeKobo,
+    maxSponsoredPrizeKobo: updated.maxSponsoredPrizeKobo,
+    stakePatternWindowDays: updated.stakePatternWindowDays,
+    stakePatternMinBattles: updated.stakePatternMinBattles,
+    stakePatternWinShareBps: updated.stakePatternWinShareBps,
+    stakePatternNetAlertKobo: updated.stakePatternNetAlertKobo,
   });
 }

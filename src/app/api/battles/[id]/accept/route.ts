@@ -4,8 +4,10 @@
  * A staked Battle requires the accepter to match the creator's stake —
  * locked here, in the same window as the OPEN → ACCEPTED claim, so a
  * Match is never created for a stake that didn't actually get matched.
- * Core escrow mechanics only — see `EscrowType.STAKE`'s own schema
- * comment on what's deliberately not built yet.
+ * The lock goes through `lockStake` (src/lib/stakes.ts) like every other
+ * stake, which is what makes the accepter's own per-account limits apply —
+ * matching someone else's stake is still staking. See `EscrowType.STAKE`'s
+ * own schema comment on what's deliberately not built yet.
  */
 
 import { NextResponse } from "next/server";
@@ -20,8 +22,7 @@ import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
 import { battleExpiresAt } from "@/lib/battles";
 import { blockedBetween } from "@/lib/blocks";
 import { emailVerificationRequired } from "@/lib/emailGate";
-
-class InsufficientWalletBalanceError extends Error {}
+import { InsufficientWalletBalanceError, StakeLimitError, lockStake } from "@/lib/stakes";
 
 export async function POST(
   request: Request,
@@ -105,18 +106,7 @@ export async function POST(
   try {
     if (battle.stakeAmount > 0) {
       await prisma.$transaction(async (tx) => {
-        const debited = await tx.user.updateMany({
-          where: { id: user.id, walletBalance: { gte: battle.stakeAmount } },
-          data: { walletBalance: { decrement: battle.stakeAmount } },
-        });
-        if (debited.count === 0) throw new InsufficientWalletBalanceError();
-
-        await tx.escrowTransaction.create({
-          data: { battleId: battle.id, userId: user.id, type: "STAKE", amount: battle.stakeAmount, status: "COMPLETE" },
-        });
-        await tx.walletTransaction.create({
-          data: { userId: user.id, type: "STAKE_DEBIT", amount: battle.stakeAmount, status: "COMPLETE" },
-        });
+        await lockStake(tx, { userId: user.id, amount: battle.stakeAmount, battleId: battle.id });
       });
       stakeLocked = true;
     }
@@ -154,6 +144,11 @@ export async function POST(
       });
       if (err instanceof InsufficientWalletBalanceError) {
         return NextResponse.json({ error: "Insufficient wallet balance to match this Battle's stake." }, { status: 402 });
+      }
+      // The Battle was reopened above, so a limit refusal here leaves it
+      // exactly as it was found: OPEN, no Match, no stake locked.
+      if (err instanceof StakeLimitError) {
+        return NextResponse.json({ error: err.message }, { status: 403 });
       }
       throw err;
     }

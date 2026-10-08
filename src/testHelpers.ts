@@ -65,6 +65,27 @@ export async function createTestTournament(
   });
 }
 
+/**
+ * A published game → mode → format trio, so a test can drive a route that resolves the catalogue
+ * (src/lib/competitionConfig.ts). Every field `resolveCompetition` checks is set here: the game has to
+ * be enabled *and* published, the mode and format enabled, and the format has to declare a structure
+ * that actually exists — a half-built fixture fails with "Pick how the competition is run.", which
+ * reads like a bug in the route rather than a hole in the fixture.
+ */
+export async function createTestCompetition() {
+  const suffix = uniqueSuffix();
+  const game = await prisma.game.create({
+    data: { name: `TEST-Game-${suffix}`, publishedAt: new Date() },
+  });
+  const mode = await prisma.gameMode.create({
+    data: { gameId: game.id, name: `TEST-Mode-${suffix}`, style: "HEAD_TO_HEAD" },
+  });
+  const format = await prisma.gameFormat.create({
+    data: { modeId: mode.id, name: `TEST-Format-${suffix}`, structures: ["KNOCKOUT"] },
+  });
+  return { gameId: game.id, gameModeId: mode.id, gameFormatId: format.id };
+}
+
 /** Deletes every row this file's fixtures could have created, anywhere
  *  it's still tagged "TEST-" — safe to call even if a given test created
  *  none of a particular kind (deleteMany on zero rows is a no-op). */
@@ -123,6 +144,10 @@ export async function cleanupAll(): Promise<void> {
   await prisma.report.deleteMany({ where: { OR: [{ reportedUserId: mine }, { reportedById: mine }] } });
   await prisma.teamMembership.deleteMany({ where: { userId: mine } });
   await prisma.team.deleteMany({ where: { captainId: mine } });
+  // Cascades off the user delete below anyway (StakePatternFlag's two user
+  // FKs are ON DELETE CASCADE), but deleted explicitly so this file stays a
+  // readable list of everything a fixture can leave behind.
+  await prisma.stakePatternFlag.deleteMany({ where: { OR: [{ userAId: mine }, { userBId: mine }] } });
   await prisma.walletTransaction.deleteMany({ where: { userId: { in: userIds } } });
   await prisma.notification.deleteMany({ where: { userId: { in: userIds } } });
   await prisma.rateLimitAttempt.deleteMany({ where: { key: { contains: "test-" } } });
@@ -130,5 +155,11 @@ export async function cleanupAll(): Promise<void> {
   await prisma.bracket.deleteMany({ where: { tournamentId: { in: tournamentIds } } });
   await prisma.tournament.deleteMany({ where: { id: { in: tournamentIds } } });
   await prisma.organizerProfile.deleteMany({ where: { userId: { in: userIds } } });
+  // The catalogue fixtures (createTestCompetition), after the tournaments that point at them. Modes and
+  // formats cascade off the game.
+  await prisma.game.deleteMany({ where: { name: { startsWith: "TEST-" } } });
+  // Rate-limit rows are keyed by the user's id, not by anything matching "test-" above, so a route with
+  // a 5-per-hour throttle would start answering 429 partway through a file without this.
+  await prisma.rateLimitAttempt.deleteMany({ where: { key: { startsWith: "tournament-create:" } } });
   await prisma.user.deleteMany({ where: { id: { in: userIds } } });
 }

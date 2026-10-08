@@ -1,13 +1,20 @@
 /**
- * Circuit — find players to add to a team. Matches handle or display name
- * (suspended accounts and the searcher are left out). Pass `teamId` and the
- * captain also learns who's already on that team or invited, so the picker
- * can show them as unavailable instead of hiding them.
+ * Circuit — find players to add to a team. Matches handle or display name.
+ * Pass `teamId` and the captain also learns who's already on that team or
+ * invited, so the picker can show them as unavailable instead of hiding them.
+ *
+ * Starts from `reachableUsersWhere` like every other player listing
+ * (src/lib/privacy.ts), so a player who turned searchability off stays out of
+ * this picker too, and so does anyone the searcher has a block with. This
+ * route used to build its own conditions with only `isSuspended` and "not me"
+ * — which left the settings and the block list enforceable everywhere except
+ * the one surface an abuser would go to find someone by handle.
  */
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
+import { reachableUsersWhere } from "@/lib/privacy";
 import type { PlayerSearchState } from "@/lib/playerSearch";
 
 const MIN_QUERY_LENGTH = 2;
@@ -27,11 +34,18 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Only the captain can search for players to add." }, { status: 403 });
   }
 
+  const reachable = await reachableUsersWhere(user.id, "discover");
+
   const found = await prisma.user.findMany({
     where: {
-      id: { not: user.id },
-      isSuspended: false,
-      OR: [{ handle: { contains: q, mode: "insensitive" } }, { displayName: { contains: q, mode: "insensitive" } }],
+      AND: [
+        reachable,
+        {
+          id: { not: user.id },
+          isSuspended: false,
+          OR: [{ handle: { contains: q, mode: "insensitive" } }, { displayName: { contains: q, mode: "insensitive" } }],
+        },
+      ],
     },
     // Exact and prefix matches first, so typing "ghost" puts @ghost above @the_ghost_2.
     orderBy: [{ handle: "asc" }],

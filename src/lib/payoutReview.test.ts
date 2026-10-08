@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/db";
 import { cleanupAll, createTestOrganizer, createTestTournament, createTestUser } from "@/testHelpers";
 import { reviewTournamentPayout } from "@/lib/payoutReview";
@@ -54,5 +54,83 @@ describe("reviewTournamentPayout", () => {
     const frozen = await createTestTournament(organizer.id, { status: "COMPLETE", completedAt: new Date(), fundsFrozen: true });
     expect((await reviewTournamentPayout(frozen)).blockers).toContain("Funds are frozen.");
     void player;
+  });
+});
+
+/**
+ * The sponsored-prize ceiling at payout time.
+ *
+ * The ceiling is checked where a prize is declared (src/lib/prizePool.ts, and both tournament routes).
+ * This is the other half, and it exists because a ceiling can be lowered after a prize was declared
+ * underneath a looser one — a declaration-only check would wave that prize straight through. Blocking
+ * here stops the money at the door and puts the reason on the Payouts page, in front of the person
+ * about to approve it.
+ */
+describe("the sponsored-prize ceiling", () => {
+  const CEILING = 100_000; // ₦1,000, small enough that a fixture can exceed it
+  let original: { maxSponsoredPrizeKobo: number } | null = null;
+
+  beforeEach(async () => {
+    original = await prisma.platformSetting.findUnique({
+      where: { id: "singleton" },
+      select: { maxSponsoredPrizeKobo: true },
+    });
+    await prisma.platformSetting.upsert({
+      where: { id: "singleton" },
+      create: { id: "singleton", maxSponsoredPrizeKobo: CEILING },
+      update: { maxSponsoredPrizeKobo: CEILING },
+    });
+  });
+
+  afterEach(async () => {
+    if (original) {
+      await prisma.platformSetting.update({ where: { id: "singleton" }, data: original });
+    } else {
+      await prisma.platformSetting.deleteMany({ where: { id: "singleton" } });
+    }
+  });
+
+  async function sponsored(prizeAmount: number) {
+    const organizer = await createTestOrganizer({ isStaff: true });
+    const champion = await createTestUser();
+    const runnerUp = await createTestUser();
+    const t = await createTestTournament(organizer.id, { status: "COMPLETE", completedAt: new Date(), prizeAmount });
+    await prisma.match.create({
+      data: { tournamentId: t.id, round: 1, playerAId: champion.id, playerBId: runnerUp.id, status: "COMPLETE", winnerId: champion.id, matchCode: `TEST-${Date.now()}` },
+    });
+    return reviewTournamentPayout(t);
+  }
+
+  it("blocks a sponsored prize above the ceiling, and says how far above", async () => {
+    const review = await sponsored(CEILING + 1);
+
+    expect(review.sponsored).toBe(true);
+    expect(review.blockers.join(" ")).toMatch(/above the ₦1,000 ceiling for a sponsored prize/);
+  });
+
+  it("allows a sponsored prize exactly at the ceiling", async () => {
+    // The guard test again: this is the boundary a real event sits on, and blocking it would be a
+    // regression dressed as a fix.
+    const review = await sponsored(CEILING);
+
+    expect(review.blockers).toEqual([]);
+  });
+
+  it("leaves an ordinary tournament alone — its prize is bounded by the entry fees, not this", async () => {
+    // The ceiling is about platform money. An ordinary organizer cannot exceed what players paid, so a
+    // prize above the sponsored ceiling on a self-funded tournament is not this rule's business.
+    const organizer = await createTestOrganizer();
+    const champion = await createTestUser();
+    const runnerUp = await createTestUser();
+    const t = await createTestTournament(organizer.id, { status: "COMPLETE", completedAt: new Date(), prizeAmount: CEILING * 10, entryFee: 100_000 });
+    await prisma.escrowTransaction.create({ data: { tournamentId: t.id, userId: organizer.id, type: "ORGANIZER_REVENUE", amount: CEILING * 10, status: "COMPLETE" } });
+    await prisma.match.create({
+      data: { tournamentId: t.id, round: 1, playerAId: champion.id, playerBId: runnerUp.id, status: "COMPLETE", winnerId: champion.id, matchCode: `TEST-${Date.now()}` },
+    });
+
+    const review = await reviewTournamentPayout(t);
+
+    expect(review.sponsored).toBe(false);
+    expect(review.blockers).toEqual([]);
   });
 });

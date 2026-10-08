@@ -80,7 +80,9 @@ export type NotificationType =
   | "PRIZE_PAYOUT_FAILED"
   | "PAYMENT_REFUNDED"
   | "ENTRY_FEE_REFUND"
-  | "REGISTRATION_NAME_TAKEN";
+  | "REGISTRATION_NAME_TAKEN"
+  | "SELF_EXCLUSION_SET"
+  | "STAKE_PATTERN_FLAGGED";
 
 export interface NotificationChannel {
   send(userId: string, type: NotificationType, payload: Record<string, unknown>): Promise<void>;
