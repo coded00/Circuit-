@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { prisma } from "@/lib/db";
 import {
   AUTH_LIMITS,
+  PUBLIC_LIMITS,
   callerThrottleKeys,
   clearAttempts,
   getClientIp,
@@ -9,6 +10,7 @@ import {
   isRateLimited,
   recordAttempt,
   recordCallerAttempt,
+  throttlePublicRequest,
 } from "./rateLimit";
 
 const TEST_KEY_PREFIX = "test-ratelimit-";
@@ -170,5 +172,79 @@ describe("the caller layer", () => {
     const second = callerThrottleKeys("login", request({ "cf-connecting-ip": "5.6.7.8" }));
     expect(first.ip).toBe(second.ip);
     expect(first.ip).toBe("auth-ip:login:unknown");
+  });
+});
+
+/**
+ * The public read layer: the bound on /api/search and /api/images, the two unauthenticated routes where an
+ * anonymous caller can make the origin do real work (finding #11). One bucket, keyed on the address.
+ *
+ * Rows are seeded directly for the "already over the line" cases, as in the caller-layer block above — 600
+ * and 1200 round trips to prove an arithmetic comparison is not worth the seconds it costs.
+ */
+describe("the public read layer", () => {
+  const request = (headers: Record<string, string> = {}) => new Request("http://localhost", { headers });
+  const fill = (key: string, times: number) =>
+    prisma.rateLimitAttempt.createMany({ data: Array.from({ length: times }, () => ({ key })) });
+
+  afterEach(async () => {
+    delete process.env.TRUSTED_PROXY_SECRET;
+    await prisma.rateLimitAttempt.deleteMany({ where: { key: { startsWith: "public-ip:" } } });
+  });
+
+  it("keys on the address and the scope, so the two routes don't spend each other's budget", async () => {
+    const search = await throttlePublicRequest("search", request({ "x-forwarded-for": "5.6.7.8" }));
+    expect(search.limited).toBe(false);
+    // A page load asks for dozens of images; if that spent the search budget, browsing would lock out
+    // searching, which is the kind of coupling that makes a limit feel broken rather than protective.
+    expect(await prisma.rateLimitAttempt.count({ where: { key: "public-ip:images:5.6.7.8" } })).toBe(0);
+    // And the other direction: a search flood must not take a carrier's images down.
+    expect(await prisma.rateLimitAttempt.count({ where: { key: "public-ip:search:5.6.7.8" } })).toBe(1);
+  });
+
+  it("counts every request it lets through — there is no success/failure signal to gate on", async () => {
+    // The difference from the auth routes: login counts only wrong passwords, but a search that returns
+    // nothing still cost the origin four scans, so every accepted request here is recorded.
+    await throttlePublicRequest("search", request({ "x-forwarded-for": "5.6.7.8" }));
+    await throttlePublicRequest("search", request({ "x-forwarded-for": "5.6.7.8" }));
+    expect(await prisma.rateLimitAttempt.count({ where: { key: "public-ip:search:5.6.7.8" } })).toBe(2);
+  });
+
+  it("refuses a caller that has spent its budget, and nobody else", async () => {
+    await fill("public-ip:search:5.6.7.8", PUBLIC_LIMITS.search.max);
+
+    const refused = await throttlePublicRequest("search", request({ "x-forwarded-for": "5.6.7.8" }));
+    expect(refused.limited).toBe(true);
+    expect(refused.retryAfterSeconds).toBeGreaterThan(0);
+    // Per-source, not platform-wide: one attacker must not be able to stop everyone else searching.
+    expect((await throttlePublicRequest("search", request({ "x-forwarded-for": "9.9.9.9" }))).limited).toBe(false);
+  });
+
+  it("does not let a refused request extend its own block", async () => {
+    await fill("public-ip:search:5.6.7.8", PUBLIC_LIMITS.search.max);
+    await throttlePublicRequest("search", request({ "x-forwarded-for": "5.6.7.8" }));
+    await throttlePublicRequest("search", request({ "x-forwarded-for": "5.6.7.8" }));
+    // Still exactly the seeded rows: a caller hammering the door does not push their own retry-after out,
+    // which would turn a one-minute limit into an indefinite lockout for a shared carrier address.
+    expect(await prisma.rateLimitAttempt.count({ where: { key: "public-ip:search:5.6.7.8" } })).toBe(PUBLIC_LIMITS.search.max);
+  });
+
+  it("cannot be handed a fresh bucket by a header the caller invented", async () => {
+    // The same failure that made finding #13 load-bearing: cf-connecting-ip used to be believed from anyone,
+    // so varying it would be a new bucket per request and both of these limits would be decorative.
+    const first = await throttlePublicRequest("search", request({ "cf-connecting-ip": "1.2.3.4" }));
+    const second = await throttlePublicRequest("search", request({ "cf-connecting-ip": "5.6.7.8" }));
+    expect(first.limited).toBe(false);
+    expect(second.limited).toBe(false);
+    expect(await prisma.rateLimitAttempt.count({ where: { key: "public-ip:search:unknown" } })).toBe(2);
+  });
+
+  it("is measured per minute for both scopes", () => {
+    // Pins the window against a copy-paste of the 15-minute auth constant, which would quietly turn these
+    // into 600-an-hour limits — an order of magnitude tighter than what the comment in rateLimit.ts argues for.
+    expect(PUBLIC_LIMITS.search.windowMs).toBe(60_000);
+    expect(PUBLIC_LIMITS.images.windowMs).toBe(60_000);
+    // Images is the looser of the two, because one page load legitimately asks for dozens.
+    expect(PUBLIC_LIMITS.images.max).toBeGreaterThan(PUBLIC_LIMITS.search.max);
   });
 });
