@@ -15,6 +15,7 @@
 import { randomUUID, createHmac, createHash, timingSafeEqual } from "crypto";
 import { mkdir, writeFile, readFile } from "fs/promises";
 import path from "path";
+import { captureMessage } from "@/lib/observability";
 
 export interface ProofStorage {
   /** Stores a proof file for a match, returns an opaque reference — never a
@@ -39,18 +40,64 @@ type ProofRef = {
 // traversal, since path.join doesn't sanitize ".." segments) and a forged
 // ref pointing at a *different* match's file than the one access control
 // was actually checked against.
-function getRefSecret(): string {
+// Finding #15 is about the key those signatures are made with. It used to be JWT_SECRET itself, raw.
+
+/**
+ * The key a reference's signature is made with: JWT_SECRET, derived for this purpose only.
+ *
+ * Signing with the raw secret meant this file and src/lib/auth.ts were computing *the same function of
+ * the same key*: a reference's signature is HMAC-SHA256(secret, "<base64url payload>") and a session
+ * token's is HMAC-SHA256(secret, "<base64url header>.<base64url payload>"). Hand a session token to
+ * `decodeRef` and it **passes the signature check**, because everything before the last dot is exactly
+ * the string that was signed. What turned it away was `JSON.parse` failing on half a decoded header —
+ * "Unexpected non-whitespace character after JSON at position 15", which is one byte past
+ * `{"alg":"HS256"}`. That is an accident of how many dots each format happens to have, not a boundary;
+ * nothing in the crypto kept the two apart, so a change to either format could have joined them.
+ *
+ * Deriving a key instead is what src/lib/oauth/flowCookies.ts already does for its cookies
+ * (`sha256(JWT_SECRET + ":oauth-flow")`) and what this file should have done from the start. It also
+ * means one leaked key is no longer both a session key and a proof-ref key.
+ *
+ * The `:proof-ref` label is part of the key. Changing it changes every signature, which invalidates
+ * every reference already stored — see below.
+ */
+function getRefKey(): Buffer {
   const secret = process.env.JWT_SECRET;
   if (!secret) {
     throw new Error(
-      "JWT_SECRET is not set. It's also used to sign proof storage references. Set it in .env."
+      "JWT_SECRET is not set. The key that signs proof storage references is derived from it. Set it in .env."
     );
   }
-  return secret;
+  return createHash("sha256").update(`${secret}:proof-ref`).digest();
 }
 
-function sign(payload: string): string {
-  return createHmac("sha256", getRefSecret()).update(payload).digest("base64url");
+/**
+ * The key references written *before* finding #15 carry: the raw secret. **Verification only** — nothing
+ * is signed with this any more.
+ *
+ * It exists because a reference is stored rather than minted per request. `Match.proofARef`,
+ * `Report.evidenceRef`, `ChatMessage.attachmentRef` and every `/api/images/<ref>` URL already sitting in
+ * a column hold a signature over this key, so dropping it would not rotate a signing key — it would
+ * blank the proof on every match already played, including whichever one a dispute is waiting on, and
+ * break every avatar and poster uploaded before the deploy.
+ *
+ * So this is a transitional path, and a transitional path is only acceptable if something ends it. Each
+ * use is reported through `captureMessage` in `decodeRef`, so "does anything still need this?" is a
+ * question the logs answer; when they go quiet, delete this function and the branch that calls it. There
+ * is deliberately no rewrite script to do it sooner: half of these references are embedded inside stored
+ * URLs (src/lib/uploads.ts), so a migration would have to find and re-sign them across every text column
+ * in the schema, and a pass that went wrong would damage exactly the rows it was meant to repair.
+ */
+function getLegacyRefKey(): Buffer {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) throw new Error("JWT_SECRET is not set.");
+  return Buffer.from(secret);
+}
+
+/** HMAC-SHA256 in the encoding a reference's signature is written in. One function, so the two keys
+ *  above cannot drift apart in *how* they sign — only in which key they sign with. */
+function refSignature(key: Buffer, payload: string): string {
+  return createHmac("sha256", key).update(payload).digest("base64url");
 }
 
 function safeEqual(a: string, b: string): boolean {
@@ -61,7 +108,7 @@ function safeEqual(a: string, b: string): boolean {
 
 function encodeRef(ref: ProofRef): string {
   const payload = Buffer.from(JSON.stringify(ref)).toString("base64url");
-  return `${payload}.${sign(payload)}`;
+  return `${payload}.${refSignature(getRefKey(), payload)}`;
 }
 
 function decodeRef(ref: string): ProofRef {
@@ -71,9 +118,18 @@ function decodeRef(ref: string): ProofRef {
   }
   const payload = ref.slice(0, separatorIndex);
   const signature = ref.slice(separatorIndex + 1);
-  if (!safeEqual(sign(payload), signature)) {
+
+  const signedWithCurrentKey = safeEqual(refSignature(getRefKey(), payload), signature);
+  if (!signedWithCurrentKey && !safeEqual(refSignature(getLegacyRefKey(), payload), signature)) {
     throw new Error("Invalid or tampered proof reference.");
   }
+
+  // Note what the check above does *not* do, because finding #15 is about exactly this: it does not
+  // keep a session token out. A token is signed over everything before its last dot, so
+  // `HMAC(raw secret, "H.P")` is that token's signature to the byte, and walking the legacy branch with
+  // one succeeds. The parse below is what rejects it — `H.P` decodes to `{"alg":"HS256"}` with the
+  // token's own payload run onto the end, which is not JSON. That was true before this change too; what
+  // changed is which key a *reference* is signed with, so the two formats no longer share one.
 
   const decoded = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as ProofRef;
   // Belt-and-suspenders: reject anything that isn't a plain path segment,
@@ -84,6 +140,16 @@ function decodeRef(ref: string): ProofRef {
       throw new Error("Invalid proof reference.");
     }
   }
+
+  // Reported rather than passed over in silence. This is the only way to know whether anything still
+  // depends on the legacy key — see getLegacyRefKey for what to do when this stops appearing.
+  if (!signedWithCurrentKey) {
+    captureMessage("proof reference verified with the pre-finding-#15 key", "info", {
+      source: "storage:decodeRef",
+      storageKey: decoded.matchId,
+    });
+  }
+
   return decoded;
 }
 
