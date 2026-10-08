@@ -1673,6 +1673,10 @@ model RateLimitAttempt {
   createdAt DateTime @default(now())
 
   @@index([key, createdAt])
+  // For the sweep's age-based purge (finding #14). The composite above leads with `key`, so it cannot
+  // serve `createdAt < cutoff` across every key at once — without this the two-minute sweep would be a
+  // sequential scan of the table it exists to keep small.
+  @@index([createdAt])
 }
 
 // ---------------------------------------------------------------------------

@@ -35,6 +35,7 @@ import { captureException } from "@/lib/observability";
 import { logAdminAction } from "@/lib/auditLog";
 import { sweepQuickMatchChallenges } from "@/lib/quickMatch";
 import { detectStakePatterns } from "@/lib/stakePatterns";
+import { purgeExpiredAttempts } from "@/lib/rateLimit";
 import { startLobby } from "@/lib/lobby";
 import { buildRoundRobinTable, roundRobinOutcome, roundRobinSchedule } from "@/lib/roundRobin";
 import {
@@ -1438,6 +1439,7 @@ export async function runScheduledSweep(): Promise<{
   stakePatternsFlagged: number;
   transfersSettled: number;
   latePaymentsChecked: number;
+  rateLimitAttemptsPurged: number;
   errors?: string[];
 }> {
   const now = new Date();
@@ -1571,6 +1573,18 @@ export async function runScheduledSweep(): Promise<{
     errors.push("reconcilePendingMoney");
   }
 
+  // Housekeeping, not a clock anybody is waiting on: rate-limit rows past their retention (finding #14).
+  // It rides this sweep rather than getting its own cron entry for the reason docs/circuit-stack.md gives
+  // for the sweep existing at all — one periodic route, not a job queue — and it is last so that a table
+  // somebody deliberately grew can only ever delay the housekeeping, never the expiries and payouts above.
+  let rateLimitAttemptsPurged = 0;
+  try {
+    rateLimitAttemptsPurged = await purgeExpiredAttempts(now);
+  } catch (err) {
+    captureException(err, { source: "sweep:purgeExpiredAttempts" });
+    errors.push("purgeExpiredAttempts");
+  }
+
   return {
     bracketsGenerated,
     advancementRepaired: repair.repaired,
@@ -1584,6 +1598,7 @@ export async function runScheduledSweep(): Promise<{
     quickMatchRecoveredStuck: quickMatchSweep.recoveredStuck,
     battlesExpired: battleExpiry.expired,
     stakePatternsFlagged: stakePatterns.flagged,
+    rateLimitAttemptsPurged,
     ...money,
     ...(errors.length > 0 ? { errors } : {}),
   };
