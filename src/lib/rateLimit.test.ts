@@ -1,6 +1,7 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { beforeEach, describe, it, expect, afterEach } from "vitest";
 import { prisma } from "@/lib/db";
 import {
+  ATTEMPT_RETENTION_MS,
   AUTH_LIMITS,
   PUBLIC_LIMITS,
   callerThrottleKeys,
@@ -8,6 +9,7 @@ import {
   getClientIp,
   isCallerThrottled,
   isRateLimited,
+  purgeExpiredAttempts,
   recordAttempt,
   recordCallerAttempt,
   throttlePublicRequest,
@@ -246,5 +248,99 @@ describe("the public read layer", () => {
     expect(PUBLIC_LIMITS.images.windowMs).toBe(60_000);
     // Images is the looser of the two, because one page load legitimately asks for dozens.
     expect(PUBLIC_LIMITS.images.max).toBeGreaterThan(PUBLIC_LIMITS.search.max);
+  });
+});
+
+/**
+ * Finding #14: the attempts table grew without bound.
+ *
+ * `isRateLimited` clears the key it is asked about, so a key nobody asks about again kept its rows
+ * forever — and on the unauthenticated routes the *caller* chooses how many keys there are, because they
+ * come out of request bodies and headers. `purgeExpiredAttempts` is the sweep that clears the rest.
+ *
+ * Aging is done by writing `createdAt` directly rather than by waiting or by faking the clock, so each
+ * case states its own age and nothing depends on how long the suite took to reach it.
+ */
+describe("purging expired attempts", () => {
+  const PURGE_PREFIX = "test-purge-";
+  const hoursAgo = (h: number) => new Date(Date.now() - h * 60 * 60 * 1000);
+  const age = (key: string, h: number) => ({ key, createdAt: hoursAgo(h) });
+  const remaining = (key: string) => prisma.rateLimitAttempt.count({ where: { key } });
+
+  beforeEach(async () => {
+    // Drain whatever is already past retention before seeding — on a shared dev database that is whatever
+    // an earlier run left behind — so the counts below are this test's own rows and nothing else.
+    await purgeExpiredAttempts();
+    await prisma.rateLimitAttempt.deleteMany({ where: { key: { startsWith: PURGE_PREFIX } } });
+  });
+
+  afterEach(async () => {
+    await prisma.rateLimitAttempt.deleteMany({ where: { key: { startsWith: PURGE_PREFIX } } });
+  });
+
+  it("deletes what is past retention and leaves what is inside it", async () => {
+    await prisma.rateLimitAttempt.createMany({
+      data: [age(`${PURGE_PREFIX}old`, 72), age(`${PURGE_PREFIX}old`, 73), age(`${PURGE_PREFIX}old`, 74), age(`${PURGE_PREFIX}old`, 1), age(`${PURGE_PREFIX}old`, 47)],
+    });
+
+    expect(await purgeExpiredAttempts()).toBe(3);
+    expect(await remaining(`${PURGE_PREFIX}old`)).toBe(2);
+  });
+
+  it("sweeps every key, not just the one it was asked about", async () => {
+    // The regression itself. The opportunistic cleanup inside isRateLimited would have left all of these
+    // behind: no caller is ever going to query `test-purge-abandoned-1` again, which is precisely why the
+    // rows sat there. A purge that only knew about one key would pass the test above and fail this one.
+    await prisma.rateLimitAttempt.createMany({
+      data: [1, 2, 3, 4, 5].map((n) => age(`${PURGE_PREFIX}abandoned-${n}`, 100 + n)),
+    });
+
+    await purgeExpiredAttempts();
+    for (const n of [1, 2, 3, 4, 5]) expect(await remaining(`${PURGE_PREFIX}abandoned-${n}`)).toBe(0);
+  });
+
+  it("stops at the run's ceiling, leaving the rest for the next run", async () => {
+    // Bounded so a table somebody deliberately grew cannot turn one sweep into one long transaction — the
+    // same sweep is what expires Battles and approves payouts, so stalling it is the thing to avoid.
+    await prisma.rateLimitAttempt.createMany({
+      data: Array.from({ length: 5 }, (_, i) => age(`${PURGE_PREFIX}bounded-${i}`, 100 + i)),
+    });
+
+    expect(await purgeExpiredAttempts(new Date(), { batchSize: 2, maxPerRun: 2 })).toBe(2);
+    // Three left, because the ceiling stopped it rather than the range being exhausted — which rows went is
+    // unspecified, so this counts the survivors instead of naming them.
+    const left = await prisma.rateLimitAttempt.count({ where: { key: { startsWith: `${PURGE_PREFIX}bounded-` } } });
+    expect(left).toBe(3);
+    // Still removing rather than giving up — the backlog drains over the runs that follow.
+    expect(await purgeExpiredAttempts(new Date(), { batchSize: 2, maxPerRun: 2 })).toBe(2);
+    expect(await purgeExpiredAttempts(new Date(), { batchSize: 2, maxPerRun: 2 })).toBe(1);
+    for (let i = 0; i < 5; i++) expect(await remaining(`${PURGE_PREFIX}bounded-${i}`)).toBe(0);
+  });
+
+  it("keeps rows for longer than any window that could still read them", () => {
+    // The one failure here that would be a security regression rather than a cost: deleting a row inside a
+    // live window would make a limit looser than the number it advertises, silently. This pins the
+    // relationship for the windows this module owns...
+    const owned = [
+      ...Object.values(AUTH_LIMITS).flatMap((l) => [l.identifier.windowMs, l.caller.windowMs, l.global.windowMs]),
+      ...Object.values(PUBLIC_LIMITS).map((l) => l.windowMs),
+    ];
+    expect(ATTEMPT_RETENTION_MS).toBeGreaterThan(Math.max(...owned));
+
+    // ...and, by value, for the longest one it does not: the 24-hour community-create limit in
+    // src/app/api/communities/route.ts. That number is not reachable from here, so it is written down
+    // instead — and if a window ever grows past the retention, this is the tripwire that says so.
+    expect(ATTEMPT_RETENTION_MS).toBeGreaterThanOrEqual(2 * 24 * 60 * 60 * 1000);
+  });
+
+  it("does not loosen a limit that is currently in force", async () => {
+    const key = `${PURGE_PREFIX}live`;
+    await prisma.rateLimitAttempt.createMany({ data: Array.from({ length: 3 }, () => ({ key })) });
+
+    await purgeExpiredAttempts();
+
+    // Three fresh rows are inside a 15-minute window, so the key is still at its cap — the purge must not
+    // have touched rows a live limit is counting.
+    expect((await isRateLimited(key, { max: 3, windowMs: 15 * 60 * 1000 })).limited).toBe(true);
   });
 });

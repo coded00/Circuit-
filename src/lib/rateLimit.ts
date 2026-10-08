@@ -242,8 +242,9 @@ export async function isRateLimited(
 ): Promise<{ limited: boolean; retryAfterSeconds: number }> {
   const windowStart = new Date(Date.now() - windowMs);
 
-  // Opportunistic cleanup for this key — keeps the table from growing
-  // unbounded without needing the (not-yet-wired) cron sweep to do it.
+  // Opportunistic cleanup for this key, so a key in steady use doesn't accumulate a row per request for
+  // as long as it is used. This is *not* what keeps the table bounded — it only ever touches the key it
+  // was asked about, and `purgeExpiredAttempts` below is what handles the rest.
   await prisma.rateLimitAttempt.deleteMany({ where: { key, createdAt: { lt: windowStart } } });
 
   const attempts = await prisma.rateLimitAttempt.findMany({
@@ -266,4 +267,65 @@ export async function recordAttempt(key: string): Promise<void> {
 
 export async function clearAttempts(key: string): Promise<void> {
   await prisma.rateLimitAttempt.deleteMany({ where: { key } });
+}
+
+// ---------------------------------------------------------------------------
+// Keeping the attempts table bounded (finding #14)
+// ---------------------------------------------------------------------------
+
+/**
+ * How long a rate-limit row is kept before the sweep may delete it.
+ *
+ * A row is dead once it is older than the window of every limit that could look at its key: `isRateLimited`
+ * counts only rows newer than the window it is called with, and `retryAfterSeconds` reads the oldest row
+ * *inside* that window, so nothing outside it is ever consulted.
+ *
+ * The longest window in the codebase is 24 hours — the community-create limit in
+ * src/app/api/communities/route.ts, the only one longer than an hour — and this is twice that. Deleting a
+ * row too early is the one mistake here that is a security regression rather than a cost: it would make a
+ * limit looser than the number it advertises, silently. The margin is the whole defence, so **if you
+ * lengthen a window past 48 hours, lengthen this with it** — there is no table to derive it from, because
+ * the windows live in the thirty route files that use them.
+ */
+export const ATTEMPT_RETENTION_MS = 48 * 60 * 60 * 1000;
+
+/** Rows removed per statement, and the ceiling on one sweep run. */
+export const PURGE_BATCH_SIZE = 5_000;
+export const PURGE_MAX_PER_RUN = 50_000;
+
+/**
+ * Deletes rate-limit rows that can no longer affect any decision. Returns how many went.
+ *
+ * Finding #14: this used to be nobody's job. `isRateLimited` clears the key it was asked about, so a key
+ * that is never asked about again kept its rows forever — and the keys are built from request bodies and
+ * headers, so it is a caller who decides how many there are. On the unauthenticated routes that is an
+ * attacker's choice, and an unbounded table on the database every other request shares is a slow way to
+ * take the site down.
+ *
+ * Bounded per run on purpose. The sweep runs every two minutes and whatever it doesn't reach is picked up
+ * by the next one, so a table somebody deliberately grew cannot turn a single run into one long
+ * transaction holding locks — and, since the same sweep is what expires Battles and approves payouts, the
+ * one run it could stall is the one with money on it.
+ *
+ * `batchSize`/`maxPerRun` are injectable so the bounding can be tested without seeding fifty thousand
+ * rows; production never passes them.
+ */
+export async function purgeExpiredAttempts(
+  now: Date = new Date(),
+  { batchSize = PURGE_BATCH_SIZE, maxPerRun = PURGE_MAX_PER_RUN }: { batchSize?: number; maxPerRun?: number } = {}
+): Promise<number> {
+  const cutoff = new Date(now.getTime() - ATTEMPT_RETENTION_MS);
+  let deleted = 0;
+
+  while (deleted < maxPerRun) {
+    const { count } = await prisma.rateLimitAttempt.deleteMany({
+      where: { createdAt: { lt: cutoff } },
+      limit: Math.min(batchSize, maxPerRun - deleted),
+    });
+    deleted += count;
+    // A short batch means the range is exhausted — the only way to know, since `limit` gives no total.
+    if (count < batchSize) break;
+  }
+
+  return deleted;
 }

@@ -369,3 +369,32 @@ describe("runScheduledSweep's stake-pattern branch", () => {
     expect(result.stakePatternsFlagged).toBe(0);
   });
 });
+
+/**
+ * Finding #14: the attempts table grew without bound, and nothing cleared it. `purgeExpiredAttempts` has
+ * its own tests for what it deletes (src/lib/rateLimit.test.ts) — what those cannot show is that anything
+ * ever *calls* it. The helper being correct while no sweep runs it is exactly the shape of the finding,
+ * so this drives the sweep itself and reads the row back.
+ */
+describe("the sweep's housekeeping", () => {
+  it("purges rate-limit rows past retention", async () => {
+    const key = `test-sweep-purge-${uniqueSuffix()}`;
+    await prisma.rateLimitAttempt.create({ data: { key, createdAt: new Date(Date.now() - 72 * 60 * 60 * 1000) } });
+
+    const result = await runScheduledSweep();
+
+    expect(result.rateLimitAttemptsPurged).toBeGreaterThanOrEqual(1);
+    expect(await prisma.rateLimitAttempt.count({ where: { key } })).toBe(0);
+  });
+
+  it("leaves a row that is still inside its window alone", async () => {
+    // The counter must not be a "delete everything" — a sweep that cleared live rows would silently reset
+    // every throttle in the app, once every two minutes.
+    const key = `test-sweep-keep-${uniqueSuffix()}`;
+    await prisma.rateLimitAttempt.create({ data: { key } });
+
+    await runScheduledSweep();
+
+    expect(await prisma.rateLimitAttempt.count({ where: { key } })).toBe(1);
+  });
+});
