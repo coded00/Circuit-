@@ -37,6 +37,11 @@ const nextConfig: NextConfig = {
         headers: [{ key: "Cache-Control", value: "public, max-age=604800, stale-while-revalidate=86400" }],
       },
       {
+        // The Content-Security-Policy is deliberately absent from this list. It moved to src/proxy.ts,
+        // because a nonce has to be generated per request and this file's headers are the same for every
+        // response. Leaving a policy here would not be harmless either: it would be enforced *alongside*
+        // the proxy's rather than replaced by it, and two policies intersect — the one without a nonce
+        // would block every script the other had just approved.
         source: "/:path*",
         headers: [
           {
@@ -55,37 +60,6 @@ const nextConfig: NextConfig = {
             // Always HTTPS from here on. Without this a visitor's first request can be downgraded to http.
             key: "Strict-Transport-Security",
             value: "max-age=63072000; includeSubDomains",
-          },
-          {
-            // The part of a Content-Security-Policy that cannot break this app: no plugins, no
-            // <base> tag hijack, and no framing by other sites. A script-src policy needs per-request
-            // nonces and a staged rollout, so it is not switched on here.
-            key: "Content-Security-Policy",
-            value: "object-src 'none'; base-uri 'self'; frame-ancestors 'self'",
-          },
-          {
-            // The full policy, in report-only mode first: nothing is blocked, but every violation is reported to
-            // /api/csp-report so the allow-list can be checked against real traffic before it is enforced.
-            // Inline scripts stay allowed ('unsafe-inline') because the framework emits them without a per-request
-            // nonce; what this policy limits is where scripts load from and where the page can send data.
-            key: "Content-Security-Policy-Report-Only",
-            value: [
-              "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' https://cdn.onesignal.com",
-              "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob: https:",
-              "font-src 'self' data:",
-              "connect-src 'self' https://onesignal.com https://*.onesignal.com",
-              "frame-src https://www.youtube.com https://www.youtube-nocookie.com https://player.twitch.tv https://player.kick.com",
-              "media-src 'self' blob: https:",
-              "worker-src 'self' blob:",
-              "manifest-src 'self'",
-              "object-src 'none'",
-              "base-uri 'self'",
-              "form-action 'self'",
-              "frame-ancestors 'self'",
-              "report-uri /api/csp-report",
-            ].join("; "),
           },
           {
             key: "Permissions-Policy",
