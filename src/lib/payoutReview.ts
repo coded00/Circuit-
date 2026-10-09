@@ -34,6 +34,13 @@ export type PayoutReview = {
    * itself, which is all of them except a sponsored one.
    */
   unbackedAmount: number;
+  /**
+   * The recorded statement of where a sponsored prize's money is coming from (TournamentSponsorship), or
+   * null if nobody has recorded one. Reported rather than turned into a blocker: the requirement is
+   * enforced at the door in payoutApproval.ts, and putting it here as well would make the sweep stop
+   * setting its "needs staff review" note on exactly the tournaments that need it most.
+   */
+  sponsorship: { amountKobo: number; source: string; recordedByName: string; recordedAt: Date } | null;
   shares: { userId: string; name: string; place: number; declared: number; payable: number }[];
   openDisputes: number;
   openLobbyFlags: number;
@@ -43,7 +50,7 @@ export type PayoutReview = {
 export async function reviewTournamentPayout(tournament: Pick<Tournament, "id" | "organizerId" | "status" | "prizeAmount" | "prizeSplit" | "fundsFrozen" | "format" | "competitionStyle" | "placementPoints" | "killPoints" | "lobbyGroups" | "lobbyQualifiers" | "lobbyFinalRounds" | "leagueWinPoints" | "leagueDrawPoints">): Promise<PayoutReview> {
   const sum = (type: "ENTRY_FEE" | "PLATFORM_FEE" | "REFUND", statuses: ("PENDING" | "COMPLETE")[]) =>
     prisma.escrowTransaction.aggregate({ where: { tournamentId: tournament.id, type, status: { in: statuses } }, _sum: { amount: true }, _count: true });
-  const [entry, fee, refund, collected, fraction, shares, openDisputes, openLobbyFlags, organizer, setting] = await Promise.all([
+  const [entry, fee, refund, collected, fraction, shares, openDisputes, openLobbyFlags, organizer, setting, sponsorshipRow] = await Promise.all([
     sum("ENTRY_FEE", ["COMPLETE"]),
     sum("PLATFORM_FEE", ["COMPLETE"]),
     sum("REFUND", ["PENDING", "COMPLETE"]),
@@ -54,7 +61,14 @@ export async function reviewTournamentPayout(tournament: Pick<Tournament, "id" |
     prisma.lobbyFlag.count({ where: { round: { tournamentId: tournament.id }, status: { in: ["OPEN", "ESCALATED"] } } }),
     prisma.user.findUnique({ where: { id: tournament.organizerId }, select: { isStaff: true } }),
     prisma.platformSetting.findUnique({ where: { id: "singleton" }, select: { maxSponsoredPrizeKobo: true } }),
+    prisma.tournamentSponsorship.findUnique({
+      where: { tournamentId: tournament.id },
+      select: { amountKobo: true, source: true, createdAt: true, recordedBy: { select: { displayName: true } } },
+    }),
   ]);
+  const sponsorship = sponsorshipRow
+    ? { amountKobo: sponsorshipRow.amountKobo, source: sponsorshipRow.source, recordedByName: sponsorshipRow.recordedBy.displayName, recordedAt: sponsorshipRow.createdAt }
+    : null;
   const users = await prisma.user.findMany({ where: { id: { in: shares.map((s) => s.userId) } }, select: { id: true, displayName: true } });
   const names = new Map(users.map((u) => [u.id, u.displayName]));
   const declaredPrize = tournament.prizeAmount ?? 0;
@@ -94,6 +108,7 @@ export async function reviewTournamentPayout(tournament: Pick<Tournament, "id" |
     organizerShare,
     sponsored,
     unbackedAmount,
+    sponsorship,
     shares: rows,
     openDisputes,
     openLobbyFlags,

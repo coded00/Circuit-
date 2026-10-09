@@ -23,7 +23,7 @@ import { sendVerificationEmail } from "@/lib/emailVerification";
 import { prisma } from "@/lib/db";
 import { createSessionToken, hashPassword, sessionCookie } from "@/lib/auth";
 import { joinGlobalCommunity } from "@/lib/community";
-import { isRateLimited, recordAttempt, clearAttempts } from "@/lib/rateLimit";
+import { AUTH_LIMITS, callerThrottleKeys, clearAttempts, isCallerThrottled, isRateLimited, recordAttempt, recordCallerAttempt } from "@/lib/rateLimit";
 import { HANDLE_RULES_MESSAGE, validateHandle } from "@/lib/handles";
 import { normalizeNigerianPhone } from "@/lib/phone";
 import { isCountryCode } from "@/lib/countries";
@@ -31,18 +31,24 @@ import { MIN_PASSWORD_LENGTH } from "@/lib/passwordRules";
 import { parseSignupDateOfBirth } from "@/lib/age";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-// Keyed by the submitted email, not IP. This stops repeated automated
-// attempts against one identifier; it does NOT by itself stop mass
-// account creation with fresh emails — that needs IP throttling or a
-// CAPTCHA, a separate decision.
-const SIGNUP_MAX_ATTEMPTS = 5;
-const SIGNUP_WINDOW_MS = 15 * 60 * 1000;
+// Throttled on three layers (rateLimit.ts, `AUTH_LIMITS.signup`): 5 attempts per email, 30 per caller and
+// 500 platform-wide per 15 minutes. The per-email bucket alone never stopped mass creation with fresh
+// addresses — each new email opened a window of its own — which is what the caller and global buckets are
+// for. Unlike login's, the caller buckets count attempts that *succeed*, because that is the attack here.
 
 const EXISTING_ACCOUNT_MESSAGE = "Couldn't create your account. If you already have one, try logging in instead.";
 
 type Field = "name" | "email" | "password" | "confirmPassword" | "terms" | "handle" | "country" | "phone" | "dateOfBirth";
 const MAX_NAME_LENGTH = 40;
 const fail = (field: Field, error: string, status = 400) => NextResponse.json({ error, field }, { status });
+
+// No `field`: being over the limit is not a problem with anything the form sent, and pinning it to one
+// input would send the user back to a step that is fine.
+const tooManyAttempts = (retryAfterSeconds: number) =>
+  NextResponse.json(
+    { error: `Too many attempts. Try again in ${Math.ceil(retryAfterSeconds / 60)} minute(s).` },
+    { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } }
+  );
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -67,14 +73,18 @@ export async function POST(request: Request) {
   const dob = parseSignupDateOfBirth(body?.dateOfBirth);
   if (!dob.ok) return fail("dateOfBirth", dob.error);
 
+  // Every attempt that gets this far counts against the caller buckets, successful or not — mass account
+  // creation is an attack that works, so a rule counting only failures would not see it. Malformed fields
+  // are deliberately not counted: nothing past this point touches the database, and spending a shared
+  // address's budget on a client that cannot spell its own birthday is the wrong trade.
+  const callerKeys = callerThrottleKeys("signup", request);
+  const callerThrottle = await isCallerThrottled("signup", callerKeys);
+  if (callerThrottle.limited) return tooManyAttempts(callerThrottle.retryAfterSeconds);
+
   const rateLimitKey = `signup:${email}`;
-  const { limited, retryAfterSeconds } = await isRateLimited(rateLimitKey, { max: SIGNUP_MAX_ATTEMPTS, windowMs: SIGNUP_WINDOW_MS });
-  if (limited) {
-    return NextResponse.json(
-      { error: `Too many attempts. Try again in ${Math.ceil(retryAfterSeconds / 60)} minute(s).` },
-      { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } }
-    );
-  }
+  const { limited, retryAfterSeconds } = await isRateLimited(rateLimitKey, AUTH_LIMITS.signup.identifier);
+  if (limited) return tooManyAttempts(retryAfterSeconds);
+  await recordCallerAttempt(callerKeys);
 
   // Case-insensitive checks the unique indexes can't do on their own.
   const [emailTaken, phoneTaken] = await Promise.all([

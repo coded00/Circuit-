@@ -153,6 +153,10 @@ export async function cleanupAll(): Promise<void> {
   await prisma.rateLimitAttempt.deleteMany({ where: { key: { contains: "test-" } } });
   await prisma.auditLogEntry.deleteMany({ where: { actorId: { in: userIds } } });
   await prisma.bracket.deleteMany({ where: { tournamentId: { in: tournamentIds } } });
+  // Cascades off the tournament delete below anyway, and off the user delete after that (both FKs are
+  // ON DELETE CASCADE), but deleted explicitly so this file stays a readable list of everything a fixture
+  // can leave behind.
+  await prisma.tournamentSponsorship.deleteMany({ where: { OR: [{ tournamentId: { in: tournamentIds } }, { recordedById: { in: userIds } }] } });
   await prisma.tournament.deleteMany({ where: { id: { in: tournamentIds } } });
   await prisma.organizerProfile.deleteMany({ where: { userId: { in: userIds } } });
   // The catalogue fixtures (createTestCompetition), after the tournaments that point at them. Modes and
@@ -161,5 +165,17 @@ export async function cleanupAll(): Promise<void> {
   // Rate-limit rows are keyed by the user's id, not by anything matching "test-" above, so a route with
   // a 5-per-hour throttle would start answering 429 partway through a file without this.
   await prisma.rateLimitAttempt.deleteMany({ where: { key: { startsWith: "tournament-create:" } } });
+  // The caller-wide auth buckets (rateLimit.ts). These are the ones that would leak *between runs* rather
+  // than between tests: a test request carries no headers, so every one of them is filed under the single
+  // key "auth-ip:<scope>:unknown", and the 15-minute windows outlive the test process. Without this the
+  // suite answers 429 on the fourth run of the day. The global counter is one shared row by design, so it
+  // needs clearing for the same reason.
+  await prisma.rateLimitAttempt.deleteMany({ where: { key: { startsWith: "auth-ip:" } } });
+  await prisma.rateLimitAttempt.deleteMany({ where: { key: { startsWith: "auth-global:" } } });
+  // The public read buckets (rateLimit.ts) have the same shape and the same leak: a test request carries no
+  // headers, so every one is filed under "public-ip:<scope>:unknown", and the 1-minute windows outlive the
+  // test file. The images limit is 1200, so this only matters for a file that makes a lot of requests — but
+  // it is the same one-line fix as the two above and this file is meant to be the full list.
+  await prisma.rateLimitAttempt.deleteMany({ where: { key: { startsWith: "public-ip:" } } });
   await prisma.user.deleteMany({ where: { id: { in: userIds } } });
 }

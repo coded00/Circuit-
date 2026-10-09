@@ -45,6 +45,43 @@ describe("reviewTournamentPayout", () => {
     expect(review.blockers).toEqual([]); // legitimate, not a fault — a person just has to be the one to approve it
   });
 
+  it("reports the recorded sponsorship, so the approver can see what they are agreeing to", async () => {
+    const organizer = await createTestOrganizer({ isStaff: true });
+    const champion = await createTestUser();
+    const t = await createTestTournament(organizer.id, { status: "COMPLETE", completedAt: new Date(), prizeAmount: 200_000 });
+    await prisma.match.create({
+      data: { tournamentId: t.id, round: 1, playerAId: champion.id, playerBId: champion.id, status: "COMPLETE", winnerId: champion.id, matchCode: `TEST-${Date.now()}` },
+    });
+    const recordedAt = new Date();
+    await prisma.tournamentSponsorship.create({
+      data: { tournamentId: t.id, recordedById: organizer.id, amountKobo: 200_000, source: "Q3 marketing budget", createdAt: recordedAt },
+    });
+
+    const review = await reviewTournamentPayout(t);
+
+    expect(review.sponsorship).toMatchObject({ amountKobo: 200_000, source: "Q3 marketing budget", recordedByName: organizer.displayName });
+    expect(review.sponsorship?.recordedAt.getTime()).toBe(recordedAt.getTime());
+  });
+
+  it("reports a missing sponsorship as null — and still does not block on it", async () => {
+    // Load-bearing, and the reason the requirement lives at the door (payoutApproval.ts) rather than here.
+    // A blocker would make autoApprovePayouts `continue` *before* it sets its "Needs staff review" note —
+    // and that note is what stops the sweep re-checking the same tournament on every run, so the
+    // tournaments that most need a person's attention would be the ones silently left with no note on them.
+    const organizer = await createTestOrganizer({ isStaff: true });
+    const champion = await createTestUser();
+    const t = await createTestTournament(organizer.id, { status: "COMPLETE", completedAt: new Date(), prizeAmount: 200_000 });
+    await prisma.match.create({
+      data: { tournamentId: t.id, round: 1, playerAId: champion.id, playerBId: champion.id, status: "COMPLETE", winnerId: champion.id, matchCode: `TEST-${Date.now()}` },
+    });
+
+    const review = await reviewTournamentPayout(t);
+
+    expect(review.sponsorship).toBeNull();
+    expect(review.blockers).toEqual([]);
+    expect(review.unbackedAmount).toBe(200_000); // unchanged by whether a record exists
+  });
+
   it("lists what should hold the release back", async () => {
     const organizer = await createTestOrganizer();
     const player = await createTestUser();

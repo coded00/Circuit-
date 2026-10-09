@@ -11,20 +11,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireSuperAdmin } from "@/lib/session";
 import { logAdminAction } from "@/lib/auditLog";
-
-/**
- * The most any kobo-valued setting may be — ₦20,000,000.
- *
- * Every one of these columns is a Prisma `Int`, which is a PostgreSQL INT4
- * topping out at 2,147,483,647 (₦21,474,836.47). This ceiling used to be
- * 100,000,000,000 on all four fields, which is not a value the column can
- * hold: a super admin typing a big number got a Prisma conversion error and
- * a 500 from a route whose whole job is validating that number, instead of
- * the 400 the check above it was written to give. ₦20m is round, safely
- * inside INT4, and far above any real setting — the largest default here is
- * ₦1,000,000, and a single Battle stake caps at ₦100,000.
- */
-const MAX_KOBO_SETTING = 2_000_000_000;
+import { MAX_KOBO_COLUMN } from "@/lib/money";
 
 export async function PATCH(request: Request) {
   const superAdminAuth = await requireSuperAdmin("Only a Super Admin can change platform settings.");
@@ -88,7 +75,7 @@ export async function PATCH(request: Request) {
   if (body.payoutAutoApproveMaxKobo !== undefined) {
     const max = Number(body.payoutAutoApproveMaxKobo);
     // Kobo; 0 sends every payout to staff. The ceiling is only a guard against a mistyped amount.
-    if (!Number.isInteger(max) || max < 0 || max > MAX_KOBO_SETTING) {
+    if (!Number.isInteger(max) || max < 0 || max > MAX_KOBO_COLUMN) {
       return NextResponse.json({ error: "The automatic approval limit must be a whole number of kobo, 0 or more." }, { status: 400 });
     }
     data.payoutAutoApproveMaxKobo = max;
@@ -100,7 +87,7 @@ export async function PATCH(request: Request) {
     // Whole naira only, same as the stake limits — nobody reasons about a prize ceiling in fractional
     // kobo. Zero is allowed and is the kill switch: staff may not declare a cash prize at all, which is
     // a legitimate tightening rather than a nonsense value.
-    if (!Number.isInteger(max) || max < 0 || max % 100 !== 0 || max > MAX_KOBO_SETTING) {
+    if (!Number.isInteger(max) || max < 0 || max % 100 !== 0 || max > MAX_KOBO_COLUMN) {
       return NextResponse.json({ error: "The sponsored-prize ceiling must be a whole number of naira, 0 or more." }, { status: 400 });
     }
     data.maxSponsoredPrizeKobo = max;
@@ -125,7 +112,7 @@ export async function PATCH(request: Request) {
     // payout limit's — NGN 1bn is far above any real setting. Setting this
     // below the per-Battle cap is allowed and simply makes the per-Battle cap
     // unreachable, which is a legitimate way to tighten.
-    if (!Number.isInteger(max) || max < 0 || max % 100 !== 0 || max > MAX_KOBO_SETTING) {
+    if (!Number.isInteger(max) || max < 0 || max % 100 !== 0 || max > MAX_KOBO_COLUMN) {
       return NextResponse.json({ error: "The at-once stake limit must be a whole number of naira, 0 or more." }, { status: 400 });
     }
     data.maxLockedStakeKobo = max;
@@ -134,7 +121,7 @@ export async function PATCH(request: Request) {
 
   if (body.maxDailyStakeKobo !== undefined) {
     const max = Number(body.maxDailyStakeKobo);
-    if (!Number.isInteger(max) || max < 0 || max % 100 !== 0 || max > MAX_KOBO_SETTING) {
+    if (!Number.isInteger(max) || max < 0 || max % 100 !== 0 || max > MAX_KOBO_COLUMN) {
       return NextResponse.json({ error: "The daily stake limit must be a whole number of naira, 0 or more." }, { status: 400 });
     }
     data.maxDailyStakeKobo = max;
@@ -183,7 +170,7 @@ export async function PATCH(request: Request) {
     const max = Number(body.stakePatternNetAlertKobo);
     // Whole naira only, same as the stake limits — nobody reasons about a
     // threshold in fractional kobo.
-    if (!Number.isInteger(max) || max < 0 || max % 100 !== 0 || max > MAX_KOBO_SETTING) {
+    if (!Number.isInteger(max) || max < 0 || max % 100 !== 0 || max > MAX_KOBO_COLUMN) {
       return NextResponse.json({ error: "The net-transfer threshold must be a whole number of naira, 0 or more." }, { status: 400 });
     }
     data.stakePatternNetAlertKobo = max;

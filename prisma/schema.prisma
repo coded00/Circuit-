@@ -314,6 +314,7 @@ model User {
   stakePatternFlagsAsA    StakePatternFlag[]       @relation("StakePatternFlagsOnA")
   stakePatternFlagsAsB    StakePatternFlag[]       @relation("StakePatternFlagsOnB")
   stakePatternReviews     StakePatternFlag[]       @relation("StakePatternFlagsReviewed")
+  sponsorshipsRecorded    TournamentSponsorship[]  @relation("SponsorshipsRecorded")
   walletTransactions      WalletTransaction[]
   auditLogEntries         AuditLogEntry[]
   friendshipsSent         Friendship[]             @relation("FriendshipRequester")
@@ -338,6 +339,11 @@ model User {
 
   @@index([emailOrPhone])
   @@index([lastActiveAt])
+  // /api/search's `contains` on displayName and handle (finding #11). The
+  // @unique on handle above is a btree, which a leading-wildcard ILIKE
+  // cannot use either.
+  @@index([displayName(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([handle(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 /// The admin dashboard's two fixed roles (no per-permission matrix — a
@@ -778,6 +784,8 @@ model Tournament {
   /// owner or moderator of it.
   hostCommunityId String?
   hostCommunity   Community?          @relation("TournamentHostCommunity", fields: [hostCommunityId], references: [id], onDelete: SetNull)
+  /// Where the money for a sponsored prize is coming from — see TournamentSponsorship.
+  sponsorship     TournamentSponsorship?
 
   @@index([game, status])
   @@index([country])
@@ -785,6 +793,49 @@ model Tournament {
   // the community route all filter by organizerId alone (no game/status
   // alongside it), so the composite index above doesn't help those reads.
   @@index([organizerId])
+  // /api/search's `contains`/insensitive predicates (finding #11 of the
+  // security audit). These compile to ILIKE '%q%', which no btree — this
+  // model's own (game, status) included — can serve; they were sequential
+  // scans. Needs pg_trgm, created by the migration alongside them.
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([game(ops: raw("gin_trgm_ops"))], type: Gin)
+}
+
+/// Where the money for a sponsored prize is coming from. One at most per tournament.
+///
+/// Finding #3 of the security audit, follow-up two of two. A staff-run tournament is sponsored: its prize
+/// is paid from Circuit's own balance, so the rule that a prize can't exceed the entry fees collected does
+/// not apply to it. Two things now bound that. The prize has a ceiling (maxSponsoredPrizeKobo), and it has
+/// to be approved by a staff member who is neither the organizer nor a winner (payoutApproval.ts). What was
+/// still missing is any record of where the money comes from: the approval row named who said yes, and
+/// nothing named what they were saying yes to.
+///
+/// This is that record, and it is required — a sponsored prize with no sponsorship recorded (or one
+/// recorded for less than the unbacked amount) cannot be approved at all, by anyone, including a super
+/// admin. Without it the separation-of-duties rule only guarantees the second person agreed; with it they
+/// are agreeing to a stated amount from a stated source, in writing, on the record.
+///
+/// Deliberately not a ledger. Nothing here moves money or reserves it — it is a declaration, checked
+/// against the payout's unbacked amount at approval time. `source` is free text because the honest answer
+/// is a budget line or a sponsor's name, neither of which is a fixed vocabulary.
+model TournamentSponsorship {
+  id           String     @id @default(cuid())
+  tournamentId String     @unique
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  /// The staff member who recorded it. Named for the record, not for the money: the source of the funds is
+  /// `source`, and on a platform-funded tournament the funder is Circuit itself.
+  recordedById String
+  recordedBy   User       @relation("SponsorshipsRecorded", fields: [recordedById], references: [id], onDelete: Cascade)
+  /// What is being put behind this prize, in kobo. Has to cover the payout's unbacked amount at approval
+  /// time — the shortfall is what the approver is asked to look at.
+  amountKobo   Int
+  /// Where it is coming from: a budget line, a sponsor, a partner. Free text, length-bounded at the route.
+  source       String
+  note         String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([recordedById])
 }
 
 /// Links a User to a Tournament. Maps to REG-1..REG-7.
@@ -1114,6 +1165,10 @@ model Battle {
   // Match.playerAId/playerBId above.
   @@index([creatorId])
   @@index([targetUserId])
+  // /api/search's `contains` on game (finding #11) — see the note on
+  // Tournament's trigram indexes. The (game, status) btree above cannot
+  // serve a leading-wildcard ILIKE.
+  @@index([game(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 enum QuickMatchStatus {
@@ -1619,6 +1674,10 @@ model RateLimitAttempt {
   createdAt DateTime @default(now())
 
   @@index([key, createdAt])
+  // For the sweep's age-based purge (finding #14). The composite above leads with `key`, so it cannot
+  // serve `createdAt < cutoff` across every key at once — without this the two-minute sweep would be a
+  // sequential scan of the table it exists to keep small.
+  @@index([createdAt])
 }
 
 // ---------------------------------------------------------------------------
@@ -1777,6 +1836,9 @@ model Community {
 
   @@index([kind, enabled])
   @@index([gameId])
+  // /api/search's `contains` on name (finding #11) — see the note on
+  // Tournament's trigram indexes.
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 /// What a community is for. GLOBAL: the single platform-wide "Circuit"

@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { prisma } from "@/lib/db";
+import { AUTH_LIMITS } from "@/lib/rateLimit";
 import { createTestUser, cleanupAll, uniqueSuffix } from "@/testHelpers";
+import { sendEmail } from "@/lib/email";
 import { POST } from "./route";
 
 /**
@@ -29,6 +31,15 @@ const request = (emailOrPhone: string) =>
     new Request("http://localhost/api/auth/forgot-password", {
       method: "POST",
       headers: { "content-type": "application/json" },
+      body: JSON.stringify({ emailOrPhone }),
+    })
+  );
+
+const requestFrom = (ip: string, emailOrPhone: string) =>
+  POST(
+    new Request("http://localhost/api/auth/forgot-password", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-forwarded-for": ip },
       body: JSON.stringify({ emailOrPhone }),
     })
   );
@@ -78,5 +89,35 @@ describe("forgot-password throttle", () => {
     expect((await request(address)).status).toBe(200);
     expect((await request(`VICTIM-${suffix.toUpperCase()}@EXAMPLE.COM`)).status).toBe(200);
     expect((await request(`viCTim-${suffix}@example.com`)).status).toBe(429);
+  });
+});
+
+/**
+ * The caller layer here (finding #8). It is the same rule as login's, but the damage it bounds is
+ * different in kind: a request this route accepts is a query and possibly an email, so an attacker walking
+ * a list of addresses is not guessing passwords — they are spending the origin's database and mailing
+ * strangers, one address at a time, each in a bucket of its own.
+ */
+describe("forgot-password caller throttling", () => {
+  const IP = "203.0.113.11";
+  const ipKey = `auth-ip:forgot-password:${IP}`;
+
+  it("refuses a caller that has spent its budget, and sends nothing", async () => {
+    const suffix = uniqueSuffix();
+    const address = `victim-${suffix}@example.com`;
+    await createTestUser({ email: address, emailOrPhone: address });
+    keys.add(`forgot-password:${address}`);
+
+    await prisma.rateLimitAttempt.createMany({
+      data: Array.from({ length: AUTH_LIMITS["forgot-password"].caller.max }, () => ({ key: ipKey })),
+    });
+
+    const blocked = await requestFrom(IP, address);
+
+    expect(blocked.status).toBe(429);
+    // The refusal is before the lookup, so the mail is not merely suppressed — it was never composed. That
+    // is the difference that matters on this route: it is the one auth endpoint whose accepted requests
+    // land in somebody else's inbox.
+    expect(vi.mocked(sendEmail)).not.toHaveBeenCalled();
   });
 });

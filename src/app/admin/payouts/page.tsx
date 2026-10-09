@@ -8,7 +8,9 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { EmptyState, KeyValue, PageHeader, Panel, StatusBadge, SubNav, naira } from "@/components/admin/ui";
 import { PayoutApprovalControl } from "@/components/admin/PayoutApprovalControl";
+import { SponsorshipControl } from "@/components/admin/SponsorshipControl";
 import { reviewTournamentPayout } from "@/lib/payoutReview";
+import { sponsorshipShortfall } from "@/lib/sponsorship";
 
 const TABS = ["waiting", "approved"] as const;
 
@@ -122,8 +124,20 @@ export default async function AdminPayoutsPage({ searchParams }: { searchParams:
                 )}
                 {t.payoutApprovalNote && <p className="mt-3 text-xs text-muted">Note: {t.payoutApprovalNote}</p>}
 
+                {/* Only for a payout that spends Circuit's own balance: a record of where that money is
+                    coming from is required before it can be approved, by anyone. */}
+                {r.unbackedAmount > 0 && <SponsorshipControl tournamentId={t.id} current={r.sponsorship} approved={!!t.payoutApprovedAt} />}
+
                 <div className="mt-4">
-                  <PayoutApprovalControl tournamentId={t.id} approved={!!t.payoutApprovedAt} blocked={r.blockers.length > 0} canWithdraw />
+                  {/* `blocked` covers the funding record as well as the blockers list: the approval route
+                      refuses without it anyway, so a live button here would only produce a 409 — but a
+                      button that explains nothing is worse than one that is disabled next to the reason. */}
+                  <PayoutApprovalControl
+                    tournamentId={t.id}
+                    approved={!!t.payoutApprovedAt}
+                    blocked={r.blockers.length > 0 || sponsorshipShortfall({ unbackedAmount: r.unbackedAmount, sponsorship: r.sponsorship }) > 0}
+                    canWithdraw
+                  />
                 </div>
               </Panel>
             );
