@@ -139,6 +139,10 @@ export async function cleanupAll(): Promise<void> {
   await prisma.friendship.deleteMany({ where: { OR: [{ requesterId: mine }, { addresseeId: mine }] } });
   await prisma.message.deleteMany({ where: { authorId: mine } });
   await prisma.communityMember.deleteMany({ where: { userId: mine } });
+  // Communities a fixture built directly (the mentionable tests). Matched by name, so only PLAYER and
+  // GAME_HUB fixtures are caught — a TOURNAMENT community has no name of its own. After the members above,
+  // which would otherwise hold the row back, and before the user delete below, since ownerId points at one.
+  await prisma.community.deleteMany({ where: { name: { startsWith: "TEST-" } } });
   await prisma.videoLike.deleteMany({ where: { userId: mine } });
   await prisma.videoSave.deleteMany({ where: { userId: mine } });
   await prisma.report.deleteMany({ where: { OR: [{ reportedUserId: mine }, { reportedById: mine }] } });
