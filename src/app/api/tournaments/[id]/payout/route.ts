@@ -24,6 +24,8 @@ import { payableFraction, releaseDelayHours } from "@/lib/prizePool";
 import { isDefiniteRejection } from "@/lib/payments/errors";
 import { hasSettledFunds } from "@/lib/payments/balance";
 import { logAdminAction } from "@/lib/auditLog";
+import { MONEY_OUT_LIMITS } from "@/lib/rateLimit";
+import { limitOrRespond } from "@/lib/rateLimitHttp";
 
 // A row still PENDING or already COMPLETE means this prize is spoken for;
 // a FAILED row (the transfer call itself errored, or the provider reported
@@ -155,6 +157,17 @@ export async function POST(
       { status: 503, headers: { "Retry-After": "3600" } }
     );
   }
+
+  // Finding #17 — the same cap as the wallet withdrawal route and, for the same reason, the same
+  // placement: after the gates above (prizes not approved for release yet, not a prize place, entry
+  // fees still settling), because those refuse identically every time they are asked, and before the
+  // reservation below, which is the first thing on this route that costs anything.
+  const tooMany = await limitOrRespond(
+    `prize-payout:${user.id}`,
+    MONEY_OUT_LIMITS["prize-payout"],
+    "You've made a lot of prize claims in the last hour. Please wait a little while before trying again."
+  );
+  if (tooMany) return tooMany;
 
   // Reserve the claim — a PENDING row created inside a Serializable
   // transaction that re-checks for an existing claim first. Two concurrent

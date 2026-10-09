@@ -236,6 +236,54 @@ export async function throttlePublicRequest(
   return check;
 }
 
+// ---------------------------------------------------------------------------
+// Per-user throttling for the money-out routes (finding #17)
+// ---------------------------------------------------------------------------
+
+/** The routes that send money out of Circuit on a signed-in caller's say-so. */
+export type MoneyOutScope = "withdraw" | "prize-payout";
+
+const HOUR_MS = 60 * 60 * 1000;
+
+/**
+ * What one account may start, per hour, on a route that moves money out.
+ *
+ * Finding #17: neither route had a throttle at all. The only bound was the balance, and a balance bounds
+ * the *amount* — not the number of calls. Two costs follow from that, and the second is why this needed
+ * fixing rather than noting:
+ *
+ * - Every accepted call is a real provider transfer, and the provider charges for each one. A user who
+ *   splits a balance into many small withdrawals is spending Circuit's money to move their own: the
+ *   platform's own minimum is ₦100, well under the ~₦10 a single transfer costs. A provider that sees
+ *   that pattern also flags the account, which is worse than the fee.
+ * - The failure paths **give the balance back**. A withdrawal the provider reports FAILED is credited
+ *   back to the wallet, and a failed prize claim reopens the claim — both deliberately, because the
+ *   second attempt is often the one that works. So the balance does not bound retries either: a payout
+ *   method the provider keeps refusing is an unbounded loop of transfers against the provider, at
+ *   whatever rate the caller likes, with nothing counting.
+ *
+ * Every call past the gate counts — not only failures, unlike `AUTH_LIMITS`, where a correct password is
+ * not an attack. There is no "correct password" here: a call that reaches the provider has cost
+ * something whether or not it succeeds.
+ *
+ * **Five an hour, reasoned from a person's pace rather than from a cost model.** Someone moving their
+ * winnings out does it once; someone whose first attempt failed does it twice. Five is far above either
+ * and far below the rate at which the loop above is worth running. It is deliberately not tighter — a
+ * withdrawal is the user's own money, and refusing it is a worse failure than paying a provider fee, so
+ * the number leans generous.
+ *
+ * There is deliberately no platform-wide layer, unlike `AUTH_LIMITS`. A global cap on money-out would
+ * refuse a legitimate withdrawal on a busy day, which is an availability failure with someone's money
+ * behind it; and there is no anonymous amplification to defend against, because every caller is signed
+ * in and can only move what is already theirs.
+ *
+ * Where each route checks this matters as much as the number — see the two call sites.
+ */
+export const MONEY_OUT_LIMITS: Record<MoneyOutScope, Limit> = {
+  withdraw: { max: 5, windowMs: HOUR_MS },
+  "prize-payout": { max: 5, windowMs: HOUR_MS },
+};
+
 export async function isRateLimited(
   key: string,
   { max, windowMs }: { max: number; windowMs: number }
