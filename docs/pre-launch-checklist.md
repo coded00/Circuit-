@@ -53,7 +53,7 @@ withdrawals or prizes are switched on.
 | `NEXT_PUBLIC_APP_URL` | **Yes** | The public `https://` address. Used in payment callbacks, emails and share links. Rebuild after changing it. |
 | `CRON_SECRET` | **Yes** | `openssl rand -base64 32`. The sweep runner and the app must share it. |
 | `PAYSTACK_SECRET_KEY` | **Yes (money)** | `sk_live_…` for launch, `sk_test_…` while testing. Also verifies webhooks. There's no public key. Checkout is hosted by Paystack. |
-| `RESEND_API_KEY` | **Yes** | Password-reset and notification emails. Without it nothing is sent at all, and nobody can reset a password. The fallback logs who the email was for and its subject, never the message itself — reset and verification links are in there, and a log is not a private place. |
+| `RESEND_API_KEY` | **Yes** | Password-reset and notification emails, and it is what signup needs to issue a session — see the signup step below. Without it nothing is sent at all, and nobody can reset a password or verify an address. The fallback logs who the email was for and its subject, never the message itself: reset and verification links are in there, and a log is not a private place. |
 | `REQUIRE_VERIFIED_EMAIL` | Optional | Players must verify their email before paid entry, staking, withdrawing or claiming a prize. Turns on by itself once `RESEND_API_KEY` is set; `true` / `false` forces it. |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | If Google sign-in is on | The redirect URI in Google Cloud must be `https://<domain>/api/auth/google/callback`. |
 | `YOUTUBE_API_KEY` | Optional | Videos on the homepage and admin Content page. |
@@ -169,8 +169,13 @@ the same way; Paystack's test cards are on its docs site):
 
 ## 8. Smoke test on the live site
 
-- [ ] Sign up with email, sign out, then reset the password. The reset
-      email arrives.
+- [ ] Sign up with email. With `RESEND_API_KEY` set, signup **does not sign
+      you in** — it ends on "Check your email". That is deliberate: the same
+      screen is shown whether or not the address was already registered, so
+      nobody can use signup to discover who has an account. Open the link in
+      the email, log in, and you should land in the first-run flow. Google
+      sign-in is unaffected, because Google has already verified the address.
+- [ ] Sign out, then reset the password. The reset email arrives.
 - [ ] Google sign-in works (if enabled).
 - [ ] Create a free tournament, register two accounts, and let the
       deadline pass. Within about 2 minutes the sweep starts the bracket.

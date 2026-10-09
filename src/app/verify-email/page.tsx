@@ -8,6 +8,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CheckCircle2, MailWarning } from "lucide-react";
 import { verifyEmailToken, type VerifyResult } from "@/lib/emailVerification";
+import { getCurrentUser } from "@/lib/session";
+import { loginPath } from "@/lib/safeRedirect";
 
 export const metadata: Metadata = { title: "Verify email", robots: { index: false, follow: false } };
 
@@ -23,13 +25,22 @@ export default async function VerifyEmailPage({ searchParams }: { searchParams: 
   const { token } = await searchParams;
   const result = await verifyEmailToken(token ?? "");
   const copy = COPY[result];
+
+  // Whether to send them somewhere or to the login form. Signing up no longer issues a session when email
+  // is configured (finding #19), so the common visitor here is a brand-new account opening the link from
+  // their mail app — signed out, and one step from being able to use what they just made. Someone who was
+  // already signed in (resending from Account settings, or verifying a changed address) skips that.
+  const signedIn = Boolean(await getCurrentUser());
+
   return (
     <div className="state-block">
       {copy.ok ? <CheckCircle2 size={40} className="motion-scale-in text-success" /> : <MailWarning size={40} className="text-muted" />}
       <h1 className="state-title">{copy.title}</h1>
-      <p className="state-description">{copy.body}</p>
-      <Link href={copy.ok ? "/communities" : "/account"} className="btn-primary">
-        {copy.ok ? "Go to communities" : "Account settings"}
+      <p className="state-description">
+        {copy.ok && !signedIn ? "Your email is confirmed. Log in to finish setting up your account." : copy.body}
+      </p>
+      <Link href={copy.ok ? (signedIn ? "/communities" : loginPath("/welcome")) : "/account"} className="btn-primary">
+        {copy.ok ? (signedIn ? "Go to communities" : "Log in") : "Account settings"}
       </Link>
     </div>
   );

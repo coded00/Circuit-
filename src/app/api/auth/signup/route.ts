@@ -13,12 +13,16 @@
  *   paid entry and payouts still lives in src/lib/age-gate.ts.
  *
  * Errors carry `field` so the form can jump back to the step that needs
- * fixing. Email/phone conflicts are worded conditionally ("if you already
- * have one…") rather than confirming an account exists.
+ * fixing — with one deliberate exception. An email or phone that is already
+ * on an account is answered exactly like a successful signup when email can
+ * be delivered, because any distinguishable answer tells a stranger whether
+ * an address is registered (finding #19; see canDeliverEmail below). Handles
+ * keep their plain 409: they are public by design.
  */
 
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
+import { sendAlreadyRegisteredNotice } from "@/lib/accountEmails";
 import { sendVerificationEmail } from "@/lib/emailVerification";
 import { prisma } from "@/lib/db";
 import { createSessionToken, hashPassword, sessionCookie } from "@/lib/auth";
@@ -37,6 +41,60 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 // for. Unlike login's, the caller buckets count attempts that *succeed*, because that is the attack here.
 
 const EXISTING_ACCOUNT_MESSAGE = "Couldn't create your account. If you already have one, try logging in instead.";
+
+/**
+ * Whether this request can send email at all — and so whether signup hands the caller a session or a
+ * trip to their inbox (finding #19).
+ *
+ * With a provider configured, a fresh signup and a taken email or phone get the **same** 201, the same
+ * body and no cookie either way; the account is created, a verification link is sent, and the caller
+ * proves the address before they can get in. Without one, nothing can be delivered, so deferring the
+ * session would lock every new account out of a site they cannot finish joining — and this falls back to
+ * the old behaviour, session and per-field 409 included.
+ *
+ * Read per request rather than at import, so a test (or a restart with a different environment) changes
+ * it. `docs/pre-launch-checklist.md` requires the key in production, so every real deployment takes the
+ * deferred branch; the fallback is for local work and the test suite.
+ *
+ * Note what is *not* used as the switch: `emailVerificationEnforced()` (src/lib/emailGate.ts). That
+ * answers a different question — whether money actions may demand verification — and it is false when
+ * `REQUIRE_VERIFIED_EMAIL=false` even though email works fine. What matters here is only whether a link
+ * can be delivered, because that is the one thing the deferred flow cannot do without.
+ */
+const canDeliverEmail = () => Boolean(process.env.RESEND_API_KEY);
+
+/**
+ * The answer to an email or phone that is already on an account, in the mode where signup does not sign
+ * anyone in (finding #19). Byte-for-byte what a successful signup returns: same status, same body, no
+ * cookie — so the response says nothing about whether the address was free.
+ *
+ * `handle` is the caller's own, and safe to echo: a taken one is refused separately, and handles are
+ * public by design (see src/app/api/auth/handle-available/route.ts). The password has already been
+ * hashed on the way in, so this costs what the success path costs. The account's owner is told by email;
+ * the caller is told nothing.
+ *
+ * The address the notice goes to is looked up rather than assumed. When the clash is on the phone number,
+ * the person who owns it may never have used — or seen — the address this caller typed, and telling the
+ * caller's own address that "someone tried to sign up with it" would be both useless and untrue.
+ */
+async function alreadyRegistered(email: string, phone: string | null, handle: string) {
+  const owner = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { emailOrPhone: { equals: email, mode: "insensitive" } },
+        { email: { equals: email, mode: "insensitive" } },
+        ...(phone ? [{ phone }, { emailOrPhone: phone }] : []),
+      ],
+    },
+    select: { email: true, emailOrPhone: true },
+  });
+  // A conflict on an identifier with no address on it has nobody to tell; the response is the same either
+  // way, which is the property that matters.
+  const ownerEmail = owner?.email ?? (owner?.emailOrPhone.includes("@") ? owner.emailOrPhone : null);
+  if (ownerEmail) await sendAlreadyRegisteredNotice(ownerEmail);
+
+  return NextResponse.json({ pending: true, handle }, { status: 201 });
+}
 
 type Field = "name" | "email" | "password" | "confirmPassword" | "terms" | "handle" | "country" | "phone" | "dateOfBirth";
 const MAX_NAME_LENGTH = 40;
@@ -86,6 +144,14 @@ export async function POST(request: Request) {
   if (limited) return tooManyAttempts(retryAfterSeconds);
   await recordCallerAttempt(callerKeys);
 
+  const deferred = canDeliverEmail();
+
+  // Hashed *before* the checks below rather than after them, which is finding #19's timing half. bcrypt
+  // dominates this handler, and a conflict that returned without hashing would come back an order of
+  // magnitude faster than a success — an oracle that survives any change to the response itself, so a fix
+  // that only made the responses match would have been theatre.
+  const passwordHash = await hashPassword(password);
+
   // Case-insensitive checks the unique indexes can't do on their own.
   const [emailTaken, phoneTaken] = await Promise.all([
     prisma.user.findFirst({
@@ -94,16 +160,13 @@ export async function POST(request: Request) {
     }),
     phone ? prisma.user.findFirst({ where: { OR: [{ phone }, { emailOrPhone: phone }] }, select: { id: true } }) : null,
   ]);
-  if (emailTaken) {
+  if (emailTaken || phoneTaken) {
+    // Counted either way: the cost of asking has to be real, or probing is free.
     await recordAttempt(rateLimitKey);
-    return fail("email", EXISTING_ACCOUNT_MESSAGE, 409);
-  }
-  if (phoneTaken) {
-    await recordAttempt(rateLimitKey);
-    return fail("phone", EXISTING_ACCOUNT_MESSAGE, 409);
+    if (deferred) return alreadyRegistered(email, phone, handle);
+    return fail(emailTaken ? "email" : "phone", EXISTING_ACCOUNT_MESSAGE, 409);
   }
 
-  const passwordHash = await hashPassword(password);
   try {
     const user = await prisma.user.create({
       data: { emailOrPhone: email, email, phone, country, termsAcceptedAt: new Date(), dateOfBirth: dob.date, passwordHash, handle, displayName: name },
@@ -116,6 +179,12 @@ export async function POST(request: Request) {
     // Best-effort: a failed send just means they resend from Account settings.
     await sendVerificationEmail(user).catch(() => undefined);
 
+    // Finding #19: the same 201 the conflict above returns, and no cookie — the account exists but the
+    // address is unproven until the link in that email is opened (/verify-email), so there is nothing to
+    // sign in with yet. Signing in here instead would make this response distinguishable from the
+    // conflict's by its Set-Cookie header alone, which is as readable as the 409 it replaced.
+    if (deferred) return NextResponse.json({ pending: true, handle: user.handle }, { status: 201 });
+
     const token = await createSessionToken({ userId: user.id });
     const response = NextResponse.json({ id: user.id, handle: user.handle }, { status: 201 });
     response.cookies.set(sessionCookie.name, token, sessionCookie);
@@ -124,7 +193,12 @@ export async function POST(request: Request) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
       await recordAttempt(rateLimitKey);
       const target = (err.meta?.target as string[] | undefined) ?? [];
+      // A taken handle is refused plainly in both modes: it is public information, and
+      // `/api/auth/handle-available` already answers it for anyone who asks.
       if (target.includes("handle")) return fail("handle", "That username is already taken.", 409);
+      // The rest is the race the pre-check above cannot close — someone registered this address between
+      // our `findFirst` and our `create`. Same answer as the pre-check, by the same helper.
+      if (deferred) return alreadyRegistered(email, phone, handle);
       if (target.includes("phone")) return fail("phone", EXISTING_ACCOUNT_MESSAGE, 409);
       return fail("email", EXISTING_ACCOUNT_MESSAGE, 409);
     }
