@@ -7,8 +7,10 @@
  * email provider (RESEND_API_KEY) no verification link can be sent, so
  * requiring it would lock everyone out of paid actions; it switches on by
  * itself once email is configured. REQUIRE_VERIFIED_EMAIL=true forces it on
- * (handy locally, where the link is printed to the server log), =false forces
- * it off. Google sign-ups arrive already verified.
+ * (handy locally, where the fallback prints the link to the console so you can
+ * verify by hand — see logUndelivered in src/lib/email.ts for why development
+ * is the only place it prints), =false forces it off. Google sign-ups arrive
+ * already verified.
  */
 
 import { NextResponse } from "next/server";
