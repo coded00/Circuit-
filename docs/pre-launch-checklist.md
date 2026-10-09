@@ -174,6 +174,13 @@ the same way; Paystack's test cards are on its docs site):
       disputes don't wait on one person.
 - [ ] Test and seed accounts are removed or suspended.
 - [ ] The platform fee and maintenance mode are set in admin → Settings.
+- [ ] Remember that the finance CSVs (Wallet Activity and Tournament &
+      Challenge Transactions) are **Super Admin only**, and every download is
+      written to admin → Settings → Audit Log as `finance.export.wallet` /
+      `finance.export.escrow` with the filters used and the row count. A
+      Moderator sees those tabs on admin → Finance but no Export CSV button —
+      that is deliberate, not a missing feature. To answer "who took a copy of
+      the ledger", read the audit log.
 
 ## 8. Smoke test on the live site
 

@@ -8,7 +8,8 @@
 import { NextResponse } from "next/server";
 import type { EscrowStatus, EscrowType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { requireStaff } from "@/lib/session";
+import { requireSuperAdmin } from "@/lib/session";
+import { logAdminAction } from "@/lib/auditLog";
 import { csvEscape } from "@/lib/csv";
 
 function escrowTypeLabel(type: EscrowType): string {
@@ -31,8 +32,10 @@ function escrowTypeLabel(type: EscrowType): string {
 }
 
 export async function GET(request: Request) {
-  const staffAuth = await requireStaff();
-  if (staffAuth.error) return staffAuth.error;
+  // Finding #22 — same gate, same reasoning and the same 5,000-row ceiling as the wallet export beside it:
+  // every entry fee, refund, prize payout and stake on the platform, with player names, in one file.
+  const superAdminAuth = await requireSuperAdmin("Only a Super Admin can export finance data.");
+  if (superAdminAuth.error) return superAdminAuth.error;
 
   const { searchParams } = new URL(request.url);
   const eq = searchParams.get("eq")?.trim() ?? "";
@@ -63,6 +66,15 @@ export async function GET(request: Request) {
       user: { select: { displayName: true, handle: true } },
       registration: { include: { user: { select: { displayName: true, handle: true } } } },
     },
+  });
+
+  // Awaited, not fire-and-forget — see the wallet export's own comment for why an unrecorded export is
+  // the one outcome this must not produce.
+  await logAdminAction({
+    actorId: superAdminAuth.user.id,
+    action: "finance.export.escrow",
+    targetType: "EscrowTransaction",
+    metadata: { filters: { eq, etype, estatus }, rows: transactions.length },
   });
 
   const rows = [
