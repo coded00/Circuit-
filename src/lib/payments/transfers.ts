@@ -30,6 +30,7 @@ import type { PaymentProviderName } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { notify } from "@/lib/notifications";
 import { getPaymentProvider } from "@/lib/payments";
+import { isRateLimited, recordAttempt } from "@/lib/rateLimit";
 import { captureException, captureMessage } from "@/lib/observability";
 import type { TransferStatus } from "./types";
 
@@ -248,6 +249,12 @@ export async function applyRefundOutcome(chargeRef: string, outcome: "SUCCESS" |
 }
 
 const TRANSFER_STALE_MS = 30 * 60_000;
+/** How long a transfer can stay PENDING before it stops looking like a slow bank and starts needing a person. */
+const TRANSFER_STUCK_MS = 24 * 60 * 60_000;
+/** How often that alert is allowed to repeat while the money is still stuck. */
+const STUCK_ALERT_REPEAT_MS = 6 * 60 * 60_000;
+/** The key that budget is spent against — one shared alert, not one per row. */
+const STUCK_ALERT_KEY = "money-alert:transfers-stuck";
 const LATE_PAYMENT_MIN_AGE_MS = 15 * 60_000;
 const LATE_PAYMENT_MAX_AGE_MS = 3 * 24 * 60 * 60_000; // an abandoned checkout never resolves; stop asking
 const RECONCILE_BATCH = 25;
@@ -258,7 +265,12 @@ const RECONCILE_BATCH = 25;
  * withdrew or re-checked-out before the payment finished
  * (confirmEntryFeePayment refunds them if the charge went through).
  */
-export async function reconcilePendingMoney(): Promise<{ transfersSettled: number; latePaymentsChecked: number }> {
+export async function reconcilePendingMoney(): Promise<{
+  transfersSettled: number;
+  latePaymentsChecked: number;
+  /** Transfers still PENDING after a day, whether or not this run got to alert about them. */
+  stuckMoney: number;
+}> {
   const staleBefore = new Date(Date.now() - TRANSFER_STALE_MS);
   const [withdrawals, payouts] = await Promise.all([
     prisma.walletTransaction.findMany({
@@ -315,5 +327,43 @@ export async function reconcilePendingMoney(): Promise<{ transfersSettled: numbe
     }
   }
 
-  return { transfersSettled, latePaymentsChecked: latePayments.length };
+  // Finding #20. The loop above settles what it can, and a throw is reported as it happens — but a transfer
+  // the provider keeps answering PENDING about was silent. The row stayed PENDING, the sweep asked about it
+  // again two minutes later, and the only trace of money that had left a player's wallet was a count on a
+  // page somebody had to think to open. A bank transfer that is still going a day later is not a slow bank:
+  // it is somebody's money waiting on somebody at Circuit, so it gets an alert of its own.
+  //
+  // The alert is deliberately about the whole backlog rather than one row — what decides who looks at this
+  // now is how much is stuck, not which transfer it is — and it is spent against the rate limiter's own
+  // keyed budget rather than a new column, because "at most once per window" is exactly the shape that
+  // table already has. Six hours is the compromise: a genuinely stuck transfer stays in front of somebody,
+  // and one unlucky payout cannot become a message every two minutes for as long as it lasts.
+  const stuckBefore = new Date(Date.now() - TRANSFER_STUCK_MS);
+  const [stuckWithdrawals, stuckPayouts] = await Promise.all([
+    prisma.walletTransaction.aggregate({
+      where: { type: "WITHDRAWAL", status: "PENDING", createdAt: { lt: stuckBefore } },
+      _count: true,
+      _sum: { amount: true },
+    }),
+    prisma.escrowTransaction.aggregate({
+      where: { type: "PRIZE_PAYOUT", status: "PENDING", createdAt: { lt: stuckBefore } },
+      _count: true,
+      _sum: { amount: true },
+    }),
+  ]);
+  const stuckCount = stuckWithdrawals._count + stuckPayouts._count;
+  if (stuckCount > 0) {
+    const { limited } = await isRateLimited(STUCK_ALERT_KEY, { max: 1, windowMs: STUCK_ALERT_REPEAT_MS });
+    if (!limited) {
+      await recordAttempt(STUCK_ALERT_KEY);
+      captureMessage("Money stuck: transfers still pending after a day", "error", {
+        withdrawals: stuckWithdrawals._count,
+        withdrawalsKobo: stuckWithdrawals._sum.amount ?? 0,
+        prizePayouts: stuckPayouts._count,
+        prizePayoutsKobo: stuckPayouts._sum.amount ?? 0,
+      });
+    }
+  }
+
+  return { transfersSettled, latePaymentsChecked: latePayments.length, stuckMoney: stuckCount };
 }
