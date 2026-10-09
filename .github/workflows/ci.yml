@@ -11,11 +11,32 @@ name: CI
 # top-level `dynamic` overrides; every page is request-time dynamic
 # behind a real session cookie check), but DATABASE_URL now points at a
 # real one anyway since the service is already up for the test/e2e steps.
+#
+# Finding #24: every action below is pinned to a full commit SHA with the
+# release it came from in a trailing comment, rather than to a major tag.
+# A tag like `@v4` is a moving pointer its maintainer (or anyone who
+# compromises that account) can repoint at any commit, so `@v4` in this
+# file is not a promise about what actually ran. Renovate/Dependabot is
+# off, so the SHA will not move on its own — bumping one of these is a
+# deliberate edit, and the three are on current majors
+# (checkout v7.0.1, setup-node v7.1.0, cache v6.1.0).
+#
+# The job also declares its own token permissions instead of inheriting the
+# repository default, which on an older repo is still read/write — see
+# `permissions` below.
 
 on:
   push:
     branches: [main, master]
   pull_request:
+
+# Least privilege. Everything this workflow does with the GitHub API is
+# read-only: checkout fetches the repo, setup-node and cache talk to their
+# own services under the runtime token, not this one. A compromised action,
+# or a step added by a fork's pull request, gets a token that can read this
+# repository and nothing else — where the default would have let it push.
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -50,10 +71,10 @@ jobs:
           --health-retries 5
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
@@ -92,7 +113,7 @@ jobs:
         run: echo "version=$(node -p "require('./package-lock.json').packages['node_modules/@playwright/test'].version")" >> "$GITHUB_OUTPUT"
 
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
