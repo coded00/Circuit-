@@ -68,6 +68,97 @@ describe("applyTransferOutcome — withdrawals", () => {
   it("ignores a reference it doesn't know", async () => {
     expect(await applyTransferOutcome(`test-nope-${uniqueSuffix()}`, "FAILED")).toBe("UNKNOWN");
   });
+
+  /**
+   * Finding #21. A withdrawal marked FAILED (the provider refused it, or the call threw) whose transfer
+   * turns out to have gone out after all. Before this, the row stayed FAILED, the credited-back money stayed
+   * in the wallet, and the only trace was a line in Sentry — Circuit paid the withdrawal *and* kept the
+   * balance it had already given back, with a ledger that said neither had happened.
+   */
+  describe("a withdrawal that failed and then turned out to have succeeded", () => {
+    /** A withdrawal that was refused — so the row is FAILED and the money is back in the wallet. */
+    async function failedWithdrawal(amount = 50_000, balanceAfterRefund = 50_000) {
+      const row = await pendingWithdrawal(amount, 0);
+      await applyTransferOutcome(row.reference, "FAILED");
+      if (balanceAfterRefund !== amount) {
+        await prisma.user.update({ where: { id: row.user.id }, data: { walletBalance: balanceAfterRefund } });
+      }
+      vi.mocked(captureMessage).mockClear();
+      return row;
+    }
+
+    it("takes the money back and records what actually happened", async () => {
+      const { user, reference } = await failedWithdrawal();
+
+      expect(await applyTransferOutcome(reference, "SUCCESS")).toBe("APPLIED");
+
+      const txn = await prisma.walletTransaction.findUniqueOrThrow({ where: { providerRef: reference } });
+      // The row has to move too. A FAILED row whose amount has been debited is the same lie the other way
+      // up — /admin/finance would show a withdrawal that never paid out.
+      expect(txn.status).toBe("COMPLETE");
+      expect((await prisma.user.findUniqueOrThrow({ where: { id: user.id } })).walletBalance).toBe(0);
+    });
+
+    it("takes it back exactly once, however many times the webhook arrives", async () => {
+      const { user, reference } = await failedWithdrawal();
+
+      await Promise.all([
+        applyTransferOutcome(reference, "SUCCESS"),
+        applyTransferOutcome(reference, "SUCCESS"),
+        applyTransferOutcome(reference, "SUCCESS"),
+      ]);
+
+      expect((await prisma.user.findUniqueOrThrow({ where: { id: user.id } })).walletBalance).toBe(0);
+    });
+
+    it("still alerts, because a provider that changed its mind is worth knowing about", async () => {
+      const { reference } = await failedWithdrawal();
+
+      await applyTransferOutcome(reference, "SUCCESS");
+
+      expect(captureMessage).toHaveBeenCalledWith(
+        "Withdrawal succeeded after it was marked failed and refunded to the wallet",
+        "error",
+        expect.objectContaining({ playerOverdrawn: false })
+      );
+    });
+
+    it("lets the balance go negative when the player already spent the refunded money", async () => {
+      // The money was given back, spent, and then the provider says it went out after all. Clawing back only
+      // what is left would quietly forgive the difference; the truthful entry is that the player was paid
+      // twice, and every spend path already requires a balance that covers the amount, so this blocks them
+      // until it is settled.
+      const { user, reference } = await failedWithdrawal(50_000, 5_000);
+
+      await applyTransferOutcome(reference, "SUCCESS");
+
+      expect((await prisma.user.findUniqueOrThrow({ where: { id: user.id } })).walletBalance).toBe(-45_000);
+    });
+
+    it("says so when it had to go negative, so somebody can decide what to do about it", async () => {
+      const { reference } = await failedWithdrawal(50_000, 5_000);
+
+      await applyTransferOutcome(reference, "SUCCESS");
+
+      expect(captureMessage).toHaveBeenCalledWith(
+        "Withdrawal succeeded after it was marked failed and refunded to the wallet",
+        "error",
+        expect.objectContaining({ amount: 50_000, balanceAfterClawback: -45_000, playerOverdrawn: true })
+      );
+    });
+
+    it("does nothing to a withdrawal that is already complete", async () => {
+      // The ordinary replay. A COMPLETE row is not a FAILED one, and must not be debited again.
+      const { user, reference } = await pendingWithdrawal(50_000, 0);
+      await applyTransferOutcome(reference, "SUCCESS");
+      vi.mocked(captureMessage).mockClear();
+
+      expect(await applyTransferOutcome(reference, "SUCCESS")).toBe("NO_CHANGE");
+
+      expect((await prisma.user.findUniqueOrThrow({ where: { id: user.id } })).walletBalance).toBe(0);
+      expect(captureMessage).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe("applyTransferOutcome — prize payouts", () => {

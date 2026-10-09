@@ -218,3 +218,13 @@ the same way; Paystack's test cards are on its docs site):
       succeeded after it was marked failed", "Entry-fee refund failed at
       the provider", "Paystack webhook rejected: invalid signature", and
       "Money stuck: transfers still pending after a day".
+- [ ] **"Withdrawal succeeded after it was marked failed" means the
+      provider changed its mind** — Circuit had already marked the
+      withdrawal failed and put the money back. The app corrects itself
+      when it sees this: the withdrawal is marked complete and the amount
+      comes out of the wallet again. If the player had already spent it,
+      their balance goes **negative**, which blocks them from spending or
+      withdrawing until it is settled, and the alert says so
+      (`playerOverdrawn: true`). There is no admin screen for adjusting a
+      wallet balance yet, so that case is a support conversation and a
+      manual correction.
