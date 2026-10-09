@@ -11,11 +11,16 @@
  *   back into the wallet; a prize payout can be claimed again (the payout
  *   route treats a FAILED row as unclaimed). A reversal can follow a
  *   success, so COMPLETE rows are reversible too.
+ * - success on a row already FAILED → the money did go out after all, so
+ *   the row goes back to COMPLETE and a withdrawal's credited-back money
+ *   comes out of the wallet again (finding #21). This is the one transition
+ *   that can leave a wallet negative, and it is meant to: see its own
+ *   comment for why that is the honest entry rather than a mistake.
  *
  * Every change is a compare-and-swap on the row's status, so a webhook
  * replay, the webhook racing the sweep, or the webhook racing the route
  * that initiated the transfer all apply an outcome once — the wallet is
- * credited back exactly once.
+ * credited back exactly once, and taken back exactly once.
  *
  * Refunds get the same treatment: issueEntryFeeRefund() records a REFUND
  * row before calling the provider (so a fast `refund.processed` webhook
@@ -52,15 +57,48 @@ export async function applyTransferOutcome(reference: string, outcome: TransferO
   if (withdrawal && withdrawal.type === "WITHDRAWAL") {
     if (outcome === "SUCCESS") {
       const done = await prisma.walletTransaction.updateMany({ where: { id: withdrawal.id, status: "PENDING" }, data: { status: "COMPLETE" } });
-      if (done.count === 0 && withdrawal.status === "FAILED") {
-        // We gave the balance back (the transfer call errored) but the money went out anyway.
-        captureMessage("Withdrawal succeeded after it was marked failed and refunded to the wallet", "error", {
-          walletTransactionId: withdrawal.id,
-          userId: withdrawal.userId,
-          amount: withdrawal.amount,
+      if (done.count) return "APPLIED";
+      // Already settled, one way or another. A replayed webhook lands here and must take nothing back a
+      // second time.
+      if (withdrawal.status !== "FAILED") return "NO_CHANGE";
+
+      // Finding #21. The row says FAILED and the provider says the money went out anyway — so the balance
+      // was given back when it was marked failed, and Circuit is now short by the amount while the player
+      // holds it twice. Both halves of that have to be put right, and together: taking the money back while
+      // the row still read FAILED would leave /admin/finance showing a failed withdrawal whose amount had
+      // been debited, which is the same lie pointing the other way.
+      //
+      // The debit is deliberately unconditional, so the balance goes negative if the player already spent
+      // the refunded money. That is the truthful entry — they were paid twice and the second payment is a
+      // debt — and it is safe to record because every spend path in the app (withdrawals, entry fees,
+      // stakes, Marketplace) already requires `walletBalance >= amount`, so a negative balance blocks them
+      // until it is settled. Clamping it at zero instead would quietly forgive the difference and leave
+      // nothing behind to collect.
+      const clawedBack = await prisma.$transaction(async (tx) => {
+        const flipped = await tx.walletTransaction.updateMany({
+          where: { id: withdrawal.id, status: "FAILED" },
+          data: { status: "COMPLETE" },
         });
-      }
-      return done.count ? "APPLIED" : "NO_CHANGE";
+        if (flipped.count === 0) return false;
+        await tx.user.update({ where: { id: withdrawal.userId }, data: { walletBalance: { decrement: withdrawal.amount } } });
+        return true;
+      });
+      if (!clawedBack) return "NO_CHANGE";
+
+      // Read back rather than assume: whether the clawback left the player overdrawn is the one fact that
+      // decides whether this needs a person today or is simply a corrected ledger, so it goes in the alert.
+      const { walletBalance } = await prisma.user.findUniqueOrThrow({
+        where: { id: withdrawal.userId },
+        select: { walletBalance: true },
+      });
+      captureMessage("Withdrawal succeeded after it was marked failed and refunded to the wallet", "error", {
+        walletTransactionId: withdrawal.id,
+        userId: withdrawal.userId,
+        amount: withdrawal.amount,
+        balanceAfterClawback: walletBalance,
+        playerOverdrawn: walletBalance < 0,
+      });
+      return "APPLIED";
     }
     const returned = await prisma.$transaction(async (tx) => {
       const flipped = await tx.walletTransaction.updateMany({
