@@ -53,7 +53,7 @@ withdrawals or prizes are switched on.
 | `NEXT_PUBLIC_APP_URL` | **Yes** | The public `https://` address. Used in payment callbacks, emails and share links. Rebuild after changing it. |
 | `CRON_SECRET` | **Yes** | `openssl rand -base64 32`. The sweep runner and the app must share it. |
 | `PAYSTACK_SECRET_KEY` | **Yes (money)** | `sk_live_…` for launch, `sk_test_…` while testing. Also verifies webhooks. There's no public key. Checkout is hosted by Paystack. |
-| `RESEND_API_KEY` | **Yes** | Password-reset and notification emails. Without it, emails are only printed to the server log, and nobody can reset a password. |
+| `RESEND_API_KEY` | **Yes** | Password-reset and notification emails. Without it nothing is sent at all, and nobody can reset a password. The fallback logs who the email was for and its subject, never the message itself — reset and verification links are in there, and a log is not a private place. |
 | `REQUIRE_VERIFIED_EMAIL` | Optional | Players must verify their email before paid entry, staking, withdrawing or claiming a prize. Turns on by itself once `RESEND_API_KEY` is set; `true` / `false` forces it. |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | If Google sign-in is on | The redirect URI in Google Cloud must be `https://<domain>/api/auth/google/callback`. |
 | `YOUTUBE_API_KEY` | Optional | Videos on the homepage and admin Content page. |
@@ -186,7 +186,8 @@ the same way; Paystack's test cards are on its docs site):
 - [ ] Only staff can sell for now. Stock it from admin → Marketplace; the
       nine placeholder products from development are removed.
 - [ ] **Order emails** (receipt, delivered, refunded) need `RESEND_API_KEY`.
-      Without it they are only printed to the server log.
+      Without it nothing is sent, and the fallback names only the recipient
+      and the subject — the body carries the instant-download link.
 - [ ] Instant-download ebooks: the file is hosted outside Circuit and the
       link is only ever revealed to people who bought it, but a buyer can
       still see where it points. Host files somewhere that lets you expire
