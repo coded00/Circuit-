@@ -30,6 +30,7 @@ import type {
   EscrowStatus,
 } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { getCurrentUser } from "@/lib/session";
 import { Download } from "lucide-react";
 import { EmptyState, Field, FilterBar, naira, PageHeader, Pagination, Section, StatStrip, StatusBadge, SubNav } from "@/components/admin/ui";
 import { RowLink } from "@/components/admin/ui-client";
@@ -216,11 +217,16 @@ export default async function AdminFinancePage({ searchParams }: { searchParams:
     const qs = params.toString();
     return qs ? `/admin/finance?${qs}` : "/admin/finance";
   };
-  const exportLink = (href: string) => (
-    <a href={href} className="btn-ghost">
-      <Download size={14} /> Export CSV
-    </a>
-  );
+  // Finding #22. Both export routes are Super Admin only, so the button that points at them is too —
+  // otherwise a moderator clicks Export and lands on a 403 instead of a file. The page itself and every
+  // filter on it stay open to all staff; what a moderator loses is the bulk copy, not the lookup.
+  const canExport = (await getCurrentUser())?.adminRole === "SUPER_ADMIN";
+  const exportLink = (href: string) =>
+    canExport ? (
+      <a href={href} className="btn-ghost">
+        <Download size={14} /> Export CSV
+      </a>
+    ) : null;
 
   return (
     <>
