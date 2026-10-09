@@ -124,7 +124,15 @@ ignores the rest:
 
 Each event is applied once, even if Paystack retries it. If a webhook never
 arrives, the sweep asks Paystack about any transfer still processing after
-30 minutes.
+30 minutes — and if one is *still* unsettled a day later, the sweep raises
+**"Money stuck: transfers still pending after a day"** rather than leaving it
+to be noticed. Turn that alert on in Sentry (below).
+
+Flutterwave is legacy and read-only here — `FLUTTERWAVE_SECRET_KEY` is
+unset, so its webhook route refuses everything and no new charge or
+transfer is ever created on it. If you ever re-enable it, its webhook
+handles charges and transfers; its refunds have no webhook to subscribe
+to and still settle through the sweep, like any missed webhook.
 
 **Account set-up:**
 
@@ -208,4 +216,5 @@ the same way; Paystack's test cards are on its docs site):
       are real money waiting on someone.
 - [ ] If Sentry is set, turn on alerts for these messages: "Withdrawal
       succeeded after it was marked failed", "Entry-fee refund failed at
-      the provider", and "Paystack webhook rejected: invalid signature".
+      the provider", "Paystack webhook rejected: invalid signature", and
+      "Money stuck: transfers still pending after a day".

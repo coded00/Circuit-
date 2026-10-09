@@ -182,5 +182,9 @@ export async function cleanupAll(): Promise<void> {
   // test file. The images limit is 1200, so this only matters for a file that makes a lot of requests — but
   // it is the same one-line fix as the two above and this file is meant to be the full list.
   await prisma.rateLimitAttempt.deleteMany({ where: { key: { startsWith: "public-ip:" } } });
+  // The sweep's stuck-money alert (finding #20) spends its once-per-six-hours budget through the same table,
+  // against one shared key. Left behind, the first test in a file to see a stuck transfer would consume the
+  // window and every later test in that file would assert on a silenced alert.
+  await prisma.rateLimitAttempt.deleteMany({ where: { key: { startsWith: "money-alert:" } } });
   await prisma.user.deleteMany({ where: { id: { in: userIds } } });
 }

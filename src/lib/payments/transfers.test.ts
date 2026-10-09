@@ -11,8 +11,17 @@ import { createTestOrganizer, createTestTournament, createTestUser, cleanupAll, 
  * everything downstream is the real code against the real database.
  */
 
+// The alerting sink, so the stuck-money alert (finding #20) can be asserted on rather than only read in a
+// console that CI throws away.
+vi.mock("@/lib/observability", () => ({ captureException: vi.fn(), captureMessage: vi.fn() }));
+const { captureMessage } = await import("@/lib/observability");
+
+/** The exact message the sweep raises once money has been out for a day. */
+const STUCK_ALERT = "Money stuck: transfers still pending after a day";
+
 afterEach(async () => {
   vi.restoreAllMocks();
+  vi.mocked(captureMessage).mockClear();
   await cleanupAll();
 });
 
@@ -234,5 +243,68 @@ describe("late payments", () => {
 
     expect((await prisma.walletTransaction.findUniqueOrThrow({ where: { providerRef: reference } })).status).toBe("FAILED");
     expect((await prisma.user.findUniqueOrThrow({ where: { id: user.id } })).walletBalance).toBe(50_000);
+  });
+});
+
+/**
+ * Finding #20, the half that was silent. The sweep settles what it can and reports what throws, but a transfer
+ * the provider keeps answering PENDING about did neither — the row stayed PENDING, the sweep asked again two
+ * minutes later, and money that had left a player's wallet showed up only as a count on a page somebody had to
+ * think to open. These tests are about the alert that closes that gap, and about it not becoming its own noise.
+ */
+describe("stuck money (finding #20)", () => {
+  /** A withdrawal aged past the alert threshold, with the provider still saying PENDING about it. */
+  async function stuckWithdrawal(ageMs: number, amount = 50_000) {
+    const row = await pendingWithdrawal(amount);
+    await prisma.walletTransaction.updateMany({
+      where: { providerRef: row.reference },
+      data: { createdAt: new Date(Date.now() - ageMs) },
+    });
+    vi.spyOn(paystackClient, "verifyTransfer").mockResolvedValue("PENDING");
+    return row;
+  }
+
+  it("alerts once money has been out for a day", async () => {
+    await stuckWithdrawal(25 * 60 * 60_000, 50_000);
+
+    const result = await reconcilePendingMoney();
+
+    expect(captureMessage).toHaveBeenCalledWith(STUCK_ALERT, "error", expect.objectContaining({ withdrawals: 1, withdrawalsKobo: 50_000 }));
+    expect(result.stuckMoney).toBe(1);
+  });
+
+  it("stays quiet while a transfer is merely slow", async () => {
+    // The same row, still inside the day. A bank transfer that takes an afternoon is not an incident, and an
+    // alert that fires for one is an alert nobody reads by the time it matters.
+    await stuckWithdrawal(45 * 60_000);
+
+    const result = await reconcilePendingMoney();
+
+    expect(captureMessage).not.toHaveBeenCalledWith(STUCK_ALERT, "error", expect.anything());
+    expect(result.stuckMoney).toBe(0);
+  });
+
+  it("does not repeat itself every two minutes for as long as the money is stuck", async () => {
+    // The sweep runs every two minutes; a transfer stuck for a week is ~5000 runs. One alert every six hours
+    // keeps it in front of somebody without training them to filter the channel out.
+    await stuckWithdrawal(25 * 60 * 60_000);
+
+    await reconcilePendingMoney();
+    await reconcilePendingMoney();
+    await reconcilePendingMoney();
+
+    expect(vi.mocked(captureMessage).mock.calls.filter(([message]) => message === STUCK_ALERT)).toHaveLength(1);
+  });
+
+  it("counts every stuck transfer, not just the ones this run's batch reached", async () => {
+    // The alert is deliberately not bounded by RECONCILE_BATCH: the size of the backlog is what decides who
+    // looks at it, and money the batch never got to is exactly the money nobody would otherwise see.
+    await stuckWithdrawal(25 * 60 * 60_000, 30_000);
+    await stuckWithdrawal(25 * 60 * 60_000, 70_000);
+
+    const result = await reconcilePendingMoney();
+
+    expect(captureMessage).toHaveBeenCalledWith(STUCK_ALERT, "error", expect.objectContaining({ withdrawals: 2, withdrawalsKobo: 100_000 }));
+    expect(result.stuckMoney).toBe(2);
   });
 });
