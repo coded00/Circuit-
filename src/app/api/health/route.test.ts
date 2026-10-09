@@ -115,6 +115,7 @@ describe("what staff get", () => {
     expect(body.checks.integrations).toEqual({
       paystack: true,
       flutterwave: false,
+      bachs: false,
       resend: true,
       onesignal: false,
       // Deleted in beforeEach, and the whole point of it being off the public body.
