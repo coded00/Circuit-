@@ -4,6 +4,8 @@ import { useState } from "react";
 import { BATTLE_EXPIRY_OPTIONS, DEFAULT_BATTLE_EXPIRY_HOURS } from "@/lib/battleExpiry";
 import { useRouter } from "next/navigation";
 import { OptionCard } from "@/components/OptionCard";
+import { StakeLimitsNote } from "@/components/StakeLimitsNote";
+import type { StakeBudget } from "@/lib/stakes";
 
 function nairaToKobo(value: string): number {
   const naira = Number(value || 0);
@@ -19,9 +21,12 @@ type Friend = { handle: string; displayName: string };
 export default function BattleForm({
   games,
   friends,
+  budget,
 }: {
   games: { id: string; name: string }[];
   friends: Friend[];
+  /** Read on the server from the same query `lockStake` enforces against — see StakeLimitsNote. */
+  budget: StakeBudget;
 }) {
   const router = useRouter();
   const [game, setGame] = useState(games[0]?.name ?? "");
@@ -136,6 +141,9 @@ export default function BattleForm({
               Locked from your wallet now. Your opponent matches it to accept — the winner takes both. Capped at ₦
               {MAX_STAKE_NAIRA.toLocaleString("en-NG")} per Battle.
             </span>
+            {/* Only under Staked, and only the running totals: a player who is choosing Free has no use for
+                their stake budget, and one who is staking has just moved their eyes here. */}
+            <StakeLimitsNote {...budget} />
           </div>
         )}
       </div>

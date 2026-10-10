@@ -221,6 +221,15 @@ the same way; Paystack's test cards are on its docs site):
       deadline pass. Within about 2 minutes the sweep starts the bracket.
       Report a result from one side, dispute it from the other, then rule
       it in admin → Disputes.
+- [ ] Open a challenge, pick **Staked**, and check the two figures under the
+      stake field — what you have in play now, and what you have staked in the
+      last 24 hours, each against its limit. Open **Account → Responsible
+      play** and check the same two are there. They come from the same query
+      that refuses a stake, so a number that looks wrong is a real one worth
+      understanding before launch, not a display bug. The form states what has
+      been staked and never how much more could be — that is deliberate (see
+      `src/components/StakeLimitsNote.tsx`), so don't "fix" it by adding the
+      subtraction.
 - [ ] Upload a proof screenshot and open it as the other player. It loads.
 - [ ] Admin Overview shows **All clear** once the test is tidied up.
 

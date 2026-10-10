@@ -1,7 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/db";
 import { cleanupAll, createTestUser } from "@/testHelpers";
-import { InsufficientWalletBalanceError, MAX_STAKE_AMOUNT, lockStake } from "./stakes";
+import {
+  DEFAULT_MAX_DAILY_STAKE,
+  DEFAULT_MAX_LOCKED_STAKE,
+  InsufficientWalletBalanceError,
+  MAX_STAKE_AMOUNT,
+  lockStake,
+  stakeBudget,
+} from "./stakes";
 import { DAY_MS } from "./selfExclusion";
 
 /**
@@ -250,5 +257,103 @@ describe("lockStake success", () => {
     const battle = await newBattle(user.id, CAP);
 
     await expect(lock(user.id, CAP, { battleId: battle.id })).resolves.toBeUndefined();
+  });
+});
+
+/**
+ * The other side of the same numbers: `stakeBudget` is what the challenge form
+ * and the Responsible play tab show a player. Its whole job is to be the same
+ * arithmetic `lockStake` refuses with — a readout that says there is room and
+ * then refuses the stake is worse than showing nothing at all, so the first
+ * test below does not check the four figures against literals; it checks them
+ * against what `lockStake` actually does with the next kobo.
+ */
+describe("stakeBudget — the figures the readout shows", () => {
+  it("reports exactly what lockStake enforces: the room it describes is the room that exists", async () => {
+    const user = await createTestUser({ walletBalance: 100_000_000 });
+    await battleStakes(user.id, 2, CAP, "OPEN"); // ₦200,000 at risk
+
+    const budget = await stakeBudget(prisma, user.id);
+    expect(budget).toMatchObject({
+      lockedTotal: 2 * CAP,
+      maxLocked: TEST_LIMITS.maxLockedStakeKobo,
+      maxDaily: TEST_LIMITS.maxDailyStakeKobo,
+    });
+
+    // Stake exactly the gap the readout describes — the last kobo of it is
+    // allowed.
+    const headroom = budget.maxLocked - budget.lockedTotal;
+    const exact = await newBattle(user.id, headroom);
+    await expect(lock(user.id, headroom, { battleId: exact.id })).resolves.toBeUndefined();
+
+    // And one kobo past it is refused. Both numbers came from the same row, so
+    // if the readout and the refusal ever drifted apart this is where it shows.
+    const over = await newBattle(user.id, 1);
+    await expect(lock(user.id, headroom + 1, { battleId: over.id })).rejects.toMatchObject({ code: "LOCKED_TOTAL" });
+  });
+
+  it("counts a host's unaccepted challenge as in play, and drops it once the challenge is cancelled", async () => {
+    // The same gap the wallet page's held-in-challenges figure has: a host's
+    // stake is locked before any Battle exists, so a sum over the battle
+    // relation alone reports nothing at risk while the money is gone.
+    const user = await createTestUser({ walletBalance: 100_000_000 });
+    await pendingChallengeStakes(user.id, 2, CAP);
+
+    expect((await stakeBudget(prisma, user.id)).lockedTotal).toBe(2 * CAP);
+
+    // Cancelling refunds, so the money stops being at risk — but the stake
+    // still happened, so the 24-hour figure keeps it.
+    await prisma.quickMatchChallenge.updateMany({ where: { hostId: user.id }, data: { status: "CANCELLED" } });
+    const after = await stakeBudget(prisma, user.id);
+    expect(after.lockedTotal).toBe(0);
+    expect(after.dailyTotal).toBe(2 * CAP);
+  });
+
+  it("stops counting a settled Battle as in play but keeps counting it in the 24 hours", async () => {
+    // These are two different questions and the readout shows them as two
+    // lines: what is at risk now, and what has gone through today. A figure
+    // that answered both with one number would understate one of them.
+    const user = await createTestUser({ walletBalance: 100_000_000 });
+    await battleStakes(user.id, 2, CAP, "COMPLETE");
+
+    const budget = await stakeBudget(prisma, user.id);
+    expect(budget.lockedTotal).toBe(0);
+    expect(budget.dailyTotal).toBe(2 * CAP);
+  });
+
+  it("does not count a stake older than the rolling window", async () => {
+    // The mirror of the test above, so the 24-hour line can't pass by counting
+    // every stake the account has ever made.
+    const user = await createTestUser({ walletBalance: 100_000_000 });
+    await battleStakes(user.id, 2, CAP, "COMPLETE", new Date(Date.now() - 25 * 3_600_000));
+
+    expect((await stakeBudget(prisma, user.id)).dailyTotal).toBe(0);
+  });
+
+  it("reads the ceilings off the settings row, and falls back when there is no row to read", async () => {
+    // A fresh database (and every test in this file before its beforeEach) has
+    // no singleton. The fallbacks are what the code enforces then, so the
+    // readout has to report those same ones.
+    const user = await createTestUser({ walletBalance: 100_000_000 });
+
+    const fromRow = await stakeBudget(prisma, user.id);
+    expect(fromRow.maxLocked).toBe(TEST_LIMITS.maxLockedStakeKobo);
+    expect(fromRow.maxDaily).toBe(TEST_LIMITS.maxDailyStakeKobo);
+
+    const noRow = await stakeBudget(prisma, user.id, null);
+    expect(noRow.maxLocked).toBe(DEFAULT_MAX_LOCKED_STAKE);
+    expect(noRow.maxDaily).toBe(DEFAULT_MAX_DAILY_STAKE);
+  });
+
+  it("uses the settings row it is handed rather than reading one of its own", async () => {
+    // This is the path lockStake takes: it has the row already (it reads it at
+    // the top for the kill switch) and passes it through, so the ceilings it
+    // refuses with are from the same read as the switch it refuses with. If
+    // this argument were ignored, every stake would be judged against a
+    // re-read row while the switch came from the first one.
+    const user = await createTestUser({ walletBalance: 100_000_000 });
+
+    const budget = await stakeBudget(prisma, user.id, { maxLockedStakeKobo: 1_234_567, maxDailyStakeKobo: 7_654_321 });
+    expect(budget).toMatchObject({ maxLocked: 1_234_567, maxDaily: 7_654_321 });
   });
 });

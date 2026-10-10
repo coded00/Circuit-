@@ -77,6 +77,75 @@ type StakeTarget = {
   quickMatchChallengeId?: string;
 };
 
+/** The two ceilings, as stored on the PlatformSetting singleton. */
+type StakeLimits = { maxLockedStakeKobo: number; maxDailyStakeKobo: number };
+
+/** What an account has staked, against the limits it is held to. */
+export type StakeBudget = {
+  /** At risk right now: open and accepted Battles, plus a host's stake on a challenge nobody has taken. */
+  lockedTotal: number;
+  /** Everything staked in the last 24 hours — settled or refunded alike, which is what the limit counts. */
+  dailyTotal: number;
+  maxLocked: number;
+  maxDaily: number;
+};
+
+/**
+ * The four numbers a stake is judged by, and the only place they are read.
+ *
+ * `lockStake` calls this for the two comparisons it enforces, and the challenge
+ * form and the Responsible play tab call it to show a player the same figures.
+ * That is the point of it being one function: a readout that computed these
+ * its own way could tell a player they had room and then refuse them, which is
+ * worse than showing them nothing.
+ *
+ * `db` is a transaction when a stake is being locked, for the same reason
+ * `lockStake` takes one — these reads must see the same snapshot as the debit
+ * that follows them, and the row lock it takes first is what stops two
+ * simultaneous stakes from both finding room.
+ *
+ * `limits` is the PlatformSetting row when the caller already has it:
+ * `lockStake` reads it at the top for the kill switch, and passing it through
+ * keeps the ceilings it enforces from the same read as the switch it enforces.
+ * Leave it out and this reads the row; pass null for a database without one.
+ */
+export async function stakeBudget(db: Prisma.TransactionClient, userId: string, limits?: StakeLimits | null): Promise<StakeBudget> {
+  const now = Date.now();
+  const [setting, locked, daily] = await Promise.all([
+    limits === undefined ? db.platformSetting.findUnique({ where: { id: "singleton" } }) : Promise.resolve(limits),
+    db.escrowTransaction.aggregate({
+      where: {
+        userId,
+        type: "STAKE",
+        OR: [
+          { battle: { status: { in: ["OPEN", "ACCEPTED"] } } },
+          // The host's stake on a challenge nobody has accepted yet: locked,
+          // but with no Battle to hang off. Filtering on the battle relation
+          // alone — as the wallet page's held-in-challenges figure does —
+          // misses these, which would leave the gap exactly where a host
+          // running many open challenges needs it counted.
+          { battleId: null, quickMatchChallenge: { status: "PENDING" } },
+        ],
+      },
+      _sum: { amount: true },
+    }),
+    // Every stake in the window, settled or refunded alike. Intentionally not
+    // narrowed to still-locked rows: a refund that restored the day's budget
+    // would let a pair move any amount by opening and cancelling in a loop.
+    db.escrowTransaction.aggregate({
+      where: { userId, type: "STAKE", createdAt: { gte: new Date(now - STAKE_WINDOW_MS) } },
+      _sum: { amount: true },
+    }),
+  ]);
+
+  return {
+    lockedTotal: locked._sum.amount ?? 0,
+    dailyTotal: daily._sum.amount ?? 0,
+    maxLocked: setting?.maxLockedStakeKobo ?? DEFAULT_MAX_LOCKED_STAKE,
+    maxDaily: setting?.maxDailyStakeKobo ?? DEFAULT_MAX_DAILY_STAKE,
+  };
+}
+
 /**
  * The gates, then the debit, then the escrow row. Order matters: nothing is
  * written until every limit has passed, so a refusal costs one rolled-back
@@ -124,34 +193,8 @@ export async function lockStake(tx: Prisma.TransactionClient, target: StakeTarge
     throw new StakeLimitError("PER_BATTLE", `Stake amount can't exceed ${naira(MAX_STAKE_AMOUNT)}.`);
   }
 
-  const [locked, daily] = await Promise.all([
-    tx.escrowTransaction.aggregate({
-      where: {
-        userId,
-        type: "STAKE",
-        OR: [
-          { battle: { status: { in: ["OPEN", "ACCEPTED"] } } },
-          // The host's stake on a challenge nobody has accepted yet: locked,
-          // but with no Battle to hang off. Filtering on the battle relation
-          // alone — as the wallet page's held-in-challenges figure does —
-          // misses these, which would leave the gap exactly where a host
-          // running many open challenges needs it counted.
-          { battleId: null, quickMatchChallenge: { status: "PENDING" } },
-        ],
-      },
-      _sum: { amount: true },
-    }),
-    // Every stake in the window, settled or refunded alike. Intentionally not
-    // narrowed to still-locked rows: a refund that restored the day's budget
-    // would let a pair move any amount by opening and cancelling in a loop.
-    tx.escrowTransaction.aggregate({
-      where: { userId, type: "STAKE", createdAt: { gte: new Date(now - STAKE_WINDOW_MS) } },
-      _sum: { amount: true },
-    }),
-  ]);
+  const { lockedTotal, dailyTotal, maxLocked, maxDaily } = await stakeBudget(tx, userId, setting);
 
-  const maxLocked = setting?.maxLockedStakeKobo ?? DEFAULT_MAX_LOCKED_STAKE;
-  const lockedTotal = locked._sum.amount ?? 0;
   if (lockedTotal + amount > maxLocked) {
     throw new StakeLimitError(
       "LOCKED_TOTAL",
@@ -159,8 +202,6 @@ export async function lockStake(tx: Prisma.TransactionClient, target: StakeTarge
     );
   }
 
-  const maxDaily = setting?.maxDailyStakeKobo ?? DEFAULT_MAX_DAILY_STAKE;
-  const dailyTotal = daily._sum.amount ?? 0;
   if (dailyTotal + amount > maxDaily) {
     throw new StakeLimitError(
       "DAILY_TOTAL",

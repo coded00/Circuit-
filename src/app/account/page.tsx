@@ -11,6 +11,8 @@ import { CommunityTagPicker } from "@/components/community/CommunityTagPicker";
 import { AppealForm } from "@/components/community/AppealForm";
 import { EmailVerificationBanner } from "@/components/EmailVerificationBanner";
 import { SectionTabs, type SectionTab } from "@/components/ui/SectionTabs";
+import { StakeLimitsNote } from "@/components/StakeLimitsNote";
+import { stakeBudget } from "@/lib/stakes";
 import AccountForm from "./AccountForm";
 import { SignInMethods } from "./SignInMethods";
 import PrivacyForm from "./PrivacyForm";
@@ -30,7 +32,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
     redirect(loginPath("/account"));
   }
   const { tab } = await searchParams;
-  const [google, taggedCommunities, openAppeals, blocked] = await Promise.all([
+  const [google, taggedCommunities, openAppeals, blocked, budget] = await Promise.all([
     prisma.authIdentity.findUnique({
       where: { userId_provider: { userId: user.id, provider: "google" } },
       select: { email: true },
@@ -42,6 +44,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
     }),
     prisma.appeal.count({ where: { userId: user.id, kind: "ACCOUNT_SUSPENSION", status: "OPEN" } }),
     listBlocked(user.id),
+    stakeBudget(prisma, user.id),
   ]);
 
   // Settings in sections, not one long stack: who you are, how you sign in,
@@ -95,10 +98,19 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
       key: "responsible",
       label: "Responsible play",
       content: (
-        <ResponsiblePlayForm
-          initialUntil={user.selfExcludedUntil?.toISOString() ?? null}
-          initialStartedAt={user.selfExcludedAt?.toISOString() ?? null}
-        />
+        <div className="flex flex-col gap-6">
+          {/* The cool-off is the headline on this tab, so the form goes first and the stake figures sit
+              under it — where a player who has just come here to slow down will find them without
+              having to look. */}
+          <ResponsiblePlayForm
+            initialUntil={user.selfExcludedUntil?.toISOString() ?? null}
+            initialStartedAt={user.selfExcludedAt?.toISOString() ?? null}
+          />
+          <div className="flex flex-col gap-2">
+            <h2 className="text-eyebrow text-muted">Your staking</h2>
+            <StakeLimitsNote {...budget} />
+          </div>
+        </div>
       ),
     },
     { key: "preferences", label: "Preferences", content: <PreferencesForm /> },
