@@ -128,6 +128,22 @@ arrives, the sweep asks Paystack about any transfer still processing after
 **"Money stuck: transfers still pending after a day"** rather than leaving it
 to be noticed. Turn that alert on in Sentry (below).
 
+**A payout that failed and then turns out to have succeeded** raises
+**"Prize payout succeeded after it was marked failed"**. Failing a payout
+reopens the claim, so by the time that message arrives the winner may already
+have been paid a second time — the alert says whether they were, and how much.
+There is no way to claw a bank transfer back, so this one always needs a
+person. It should be treated as urgent, not as noise: watch for it in Sentry
+(below) alongside the stuck-money alert.
+
+Before handing out a second reference, the payout route asks Paystack what
+became of any earlier failed attempt on that tournament and sends nothing if
+the answer is anything but a definite failure. If Paystack cannot be reached
+to answer, the claim is refused with a retry-later message rather than paid —
+deliberately, because paying twice cannot be undone. A winner seeing that
+message repeatedly while nothing else on the site is failing is a signal that
+the payout API key or the account is in trouble.
+
 Flutterwave is legacy and read-only here — `FLUTTERWAVE_SECRET_KEY` is
 unset, so its webhook route refuses everything and no new charge or
 transfer is ever created on it. If you ever re-enable it, its webhook
