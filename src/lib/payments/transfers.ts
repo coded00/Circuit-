@@ -16,6 +16,10 @@
  *   comes out of the wallet again (finding #21). This is the one transition
  *   that can leave a wallet negative, and it is meant to: see its own
  *   comment for why that is the honest entry rather than a mistake.
+ *   The same transition on a prize payout is worse — a failed payout
+ *   releases the claim, so the champion may already have been paid again —
+ *   and there is no balance to take it back out of, so it records the row
+ *   and raises a loud alert naming both payments instead of correcting them.
  *
  * Every change is a compare-and-swap on the row's status, so a webhook
  * replay, the webhook racing the sweep, or the webhook racing the route
@@ -121,26 +125,69 @@ export async function applyTransferOutcome(reference: string, outcome: TransferO
 
   const payout = await prisma.escrowTransaction.findUnique({ where: { providerRef: reference } });
   if (payout && payout.type === "PRIZE_PAYOUT") {
-    const flipped = await prisma.escrowTransaction.updateMany({
-      where: { id: payout.id, status: outcome === "SUCCESS" ? "PENDING" : { in: ["PENDING", "COMPLETE"] } },
-      data: { status: outcome === "SUCCESS" ? "COMPLETE" : "FAILED" },
-    });
-    if (flipped.count === 0) return "NO_CHANGE";
-    if (outcome !== "SUCCESS") {
-      captureMessage(`Prize payout ${outcome === "REVERSED" ? "reversed" : "failed"}; claim reopened`, "warning", {
+    if (outcome === "SUCCESS") {
+      const done = await prisma.escrowTransaction.updateMany({ where: { id: payout.id, status: "PENDING" }, data: { status: "COMPLETE" } });
+      if (done.count) return "APPLIED";
+      // A COMPLETE row is a replay of a success we already recorded, and there is nothing to say about it.
+      // A FAILED row is what this branch is for — the same shape as the withdrawal branch above, and the
+      // reason a prize payout used to be able to go out twice. A failed payout releases the claim (the
+      // payout route treats only PENDING and COMPLETE as spoken for), so the champion may have claimed
+      // again and been paid again under a second reference by now. Nothing else ever asks the provider
+      // about a FAILED reference again — the sweep re-checks PENDING rows only — so this webhook is the
+      // last chance to record that the first transfer did land after all.
+      if (payout.status !== "FAILED") return "NO_CHANGE";
+
+      const flipped = await prisma.escrowTransaction.updateMany({ where: { id: payout.id, status: "FAILED" }, data: { status: "COMPLETE" } });
+      if (flipped.count === 0) return "NO_CHANGE";
+
+      // Unlike a withdrawal there is no balance to take this back out of — the money is in the champion's
+      // bank — so the honest output is a loud one for a person, not a correction. Counting the other
+      // completed payouts for the same champion and tournament is what separates "something is off" from
+      // "this player has been paid twice, here is how much".
+      const alsoPaid =
+        payout.tournamentId && payout.userId
+          ? await prisma.escrowTransaction.aggregate({
+              where: {
+                tournamentId: payout.tournamentId,
+                userId: payout.userId,
+                type: "PRIZE_PAYOUT",
+                status: "COMPLETE",
+                id: { not: payout.id },
+              },
+              _count: true,
+              _sum: { amount: true },
+            })
+          : null;
+      captureMessage("Prize payout succeeded after it was marked failed", "error", {
         escrowTransactionId: payout.id,
         tournamentId: payout.tournamentId,
         userId: payout.userId,
         amount: payout.amount,
+        otherPayoutsForTournament: alsoPaid?._count ?? 0,
+        otherPayoutsKobo: alsoPaid?._sum.amount ?? 0,
+        playerPaidTwice: (alsoPaid?._count ?? 0) > 0,
       });
-      if (payout.userId && payout.tournamentId) {
-        const tournament = await prisma.tournament.findUnique({ where: { id: payout.tournamentId }, select: { name: true } });
-        await notify(payout.userId, "PRIZE_PAYOUT_FAILED", {
-          tournamentId: payout.tournamentId,
-          tournamentName: tournament?.name,
-          amount: payout.amount,
-        }).catch(() => undefined);
-      }
+      return "APPLIED";
+    }
+
+    const flipped = await prisma.escrowTransaction.updateMany({
+      where: { id: payout.id, status: { in: ["PENDING", "COMPLETE"] } },
+      data: { status: "FAILED" },
+    });
+    if (flipped.count === 0) return "NO_CHANGE";
+    captureMessage(`Prize payout ${outcome === "REVERSED" ? "reversed" : "failed"}; claim reopened`, "warning", {
+      escrowTransactionId: payout.id,
+      tournamentId: payout.tournamentId,
+      userId: payout.userId,
+      amount: payout.amount,
+    });
+    if (payout.userId && payout.tournamentId) {
+      const tournament = await prisma.tournament.findUnique({ where: { id: payout.tournamentId }, select: { name: true } });
+      await notify(payout.userId, "PRIZE_PAYOUT_FAILED", {
+        tournamentId: payout.tournamentId,
+        tournamentName: tournament?.name,
+        amount: payout.amount,
+      }).catch(() => undefined);
     }
     return "APPLIED";
   }

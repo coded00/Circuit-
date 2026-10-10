@@ -14,7 +14,7 @@ import { Prisma, EscrowStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { tournamentPrizeShares } from "@/lib/prizePlaces";
 import { getCurrentUser, suspendedResponse } from "@/lib/session";
-import { getDefaultPaymentProvider } from "@/lib/payments";
+import { getDefaultPaymentProvider, getPaymentProvider, type TransferStatus } from "@/lib/payments";
 import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
 import { trackEvent } from "@/lib/analytics";
 import { applyTransferOutcome } from "@/lib/payments/transfers";
@@ -29,7 +29,9 @@ import { limitOrRespond } from "@/lib/rateLimitHttp";
 
 // A row still PENDING or already COMPLETE means this prize is spoken for;
 // a FAILED row (the transfer call itself errored, or the provider reported
-// a failure) doesn't block a fresh claim attempt.
+// a failure) doesn't block a fresh claim attempt — but it is not simply
+// ignored either: the re-verify guard below asks the provider what actually
+// became of it first (finding 1a).
 const CLAIMED_STATUSES: EscrowStatus[] = ["PENDING", "COMPLETE"];
 
 // Same isolation + retry pattern as applyWinnerAdvancement in
@@ -168,6 +170,71 @@ export async function POST(
     "You've made a lot of prize claims in the last hour. Please wait a little while before trying again."
   );
   if (tooMany) return tooMany;
+
+  // Finding 1a — a PENDING or COMPLETE row blocks a fresh claim, a FAILED one
+  // deliberately doesn't (see CLAIMED_STATUSES above): the ordinary FAILED row
+  // is a transfer that never left, and the champion should be able to try
+  // again. The unsafe one is a transfer the provider *did* pay while this app
+  // recorded FAILED — a webhook that landed after the row was flipped, or a
+  // reconcile answer overtaken by a later success. Failing a payout reopens
+  // the claim, so the champion comes back, gets a brand-new reference, and is
+  // paid a second time. And because the sweep only ever re-checks PENDING
+  // rows, nothing would ever ask the provider about the failed reference
+  // again: a double payout with no record of it anywhere.
+  //
+  // So before reserving a fresh reference, ask the provider what became of
+  // this player's failed attempts on this tournament. Normally there are
+  // none, and this is one indexed read with no network call behind it.
+  const failedAttempts = await prisma.escrowTransaction.findMany({
+    where: { tournamentId: id, type: "PRIZE_PAYOUT", status: "FAILED", providerRef: { not: null }, provider: { not: null }, ...mineOrLegacy },
+    select: { providerRef: true, provider: true },
+  });
+  for (const attempt of failedAttempts) {
+    let status: TransferStatus;
+    try {
+      // The row's own provider, not the default — a legacy Flutterwave payout
+      // has to be asked of Flutterwave.
+      status = await getPaymentProvider(attempt.provider!).verifyTransfer(attempt.providerRef!);
+    } catch (err) {
+      // Deliberately the opposite of getBalance's "unknown, not empty: callers
+      // carry on rather than blocking every payout". That lookup runs on every
+      // claim and its failure means only that we don't know the balance; this
+      // one runs only when a prior attempt is already on record, and its
+      // failure leaves us unable to rule out that the prize was paid. Carrying
+      // on there can pay the same prize twice and say nothing; refusing only
+      // delays a claim that is still waiting on a release window anyway. The
+      // capture below is what keeps the refusal from being silent — it is the
+      // only signal if the provider is answering nobody. The champion can
+      // retry, and a retry is what resolves it.
+      captureException(err, {
+        route: "tournaments/[id]/payout",
+        stage: "reverifyFailedPayout",
+        tournamentId: id,
+        userId: user.id,
+        providerRef: attempt.providerRef,
+      });
+      return NextResponse.json(
+        { error: "We're double-checking an earlier attempt at this prize. Please try again in a little while." },
+        { status: 503, headers: { "Retry-After": "3600" } }
+      );
+    }
+
+    // Only a definite "it did not go" frees this reference's claim. SUCCESS
+    // obviously didn't, and PENDING means it is in flight right now — neither
+    // leaves anything here to claim.
+    if (status === "FAILED" || status === "REVERSED") continue;
+
+    if (status === "SUCCESS") {
+      // Record it exactly as the webhook would have, so the row stops saying
+      // FAILED and transfers.ts raises its paid-twice alert.
+      await applyTransferOutcome(attempt.providerRef!, "SUCCESS");
+      return NextResponse.json({ error: "This prize has already been paid out." }, { status: 409 });
+    }
+    return NextResponse.json(
+      { error: "A payout for this prize is still being processed. Your prize is safe — please check back shortly." },
+      { status: 409 }
+    );
+  }
 
   // Reserve the claim — a PENDING row created inside a Serializable
   // transaction that re-checks for an existing claim first. Two concurrent

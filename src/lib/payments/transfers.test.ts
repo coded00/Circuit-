@@ -175,6 +175,129 @@ describe("applyTransferOutcome — prize payouts", () => {
     expect(row.status).toBe("FAILED");
     expect(await prisma.notification.count({ where: { userId: winner.id, type: "PRIZE_PAYOUT_FAILED" } })).toBe(1);
   });
+
+  /**
+   * Finding 1a — the mirror image of the withdrawal case above, and the one that cannot be corrected.
+   *
+   * Failing a payout reopens the claim, which is deliberate: the ordinary FAILED row is a transfer that
+   * never left. But when the provider later says that same reference was paid, the champion has already
+   * been free to claim again with a fresh reference — so there may be two completed payouts for one prize
+   * and no balance anywhere to take the second one back out of. All this can do is stop lying: the row
+   * moves to COMPLETE and a person is told, with enough in the alert to see whether it happened twice.
+   *
+   * Nothing else would ever have noticed. The sweep asks only about PENDING rows, and the route treats
+   * only PENDING and COMPLETE as claimed, so a FAILED row was the one state neither of them looked at.
+   */
+  describe("a prize payout that failed and then turned out to have succeeded", () => {
+    /** A payout the provider refused — so the row is FAILED and the champion is free to claim again. */
+    async function failedPayout(amount = 100_000) {
+      const organizer = await createTestOrganizer();
+      const winner = await createTestUser();
+      const tournament = await createTestTournament(organizer.id, { status: "COMPLETE", prizeAmount: amount });
+      const reference = `test-payout-${uniqueSuffix()}`;
+      await prisma.escrowTransaction.create({
+        data: { tournamentId: tournament.id, type: "PRIZE_PAYOUT", amount, userId: winner.id, place: 1, provider: "PAYSTACK", providerRef: reference, status: "FAILED" },
+      });
+      vi.mocked(captureMessage).mockClear();
+      return { tournament, winner, reference };
+    }
+
+    it("stops claiming the prize never went out", async () => {
+      const { reference } = await failedPayout();
+
+      expect(await applyTransferOutcome(reference, "SUCCESS")).toBe("APPLIED");
+
+      const row = await prisma.escrowTransaction.findUniqueOrThrow({ where: { providerRef: reference } });
+      expect(row.status).toBe("COMPLETE");
+    });
+
+    it("alerts, because the money is already in the champion's bank and only a person can settle that", async () => {
+      const { tournament, winner, reference } = await failedPayout();
+
+      await applyTransferOutcome(reference, "SUCCESS");
+
+      expect(captureMessage).toHaveBeenCalledWith(
+        "Prize payout succeeded after it was marked failed",
+        "error",
+        expect.objectContaining({ tournamentId: tournament.id, userId: winner.id, amount: 100_000, playerPaidTwice: false })
+      );
+    });
+
+    it("says how much was paid twice when the champion's second claim had already completed", async () => {
+      // The whole of finding 1a, end to end: the first transfer is marked FAILED, the champion claims
+      // again and that one completes, and only then does the first reference come back as paid.
+      const { tournament, winner, reference } = await failedPayout();
+      await prisma.escrowTransaction.create({
+        data: { tournamentId: tournament.id, type: "PRIZE_PAYOUT", amount: 100_000, userId: winner.id, place: 1, provider: "PAYSTACK", providerRef: `test-payout-${uniqueSuffix()}`, status: "COMPLETE" },
+      });
+
+      await applyTransferOutcome(reference, "SUCCESS");
+
+      expect(captureMessage).toHaveBeenCalledWith(
+        "Prize payout succeeded after it was marked failed",
+        "error",
+        expect.objectContaining({ playerPaidTwice: true, otherPayoutsForTournament: 1, otherPayoutsKobo: 100_000 })
+      );
+    });
+
+    it("counts only this champion's payouts for this tournament", async () => {
+      // The count is what turns "something is off" into "this player was paid twice", so it has to be
+      // scoped to the pair — another tournament's winner completing a payout is ordinary, not evidence.
+      const { winner, reference } = await failedPayout();
+      const otherOrganizer = await createTestOrganizer();
+      const otherTournament = await createTestTournament(otherOrganizer.id, { status: "COMPLETE", prizeAmount: 100_000 });
+      await prisma.escrowTransaction.create({
+        data: { tournamentId: otherTournament.id, type: "PRIZE_PAYOUT", amount: 100_000, userId: winner.id, place: 1, provider: "PAYSTACK", providerRef: `test-payout-${uniqueSuffix()}`, status: "COMPLETE" },
+      });
+
+      await applyTransferOutcome(reference, "SUCCESS");
+
+      expect(captureMessage).toHaveBeenCalledWith(
+        "Prize payout succeeded after it was marked failed",
+        "error",
+        expect.objectContaining({ playerPaidTwice: false, otherPayoutsForTournament: 0 })
+      );
+    });
+
+    it("records it exactly once, however many times the webhook arrives", async () => {
+      const { reference } = await failedPayout();
+
+      await Promise.all([
+        applyTransferOutcome(reference, "SUCCESS"),
+        applyTransferOutcome(reference, "SUCCESS"),
+        applyTransferOutcome(reference, "SUCCESS"),
+      ]);
+
+      const row = await prisma.escrowTransaction.findUniqueOrThrow({ where: { providerRef: reference } });
+      expect(row.status).toBe("COMPLETE");
+      expect(captureMessage).toHaveBeenCalledTimes(1);
+    });
+
+    it("does nothing to a payout that is already complete", async () => {
+      // The ordinary replay, and the reason the FAILED check exists rather than a bare compare-and-swap:
+      // a second SUCCESS on a COMPLETE row must not look like a second payment.
+      const { tournament, winner } = await failedPayout();
+      const reference = `test-payout-${uniqueSuffix()}`;
+      await prisma.escrowTransaction.create({
+        data: { tournamentId: tournament.id, type: "PRIZE_PAYOUT", amount: 100_000, userId: winner.id, place: 1, provider: "PAYSTACK", providerRef: reference, status: "PENDING" },
+      });
+      await applyTransferOutcome(reference, "SUCCESS");
+      vi.mocked(captureMessage).mockClear();
+
+      expect(await applyTransferOutcome(reference, "SUCCESS")).toBe("NO_CHANGE");
+
+      expect(captureMessage).not.toHaveBeenCalled();
+    });
+
+    it("leaves a failed payout failed when the provider fails it again", async () => {
+      // The retry loop finding #17 bounds: the same FAILED answer, arriving again, changes nothing.
+      const { reference } = await failedPayout();
+
+      expect(await applyTransferOutcome(reference, "FAILED")).toBe("NO_CHANGE");
+
+      expect(captureMessage).not.toHaveBeenCalled();
+    });
+  });
 });
 
 async function paidEntry(status: "CONFIRMED" | "WITHDRAWN" | "PENDING_PAYMENT", feeStatus: "COMPLETE" | "PENDING") {
