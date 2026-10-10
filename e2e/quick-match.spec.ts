@@ -119,4 +119,52 @@ test.describe("Quick Match: first accept wins (end to end)", () => {
     const stakeRows = await prisma.escrowTransaction.findMany({ where: { battleId: battle.id, type: "STAKE" } });
     expect(stakeRows).toHaveLength(2);
   });
+
+  test("the challenge form shows a player what they have staked, never what is left", async ({ browser }) => {
+    // The stake readout (StakeLimitsNote) is the one place a player sees the
+    // per-account limits, and it is the surface where the phrasing is a
+    // product decision, not a formatting one: it states usage and never
+    // offers headroom as an invitation. This is the only test that the note
+    // reaches the real form at all — the unit tests in src/lib/stakes.test.ts
+    // cover the numbers, not the wiring.
+    const host = await createE2EUser({ walletBalance: 1_000_000 });
+    // A Quick Match sends to whoever is online for that game and stake, and
+    // refuses rather than opening a challenge nobody would receive — so there
+    // has to be one. lastActiveAt is what "online" means here.
+    await createE2EUser({ walletBalance: 1_000_000, lastActiveAt: new Date() });
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await loginViaUI(page, host.emailOrPhone!);
+
+    await page.goto("/battles/new");
+    // Free is the default, and a player choosing it has no use for their stake
+    // budget — so the note is not on the form yet.
+    await expect(page.getByText("In play now")).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Staked" }).click();
+    await expect(page.getByText("In play now")).toBeVisible();
+    await expect(page.getByText("Last 24 hours")).toBeVisible();
+    // The design decision, asserted rather than assumed: nothing on this form
+    // tells a player how much more they could stake today.
+    await expect(page.getByText(/you can still|remaining|left to stake/i)).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Quick Match" }).click();
+    await page.locator("#stakeNaira").fill("300");
+    const [createResponse] = await Promise.all([
+      page.waitForResponse(
+        (res) => res.url().includes("/api/quick-match") && res.request().method() === "POST",
+        { timeout: 30_000 }
+      ),
+      page.getByRole("button", { name: "Challenge All Available Players", exact: true }).click(),
+    ]);
+    expect(createResponse.ok()).toBe(true);
+
+    // Back on the form, the note reflects the stake that was just locked: the
+    // readout really is reading the account, not rendering a constant.
+    await page.goto("/battles/new");
+    await page.getByRole("button", { name: "Staked" }).click();
+    await expect(page.locator("dl", { hasText: "In play now" })).toContainText("₦300");
+
+    await context.close();
+  });
 });

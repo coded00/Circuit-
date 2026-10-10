@@ -164,7 +164,16 @@ concurrency-safety in money-moving code, not broad line coverage:
   through the real `/battles/new` → Quick Match form and the real
   `/quick-match/[id]` accept page (two recipient browser contexts race a
   real accept click), confirming the guarantee holds through the actual
-  API routes and UI, not just the underlying transaction logic.
+  API routes and UI, not just the underlying transaction logic. The same
+  file also covers the stake readout end to end: the challenge form shows
+  it only once "Staked" is picked, shows what the account has staked and
+  never what is left, and reflects a stake the moment one is locked. The
+  figures themselves are covered at the unit level in
+  `src/lib/stakes.test.ts`, which checks `stakeBudget` against what
+  `lockStake` actually refuses rather than against literal numbers — a
+  readout that disagreed with the enforcement would be worse than none.
+  That spec's own e2e coverage is the wiring, which nothing below the
+  browser can reach.
 
 Deliberately not yet covered: most individual API route handlers.
 Several (auth-gated ones especially) call `next/headers`'s `cookies()`
