@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { prisma } from "@/lib/db";
-import { applyRefundOutcome, applyTransferOutcome, currentPaidEntryFee, issueEntryFeeRefund, reconcilePendingMoney, refundRef, voidEntryFeeRevenue } from "./transfers";
+import { applyRefundOutcome, applyTransferOutcome, currentPaidEntryFee, issueEntryFeeRefund, reconcilePendingMoney, refundRef, voidEntryFeeRevenue, RECONCILE_BATCH, RECONCILE_MAX_BATCHES } from "./transfers";
 import { confirmEntryFeePayment } from "./confirm";
 import { paystackClient } from "./paystack";
 import { createTestOrganizer, createTestTournament, createTestUser, cleanupAll, uniqueSuffix } from "@/testHelpers";
@@ -457,6 +457,127 @@ describe("late payments", () => {
 
     expect((await prisma.walletTransaction.findUniqueOrThrow({ where: { providerRef: reference } })).status).toBe("FAILED");
     expect((await prisma.user.findUniqueOrThrow({ where: { id: user.id } })).walletBalance).toBe(50_000);
+  });
+});
+
+/**
+ * Finding 1c: the sweep asked about the same twenty-five transfers forever.
+ *
+ * `createdAt asc, take 25` picks the oldest stale transfers, and a transfer the provider keeps answering
+ * PENDING about never settles and never stops being the oldest. Twenty-five of those — a payout method
+ * caught behind a Transfer OTP nobody cleared is the documented way to get them — filled the batch on
+ * every run, and every transfer behind them was never asked about at all. It stayed PENDING, joined the
+ * backlog, and the sweep went on asking about the same stuck twenty-five every two minutes. The run
+ * reported success throughout, and the stuck-money alert (finding #20) counted a backlog growing for a
+ * reason this code could no longer see.
+ */
+describe("the sweep's backstop paging (finding 1c)", () => {
+  const STALE = 45 * 60_000;
+  /**
+   * The sweep's page size, spelled out rather than imported.
+   *
+   * Every test here is about "one row more than the sweep fetches at a time", so its fixtures have to be
+   * built from the real number — and importing that number is how the first draft of these tests managed to
+   * pass against the unfixed code: with the export gone, `Array.from({ length: undefined })` quietly built
+   * an *empty* fixture and the starvation test had nothing to starve behind. The last test in this block
+   * asserts the two against `transfers.ts`, so a page size that moves without these following it fails
+   * loudly instead of turning them vacuous.
+   */
+  const PAGE = 25;
+  const CEILING_BATCHES = 4;
+
+  it("pages at the size and ceiling transfers.ts actually uses", () => {
+    expect(RECONCILE_BATCH).toBe(PAGE);
+    expect(RECONCILE_MAX_BATCHES).toBe(CEILING_BATCHES);
+  });
+
+  /**
+   * `count` withdrawals the provider will keep saying PENDING about, all stale by `createdAt`.
+   *
+   * Ids are pinned rather than generated so the tie test below can rely on where they sort — a real cuid
+   * also starts with `c`, and the point is only that they come before "zzz…".
+   */
+  async function stuckWithdrawals(count: number, createdAt: Date) {
+    const user = await createTestUser({ walletBalance: 0 });
+    const rows = Array.from({ length: count }, (_, i) => ({
+      id: `c-stuck-${uniqueSuffix()}-${String(i).padStart(4, "0")}`,
+      userId: user.id,
+      type: "WITHDRAWAL" as const,
+      amount: 50_000,
+      provider: "PAYSTACK" as const,
+      providerRef: `test-stuck-${uniqueSuffix()}-${i}`,
+      status: "PENDING" as const,
+      createdAt,
+    }));
+    await prisma.walletTransaction.createMany({ data: rows });
+    return { user, refs: rows.map((r) => r.providerRef) };
+  }
+
+  /** The provider answers PENDING for every stuck ref and FAILED for anything else. */
+  function providerAnswers(stuckRefs: string[]) {
+    const stuck = new Set(stuckRefs);
+    return vi.spyOn(paystackClient, "verifyTransfer").mockImplementation(async (ref) => (stuck.has(ref) ? "PENDING" : "FAILED"));
+  }
+
+  it("still asks about a transfer a whole batch of stuck ones is hiding", async () => {
+    // The bug, exactly: 25 permanently-stuck withdrawals fill the one page the old sweep ever fetched, and
+    // this one — the 26th oldest, and the first that would actually settle — is never asked about.
+    const { refs } = await stuckWithdrawals(PAGE, new Date(Date.now() - STALE));
+    const fresh = await pendingWithdrawal(50_000);
+    await prisma.walletTransaction.updateMany({ where: { providerRef: fresh.reference }, data: { createdAt: new Date(Date.now() - 40 * 60_000) } });
+    providerAnswers(refs);
+
+    const result = await reconcilePendingMoney();
+
+    expect(result.transfersSettled).toBeGreaterThanOrEqual(1);
+    expect((await prisma.walletTransaction.findUniqueOrThrow({ where: { providerRef: fresh.reference } })).status).toBe("FAILED");
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: fresh.user.id } })).walletBalance).toBe(50_000);
+  });
+
+  it("asks about every stale transfer exactly once while it pages", async () => {
+    // A page and a half. Keyset paging has two ways to be wrong and only one of them shows up as a missing
+    // settlement: it can also re-ask about a row it already asked about, which is what an offset would do
+    // as settled rows left the set and the rest moved up into the gap.
+    const { refs } = await stuckWithdrawals(PAGE + 5, new Date(Date.now() - STALE));
+    const verifyTransfer = providerAnswers(refs);
+
+    const result = await reconcilePendingMoney();
+
+    expect(verifyTransfer).toHaveBeenCalledTimes(PAGE + 5);
+    expect(result.transfersSettled).toBe(0);
+  });
+
+  it("does not skip a transfer that shares its timestamp with the batch in front of it", async () => {
+    // createdAt is only millisecond-precise, so a batch written by one request shares it. A cursor carrying
+    // the time alone would ask about the first page and then jump the whole remainder of that millisecond.
+    const at = new Date(Date.now() - STALE);
+    const { user, refs } = await stuckWithdrawals(PAGE, at);
+    const targetRef = `test-target-${uniqueSuffix()}`;
+    await prisma.walletTransaction.createMany({
+      data: [{ id: "zzzz-same-millisecond", userId: user.id, type: "WITHDRAWAL", amount: 50_000, provider: "PAYSTACK", providerRef: targetRef, status: "PENDING", createdAt: at }],
+    });
+    providerAnswers(refs);
+
+    await reconcilePendingMoney();
+
+    expect((await prisma.walletTransaction.findUniqueOrThrow({ where: { providerRef: targetRef } })).status).toBe("FAILED");
+  });
+
+  it("stops at the ceiling instead of walking an unbounded backlog in one run", async () => {
+    // The bound is what keeps a two-minute schedule from overlapping itself: each row is a provider round
+    // trip and the loop is sequential. Reaching it is not silent — the stuck-money alert has already been
+    // telling a person about this backlog for days.
+    const { refs } = await stuckWithdrawals(PAGE * CEILING_BATCHES, new Date(Date.now() - STALE));
+    const fresh = await pendingWithdrawal(50_000);
+    await prisma.walletTransaction.updateMany({ where: { providerRef: fresh.reference }, data: { createdAt: new Date(Date.now() - 40 * 60_000) } });
+    const verifyTransfer = providerAnswers(refs);
+
+    await reconcilePendingMoney();
+
+    // One row past the ceiling, so this run did not reach it. The next run starts from the oldest again and
+    // gets exactly as far, which is the trade the bound makes.
+    expect(verifyTransfer).toHaveBeenCalledTimes(PAGE * CEILING_BATCHES);
+    expect((await prisma.walletTransaction.findUniqueOrThrow({ where: { providerRef: fresh.reference } })).status).toBe("PENDING");
   });
 });
 

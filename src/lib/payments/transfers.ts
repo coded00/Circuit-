@@ -342,13 +342,56 @@ const STUCK_ALERT_REPEAT_MS = 6 * 60 * 60_000;
 const STUCK_ALERT_KEY = "money-alert:transfers-stuck";
 const LATE_PAYMENT_MIN_AGE_MS = 15 * 60_000;
 const LATE_PAYMENT_MAX_AGE_MS = 3 * 24 * 60 * 60_000; // an abandoned checkout never resolves; stop asking
-const RECONCILE_BATCH = 25;
+/** Exported for the paging tests, which have to build a batch and a half (and a ceiling's worth) to see it. */
+export const RECONCILE_BATCH = 25;
+/**
+ * How many batches of stale transfers one run will walk. The sweep on its own is a two-minute schedule
+ * (vercel.json), each row is a provider round trip, and the loop is sequential — so 4 batches × 25 rows ×
+ * the two tables is 200 calls at worst, roughly a minute, and the next run has room. A bigger ceiling
+ * would have back-to-back runs overlapping. Reaching it means the backlog is not clearing, which is the
+ * state the stuck-money alert below has already raised for a person.
+ */
+export const RECONCILE_MAX_BATCHES = 4;
+
+/** Where a page starts from: before any row, so the paging below needs no first-page branch.
+ *  Dates are stored at millisecond precision and ids are cuids, so both are lower bounds on any real row. */
+const RECONCILE_START: ReconcileCursor = { createdAt: new Date(0), id: "" };
+
+/**
+ * A position in one of the two transfer tables, for keyset paging.
+ *
+ * `id` is part of it because `createdAt` alone is not unique: a batch of transfers written by one request
+ * shares a timestamp, and a cursor carrying only the time would step over the rest of that batch.
+ */
+type ReconcileCursor = { createdAt: Date; id: string };
+
+/** The rows after `cursor` in `createdAt asc, id asc` order — what the previous page ended on. */
+function afterCursor(cursor: ReconcileCursor) {
+  return {
+    OR: [
+      { createdAt: { gt: cursor.createdAt } },
+      { createdAt: cursor.createdAt, id: { gt: cursor.id } },
+    ],
+  };
+}
 
 /**
  * Sweep backstop (runScheduledSweep): asks the provider about transfers
  * still pending after 30 minutes, and re-checks entry fees whose player
  * withdrew or re-checked-out before the payment finished
  * (confirmEntryFeePayment refunds them if the charge went through).
+ *
+ * The transfer half walks *batches* rather than a single page of the 25 oldest. A single page was a
+ * starvation bug with no symptom: a transfer the provider keeps answering PENDING about never settles,
+ * never leaves the set and never loses its place at the front, so twenty-five of them — a payout method
+ * caught behind a Transfer OTP nobody cleared, which docs/pre-launch-checklist.md already warns about —
+ * and this loop stopped asking about anything newer, permanently. The run still reported success and the
+ * stuck-money alert counted a backlog that was growing for a reason this code could no longer see. It
+ * would have gone on asking about the same stuck twenty-five every two minutes forever.
+ *
+ * Paging is keyset rather than offset for a second reason on top of the obvious: rows this loop *does*
+ * settle leave the set as it goes, so `skip: 25` on the next page would step over the rows that moved up
+ * into the gap behind them. "What comes after this row" does not care what left.
  */
 export async function reconcilePendingMoney(): Promise<{
   transfersSettled: number;
@@ -357,30 +400,44 @@ export async function reconcilePendingMoney(): Promise<{
   stuckMoney: number;
 }> {
   const staleBefore = new Date(Date.now() - TRANSFER_STALE_MS);
-  const [withdrawals, payouts] = await Promise.all([
-    prisma.walletTransaction.findMany({
-      where: { type: "WITHDRAWAL", status: "PENDING", createdAt: { lt: staleBefore }, providerRef: { not: null }, provider: { not: null } },
-      select: { providerRef: true, provider: true },
-      orderBy: { createdAt: "asc" },
-      take: RECONCILE_BATCH,
-    }),
-    prisma.escrowTransaction.findMany({
-      where: { type: "PRIZE_PAYOUT", status: "PENDING", createdAt: { lt: staleBefore }, providerRef: { not: null }, provider: { not: null } },
-      select: { providerRef: true, provider: true },
-      orderBy: { createdAt: "asc" },
-      take: RECONCILE_BATCH,
-    }),
-  ]);
-
   let transfersSettled = 0;
-  for (const row of [...withdrawals, ...payouts]) {
-    try {
-      const status = await getPaymentProvider(row.provider!).verifyTransfer(row.providerRef!);
-      if (status === "PENDING") continue;
-      if ((await applyTransferOutcome(row.providerRef!, status)) === "APPLIED") transfersSettled++;
-    } catch (err) {
-      captureException(err, { source: "reconcilePendingMoney", reference: row.providerRef });
+  let withdrawalCursor = RECONCILE_START;
+  let payoutCursor = RECONCILE_START;
+
+  for (let batch = 0; batch < RECONCILE_MAX_BATCHES; batch++) {
+    const [withdrawals, payouts] = await Promise.all([
+      prisma.walletTransaction.findMany({
+        where: { type: "WITHDRAWAL", status: "PENDING", createdAt: { lt: staleBefore }, providerRef: { not: null }, provider: { not: null }, ...afterCursor(withdrawalCursor) },
+        select: { id: true, createdAt: true, providerRef: true, provider: true },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        take: RECONCILE_BATCH,
+      }),
+      prisma.escrowTransaction.findMany({
+        where: { type: "PRIZE_PAYOUT", status: "PENDING", createdAt: { lt: staleBefore }, providerRef: { not: null }, provider: { not: null }, ...afterCursor(payoutCursor) },
+        select: { id: true, createdAt: true, providerRef: true, provider: true },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        take: RECONCILE_BATCH,
+      }),
+    ]);
+
+    if (withdrawals.length === 0 && payouts.length === 0) break;
+    if (withdrawals.length) withdrawalCursor = withdrawals[withdrawals.length - 1];
+    if (payouts.length) payoutCursor = payouts[payouts.length - 1];
+
+    for (const row of [...withdrawals, ...payouts]) {
+      try {
+        const status = await getPaymentProvider(row.provider!).verifyTransfer(row.providerRef!);
+        if (status === "PENDING") continue;
+        if ((await applyTransferOutcome(row.providerRef!, status)) === "APPLIED") transfersSettled++;
+      } catch (err) {
+        // One row that will not answer must not end the run: it holds its place at the front of the queue
+        // for the next one, and the batches above are what stop it holding the whole queue.
+        captureException(err, { source: "reconcilePendingMoney", reference: row.providerRef });
+      }
     }
+
+    // A short page is the end of the set — the next one would come back empty.
+    if (withdrawals.length < RECONCILE_BATCH && payouts.length < RECONCILE_BATCH) break;
   }
 
   // Imported lazily: confirm.ts → matches.ts → (sweep) → this file.

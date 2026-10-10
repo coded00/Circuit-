@@ -128,6 +128,15 @@ arrives, the sweep asks Paystack about any transfer still processing after
 **"Money stuck: transfers still pending after a day"** rather than leaving it
 to be noticed. Turn that alert on in Sentry (below).
 
+The sweep gets through a bounded amount of that backlog per run — a few
+hundred transfers at most, oldest first, because each one is a call to
+Paystack and the sweep runs every 2 minutes. It used to fetch only the 25
+oldest, which meant twenty-five transfers Paystack kept answering "pending"
+about would hide every transfer behind them, forever, without the run ever
+reporting a problem. If `stuckMoney` on the admin Overview keeps climbing
+across several sweeps, the sweep is working through more than it can clear in
+one run and wants a person, not another sweep.
+
 **A payout that failed and then turns out to have succeeded** raises
 **"Prize payout succeeded after it was marked failed"**. Failing a payout
 reopens the claim, so by the time that message arrives the winner may already
