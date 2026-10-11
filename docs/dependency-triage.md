@@ -1,13 +1,25 @@
 # Circuit: dependency triage
 
-Written 2026-10-11, against a clean `npm ci` on `main`. Re-run it the same
-way — see "Re-running this" at the end. Everything below is a claim about
-the tree as it stood at that commit, and dependency trees rot.
+Written 2026-10-11, against a clean `npm ci` on `main`, and **re-checked
+later the same day** after five dependency PRs landed (#40, #41, #42,
+#43 — `next` 16.4.0, `react` 19.3.0, `jose` 6, `eslint` 10,
+`framer-motion` 14). Re-run it the same way — see "Re-running this" at
+the end. Everything below is a claim about the tree as it stood at that
+commit, and dependency trees rot.
 
-`npm audit` reports **11 high, 0 critical**. Three were fixable without
-breaking anything and have been. The other eight cannot be fixed at all
-right now, for reasons that are all upstream, and are recorded here so
-that the next person does not re-derive them from a red CI badge.
+`npm audit` reports **8 high, 0 critical**, down from 11. Three were
+fixable without breaking anything and have been. The other eight cannot
+be fixed at all right now, for reasons that are all upstream, and are
+recorded here so that the next person does not re-derive them from a red
+CI badge.
+
+The re-check is the part worth reading twice. Those five PRs replaced
+most of the tree — including the whole ESLint chain this document blames
+for five of the eight — and the audit came back with **the same eight,
+from the same two root advisories, and the same two bogus downgrades on
+offer**. Nothing cleared and nothing new appeared. So these conclusions
+survived a large upgrade rather than holding only for the tree they were
+written against.
 
 ## What the three that were fixed actually were
 
@@ -55,8 +67,13 @@ own `prisma` config, not anything a player can send.
 
 ### The ESLint chain — five of the eight
 
-`eslint-config-next` and `@next/eslint-plugin-next` (both 16.3.8), with
-`fast-glob` and `micromatch` flagged only because they carry `braces`.
+`eslint-config-next` and `@next/eslint-plugin-next` (both 16.4.0,
+on `eslint` 10.12.0), with `fast-glob` and `micromatch` flagged only
+because they carry `braces`. This section was written against 16.3.8 on
+`eslint` 9 and re-checked after both moved — the chain is unchanged:
+`braces` 3.0.3 → `micromatch` 4.0.8 → `fast-glob` 3.3.1 →
+`@next/eslint-plugin-next` → `eslint-config-next`. Upgrading the whole
+lint stack changed nothing about it.
 
 - `braces` is vulnerable at `<=3.0.3`, and **3.0.3 is the newest version
   published**. There is no patched release to move to. This is why npm
@@ -79,6 +96,30 @@ because `@prisma/config` depends on the 7.x line and the advisory covers
 `@prisma/client` — the part that runs in production — is **not** flagged.
 This is the CLI: migrations and `prisma generate`. It waits on Prisma.
 
+## TypeScript stays on 5, and that is not this repo's decision
+
+`typescript` is `^5` in `package.json` and has to stay there for now.
+Dependabot opened the bump to TypeScript 7
+([#44](https://github.com/Circuit-OurCircuit/circuit/pull/44)) and it was
+closed, because `eslint-config-next` depends on `typescript-eslint`,
+which hard-refuses TS 7.0 and exits 2:
+
+```
+Error: typescript-eslint does not support TS 7.0.
+    at .../eslint-config-next/node_modules/typescript-eslint/dist/index.js:52:11
+```
+
+Nothing on this side makes that PR green. The `package-lock.json`
+conflict a rebase would have cleared was incidental — the lint step dies
+on the same line either way. It waits on `typescript-eslint` supporting
+TS 7 (tracked in `typescript-eslint/typescript-eslint#10940`, aimed at
+TS >= 7.1) and on `eslint-config-next` picking that release up.
+Dependabot will open a fresh PR when it does, so closing cost nothing.
+
+Recorded here because it is the same shape as the eight above: a
+toolchain upgrade that reads as routine in a PR list and is in fact
+blocked upstream, with no signal on our side except a red check.
+
 ## Do not run `npm audit fix --force`
 
 This is the reason it is worth writing all of the above down. For the
@@ -92,6 +133,11 @@ Both are marked `isSemVerMajor: true` and appear only under `--force`.
 Never take them. They would replace eight dev-only advisories that cannot
 be triggered with a broken lint setup and a CLI that disagrees with the
 client about migrations.
+
+Re-checked on the refreshed tree, and it is still exactly these two —
+same targets, same `isSemVerMajor: true`, all eight advisory entries
+pointing at one or the other. A `--force` that was wrong before is no
+more right for having survived an upgrade.
 
 ## Dependabot: what it will and will not do here
 
@@ -110,6 +156,19 @@ That is the argument for turning them on. The cost is bounded: for the
 eight above there is no compatible patched version for Dependabot to move
 to, so it has nothing to open, and it does not propose downgrades.
 
+**What it has actually done so far.** The first batch arrived 2026-10-11:
+five PRs — one group of twelve minor and patch updates, plus majors for
+`jose`, `framer-motion`, `eslint` and `typescript`. Four merged; the
+`typescript` one was closed (see above). It did not touch `sharp`,
+`source-map-js` or `brace-expansion` — all three are still at the
+versions the manual fix left them at, which is the prediction in the
+paragraph above holding up in practice.
+
+Worth noting from that batch: the majors arrive looking like the group
+does. The group PR is genuinely routine, but its green check and its
+"minor and patch" title sit in the same list as a `jose` major that
+touches session signing. Read the majors.
+
 ## Re-running this
 
 ```
@@ -122,5 +181,11 @@ npm audit              # what is left
 Then check the remaining ones the same way: does a patched version exist
 at all, and does the flag sit in production or in the toolchain. The
 answer for all eight above is "no, and in the toolchain", and the moment
-it changes is the moment Next or Prisma ships a release. Worth a re-read
-after either of those is upgraded — not before.
+it changes is the moment Next or Prisma ships a release.
+
+Re-read this after a batch of dependency PRs lands, not on a schedule.
+Both of the things this document warns about — the eight, and the
+`--force` downgrades — were re-checked after five such PRs and came back
+identical, which is the useful kind of boring. The one thing that *did*
+move was a version number in a heading, and that is the sort of drift
+that makes a stale document worse than none.
