@@ -283,7 +283,7 @@ export default async function AdminOverviewPage() {
                   const today = k === dayKey(now);
                   return (
                     <tr key={k}>
-                      <td className="text-muted">
+                      <td className="whitespace-nowrap text-muted">
                         {today ? <span className="text-foreground">Today</span> : `${d.toLocaleDateString("en-NG", { weekday: "short" })} ${d.getDate()}`}
                       </td>
                       {[usersByDay, regsByDay, battlesByDay].map((m, i) => {
