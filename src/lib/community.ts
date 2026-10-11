@@ -647,11 +647,25 @@ async function communityLocation(communityId: string) {
 }
 
 /** Members matching `query` by handle or display name — the composer's
- *  @-suggestion list. Handle-prefix matches first. */
+ *  @-suggestion list. Handle-prefix matches first.
+ *
+ *  Finding #23: this was the one community read that skipped the closed-community gate. It checked the
+ *  viewer's membership and their suspension, but never whether the community itself was still open — so a
+ *  standing member of a suspended community could keep enumerating its membership, which is exactly the
+ *  list the moderator who closed it was shutting off. Its sibling reads (/members, /search) both go
+ *  through communityThreads' `memberContext`, which answers NOT_FOUND for a missing *or* disabled
+ *  community, so a suspended one is indistinguishable from one that never existed. This file cannot
+ *  import that helper — communityThreads imports this one — so the same two checks are made here, in the
+ *  same order and with the same codes. */
 export async function searchMentionableMembers(communityId: string, viewerId: string, query: string) {
-  const membership = await prisma.communityMember.findUnique({
-    where: { communityId_userId: { communityId, userId: viewerId } },
-  });
+  const [community, membership] = await Promise.all([
+    prisma.community.findUnique({ where: { id: communityId }, select: { enabled: true } }),
+    prisma.communityMember.findUnique({
+      where: { communityId_userId: { communityId, userId: viewerId } },
+      select: { id: true },
+    }),
+  ]);
+  if (!community || !community.enabled) throw new CommunityError("NOT_FOUND", "Community not found.");
   if (!membership) throw new CommunityError("NOT_A_MEMBER", "Join the community to mention people.");
 
   const q = query.trim().toLowerCase().replace(/^@/, "").slice(0, 40);

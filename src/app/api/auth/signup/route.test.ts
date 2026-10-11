@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { prisma } from "@/lib/db";
 import { AUTH_LIMITS } from "@/lib/rateLimit";
 import { cleanupAll, uniqueSuffix } from "@/testHelpers";
@@ -15,6 +15,9 @@ import { POST } from "./route";
  */
 
 vi.mock("@/lib/emailVerification", () => ({ sendVerificationEmail: vi.fn(async () => undefined) }));
+vi.mock("@/lib/accountEmails", () => ({ sendAlreadyRegisteredNotice: vi.fn(async () => undefined) }));
+
+const { sendAlreadyRegisteredNotice } = await import("@/lib/accountEmails");
 
 const PASSWORD = "correct-horse-battery-staple";
 const IP = "203.0.113.9";
@@ -96,5 +99,136 @@ describe("signup caller throttling", () => {
     expect(refused.status).toBe(400);
 
     expect(await prisma.rateLimitAttempt.count({ where: { key: ipKey } })).toBe(0);
+  });
+});
+
+/**
+ * Finding #19, and the half of it the tests above cannot reach: when email can actually be delivered,
+ * signup stops answering "that address is taken" and starts answering everything the same way.
+ *
+ * The key is set for this block only. Without it the route keeps the old behaviour on purpose (that is
+ * what the block above pins), which is why the two modes are tested against the same payloads.
+ */
+describe("signup with email configured (finding #19)", () => {
+  const savedKey = process.env.RESEND_API_KEY;
+
+  beforeEach(() => {
+    process.env.RESEND_API_KEY = "re_test_key";
+    vi.mocked(sendAlreadyRegisteredNotice).mockClear();
+  });
+
+  afterEach(() => {
+    if (savedKey === undefined) delete process.env.RESEND_API_KEY;
+    else process.env.RESEND_API_KEY = savedKey;
+  });
+
+  /** Registered accounts are created through the route, so the fixture and the thing under test agree. */
+  async function registered(body: ReturnType<typeof payload>) {
+    expect((await signupFrom(IP, body)).status).toBe(201);
+    return body;
+  }
+
+  it("answers a taken address exactly as it answers a free one", async () => {
+    const taken = await registered(payload());
+
+    // The payloads differ in their handle, because the second signup cannot reuse the first's — so the
+    // thing to compare is the shape and what it echoes, not the two bodies wholesale. What the caller
+    // learns from either response: `{ pending: true }` and their own handle back. Nothing else.
+    const freshPayload = payload();
+    const existingPayload = payload({ email: taken.email });
+
+    const fresh = await signupFrom(IP, freshPayload);
+    const existing = await signupFrom(IP, existingPayload);
+
+    expect(fresh.status).toBe(201);
+    expect(existing.status).toBe(201);
+    expect(await fresh.json()).toEqual({ pending: true, handle: freshPayload.handle });
+    expect(await existing.json()).toEqual({ pending: true, handle: existingPayload.handle });
+    // Without the fix the second response was a 409 naming the field — which told anyone who asked
+    // whether an address is registered. It is now the same 201, signing nobody in.
+    expect(existing.headers.get("set-cookie")).toBeNull();
+    expect(fresh.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("does not create a second account for the taken address", async () => {
+    const taken = await registered(payload());
+
+    await signupFrom(IP, payload({ email: taken.email }));
+
+    expect(await prisma.user.count({ where: { email: taken.email as string } })).toBe(1);
+  });
+
+  it("tells the address's owner, since the caller is told nothing", async () => {
+    const taken = await registered(payload());
+    vi.mocked(sendAlreadyRegisteredNotice).mockClear();
+
+    await signupFrom(IP, payload({ email: taken.email }));
+
+    expect(sendAlreadyRegisteredNotice).toHaveBeenCalledWith(taken.email);
+  });
+
+  it("covers the phone the same way, because a phone is the same fact about a person", async () => {
+    const phone = "+2348030001234";
+    const first = await registered(payload({ phone }));
+    vi.mocked(sendAlreadyRegisteredNotice).mockClear();
+
+    const clash = await signupFrom(IP, payload({ phone }));
+
+    expect(clash.status).toBe(201);
+    expect(clash.headers.get("set-cookie")).toBeNull();
+    expect(await prisma.user.count({ where: { phone } })).toBe(1);
+    expect(sendAlreadyRegisteredNotice).toHaveBeenCalledWith(first.email);
+  });
+
+  it("costs a conflict what a success costs, so the clock is not an oracle either", async () => {
+    // The half of #19 that survives any change to the response's shape. bcrypt dominates this handler and
+    // is now paid before the answer is known; a conflict that skipped it came back roughly thirty times
+    // faster, which any client can read off the wire. The threshold is deliberately loose — both paths
+    // are ~300ms of bcrypt, so a third of the success time is nowhere near either outcome, and the gap it
+    // has to catch is a factor of thirty rather than a few percent.
+    const taken = await registered(payload());
+
+    const freshStart = performance.now();
+    await signupFrom(IP, payload());
+    const freshMs = performance.now() - freshStart;
+
+    const takenStart = performance.now();
+    await signupFrom(IP, payload({ email: taken.email }));
+    const takenMs = performance.now() - takenStart;
+
+    expect(takenMs).toBeGreaterThan(freshMs / 3);
+  });
+
+  it("still refuses a taken handle plainly — that one is public information", async () => {
+    const taken = await registered(payload());
+
+    const clash = await signupFrom(IP, payload({ handle: taken.handle }));
+
+    expect(clash.status).toBe(409);
+    expect(((await clash.json()) as { field: string }).field).toBe("handle");
+  });
+
+  it("still charges a conflict to the caller's budget, so probing is not free", async () => {
+    const taken = await registered(payload());
+    const before = await prisma.rateLimitAttempt.count({ where: { key: ipKey } });
+
+    await signupFrom(IP, payload({ email: taken.email }));
+
+    expect(await prisma.rateLimitAttempt.count({ where: { key: ipKey } })).toBe(before + 1);
+  });
+
+  it("goes back to signing in when no provider is configured", async () => {
+    // The other half of the switch, so the gate itself is pinned rather than assumed: with no key there
+    // is no link to send, and deferring the session would lock a new account out of a site it can never
+    // finish joining.
+    delete process.env.RESEND_API_KEY;
+    const taken = await registered(payload());
+
+    const fresh = await signupFrom(IP, payload());
+    const existing = await signupFrom(IP, payload({ email: taken.email }));
+
+    expect(fresh.status).toBe(201);
+    expect(fresh.headers.get("set-cookie")).toContain("circuit_session");
+    expect(existing.status).toBe(409);
   });
 });

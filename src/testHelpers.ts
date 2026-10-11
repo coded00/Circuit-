@@ -148,6 +148,10 @@ export async function cleanupAll(): Promise<void> {
   await prisma.friendship.deleteMany({ where: { OR: [{ requesterId: mine }, { addresseeId: mine }] } });
   await prisma.message.deleteMany({ where: { authorId: mine } });
   await prisma.communityMember.deleteMany({ where: { userId: mine } });
+  // Communities a fixture built directly (the mentionable tests). Matched by name, so only PLAYER and
+  // GAME_HUB fixtures are caught — a TOURNAMENT community has no name of its own. After the members above,
+  // which would otherwise hold the row back, and before the user delete below, since ownerId points at one.
+  await prisma.community.deleteMany({ where: { name: { startsWith: "TEST-" } } });
   await prisma.videoLike.deleteMany({ where: { userId: mine } });
   await prisma.videoSave.deleteMany({ where: { userId: mine } });
   await prisma.report.deleteMany({ where: { OR: [{ reportedUserId: mine }, { reportedById: mine }] } });
@@ -174,6 +178,11 @@ export async function cleanupAll(): Promise<void> {
   // Rate-limit rows are keyed by the user's id, not by anything matching "test-" above, so a route with
   // a 5-per-hour throttle would start answering 429 partway through a file without this.
   await prisma.rateLimitAttempt.deleteMany({ where: { key: { startsWith: "tournament-create:" } } });
+  // The money-out throttles (finding #17) are keyed by user id too, so they leak between tests the same
+  // way — and at five an hour, a file that exercises either route would start answering 429 partway
+  // through its sixth call. Same one-line fix as the line above.
+  await prisma.rateLimitAttempt.deleteMany({ where: { key: { startsWith: "wallet-withdraw:" } } });
+  await prisma.rateLimitAttempt.deleteMany({ where: { key: { startsWith: "prize-payout:" } } });
   // The caller-wide auth buckets (rateLimit.ts). These are the ones that would leak *between runs* rather
   // than between tests: a test request carries no headers, so every one of them is filed under the single
   // key "auth-ip:<scope>:unknown", and the 15-minute windows outlive the test process. Without this the
@@ -186,5 +195,9 @@ export async function cleanupAll(): Promise<void> {
   // test file. The images limit is 1200, so this only matters for a file that makes a lot of requests — but
   // it is the same one-line fix as the two above and this file is meant to be the full list.
   await prisma.rateLimitAttempt.deleteMany({ where: { key: { startsWith: "public-ip:" } } });
+  // The sweep's stuck-money alert (finding #20) spends its once-per-six-hours budget through the same table,
+  // against one shared key. Left behind, the first test in a file to see a stuck transfer would consume the
+  // window and every later test in that file would assert on a silenced alert.
+  await prisma.rateLimitAttempt.deleteMany({ where: { key: { startsWith: "money-alert:" } } });
   await prisma.user.deleteMany({ where: { id: { in: userIds } } });
 }

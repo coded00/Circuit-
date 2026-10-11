@@ -3,6 +3,7 @@ import { loginPath } from "@/lib/safeRedirect";
 import { getCurrentUser } from "@/lib/session";
 import { prisma } from "@/lib/db";
 import { getFriendIds } from "@/lib/friends";
+import { stakeBudget } from "@/lib/stakes";
 import BattleForm from "./BattleForm";
 import { buildMetadata } from "@/lib/seo";
 
@@ -20,9 +21,13 @@ export default async function NewBattlePage() {
   if (!user) {
     redirect(loginPath("/battles/new"));
   }
-  const [games, friendIds] = await Promise.all([
+  const [games, friendIds, budget] = await Promise.all([
     prisma.game.findMany({ where: { enabled: true, publishedAt: { not: null } }, orderBy: { name: "asc" } }),
     getFriendIds(user.id),
+    // Read alongside everything else rather than behind the form's Free/Staked
+    // toggle: it is two aggregates, and the form needs it the moment a player
+    // picks Staked.
+    stakeBudget(prisma, user.id),
   ]);
   const friends = friendIds.length
     ? await prisma.user.findMany({ where: { id: { in: friendIds } }, select: { handle: true, displayName: true }, orderBy: { displayName: "asc" } })
@@ -31,7 +36,7 @@ export default async function NewBattlePage() {
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 py-6 sm:px-8 sm:py-10">
       <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Open a Challenge</h1>
-      <BattleForm games={games} friends={friends} />
+      <BattleForm games={games} friends={friends} budget={budget} />
     </div>
   );
 }

@@ -53,7 +53,7 @@ withdrawals or prizes are switched on.
 | `NEXT_PUBLIC_APP_URL` | **Yes** | The public `https://` address. Used in payment callbacks, emails and share links. Rebuild after changing it. |
 | `CRON_SECRET` | **Yes** | `openssl rand -base64 32`. The sweep runner and the app must share it. |
 | `PAYSTACK_SECRET_KEY` | **Yes (money)** | `sk_live_…` for launch, `sk_test_…` while testing. Also verifies webhooks. There's no public key. Checkout is hosted by Paystack. |
-| `RESEND_API_KEY` | **Yes** | Password-reset and notification emails. Without it, emails are only printed to the server log, and nobody can reset a password. |
+| `RESEND_API_KEY` | **Yes** | Password-reset and notification emails, and it is what signup needs to issue a session — see the signup step below. Without it nothing is sent at all, and nobody can reset a password or verify an address. The fallback logs who the email was for and its subject, never the message itself: reset and verification links are in there, and a log is not a private place. |
 | `REQUIRE_VERIFIED_EMAIL` | Optional | Players must verify their email before paid entry, staking, withdrawing or claiming a prize. Turns on by itself once `RESEND_API_KEY` is set; `true` / `false` forces it. |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | If Google sign-in is on | The redirect URI in Google Cloud must be `https://<domain>/api/auth/google/callback`. |
 | `YOUTUBE_API_KEY` | Optional | Videos on the homepage and admin Content page. |
@@ -126,7 +126,40 @@ ignores the rest:
 
 Each event is applied once, even if Paystack retries it. If a webhook never
 arrives, the sweep asks Paystack about any transfer still processing after
-30 minutes.
+30 minutes — and if one is *still* unsettled a day later, the sweep raises
+**"Money stuck: transfers still pending after a day"** rather than leaving it
+to be noticed. Turn that alert on in Sentry (below).
+
+The sweep gets through a bounded amount of that backlog per run — a few
+hundred transfers at most, oldest first, because each one is a call to
+Paystack and the sweep runs every 2 minutes. It used to fetch only the 25
+oldest, which meant twenty-five transfers Paystack kept answering "pending"
+about would hide every transfer behind them, forever, without the run ever
+reporting a problem. If `stuckMoney` on the admin Overview keeps climbing
+across several sweeps, the sweep is working through more than it can clear in
+one run and wants a person, not another sweep.
+
+**A payout that failed and then turns out to have succeeded** raises
+**"Prize payout succeeded after it was marked failed"**. Failing a payout
+reopens the claim, so by the time that message arrives the winner may already
+have been paid a second time — the alert says whether they were, and how much.
+There is no way to claw a bank transfer back, so this one always needs a
+person. It should be treated as urgent, not as noise: watch for it in Sentry
+(below) alongside the stuck-money alert.
+
+Before handing out a second reference, the payout route asks Paystack what
+became of any earlier failed attempt on that tournament and sends nothing if
+the answer is anything but a definite failure. If Paystack cannot be reached
+to answer, the claim is refused with a retry-later message rather than paid —
+deliberately, because paying twice cannot be undone. A winner seeing that
+message repeatedly while nothing else on the site is failing is a signal that
+the payout API key or the account is in trouble.
+
+Flutterwave is legacy and read-only here — `FLUTTERWAVE_SECRET_KEY` is
+unset, so its webhook route refuses everything and no new charge or
+transfer is ever created on it. If you ever re-enable it, its webhook
+handles charges and transfers; its refunds have no webhook to subscribe
+to and still settle through the sweep, like any missed webhook.
 
 **Account set-up:**
 
@@ -168,16 +201,72 @@ the same way; Paystack's test cards are on its docs site):
       disputes don't wait on one person.
 - [ ] Test and seed accounts are removed or suspended.
 - [ ] The platform fee and maintenance mode are set in admin → Settings.
+- [ ] Remember that the finance CSVs (Wallet Activity and Tournament &
+      Challenge Transactions) are **Super Admin only**, and every download is
+      written to admin → Settings → Audit Log as `finance.export.wallet` /
+      `finance.export.escrow` with the filters used and the row count. A
+      Moderator sees those tabs on admin → Finance but no Export CSV button —
+      that is deliberate, not a missing feature. To answer "who took a copy of
+      the ledger", read the audit log.
+- [ ] **`security@circuitvrse.co` exists, and someone reads it.** `SECURITY.md`
+      names it as the only place a vulnerability report should go, so send a
+      test message to it from an outside address and confirm a person sees it
+      arrive. A policy pointing at a mailbox nobody monitors is worse than
+      having no policy: a researcher reporting a live hole would hear nothing
+      back and conclude nobody is home. Note also that Circuit's own mail goes
+      out as `no-reply@circuit.app` (see `src/lib/email.ts`), so the domain in
+      that address is not the one this one uses — worth reconciling before a
+      player has to decide whether a Circuit email is real.
+- [ ] **Decide on branch protection again, now that the repo holds money.**
+      There is none today, and it is not an oversight: `main` is unprotected
+      because the org is on GitHub **Free** and the repository is **private**,
+      and on the free plan both classic branch protection and rulesets answer
+      `403 Upgrade to GitHub Pro or make this repository public`. So there is
+      nothing stopping a force-push to `main`, a direct push to it, or a merge
+      while CI is still red — the last of which has happened (PR #34 went in
+      before its checks finished).
+
+      It was accepted as-is before launch, with two collaborators who are both
+      trusted admins. What makes that reasonable expires: **the moment a third
+      person has write access**, or the moment real money is flowing in
+      production, buy GitHub Team, or make the repository public, and turn on a
+      required CI check. Until then the rule is the discipline — **CI green
+      before merge** — and it only binds people who read it.
 
 ## 8. Smoke test on the live site
 
-- [ ] Sign up with email, sign out, then reset the password. The reset
-      email arrives.
+- [ ] Sign up with email. With `RESEND_API_KEY` set, signup **does not sign
+      you in** — it ends on "Check your email". That is deliberate: the same
+      screen is shown whether or not the address was already registered, so
+      nobody can use signup to discover who has an account. Open the link in
+      the email, log in, and you should land in the first-run flow. Google
+      sign-in is unaffected, because Google has already verified the address.
+- [ ] Sign out, then reset the password. The reset email arrives.
 - [ ] Google sign-in works (if enabled).
 - [ ] Create a free tournament, register two accounts, and let the
       deadline pass. Within about 2 minutes the sweep starts the bracket.
       Report a result from one side, dispute it from the other, then rule
       it in admin → Disputes.
+- [ ] Open a challenge, pick **Staked**, and check the two figures under the
+      stake field — what you have in play now, and what you have staked in the
+      last 24 hours, each against its limit. Open **Account → Responsible
+      play** and check the same two are there. They come from the same query
+      that refuses a stake, so a number that looks wrong is a real one worth
+      understanding before launch, not a display bug. The form states what has
+      been staked and never how much more could be — that is deliberate (see
+      `src/components/StakeLimitsNote.tsx`), so don't "fix" it by adding the
+      subtraction.
+- [ ] Take a cool-off on a test account (**Account → Responsible play**),
+      have someone send it a staked Quick Match, and tap **Accept**. The
+      refusal must name the cool-off and the date it ends — if it says another
+      player accepted the battle first, the real reason has been swallowed
+      again (see `src/lib/quickMatchRefusal.ts`; this is the bug that copy was
+      built to stop). Do it both ways, because they are separate components:
+      on the request pop-up that appears wherever you are, and from the
+      notification link on `/quick-match/[id]`. Tapping Accept there the
+      instant the page opens must work too — that card is server-rendered, and
+      a hydration mismatch once rebuilt it under the tap so the press did
+      nothing at all.
 - [ ] Upload a proof screenshot and open it as the other player. It loads.
 - [ ] Admin Overview shows **All clear** once the test is tidied up.
 
@@ -188,7 +277,8 @@ the same way; Paystack's test cards are on its docs site):
 - [ ] Only staff can sell for now. Stock it from admin → Marketplace; the
       nine placeholder products from development are removed.
 - [ ] **Order emails** (receipt, delivered, refunded) need `RESEND_API_KEY`.
-      Without it they are only printed to the server log.
+      Without it nothing is sent, and the fallback names only the recipient
+      and the subject — the body carries the instant-download link.
 - [ ] Instant-download ebooks: the file is hosted outside Circuit and the
       link is only ever revealed to people who bought it, but a buyer can
       still see where it points. Host files somewhere that lets you expire
@@ -204,4 +294,24 @@ the same way; Paystack's test cards are on its docs site):
       are real money waiting on someone.
 - [ ] If Sentry is set, turn on alerts for these messages: "Withdrawal
       succeeded after it was marked failed", "Entry-fee refund failed at
-      the provider", and "Paystack webhook rejected: invalid signature".
+      the provider", "Paystack webhook rejected: invalid signature", and
+      "Money stuck: transfers still pending after a day".
+- [ ] **"Withdrawal succeeded after it was marked failed" means the
+      provider changed its mind** — Circuit had already marked the
+      withdrawal failed and put the money back. The app corrects itself
+      when it sees this: the withdrawal is marked complete and the amount
+      comes out of the wallet again. If the player had already spent it,
+      their balance goes **negative**, which blocks them from spending or
+      withdrawing until it is settled, and the alert says so
+      (`playerOverdrawn: true`). There is no admin screen for adjusting a
+      wallet balance yet, so that case is a support conversation and a
+      manual correction.
+- [ ] **Read the Dependabot PRs.** They arrive weekly: one grouped PR for
+      minor and patch bumps, individual ones for majors, plus one for the
+      actions pinned in `ci.yml`. They come already green, which is exactly
+      what makes them easy to wave through — read the majors. A bump to a
+      payouts, webhooks or auth library is a money change, not a chore, and
+      `sharp` sits in the image path. Vulnerability **alerts** are on as well
+      (**Security → Dependabot alerts**); those do not open PRs by
+      themselves, so they need looking at. What is behind them, and which are
+      safe to ignore, is written up in `docs/dependency-triage.md`.

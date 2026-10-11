@@ -9,18 +9,55 @@
  * is configured — loud and visible, not a silent no-op (same discipline
  * `PushChannel` in notifications.ts documents for its own not-yet-built
  * channel), so a developer can actually complete the flow locally.
+ *
+ * How much it logs is finding #18's subject: the message body is printed
+ * in development and nowhere else. See logUndelivered.
  */
 
 import { Resend } from "resend";
 
 const FROM_ADDRESS = "Circuit <no-reply@circuit.app>";
 
+/**
+ * The no-provider fallback: nothing can be sent, so something must be said. What must *not* be said,
+ * outside development, is the message body.
+ *
+ * Finding #18. This fallback used to print the whole message, and three of its five callers put a bearer
+ * secret in one: the password-reset link (src/app/api/auth/forgot-password/route.ts), the email-verification
+ * link (src/lib/emailVerification.ts) and a marketplace instant-download URL (src/lib/orderEmails.ts).
+ * So a deploy that had simply not set `RESEND_API_KEY` — the exact deploy this fallback exists to make
+ * visible — wrote working credentials into the log. A log is not a private place: it is a drain, a hosting
+ * provider's retention window, an attachment on an error report, a screen somebody shares. Anyone who can
+ * read that line can take the account the link was cut for, which is the one thing the link is for.
+ *
+ * So the body is printed in development — where the printed link is the only way to finish a reset or a
+ * verification by hand, and the only reader is the developer who just asked for it — and nowhere else. The
+ * test is `=== "development"` rather than `!== "production"` so an unset or unexpected `NODE_ENV` lands on
+ * the quiet side: that this fallback is *loud* is its point, and that it is quiet about the body is this
+ * one's.
+ *
+ * The recipient and the subject stay in both branches. They are what makes the warning diagnosable, and a
+ * production deploy that cannot send email has to say so loudly — until the key is set, nobody can reset a
+ * password, verify an address, or receive an order.
+ */
+function logUndelivered(to: string, subject: string, body: string): void {
+  if (process.env.NODE_ENV === "development") {
+    console.warn(
+      `[email] RESEND_API_KEY not set. Logging instead of sending.\nTo: ${to}\nSubject: ${subject}\n\n${body}\n`
+    );
+    return;
+  }
+
+  console.warn(
+    `[email] RESEND_API_KEY is not set, so nothing was sent — no password reset, verification link or ` +
+      `order email can reach anyone until it is.\nTo: ${to}\nSubject: ${subject}`
+  );
+}
+
 export async function sendEmail(to: string, subject: string, text: string): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
-    console.warn(
-      `[email] RESEND_API_KEY not set. Logging instead of sending.\nTo: ${to}\nSubject: ${subject}\n\n${text}\n`
-    );
+    logUndelivered(to, subject, text);
     return;
   }
 
@@ -50,9 +87,10 @@ export async function sendEmailBatch(recipients: string[], subject: string, text
 
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
-    console.warn(
-      `[email] RESEND_API_KEY not set. Logging instead of sending.\nTo: ${recipients.length} recipients\nSubject: ${subject}\n\n${text}\n`
-    );
+    // Same fallback as sendEmail, and the same gate on the body — this batch is announcements today, but
+    // the rule is about the fallback rather than about the caller, so it holds for whatever is sent here
+    // next.
+    logUndelivered(`${recipients.length} recipients`, subject, text);
     return;
   }
 

@@ -21,6 +21,7 @@ import { captureException } from "@/lib/observability";
 import { recoverFailedAccept, resolveQuickMatchAcceptance } from "@/lib/quickMatch";
 import { InsufficientWalletBalanceError, StakeLimitError } from "@/lib/stakes";
 import { emailVerificationRequired } from "@/lib/emailGate";
+import { refusalForRecipientRow } from "@/lib/quickMatchRefusal";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -50,7 +51,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "You weren't challenged to this Quick Match." }, { status: 403 });
   }
   if (recipientRow.status !== "PENDING") {
-    return NextResponse.json({ error: "This challenge is no longer available to you." }, { status: 409 });
+    // Their own row is closed, and the row's status is the only thing that
+    // knows why — CANCELLED is "somebody else won", DECLINED is "you said no",
+    // EXPIRED is "nobody answered in time". One combined sentence here is what
+    // the clients used to read as "another player accepted this first" whatever
+    // had actually happened. See src/lib/quickMatchRefusal.ts.
+    const refusal = refusalForRecipientRow(recipientRow.status);
+    return NextResponse.json(
+      { error: refusal.message, code: refusal.gone ? "GONE" : undefined },
+      { status: 409 }
+    );
   }
 
   if (challenge.stakeAmount > 0) {
@@ -100,7 +110,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (current?.status === "ACCEPTED" && !current.battleId) {
       return NextResponse.json({ error: "This challenge is being accepted. Try again in a moment." }, { status: 423 });
     }
-    return NextResponse.json({ error: "This challenge is no longer available." }, { status: 409 });
+    // "GONE" rather than another message-only refusal: the clients treat this
+    // as nothing-to-act-on and clear it themselves, the same as the CANCELLED
+    // row above. Every other refusal in this route is a rule the player has to
+    // do something about, and stays on screen until they close it.
+    return NextResponse.json({ error: "This challenge is no longer available.", code: "GONE" }, { status: 409 });
   }
 
   let battleId: string;

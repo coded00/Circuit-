@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { prisma } from "@/lib/db";
-import { applyRefundOutcome, applyTransferOutcome, currentPaidEntryFee, issueEntryFeeRefund, reconcilePendingMoney, refundRef, voidEntryFeeRevenue } from "./transfers";
+import { applyRefundOutcome, applyTransferOutcome, currentPaidEntryFee, issueEntryFeeRefund, reconcilePendingMoney, refundRef, voidEntryFeeRevenue, RECONCILE_BATCH, RECONCILE_MAX_BATCHES } from "./transfers";
 import { confirmEntryFeePayment } from "./confirm";
 import { paystackClient } from "./paystack";
 import { createTestOrganizer, createTestTournament, createTestUser, cleanupAll, uniqueSuffix } from "@/testHelpers";
@@ -11,8 +11,17 @@ import { createTestOrganizer, createTestTournament, createTestUser, cleanupAll, 
  * everything downstream is the real code against the real database.
  */
 
+// The alerting sink, so the stuck-money alert (finding #20) can be asserted on rather than only read in a
+// console that CI throws away.
+vi.mock("@/lib/observability", () => ({ captureException: vi.fn(), captureMessage: vi.fn() }));
+const { captureMessage } = await import("@/lib/observability");
+
+/** The exact message the sweep raises once money has been out for a day. */
+const STUCK_ALERT = "Money stuck: transfers still pending after a day";
+
 afterEach(async () => {
   vi.restoreAllMocks();
+  vi.mocked(captureMessage).mockClear();
   await cleanupAll();
 });
 
@@ -59,6 +68,97 @@ describe("applyTransferOutcome — withdrawals", () => {
   it("ignores a reference it doesn't know", async () => {
     expect(await applyTransferOutcome(`test-nope-${uniqueSuffix()}`, "FAILED")).toBe("UNKNOWN");
   });
+
+  /**
+   * Finding #21. A withdrawal marked FAILED (the provider refused it, or the call threw) whose transfer
+   * turns out to have gone out after all. Before this, the row stayed FAILED, the credited-back money stayed
+   * in the wallet, and the only trace was a line in Sentry — Circuit paid the withdrawal *and* kept the
+   * balance it had already given back, with a ledger that said neither had happened.
+   */
+  describe("a withdrawal that failed and then turned out to have succeeded", () => {
+    /** A withdrawal that was refused — so the row is FAILED and the money is back in the wallet. */
+    async function failedWithdrawal(amount = 50_000, balanceAfterRefund = 50_000) {
+      const row = await pendingWithdrawal(amount, 0);
+      await applyTransferOutcome(row.reference, "FAILED");
+      if (balanceAfterRefund !== amount) {
+        await prisma.user.update({ where: { id: row.user.id }, data: { walletBalance: balanceAfterRefund } });
+      }
+      vi.mocked(captureMessage).mockClear();
+      return row;
+    }
+
+    it("takes the money back and records what actually happened", async () => {
+      const { user, reference } = await failedWithdrawal();
+
+      expect(await applyTransferOutcome(reference, "SUCCESS")).toBe("APPLIED");
+
+      const txn = await prisma.walletTransaction.findUniqueOrThrow({ where: { providerRef: reference } });
+      // The row has to move too. A FAILED row whose amount has been debited is the same lie the other way
+      // up — /admin/finance would show a withdrawal that never paid out.
+      expect(txn.status).toBe("COMPLETE");
+      expect((await prisma.user.findUniqueOrThrow({ where: { id: user.id } })).walletBalance).toBe(0);
+    });
+
+    it("takes it back exactly once, however many times the webhook arrives", async () => {
+      const { user, reference } = await failedWithdrawal();
+
+      await Promise.all([
+        applyTransferOutcome(reference, "SUCCESS"),
+        applyTransferOutcome(reference, "SUCCESS"),
+        applyTransferOutcome(reference, "SUCCESS"),
+      ]);
+
+      expect((await prisma.user.findUniqueOrThrow({ where: { id: user.id } })).walletBalance).toBe(0);
+    });
+
+    it("still alerts, because a provider that changed its mind is worth knowing about", async () => {
+      const { reference } = await failedWithdrawal();
+
+      await applyTransferOutcome(reference, "SUCCESS");
+
+      expect(captureMessage).toHaveBeenCalledWith(
+        "Withdrawal succeeded after it was marked failed and refunded to the wallet",
+        "error",
+        expect.objectContaining({ playerOverdrawn: false })
+      );
+    });
+
+    it("lets the balance go negative when the player already spent the refunded money", async () => {
+      // The money was given back, spent, and then the provider says it went out after all. Clawing back only
+      // what is left would quietly forgive the difference; the truthful entry is that the player was paid
+      // twice, and every spend path already requires a balance that covers the amount, so this blocks them
+      // until it is settled.
+      const { user, reference } = await failedWithdrawal(50_000, 5_000);
+
+      await applyTransferOutcome(reference, "SUCCESS");
+
+      expect((await prisma.user.findUniqueOrThrow({ where: { id: user.id } })).walletBalance).toBe(-45_000);
+    });
+
+    it("says so when it had to go negative, so somebody can decide what to do about it", async () => {
+      const { reference } = await failedWithdrawal(50_000, 5_000);
+
+      await applyTransferOutcome(reference, "SUCCESS");
+
+      expect(captureMessage).toHaveBeenCalledWith(
+        "Withdrawal succeeded after it was marked failed and refunded to the wallet",
+        "error",
+        expect.objectContaining({ amount: 50_000, balanceAfterClawback: -45_000, playerOverdrawn: true })
+      );
+    });
+
+    it("does nothing to a withdrawal that is already complete", async () => {
+      // The ordinary replay. A COMPLETE row is not a FAILED one, and must not be debited again.
+      const { user, reference } = await pendingWithdrawal(50_000, 0);
+      await applyTransferOutcome(reference, "SUCCESS");
+      vi.mocked(captureMessage).mockClear();
+
+      expect(await applyTransferOutcome(reference, "SUCCESS")).toBe("NO_CHANGE");
+
+      expect((await prisma.user.findUniqueOrThrow({ where: { id: user.id } })).walletBalance).toBe(0);
+      expect(captureMessage).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe("applyTransferOutcome — prize payouts", () => {
@@ -74,6 +174,129 @@ describe("applyTransferOutcome — prize payouts", () => {
     const row = await prisma.escrowTransaction.findUniqueOrThrow({ where: { providerRef: reference } });
     expect(row.status).toBe("FAILED");
     expect(await prisma.notification.count({ where: { userId: winner.id, type: "PRIZE_PAYOUT_FAILED" } })).toBe(1);
+  });
+
+  /**
+   * Finding 1a — the mirror image of the withdrawal case above, and the one that cannot be corrected.
+   *
+   * Failing a payout reopens the claim, which is deliberate: the ordinary FAILED row is a transfer that
+   * never left. But when the provider later says that same reference was paid, the champion has already
+   * been free to claim again with a fresh reference — so there may be two completed payouts for one prize
+   * and no balance anywhere to take the second one back out of. All this can do is stop lying: the row
+   * moves to COMPLETE and a person is told, with enough in the alert to see whether it happened twice.
+   *
+   * Nothing else would ever have noticed. The sweep asks only about PENDING rows, and the route treats
+   * only PENDING and COMPLETE as claimed, so a FAILED row was the one state neither of them looked at.
+   */
+  describe("a prize payout that failed and then turned out to have succeeded", () => {
+    /** A payout the provider refused — so the row is FAILED and the champion is free to claim again. */
+    async function failedPayout(amount = 100_000) {
+      const organizer = await createTestOrganizer();
+      const winner = await createTestUser();
+      const tournament = await createTestTournament(organizer.id, { status: "COMPLETE", prizeAmount: amount });
+      const reference = `test-payout-${uniqueSuffix()}`;
+      await prisma.escrowTransaction.create({
+        data: { tournamentId: tournament.id, type: "PRIZE_PAYOUT", amount, userId: winner.id, place: 1, provider: "PAYSTACK", providerRef: reference, status: "FAILED" },
+      });
+      vi.mocked(captureMessage).mockClear();
+      return { tournament, winner, reference };
+    }
+
+    it("stops claiming the prize never went out", async () => {
+      const { reference } = await failedPayout();
+
+      expect(await applyTransferOutcome(reference, "SUCCESS")).toBe("APPLIED");
+
+      const row = await prisma.escrowTransaction.findUniqueOrThrow({ where: { providerRef: reference } });
+      expect(row.status).toBe("COMPLETE");
+    });
+
+    it("alerts, because the money is already in the champion's bank and only a person can settle that", async () => {
+      const { tournament, winner, reference } = await failedPayout();
+
+      await applyTransferOutcome(reference, "SUCCESS");
+
+      expect(captureMessage).toHaveBeenCalledWith(
+        "Prize payout succeeded after it was marked failed",
+        "error",
+        expect.objectContaining({ tournamentId: tournament.id, userId: winner.id, amount: 100_000, playerPaidTwice: false })
+      );
+    });
+
+    it("says how much was paid twice when the champion's second claim had already completed", async () => {
+      // The whole of finding 1a, end to end: the first transfer is marked FAILED, the champion claims
+      // again and that one completes, and only then does the first reference come back as paid.
+      const { tournament, winner, reference } = await failedPayout();
+      await prisma.escrowTransaction.create({
+        data: { tournamentId: tournament.id, type: "PRIZE_PAYOUT", amount: 100_000, userId: winner.id, place: 1, provider: "PAYSTACK", providerRef: `test-payout-${uniqueSuffix()}`, status: "COMPLETE" },
+      });
+
+      await applyTransferOutcome(reference, "SUCCESS");
+
+      expect(captureMessage).toHaveBeenCalledWith(
+        "Prize payout succeeded after it was marked failed",
+        "error",
+        expect.objectContaining({ playerPaidTwice: true, otherPayoutsForTournament: 1, otherPayoutsKobo: 100_000 })
+      );
+    });
+
+    it("counts only this champion's payouts for this tournament", async () => {
+      // The count is what turns "something is off" into "this player was paid twice", so it has to be
+      // scoped to the pair — another tournament's winner completing a payout is ordinary, not evidence.
+      const { winner, reference } = await failedPayout();
+      const otherOrganizer = await createTestOrganizer();
+      const otherTournament = await createTestTournament(otherOrganizer.id, { status: "COMPLETE", prizeAmount: 100_000 });
+      await prisma.escrowTransaction.create({
+        data: { tournamentId: otherTournament.id, type: "PRIZE_PAYOUT", amount: 100_000, userId: winner.id, place: 1, provider: "PAYSTACK", providerRef: `test-payout-${uniqueSuffix()}`, status: "COMPLETE" },
+      });
+
+      await applyTransferOutcome(reference, "SUCCESS");
+
+      expect(captureMessage).toHaveBeenCalledWith(
+        "Prize payout succeeded after it was marked failed",
+        "error",
+        expect.objectContaining({ playerPaidTwice: false, otherPayoutsForTournament: 0 })
+      );
+    });
+
+    it("records it exactly once, however many times the webhook arrives", async () => {
+      const { reference } = await failedPayout();
+
+      await Promise.all([
+        applyTransferOutcome(reference, "SUCCESS"),
+        applyTransferOutcome(reference, "SUCCESS"),
+        applyTransferOutcome(reference, "SUCCESS"),
+      ]);
+
+      const row = await prisma.escrowTransaction.findUniqueOrThrow({ where: { providerRef: reference } });
+      expect(row.status).toBe("COMPLETE");
+      expect(captureMessage).toHaveBeenCalledTimes(1);
+    });
+
+    it("does nothing to a payout that is already complete", async () => {
+      // The ordinary replay, and the reason the FAILED check exists rather than a bare compare-and-swap:
+      // a second SUCCESS on a COMPLETE row must not look like a second payment.
+      const { tournament, winner } = await failedPayout();
+      const reference = `test-payout-${uniqueSuffix()}`;
+      await prisma.escrowTransaction.create({
+        data: { tournamentId: tournament.id, type: "PRIZE_PAYOUT", amount: 100_000, userId: winner.id, place: 1, provider: "PAYSTACK", providerRef: reference, status: "PENDING" },
+      });
+      await applyTransferOutcome(reference, "SUCCESS");
+      vi.mocked(captureMessage).mockClear();
+
+      expect(await applyTransferOutcome(reference, "SUCCESS")).toBe("NO_CHANGE");
+
+      expect(captureMessage).not.toHaveBeenCalled();
+    });
+
+    it("leaves a failed payout failed when the provider fails it again", async () => {
+      // The retry loop finding #17 bounds: the same FAILED answer, arriving again, changes nothing.
+      const { reference } = await failedPayout();
+
+      expect(await applyTransferOutcome(reference, "FAILED")).toBe("NO_CHANGE");
+
+      expect(captureMessage).not.toHaveBeenCalled();
+    });
   });
 });
 
@@ -234,5 +457,189 @@ describe("late payments", () => {
 
     expect((await prisma.walletTransaction.findUniqueOrThrow({ where: { providerRef: reference } })).status).toBe("FAILED");
     expect((await prisma.user.findUniqueOrThrow({ where: { id: user.id } })).walletBalance).toBe(50_000);
+  });
+});
+
+/**
+ * Finding 1c: the sweep asked about the same twenty-five transfers forever.
+ *
+ * `createdAt asc, take 25` picks the oldest stale transfers, and a transfer the provider keeps answering
+ * PENDING about never settles and never stops being the oldest. Twenty-five of those — a payout method
+ * caught behind a Transfer OTP nobody cleared is the documented way to get them — filled the batch on
+ * every run, and every transfer behind them was never asked about at all. It stayed PENDING, joined the
+ * backlog, and the sweep went on asking about the same stuck twenty-five every two minutes. The run
+ * reported success throughout, and the stuck-money alert (finding #20) counted a backlog growing for a
+ * reason this code could no longer see.
+ */
+describe("the sweep's backstop paging (finding 1c)", () => {
+  const STALE = 45 * 60_000;
+  /**
+   * The sweep's page size, spelled out rather than imported.
+   *
+   * Every test here is about "one row more than the sweep fetches at a time", so its fixtures have to be
+   * built from the real number — and importing that number is how the first draft of these tests managed to
+   * pass against the unfixed code: with the export gone, `Array.from({ length: undefined })` quietly built
+   * an *empty* fixture and the starvation test had nothing to starve behind. The last test in this block
+   * asserts the two against `transfers.ts`, so a page size that moves without these following it fails
+   * loudly instead of turning them vacuous.
+   */
+  const PAGE = 25;
+  const CEILING_BATCHES = 4;
+
+  it("pages at the size and ceiling transfers.ts actually uses", () => {
+    expect(RECONCILE_BATCH).toBe(PAGE);
+    expect(RECONCILE_MAX_BATCHES).toBe(CEILING_BATCHES);
+  });
+
+  /**
+   * `count` withdrawals the provider will keep saying PENDING about, all stale by `createdAt`.
+   *
+   * Ids are pinned rather than generated so the tie test below can rely on where they sort — a real cuid
+   * also starts with `c`, and the point is only that they come before "zzz…".
+   */
+  async function stuckWithdrawals(count: number, createdAt: Date) {
+    const user = await createTestUser({ walletBalance: 0 });
+    const rows = Array.from({ length: count }, (_, i) => ({
+      id: `c-stuck-${uniqueSuffix()}-${String(i).padStart(4, "0")}`,
+      userId: user.id,
+      type: "WITHDRAWAL" as const,
+      amount: 50_000,
+      provider: "PAYSTACK" as const,
+      providerRef: `test-stuck-${uniqueSuffix()}-${i}`,
+      status: "PENDING" as const,
+      createdAt,
+    }));
+    await prisma.walletTransaction.createMany({ data: rows });
+    return { user, refs: rows.map((r) => r.providerRef) };
+  }
+
+  /** The provider answers PENDING for every stuck ref and FAILED for anything else. */
+  function providerAnswers(stuckRefs: string[]) {
+    const stuck = new Set(stuckRefs);
+    return vi.spyOn(paystackClient, "verifyTransfer").mockImplementation(async (ref) => (stuck.has(ref) ? "PENDING" : "FAILED"));
+  }
+
+  it("still asks about a transfer a whole batch of stuck ones is hiding", async () => {
+    // The bug, exactly: 25 permanently-stuck withdrawals fill the one page the old sweep ever fetched, and
+    // this one — the 26th oldest, and the first that would actually settle — is never asked about.
+    const { refs } = await stuckWithdrawals(PAGE, new Date(Date.now() - STALE));
+    const fresh = await pendingWithdrawal(50_000);
+    await prisma.walletTransaction.updateMany({ where: { providerRef: fresh.reference }, data: { createdAt: new Date(Date.now() - 40 * 60_000) } });
+    providerAnswers(refs);
+
+    const result = await reconcilePendingMoney();
+
+    expect(result.transfersSettled).toBeGreaterThanOrEqual(1);
+    expect((await prisma.walletTransaction.findUniqueOrThrow({ where: { providerRef: fresh.reference } })).status).toBe("FAILED");
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: fresh.user.id } })).walletBalance).toBe(50_000);
+  });
+
+  it("asks about every stale transfer exactly once while it pages", async () => {
+    // A page and a half. Keyset paging has two ways to be wrong and only one of them shows up as a missing
+    // settlement: it can also re-ask about a row it already asked about, which is what an offset would do
+    // as settled rows left the set and the rest moved up into the gap.
+    const { refs } = await stuckWithdrawals(PAGE + 5, new Date(Date.now() - STALE));
+    const verifyTransfer = providerAnswers(refs);
+
+    const result = await reconcilePendingMoney();
+
+    expect(verifyTransfer).toHaveBeenCalledTimes(PAGE + 5);
+    expect(result.transfersSettled).toBe(0);
+  });
+
+  it("does not skip a transfer that shares its timestamp with the batch in front of it", async () => {
+    // createdAt is only millisecond-precise, so a batch written by one request shares it. A cursor carrying
+    // the time alone would ask about the first page and then jump the whole remainder of that millisecond.
+    const at = new Date(Date.now() - STALE);
+    const { user, refs } = await stuckWithdrawals(PAGE, at);
+    const targetRef = `test-target-${uniqueSuffix()}`;
+    await prisma.walletTransaction.createMany({
+      data: [{ id: "zzzz-same-millisecond", userId: user.id, type: "WITHDRAWAL", amount: 50_000, provider: "PAYSTACK", providerRef: targetRef, status: "PENDING", createdAt: at }],
+    });
+    providerAnswers(refs);
+
+    await reconcilePendingMoney();
+
+    expect((await prisma.walletTransaction.findUniqueOrThrow({ where: { providerRef: targetRef } })).status).toBe("FAILED");
+  });
+
+  it("stops at the ceiling instead of walking an unbounded backlog in one run", async () => {
+    // The bound is what keeps a two-minute schedule from overlapping itself: each row is a provider round
+    // trip and the loop is sequential. Reaching it is not silent — the stuck-money alert has already been
+    // telling a person about this backlog for days.
+    const { refs } = await stuckWithdrawals(PAGE * CEILING_BATCHES, new Date(Date.now() - STALE));
+    const fresh = await pendingWithdrawal(50_000);
+    await prisma.walletTransaction.updateMany({ where: { providerRef: fresh.reference }, data: { createdAt: new Date(Date.now() - 40 * 60_000) } });
+    const verifyTransfer = providerAnswers(refs);
+
+    await reconcilePendingMoney();
+
+    // One row past the ceiling, so this run did not reach it. The next run starts from the oldest again and
+    // gets exactly as far, which is the trade the bound makes.
+    expect(verifyTransfer).toHaveBeenCalledTimes(PAGE * CEILING_BATCHES);
+    expect((await prisma.walletTransaction.findUniqueOrThrow({ where: { providerRef: fresh.reference } })).status).toBe("PENDING");
+  });
+});
+
+/**
+ * Finding #20, the half that was silent. The sweep settles what it can and reports what throws, but a transfer
+ * the provider keeps answering PENDING about did neither — the row stayed PENDING, the sweep asked again two
+ * minutes later, and money that had left a player's wallet showed up only as a count on a page somebody had to
+ * think to open. These tests are about the alert that closes that gap, and about it not becoming its own noise.
+ */
+describe("stuck money (finding #20)", () => {
+  /** A withdrawal aged past the alert threshold, with the provider still saying PENDING about it. */
+  async function stuckWithdrawal(ageMs: number, amount = 50_000) {
+    const row = await pendingWithdrawal(amount);
+    await prisma.walletTransaction.updateMany({
+      where: { providerRef: row.reference },
+      data: { createdAt: new Date(Date.now() - ageMs) },
+    });
+    vi.spyOn(paystackClient, "verifyTransfer").mockResolvedValue("PENDING");
+    return row;
+  }
+
+  it("alerts once money has been out for a day", async () => {
+    await stuckWithdrawal(25 * 60 * 60_000, 50_000);
+
+    const result = await reconcilePendingMoney();
+
+    expect(captureMessage).toHaveBeenCalledWith(STUCK_ALERT, "error", expect.objectContaining({ withdrawals: 1, withdrawalsKobo: 50_000 }));
+    expect(result.stuckMoney).toBe(1);
+  });
+
+  it("stays quiet while a transfer is merely slow", async () => {
+    // The same row, still inside the day. A bank transfer that takes an afternoon is not an incident, and an
+    // alert that fires for one is an alert nobody reads by the time it matters.
+    await stuckWithdrawal(45 * 60_000);
+
+    const result = await reconcilePendingMoney();
+
+    expect(captureMessage).not.toHaveBeenCalledWith(STUCK_ALERT, "error", expect.anything());
+    expect(result.stuckMoney).toBe(0);
+  });
+
+  it("does not repeat itself every two minutes for as long as the money is stuck", async () => {
+    // The sweep runs every two minutes; a transfer stuck for a week is ~5000 runs. One alert every six hours
+    // keeps it in front of somebody without training them to filter the channel out.
+    await stuckWithdrawal(25 * 60 * 60_000);
+
+    await reconcilePendingMoney();
+    await reconcilePendingMoney();
+    await reconcilePendingMoney();
+
+    expect(vi.mocked(captureMessage).mock.calls.filter(([message]) => message === STUCK_ALERT)).toHaveLength(1);
+  });
+
+  it("counts every stuck transfer, not just the ones this run's batch reached", async () => {
+    // The alert is deliberately not bounded by RECONCILE_BATCH: the size of the backlog is what decides who
+    // looks at it, and money the batch never got to is exactly the money nobody would otherwise see.
+    await stuckWithdrawal(25 * 60 * 60_000, 30_000);
+    await stuckWithdrawal(25 * 60 * 60_000, 70_000);
+
+    const result = await reconcilePendingMoney();
+
+    expect(captureMessage).toHaveBeenCalledWith(STUCK_ALERT, "error", expect.objectContaining({ withdrawals: 2, withdrawalsKobo: 100_000 }));
+    expect(result.stuckMoney).toBe(2);
   });
 });

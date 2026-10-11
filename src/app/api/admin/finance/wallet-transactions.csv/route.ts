@@ -8,7 +8,8 @@
 import { NextResponse } from "next/server";
 import type { Prisma, WalletTransactionStatus, WalletTransactionType } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { requireStaff } from "@/lib/session";
+import { requireSuperAdmin } from "@/lib/session";
+import { logAdminAction } from "@/lib/auditLog";
 import { csvEscape } from "@/lib/csv";
 
 function typeLabel(type: string): string {
@@ -18,8 +19,13 @@ function typeLabel(type: string): string {
 }
 
 export async function GET(request: Request) {
-  const staffAuth = await requireStaff();
-  if (staffAuth.error) return staffAuth.error;
+  // Finding #22. This used to be requireStaff(), which put a 5,000-row export of every player's wallet
+  // activity — names, handles, amounts, provider references — one click away from any staff account,
+  // a MODERATOR included. The same rows are still browsable on the Finance page by anyone on staff, a
+  // page at a time; this is the copy that leaves the building as a file, and that is the difference the
+  // audit was pointing at. Super Admin only, like platform settings and staff management.
+  const superAdminAuth = await requireSuperAdmin("Only a Super Admin can export finance data.");
+  if (superAdminAuth.error) return superAdminAuth.error;
 
   const { searchParams } = new URL(request.url);
   const q = searchParams.get("q")?.trim() ?? "";
@@ -45,6 +51,18 @@ export async function GET(request: Request) {
     orderBy: { createdAt: "desc" },
     take: 5000,
     include: { user: { select: { displayName: true, handle: true } } },
+  });
+
+  // Logged before the file is built, and awaited to the point of failure — unlike the withdraw route's own
+  // logAdminAction call, which swallows a broken audit log and carries on. Here the export whose record
+  // failed to write is precisely the export this exists to account for, so a broken audit log refuses the
+  // download rather than handing over an unrecorded copy. The filters and the row count are what make the
+  // entry worth reading later: they say which slice of the ledger left, and how much of it there was.
+  await logAdminAction({
+    actorId: superAdminAuth.user.id,
+    action: "finance.export.wallet",
+    targetType: "WalletTransaction",
+    metadata: { filters: { q, type, status }, rows: transactions.length },
   });
 
   const rows = [

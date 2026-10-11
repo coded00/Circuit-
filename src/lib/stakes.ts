@@ -80,27 +80,43 @@ type StakeTarget = {
   quickMatchChallengeId?: string;
 };
 
+/** The two ceilings, as stored on the PlatformSetting singleton. */
+type StakeLimits = { maxLockedStakeKobo: number; maxDailyStakeKobo: number };
+
+/** What an account has staked, against the limits it is held to. */
+export type StakeBudget = {
+  /** At risk right now: open and accepted Battles, a host's stake on a challenge nobody has taken, and Daily Challenge entry fees still in play. */
+  lockedTotal: number;
+  /** Everything staked or paid as a challenge entry in the last 24 hours — settled or refunded alike, which is what the limit counts. */
+  dailyTotal: number;
+  maxLocked: number;
+  maxDaily: number;
+};
+
 /**
- * One responsible-play budget per account, shared by everything that puts a player's own money at risk on a
- * result: Battle stakes and Daily Challenge entry fees. Two separate budgets would let a player run both at
- * full size, which is exactly the exposure the limits exist to bound, so both kinds of money are counted in
- * both limits and both entry points call this.
+ * The four numbers a stake is judged by, and the only place they are read.
  *
- * The caller has already taken the account's row lock (see lockStake) — that is what makes these reads safe
- * against a double-click. This only reads and compares; it writes nothing.
+ * `lockStake` calls this for the two comparisons it enforces, and the challenge
+ * form and the Responsible play tab call it to show a player the same figures.
+ * That is the point of it being one function: a readout that computed these
+ * its own way could tell a player they had room and then refuse them, which is
+ * worse than showing them nothing.
  *
- * - "In play at once": stakes on open or accepted Battles and unaccepted Quick Matches, plus the entry fees of
- *   challenge entries that are still in the running in a challenge that hasn't finished.
- * - "In 24 hours": every stake and every challenge entry fee in the rolling window, refunded or not, so a
- *   withdraw-and-re-enter loop cannot hand the day's budget back.
+ * `db` is a transaction when a stake is being locked, for the same reason
+ * `lockStake` takes one — these reads must see the same snapshot as the debit
+ * that follows them, and the row lock it takes first is what stops two
+ * simultaneous stakes from both finding room.
+ *
+ * `limits` is the PlatformSetting row when the caller already has it:
+ * `lockStake` reads it at the top for the kill switch, and passing it through
+ * keeps the ceilings it enforces from the same read as the switch it enforces.
+ * Leave it out and this reads the row; pass null for a database without one.
  */
-export async function assertWithinStakeBudget(
-  tx: Prisma.TransactionClient,
-  opts: { userId: string; amount: number; now: number; setting: { maxLockedStakeKobo: number; maxDailyStakeKobo: number } | null },
-): Promise<void> {
-  const { userId, amount, now, setting } = opts;
-  const [locked, daily, challengeEntries, challengeDaily] = await Promise.all([
-    tx.escrowTransaction.aggregate({
+export async function stakeBudget(db: Prisma.TransactionClient, userId: string, limits?: StakeLimits | null): Promise<StakeBudget> {
+  const now = Date.now();
+  const [setting, locked, daily, challengeEntries, challengeDaily] = await Promise.all([
+    limits === undefined ? db.platformSetting.findUnique({ where: { id: "singleton" } }) : Promise.resolve(limits),
+    db.escrowTransaction.aggregate({
       where: {
         userId,
         type: "STAKE",
@@ -119,24 +135,52 @@ export async function assertWithinStakeBudget(
     // Every stake in the window, settled or refunded alike. Intentionally not
     // narrowed to still-locked rows: a refund that restored the day's budget
     // would let a pair move any amount by opening and cancelling in a loop.
-    tx.escrowTransaction.aggregate({
+    db.escrowTransaction.aggregate({
       where: { userId, type: "STAKE", createdAt: { gte: new Date(now - STAKE_WINDOW_MS) } },
       _sum: { amount: true },
     }),
-    // Challenge entry fees still in play: counted once per entry, by the challenge's own fee (immutable once
+      // Challenge entry fees still in play: counted once per entry, by the challenge's own fee (immutable once
     // published), so a withdrawn-and-re-entered entry is not counted twice.
-    tx.dailyChallengeEntry.findMany({
+    db.dailyChallengeEntry.findMany({
       where: { userId, status: { in: ["ENTERED", "SUBMITTED", "VERIFIED"] }, challenge: { status: { in: CHALLENGE_IN_PLAY } } },
       select: { challenge: { select: { entryFee: true } } },
     }),
-    tx.escrowTransaction.aggregate({
+    // And every challenge entry fee in the window, refunded or not, so a withdraw-and-re-enter loop can't hand the budget back.
+    db.escrowTransaction.aggregate({
       where: { userId, type: "CHALLENGE_ENTRY", createdAt: { gte: new Date(now - STAKE_WINDOW_MS) } },
       _sum: { amount: true },
     }),
   ]);
 
-  const maxLocked = setting?.maxLockedStakeKobo ?? DEFAULT_MAX_LOCKED_STAKE;
-  const lockedTotal = (locked._sum.amount ?? 0) + challengeEntries.reduce((a, e) => a + e.challenge.entryFee, 0);
+  return {
+    lockedTotal: (locked._sum.amount ?? 0) + challengeEntries.reduce((sum, e) => sum + e.challenge.entryFee, 0),
+    dailyTotal: (daily._sum.amount ?? 0) + (challengeDaily._sum.amount ?? 0),
+    maxLocked: setting?.maxLockedStakeKobo ?? DEFAULT_MAX_LOCKED_STAKE,
+    maxDaily: setting?.maxDailyStakeKobo ?? DEFAULT_MAX_DAILY_STAKE,
+  };
+}
+
+/**
+ * One responsible-play budget per account, shared by everything that puts a player's own money at risk on a
+ * result: Battle stakes and Daily Challenge entry fees. Two separate budgets would let a player run both at
+ * full size, which is exactly the exposure the limits exist to bound, so both kinds of money are counted in
+ * both limits and both entry points call this.
+ *
+ * The caller has already taken the account's row lock (see lockStake) — that is what makes these reads safe
+ * against a double-click. This only reads and compares; it writes nothing.
+ *
+ * - "In play at once": stakes on open or accepted Battles and unaccepted Quick Matches, plus the entry fees of
+ *   challenge entries that are still in the running in a challenge that hasn't finished.
+ * - "In 24 hours": every stake and every challenge entry fee in the rolling window, refunded or not, so a
+ *   withdraw-and-re-enter loop cannot hand the day's budget back.
+ */
+export async function assertWithinStakeBudget(
+  tx: Prisma.TransactionClient,
+  opts: { userId: string; amount: number; setting: StakeLimits | null },
+): Promise<void> {
+  const { userId, amount, setting } = opts;
+  const { lockedTotal, dailyTotal, maxLocked, maxDaily } = await stakeBudget(tx, userId, setting);
+
   if (lockedTotal + amount > maxLocked) {
     throw new StakeLimitError(
       "LOCKED_TOTAL",
@@ -144,8 +188,6 @@ export async function assertWithinStakeBudget(
     );
   }
 
-  const maxDaily = setting?.maxDailyStakeKobo ?? DEFAULT_MAX_DAILY_STAKE;
-  const dailyTotal = (daily._sum.amount ?? 0) + (challengeDaily._sum.amount ?? 0);
   if (dailyTotal + amount > maxDaily) {
     throw new StakeLimitError(
       "DAILY_TOTAL",
@@ -201,7 +243,7 @@ export async function lockStake(tx: Prisma.TransactionClient, target: StakeTarge
     throw new StakeLimitError("PER_BATTLE", `Stake amount can't exceed ${naira(MAX_STAKE_AMOUNT)}.`);
   }
 
-  await assertWithinStakeBudget(tx, { userId, amount, now, setting });
+  await assertWithinStakeBudget(tx, { userId, amount, setting });
 
   // Atomic guard: a single conditional UPDATE, not a read-then-write — same
   // pattern as paid tournament registration, and still needed here even

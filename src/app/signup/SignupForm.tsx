@@ -18,7 +18,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, AtSign, CalendarDays, Camera, Check, Globe, Lock, Phone, Search, Trash2, UserRound, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, AtSign, CalendarDays, Camera, Check, Globe, Lock, MailCheck, Phone, Search, Trash2, UserRound, X } from "lucide-react";
 import { safeNextPath } from "@/lib/safeRedirect";
 import { HANDLE_PATTERN } from "@/lib/handles";
 import { formatNigerianPhone, normalizeNigerianPhone } from "@/lib/phone";
@@ -114,6 +114,11 @@ export default function SignupForm({ games, countries }: { games: GameOption[]; 
   const [submitting, setSubmitting] = useState(false);
   /** Set when the server says the email, gamertag or phone is already on an account. */
   const [conflict, setConflict] = useState<{ field: ConflictField; message: string } | null>(null);
+  /**
+   * Set when signup created the account but handed off to the inbox instead of signing in (finding #19).
+   * The address it went to, so the panel can name it.
+   */
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
   /** The server's answer, and which username it was for. */
   const [handleCheck, setHandleCheck] = useState<{ handle: string; available: boolean; reason?: string } | null>(null);
   const firstFieldRef = useRef<HTMLDivElement>(null);
@@ -285,6 +290,12 @@ export default function SignupForm({ games, countries }: { games: GameOption[]; 
       return;
     }
 
+    // Finding #19: whether this was a new account or an address that already had one, the server answers
+    // the same way and signs nobody in — so the optional steps below would only 401. Stop here and send
+    // them to their inbox; the games and photo steps live on in /welcome, which runs once they're in.
+    const signupData = await res.json().catch(() => null);
+    if (signupData?.pending === true) return setPendingEmail(values.email.trim());
+
     // The account exists and we're signed in: save the optional parts.
     // None of this blocks entry — if it fails they can finish in Settings.
     const failed: string[] = [];
@@ -360,6 +371,25 @@ export default function SignupForm({ games, countries }: { games: GameOption[]; 
   }
 
   const loginHref = `/login?next=${encodeURIComponent(next)}`;
+
+  // Finding #19: signup no longer signs anyone in when email is configured, so this is where the form
+  // ends — same screen whether the address was free or already had an account, which is the point.
+  if (pendingEmail) {
+    return (
+      <div className="state-block">
+        <MailCheck size={40} className="motion-scale-in text-accent-volt" />
+        <h1 className="state-title">Check your email</h1>
+        <p className="state-description">
+          If <span className="font-semibold text-foreground">{pendingEmail}</span> is yours and wasn&apos;t already on
+          Circuit, there&apos;s a link waiting to finish setting the account up. Already have one?{" "}
+          <Link href={loginHref} className="font-semibold underline underline-offset-2 hover:text-foreground">
+            Log in
+          </Link>{" "}
+          instead.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <form ref={formRef} onSubmit={handleSubmit} noValidate className="flex scroll-mt-6 flex-col gap-5">

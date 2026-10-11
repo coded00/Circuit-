@@ -1439,6 +1439,8 @@ export async function runScheduledSweep(): Promise<{
   stakePatternsFlagged: number;
   transfersSettled: number;
   latePaymentsChecked: number;
+  /** Transfers still PENDING after a day (finding #20) — surfaced here so the sweep's own log says so too. */
+  stuckMoney: number;
   rateLimitAttemptsPurged: number;
   dailyChallengesMoved: number;
   dailyChallengesCancelled: number;
@@ -1597,7 +1599,7 @@ export async function runScheduledSweep(): Promise<{
   }
 
   // Money backstop for webhooks that never arrive — see src/lib/payments/transfers.ts.
-  let money = { transfersSettled: 0, latePaymentsChecked: 0 };
+  let money = { transfersSettled: 0, latePaymentsChecked: 0, stuckMoney: 0 };
   try {
     const { reconcilePendingMoney } = await import("@/lib/payments/transfers");
     money = await reconcilePendingMoney();

@@ -117,7 +117,7 @@ export async function enterChallenge(opts: { userId: string; challengeId: string
     if (c.entryFee > 0) {
       if (isSelfExcluded(excludedUntil, now.getTime())) throw new StakeLimitError("SELF_EXCLUDED", selfExclusionMessage(excludedUntil));
       const setting = await tx.platformSetting.findUnique({ where: { id: "singleton" } });
-      await assertWithinStakeBudget(tx, { userId: opts.userId, amount: c.entryFee, now: now.getTime(), setting });
+      await assertWithinStakeBudget(tx, { userId: opts.userId, amount: c.entryFee, setting });
     }
 
     // The entry first: the ledger rows point at it.

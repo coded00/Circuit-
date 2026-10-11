@@ -31,6 +31,8 @@ import { emailVerificationRequired } from "@/lib/emailGate";
 import { isDefiniteRejection } from "@/lib/payments/errors";
 import { hasSettledFunds } from "@/lib/payments/balance";
 import { logAdminAction } from "@/lib/auditLog";
+import { MONEY_OUT_LIMITS } from "@/lib/rateLimit";
+import { limitOrRespond } from "@/lib/rateLimitHttp";
 
 const MIN_WITHDRAW_AMOUNT = 10000; // ₦100
 
@@ -94,6 +96,18 @@ export async function POST(request: Request) {
       { status: 503, headers: { "Retry-After": "3600" } }
     );
   }
+
+  // Finding #17. Where this sits is as much the point as the number: every gate above is an account
+  // state that refuses the same way however many times it is asked — no payout method linked, no
+  // verified email, a balance that hasn't settled yet — so counting those would spend the user's hour
+  // on requests that were never going to reach the provider. Everything past this line reserves money
+  // and calls the provider, which is what the limit exists to bound.
+  const tooMany = await limitOrRespond(
+    `wallet-withdraw:${user.id}`,
+    MONEY_OUT_LIMITS.withdraw,
+    "You've started a lot of withdrawals in the last hour. Please wait a little while before trying again."
+  );
+  if (tooMany) return tooMany;
 
   let txnId: string;
   try {
