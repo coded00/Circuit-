@@ -85,8 +85,10 @@ withdrawals or prizes are switched on.
 
 ## 4. The sweep (required)
 
-Something must call `/api/cron/sweep` every 2 minutes. `scripts/cron-sweep.mjs`
-does it; set it up with cron or pm2 as shown in
+Something must call `/api/cron/sweep` every few minutes. On Vercel's free plan
+that is `.github/workflows/sweep.yml` (every 5 minutes; set the repository
+secrets `APP_URL` and `CRON_SECRET`). `scripts/cron-sweep.mjs`
+does it on a server; set it up with cron or pm2 as shown in
 [self-hosting.md §2](self-hosting.md#2-the-scheduled-sweep-required). Without
 the sweep:
 

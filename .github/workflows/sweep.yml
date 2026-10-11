@@ -1,0 +1,34 @@
+# Runs the scheduled sweep (match deadlines, Daily Challenge windows/settlement, template publishing) by calling the
+# app's /api/cron/sweep route. Vercel's free plan only allows a cron once a day, so the schedule lives here instead.
+# GitHub's shortest schedule is every 5 minutes and runs can start a few minutes late — the sweep is built to catch up.
+#
+# Needs two repository secrets (Settings → Secrets and variables → Actions):
+#   APP_URL      the app's address with no trailing slash, e.g. https://circuit.example.com
+#   CRON_SECRET  the same value as the CRON_SECRET environment variable on the deployed app
+name: Sweep
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: sweep
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Call the sweep
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "APP_URL and CRON_SECRET must be set as repository secrets." >&2
+            exit 1
+          fi
+          curl --fail-with-body --silent --show-error --max-time 120 \
+            -X POST -H "Authorization: Bearer $CRON_SECRET" "$APP_URL/api/cron/sweep"

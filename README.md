@@ -59,7 +59,7 @@ IDs:
 | P3-1..P3-3 | Match/Bracket entities, bracket generation, match codes | `src/lib/matches.ts` (`generateBracket`) |
 | P3-4 | Result submission & proof upload | `src/app/api/matches/[id]/results/route.ts`, `src/app/matches/[id]/` |
 | P3-5 | Auto-complete on matching reports | `src/lib/matches.ts` (`resolveAfterSubmission`, `completeMatch`) |
-| P3-6 | Silent-side auto-accept + dispute-escalation timeout | `src/lib/matches.ts` (`runScheduledSweep`), `src/app/api/cron/sweep/route.ts` — Vercel Cron (`vercel.json`), or `scripts/cron-sweep.mjs` on a self-hosted server (docs/self-hosting.md) |
+| P3-6 | Silent-side auto-accept + dispute-escalation timeout | `src/lib/matches.ts` (`runScheduledSweep`), `src/app/api/cron/sweep/route.ts` — the GitHub Actions schedule (`.github/workflows/sweep.yml`), or `scripts/cron-sweep.mjs` on a self-hosted server (docs/self-hosting.md) |
 | P3-7 | Dispute creation on conflict | `src/lib/matches.ts` (`openDispute`) |
 | P3-8 | Organizer ruling & staff escalation | `src/app/api/disputes/[id]/rule/route.ts`, `src/lib/matches.ts` (`ruleDispute`) |
 | P3-9 | Live bracket view (polling) | `src/app/tournaments/[id]/bracket/` |
@@ -130,8 +130,9 @@ file's own comment for each):
   organizer's call?) for both free and paid matches. Staff can only void a
   Battle (no stake, nothing to return); a bracket match dispute must be
   resolved with a winner until someone signs off on an answer.
-- The sweep endpoint (`/api/cron/sweep`) has to be called every 2 minutes:
-  Vercel does it from `vercel.json`; a self-hosted server needs
+- The sweep endpoint (`/api/cron/sweep`) has to be called every few minutes:
+  on Vercel's free plan (daily crons only) `.github/workflows/sweep.yml` does it every 5 minutes
+  and needs the repository secrets `APP_URL` and `CRON_SECRET`; a self-hosted server needs
   `scripts/cron-sweep.mjs` on a cron or as a process (docs/self-hosting.md).
   Either way it needs `CRON_SECRET` set.
 - Migrations need `DIRECT_URL` (a non-pooled connection; see `.env.example`)
