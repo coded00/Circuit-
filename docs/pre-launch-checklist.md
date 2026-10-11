@@ -215,6 +215,21 @@ the same way; Paystack's test cards are on its docs site):
       out as `no-reply@circuit.app` (see `src/lib/email.ts`), so the domain in
       that address is not the one this one uses — worth reconciling before a
       player has to decide whether a Circuit email is real.
+- [ ] **Decide on branch protection again, now that the repo holds money.**
+      There is none today, and it is not an oversight: `main` is unprotected
+      because the org is on GitHub **Free** and the repository is **private**,
+      and on the free plan both classic branch protection and rulesets answer
+      `403 Upgrade to GitHub Pro or make this repository public`. So there is
+      nothing stopping a force-push to `main`, a direct push to it, or a merge
+      while CI is still red — the last of which has happened (PR #34 went in
+      before its checks finished).
+
+      It was accepted as-is before launch, with two collaborators who are both
+      trusted admins. What makes that reasonable expires: **the moment a third
+      person has write access**, or the moment real money is flowing in
+      production, buy GitHub Team, or make the repository public, and turn on a
+      required CI check. Until then the rule is the discipline — **CI green
+      before merge** — and it only binds people who read it.
 
 ## 8. Smoke test on the live site
 
