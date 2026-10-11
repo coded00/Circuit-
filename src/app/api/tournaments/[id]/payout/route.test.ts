@@ -22,11 +22,11 @@ vi.mock("@/lib/session", () => ({ getCurrentUser: vi.fn(), suspendedResponse: vi
 vi.mock("@/lib/analytics", () => ({ trackEvent: vi.fn() }));
 vi.mock("@/lib/notifications", () => ({ notify: vi.fn(async () => undefined) }));
 vi.mock("@/lib/observability", () => ({ captureException: vi.fn(), captureMessage: vi.fn() }));
-vi.mock("@/lib/payments", () => ({ getDefaultPaymentProvider: vi.fn(), getPaymentProvider: vi.fn() }));
+vi.mock("@/lib/payments", () => ({ getPayoutProvider: vi.fn(), getPaymentProvider: vi.fn() }));
 
 const { POST } = await import("./route");
 const { getCurrentUser } = await import("@/lib/session");
-const { getDefaultPaymentProvider, getPaymentProvider } = await import("@/lib/payments");
+const { getPayoutProvider, getPaymentProvider } = await import("@/lib/payments");
 const { captureException } = await import("@/lib/observability");
 
 const initiateTransfer = vi.fn();
@@ -70,7 +70,7 @@ beforeEach(async () => {
     verifyTransfer,
     availableBalance,
   } as never;
-  vi.mocked(getDefaultPaymentProvider).mockReturnValue(client);
+  vi.mocked(getPayoutProvider).mockReturnValue(client);
   // Both, because the guard asks the *row's* own provider rather than the default — a legacy Flutterwave
   // payout has to be asked of Flutterwave, and the point of the test is that it is a different client.
   vi.mocked(getPaymentProvider).mockReturnValue(client);

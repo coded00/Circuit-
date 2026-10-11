@@ -24,11 +24,11 @@ vi.mock("@/lib/analytics", () => ({ trackEvent: vi.fn() }));
 // network on a deploy that has the keys set. Nothing here is about either of them.
 vi.mock("@/lib/notifications", () => ({ notify: vi.fn(async () => undefined) }));
 vi.mock("@/lib/observability", () => ({ captureException: vi.fn(), captureMessage: vi.fn() }));
-vi.mock("@/lib/payments", () => ({ getDefaultPaymentProvider: vi.fn(), getPaymentProvider: vi.fn() }));
+vi.mock("@/lib/payments", () => ({ getPayoutProvider: vi.fn(), getPaymentProvider: vi.fn() }));
 
 const { POST } = await import("./route");
 const { getCurrentUser } = await import("@/lib/session");
-const { getDefaultPaymentProvider } = await import("@/lib/payments");
+const { getPayoutProvider } = await import("@/lib/payments");
 
 const initiateTransfer = vi.fn();
 const availableBalance = vi.fn();
@@ -47,7 +47,7 @@ beforeEach(() => {
   // null = "couldn't read the balance", which hasSettledFunds treats as go-ahead.
   availableBalance.mockResolvedValue(null);
 
-  vi.mocked(getDefaultPaymentProvider).mockReturnValue({
+  vi.mocked(getPayoutProvider).mockReturnValue({
     name: "PAYSTACK",
     initializeCharge: vi.fn(),
     verifyCharge: vi.fn(),
