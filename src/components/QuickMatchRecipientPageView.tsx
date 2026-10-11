@@ -10,16 +10,19 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { QuickMatchChallengeCard, type QuickMatchChallengeInfo } from "@/components/QuickMatchChallengeCard";
+import { QuickMatchRefusalNotice } from "@/components/QuickMatchRefusalNotice";
+import { refusalFromResponse, type AcceptRefusal } from "@/lib/quickMatchRefusal";
 
 export function QuickMatchRecipientPageView({
   challenge,
-  alreadyResolved,
+  refusal: initialRefusal,
 }: {
   challenge: QuickMatchChallengeInfo;
-  alreadyResolved: boolean;
+  /** Set when the page already knows this one is closed — see quickMatchRefusal. */
+  refusal: AcceptRefusal | null;
 }) {
   const router = useRouter();
-  const [unavailable, setUnavailable] = useState(alreadyResolved);
+  const [refusal, setRefusal] = useState(initialRefusal);
 
   async function handleAccept() {
     const res = await fetch(`/api/quick-match/${challenge.id}/accept`, { method: "POST" });
@@ -33,7 +36,11 @@ export function QuickMatchRecipientPageView({
       await new Promise((r) => setTimeout(r, 800));
       return handleAccept();
     }
-    setUnavailable(true);
+    // The route's own sentence, not a guess at it — the reasons it can give
+    // here are a stake limit, a cool-off, an unverified email, a missing date
+    // of birth, an empty wallet, or somebody else having won the race, and only
+    // the last of those reads anything like "already taken".
+    setRefusal(refusalFromResponse(res.status, data));
   }
 
   async function handleDecline() {
@@ -41,11 +48,10 @@ export function QuickMatchRecipientPageView({
     router.replace("/battles");
   }
 
-  if (unavailable) {
+  if (refusal) {
     return (
-      <div className="card flex flex-col items-center gap-2 p-6 text-center">
-        <p className="font-semibold">Battle unavailable</p>
-        <p className="text-sm text-muted">This challenge was already accepted by another player.</p>
+      <div className="card">
+        <QuickMatchRefusalNotice refusal={refusal} />
       </div>
     );
   }

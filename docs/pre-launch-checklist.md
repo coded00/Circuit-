@@ -230,6 +230,17 @@ the same way; Paystack's test cards are on its docs site):
       been staked and never how much more could be — that is deliberate (see
       `src/components/StakeLimitsNote.tsx`), so don't "fix" it by adding the
       subtraction.
+- [ ] Take a cool-off on a test account (**Account → Responsible play**),
+      have someone send it a staked Quick Match, and tap **Accept**. The
+      refusal must name the cool-off and the date it ends — if it says another
+      player accepted the battle first, the real reason has been swallowed
+      again (see `src/lib/quickMatchRefusal.ts`; this is the bug that copy was
+      built to stop). Do it both ways, because they are separate components:
+      on the request pop-up that appears wherever you are, and from the
+      notification link on `/quick-match/[id]`. Tapping Accept there the
+      instant the page opens must work too — that card is server-rendered, and
+      a hydration mismatch once rebuilt it under the tap so the press did
+      nothing at all.
 - [ ] Upload a proof screenshot and open it as the other player. It loads.
 - [ ] Admin Overview shows **All clear** once the test is tidied up.
 

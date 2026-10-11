@@ -13,6 +13,7 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { QuickMatchSearchingScreen } from "@/components/QuickMatchSearchingScreen";
 import { QuickMatchRecipientPageView } from "@/components/QuickMatchRecipientPageView";
+import { quickMatchRefusal } from "@/lib/quickMatchRefusal";
 
 export default async function QuickMatchPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -73,7 +74,11 @@ export default async function QuickMatchPage({ params }: { params: Promise<{ id:
           hostDisplayName: challenge.host.displayName,
           hostHandle: challenge.host.handle,
         }}
-        alreadyResolved={recipientRow.status !== "PENDING" || challenge.status !== "PENDING"}
+        // Why this one is closed, from the two statuses that know — not a bare
+        // boolean the client then had to guess a reason for (it guessed
+        // "another player accepted this" every time, including for a challenge
+        // this player had declined themselves).
+        refusal={quickMatchRefusal(recipientRow.status, challenge.status)}
       />
     </div>
   );

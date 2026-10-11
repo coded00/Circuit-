@@ -143,6 +143,20 @@ concurrency-safety in money-moving code, not broad line coverage:
   reopening the challenge without touching the host's still-locked stake,
   and `getEligibleRecipients`'s exclusions (self, suspended, offline,
   can't-afford-the-stake, already in an active match).
+- `src/lib/quickMatchRefusal.test.ts` — why a refused accept says what it
+  says. The accept clients used to answer every rejection with "another
+  player accepted this battle first", whatever the reason was, discarding
+  a response body that already held a sentence written for the player to
+  read — the sharpest case being a self-excluded player, who asked to be
+  stopped and was told somebody had simply been faster. So the assertions
+  that matter are the ones pinning a *specific* reason to the screen (the
+  cool-off's own sentence round-tripped against `selfExclusionMessage`,
+  a `StakeLimitError`'s message shown verbatim); a "shows some message"
+  test would have passed against the broken code too. The rest cover the
+  two things that must not be confused for each other: which refusals are
+  *gone* (nothing to act on — the calm "too late" framing, auto-dismissed)
+  and which need the player to do something (kept until they close it),
+  plus the row-outranks-challenge precedence the page and a click share.
 - `e2e/registration-wallet-pay.spec.ts` — register → pay → escrow hold,
   through the real `/tournaments/[id]/register` form: the wallet-pay
   radio (the one entry-fee path that needs no external payment-provider
@@ -173,7 +187,17 @@ concurrency-safety in money-moving code, not broad line coverage:
   `lockStake` actually refuses rather than against literal numbers — a
   readout that disagreed with the enforcement would be worse than none.
   That spec's own e2e coverage is the wiring, which nothing below the
-  browser can reach.
+  browser can reach. A third test covers the refusal reaching the player
+  on both accept surfaces — the live request modal and the dedicated
+  `/quick-match/[id]` page, which are separate components with separate
+  state — using a self-excluded recipient, since that is the case where
+  the old fixed copy was most plainly false. It clicks the dedicated
+  page's Accept the instant the page loads, on purpose: that card is
+  server-rendered and gives React a hydration mismatch, and while that
+  went unhandled React rebuilt the card mid-hydration and detached the
+  button, so an immediate press sent no request at all and produced no
+  refusal to read. Waiting first would hide exactly the regression the
+  click is there to catch.
 
 Deliberately not yet covered: most individual API route handlers.
 Several (auth-gated ones especially) call `next/headers`'s `cookies()`
