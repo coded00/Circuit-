@@ -206,6 +206,15 @@ the same way; Paystack's test cards are on its docs site):
       Moderator sees those tabs on admin → Finance but no Export CSV button —
       that is deliberate, not a missing feature. To answer "who took a copy of
       the ledger", read the audit log.
+- [ ] **`security@circuitvrse.co` exists, and someone reads it.** `SECURITY.md`
+      names it as the only place a vulnerability report should go, so send a
+      test message to it from an outside address and confirm a person sees it
+      arrive. A policy pointing at a mailbox nobody monitors is worse than
+      having no policy: a researcher reporting a live hole would hear nothing
+      back and conclude nobody is home. Note also that Circuit's own mail goes
+      out as `no-reply@circuit.app` (see `src/lib/email.ts`), so the domain in
+      that address is not the one this one uses — worth reconciling before a
+      player has to decide whether a Circuit email is real.
 
 ## 8. Smoke test on the live site
 
