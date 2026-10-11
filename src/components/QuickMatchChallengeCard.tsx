@@ -93,12 +93,22 @@ export function QuickMatchChallengeCard({
           <p className="truncate font-display text-base font-bold tracking-tight">{challenge.hostDisplayName}</p>
           <p className="truncate text-xs text-muted">@{challenge.hostHandle} wants to play you</p>
         </div>
-        <span className={`font-mono text-2xl font-semibold tabular-nums ${urgent ? "text-live" : "text-foreground"}`}>
+        {/* Both of these are read off the clock, so the server's value and the
+            browser's are a second apart by construction and can never match.
+            Without this, React treats the card as a hydration mismatch and
+            regenerates the tree on the client — which detaches the Accept
+            button for the moment a player is most likely to press it, so the
+            press lands on a node with no listener and is silently lost. */}
+        <span
+          suppressHydrationWarning
+          className={`font-mono text-2xl font-semibold tabular-nums ${urgent ? "text-live" : "text-foreground"}`}
+        >
           {expired ? "--" : formatCountdown(remainingMs).slice(3)}
           <span className="ml-0.5 text-xs text-muted">s</span>
         </span>
         <span
           aria-hidden
+          suppressHydrationWarning
           className={`absolute bottom-0 left-0 h-[3px] transition-[width] duration-1000 ease-linear ${urgent ? "bg-live" : "bg-accent-volt"}`}
           style={{ width: `${Math.min(100, (remainingMs / windowMs) * 100)}%` }}
         />
