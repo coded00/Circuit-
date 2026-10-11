@@ -17,27 +17,38 @@ const NOON = new Date("2026-11-05T10:00:00Z"); // 11:00 in Lagos, a Thursday
 const EVENING = new Date("2026-11-05T19:00:00Z"); // 20:00 in Lagos: entries have closed
 
 let settings: { dailyChallengesEnabled: boolean } | null = null;
-let freeFire: { id: string; publishedAt: Date | null } | null = null;
-let mobileLegends: { id: string; publishedAt: Date | null } | null = null;
+type GameState = { id: string; publishedAt: Date | null; created: boolean };
+let freeFire: GameState | null = null;
+let mobileLegends: GameState | null = null;
+
+/** The catalog game with this name, or — on a fresh database such as CI's — a stand-in made for the test and removed after. */
+async function gameNamed(name: string, slug: string): Promise<GameState> {
+  const found = await prisma.game.findFirst({ where: { name }, select: { id: true, publishedAt: true } });
+  if (found) return { ...found, created: false };
+  const made = await prisma.game.create({ data: { name, slug, enabled: true, publishedAt: null }, select: { id: true, publishedAt: true } });
+  return { ...made, created: true };
+}
+
+async function restore(g: GameState | null) {
+  if (!g) return;
+  if (g.created) await prisma.game.delete({ where: { id: g.id } });
+  else await prisma.game.update({ where: { id: g.id }, data: { publishedAt: g.publishedAt } });
+}
 
 beforeAll(async () => {
   const s = await prisma.platformSetting.findUnique({ where: { id: "singleton" } });
   settings = s ? { dailyChallengesEnabled: s.dailyChallengesEnabled } : null;
   await prisma.platformSetting.upsert({ where: { id: "singleton" }, create: { id: "singleton", dailyChallengesEnabled: true }, update: { dailyChallengesEnabled: true } });
-  const g = await prisma.game.findFirst({ where: { name: "Free Fire" }, select: { id: true, publishedAt: true } });
-  if (!g) throw new Error("Free Fire isn't in the catalog — run scripts/seed-template-games.mjs first.");
-  freeFire = g;
-  await prisma.game.update({ where: { id: g.id }, data: { publishedAt: new Date(), enabled: true } });
+  freeFire = await gameNamed("Free Fire", "free-fire");
+  await prisma.game.update({ where: { id: freeFire.id }, data: { publishedAt: new Date(), enabled: true } });
   // Mobile Legends may be published in the catalog by now; the tests need it unpublished for their duration.
-  const ml = await prisma.game.findFirst({ where: { name: "Mobile Legends" }, select: { id: true, publishedAt: true } });
-  if (!ml) throw new Error("Mobile Legends isn't in the catalog — run scripts/seed-template-games.mjs first.");
-  mobileLegends = ml;
-  await prisma.game.update({ where: { id: ml.id }, data: { publishedAt: null } });
+  mobileLegends = await gameNamed("Mobile Legends", "mobile-legends");
+  await prisma.game.update({ where: { id: mobileLegends.id }, data: { publishedAt: null } });
 });
 
 afterAll(async () => {
-  if (freeFire) await prisma.game.update({ where: { id: freeFire.id }, data: { publishedAt: freeFire.publishedAt } });
-  if (mobileLegends) await prisma.game.update({ where: { id: mobileLegends.id }, data: { publishedAt: mobileLegends.publishedAt } });
+  await restore(freeFire);
+  await restore(mobileLegends);
   if (settings) await prisma.platformSetting.update({ where: { id: "singleton" }, data: settings });
 });
 
