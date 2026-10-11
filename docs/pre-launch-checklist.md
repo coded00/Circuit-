@@ -280,3 +280,12 @@ the same way; Paystack's test cards are on its docs site):
       (`playerOverdrawn: true`). There is no admin screen for adjusting a
       wallet balance yet, so that case is a support conversation and a
       manual correction.
+- [ ] **Read the Dependabot PRs.** They arrive weekly: one grouped PR for
+      minor and patch bumps, individual ones for majors, plus one for the
+      actions pinned in `ci.yml`. They come already green, which is exactly
+      what makes them easy to wave through — read the majors. A bump to a
+      payouts, webhooks or auth library is a money change, not a chore, and
+      `sharp` sits in the image path. Vulnerability **alerts** are on as well
+      (**Security → Dependabot alerts**); those do not open PRs by
+      themselves, so they need looking at. What is behind them, and which are
+      safe to ignore, is written up in `docs/dependency-triage.md`.

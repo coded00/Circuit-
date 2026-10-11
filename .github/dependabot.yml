@@ -1,0 +1,43 @@
+# Circuit — Dependabot configuration. Version updates only; vulnerability
+# alerts are a repository setting (Dependabot alerts, on) and are separate
+# from this file. Automated *security* fix PRs are deliberately left off
+# until docs/dependency-triage.md has been written and we know which of the
+# flagged advisories actually have fixes we can take.
+#
+# Everything targets `main`, which is where work lands. The repository's
+# default branch was `master` — a pointer 67 commits behind that nothing
+# merged into — and Dependabot opens PRs against the default branch, so
+# this was wrong until that was corrected. No `target-branch` is needed
+# now; if the default ever moves again, this file needs revisiting.
+
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    # Enough to be useful, few enough to read. This repo has one CI job
+    # that must go green per PR, so a pile of them just sits there.
+    open-pull-requests-limit: 5
+    groups:
+      # Minor and patch bumps arrive as a single PR rather than one per
+      # package — the upgrade is the reviewable unit here, not the
+      # dependency. Majors are deliberately not grouped and still come
+      # individually: Next, React and Prisma majors each need their own
+      # reading and their own migration notes.
+      npm-minor-and-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      # ci.yml pins every action to a commit SHA with the version in a
+      # trailing comment. That is the right thing to do and it also means
+      # the pins rot silently — nothing bumps a SHA for you. Dependabot
+      # understands the pin and rewrites both the SHA and the comment, so
+      # this entry is what keeps that policy livable.
+      github-actions:
+        patterns: ["*"]
