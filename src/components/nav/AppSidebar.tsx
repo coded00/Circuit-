@@ -39,7 +39,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Settings } from "lucide-react";
-import { CalendarIcon, ChatIcon, HomeIcon, PadIcon, PlayerIcon, ShopIcon, SwordsIcon, TrophyIcon } from "@/components/icons/GameIcons";
+import { CalendarIcon, ChatIcon, HomeIcon, PlayerIcon, ShopIcon, SwordsIcon, TrophyIcon } from "@/components/icons/GameIcons";
 import { loginPath, signupPath } from "@/lib/safeRedirect";
 import { SidebarPromoCard } from "./SidebarPromoCard";
 import { Tv } from "lucide-react";
@@ -52,7 +52,6 @@ const PRIMARY: Item[] = [
   { href: "/", label: "Home", icon: HomeIcon },
   { href: "/compete", label: "Compete", icon: TrophyIcon },
   { href: "/watch", label: "Watch", icon: Tv },
-  { href: "/activity", label: "Feed", icon: PadIcon, also: ["/ladder"] },
   { href: "/battles", label: "Challenges", icon: SwordsIcon },
   { href: "/communities", label: "Communities", icon: ChatIcon },
   { href: "/calendar", label: "Calendar", icon: CalendarIcon },
@@ -136,7 +135,10 @@ export function AppSidebar({ user }: { user: NavUser }) {
           full lg+ rail — a guest at tablet width still has Log in/Sign up
           available in the top bar, so nothing is actually unreachable. */}
       <div className="mt-auto hidden flex-col gap-3 pt-4 lg:flex">
-        <SidebarPromoCard />
+        {/* The promo card is the first thing to give way when the window is short, so the rail never has to scroll. */}
+        <div className="[@media(max-height:820px)]:hidden">
+          <SidebarPromoCard />
+        </div>
         {!user && (
           <div className="flex flex-col gap-2">
             <Link href={loginPath(pathname)} className="btn-secondary w-full">

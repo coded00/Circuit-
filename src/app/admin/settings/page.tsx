@@ -26,6 +26,7 @@ import { PlatformFeeControl } from "@/components/admin/PlatformFeeControl";
 import { OrganizerRevenueSettlementControl } from "@/components/admin/OrganizerRevenueSettlementControl";
 import { PayoutAutoApproveControl } from "@/components/admin/PayoutAutoApproveControl";
 import { SponsoredPrizeControl } from "@/components/admin/SponsoredPrizeControl";
+import { DailyChallengesControl } from "@/components/admin/DailyChallengesControl";
 import { StakedBattlesControl } from "@/components/admin/StakedBattlesControl";
 import { StakePatternControl } from "@/components/admin/StakePatternControl";
 import { ArrowUpRight } from "lucide-react";
@@ -182,6 +183,17 @@ export default async function AdminSettingsPage() {
                     enabled={platformSetting?.stakedBattlesEnabled ?? true}
                     maxLockedKobo={platformSetting?.maxLockedStakeKobo ?? 50_000_000}
                     maxDailyKobo={platformSetting?.maxDailyStakeKobo ?? 100_000_000}
+                    canEdit={isSuperAdmin}
+                  />
+                </div>
+              </PanelRow>
+              <PanelRow>
+                <div className="w-full">
+                  <DailyChallengesControl
+                    enabled={platformSetting?.dailyChallengesEnabled ?? false}
+                    maxFeeKobo={platformSetting?.maxChallengeEntryFeeKobo ?? 200_000}
+                    maxEntrants={platformSetting?.maxChallengeEntrants ?? 50}
+                    maxPayoutBps={platformSetting?.maxChallengePayoutBps ?? 7000}
                     canEdit={isSuperAdmin}
                   />
                 </div>

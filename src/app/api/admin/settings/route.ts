@@ -23,7 +23,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const data: { maintenanceMode?: boolean; platformFeeBps?: number; organizerRevenueSettlementHours?: number; payoutAutoApprove?: boolean; payoutAutoApproveMaxKobo?: number; stakedBattlesEnabled?: boolean; maxLockedStakeKobo?: number; maxDailyStakeKobo?: number; maxSponsoredPrizeKobo?: number; stakePatternWindowDays?: number; stakePatternMinBattles?: number; stakePatternWinShareBps?: number; stakePatternNetAlertKobo?: number } = {};
+  const data: { maintenanceMode?: boolean; platformFeeBps?: number; organizerRevenueSettlementHours?: number; payoutAutoApprove?: boolean; payoutAutoApproveMaxKobo?: number; stakedBattlesEnabled?: boolean; maxLockedStakeKobo?: number; maxDailyStakeKobo?: number; maxSponsoredPrizeKobo?: number; stakePatternWindowDays?: number; stakePatternMinBattles?: number; stakePatternWinShareBps?: number; dailyChallengesEnabled?: boolean; maxChallengeEntryFeeKobo?: number; maxChallengeEntrants?: number; maxChallengePayoutBps?: number; stakePatternNetAlertKobo?: number } = {};
   const actions: { action: string; metadata?: Prisma.InputJsonValue }[] = [];
 
   if (body.maintenanceMode !== undefined) {
@@ -128,6 +128,46 @@ export async function PATCH(request: Request) {
     actions.push({ action: "settings.maxDailyStakeChange", metadata: { maxDailyStakeKobo: max } });
   }
 
+  // Daily Challenges: the kill switch and the pilot ceilings. Turning the switch off stops new entries and
+  // new publishes; challenges already running keep running and can still be paused or cancelled.
+  if (body.dailyChallengesEnabled !== undefined) {
+    if (typeof body.dailyChallengesEnabled !== "boolean") {
+      return NextResponse.json({ error: "dailyChallengesEnabled must be a boolean." }, { status: 400 });
+    }
+    data.dailyChallengesEnabled = body.dailyChallengesEnabled;
+    actions.push({ action: body.dailyChallengesEnabled ? "settings.dailyChallengesOn" : "settings.dailyChallengesOff" });
+  }
+
+  if (body.maxChallengeEntryFeeKobo !== undefined) {
+    const max = Number(body.maxChallengeEntryFeeKobo);
+    // Whole naira, like the other money ceilings. Zero is allowed: it limits the pilot to free challenges.
+    if (!Number.isInteger(max) || max < 0 || max % 100 !== 0 || max > MAX_KOBO_COLUMN) {
+      return NextResponse.json({ error: "The challenge entry-fee limit must be a whole number of naira, 0 or more." }, { status: 400 });
+    }
+    data.maxChallengeEntryFeeKobo = max;
+    actions.push({ action: "settings.maxChallengeEntryFeeChange", metadata: { maxChallengeEntryFeeKobo: max } });
+  }
+
+  if (body.maxChallengePayoutBps !== undefined) {
+    const bps = Number(body.maxChallengePayoutBps);
+    // The share of its minimum field's entries a challenge's prizes may add up to. 10000 = 100% (the house keeps nothing at
+    // the minimum); 0 allows no prizes at all.
+    if (!Number.isInteger(bps) || bps < 0 || bps > 10_000) {
+      return NextResponse.json({ error: "The payout cap must be a whole number of basis points from 0 to 10000 (0-100%)." }, { status: 400 });
+    }
+    data.maxChallengePayoutBps = bps;
+    actions.push({ action: "settings.maxChallengePayoutChange", metadata: { maxChallengePayoutBps: bps } });
+  }
+
+  if (body.maxChallengeEntrants !== undefined) {
+    const max = Number(body.maxChallengeEntrants);
+    if (!Number.isInteger(max) || max < 1 || max > 10_000) {
+      return NextResponse.json({ error: "The challenge entrant limit must be a whole number between 1 and 10,000." }, { status: 400 });
+    }
+    data.maxChallengeEntrants = max;
+    actions.push({ action: "settings.maxChallengeEntrantsChange", metadata: { maxChallengeEntrants: max } });
+  }
+
   // The repeated-pair detection thresholds (src/lib/stakePatterns.ts). Read
   // fresh at sweep time like the settlement window, so a change re-measures
   // every pair on the next run rather than only affecting new flags.
@@ -205,5 +245,9 @@ export async function PATCH(request: Request) {
     stakePatternMinBattles: updated.stakePatternMinBattles,
     stakePatternWinShareBps: updated.stakePatternWinShareBps,
     stakePatternNetAlertKobo: updated.stakePatternNetAlertKobo,
+    dailyChallengesEnabled: updated.dailyChallengesEnabled,
+    maxChallengeEntryFeeKobo: updated.maxChallengeEntryFeeKobo,
+    maxChallengeEntrants: updated.maxChallengeEntrants,
+    maxChallengePayoutBps: updated.maxChallengePayoutBps,
   });
 }

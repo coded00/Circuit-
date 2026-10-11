@@ -111,6 +111,19 @@ enum EscrowType {
   /// `userId` is set (the organizer) so the settlement sweep knows whose
   /// wallet to credit.
   ORGANIZER_REVENUE
+  /// A Daily Challenge entry fee, taken from the player's wallet at entry. Full fee, same as ENTRY_FEE.
+  CHALLENGE_ENTRY
+  /// Circuit's cut of a Daily Challenge entry fee, carved out of CHALLENGE_ENTRY at the same moment.
+  CHALLENGE_PLATFORM_FEE
+  /// One row per winning place when a Daily Challenge is settled. `place` says which.
+  CHALLENGE_PRIZE
+  /// An entry fee going back — withdrawn before the window, or the challenge was cancelled.
+  CHALLENGE_REFUND
+  /// The compensating row for CHALLENGE_PLATFORM_FEE when an entry's fee goes back to the player. Never an edit of
+  /// the original row: the cut was recorded, and giving it back is its own record.
+  CHALLENGE_PLATFORM_FEE_REVERSAL
+  /// What the house keeps at settlement: everything collected for a challenge that was not awarded as a prize.
+  CHALLENGE_HOUSE_REVENUE
 }
 
 enum EscrowStatus {
@@ -161,86 +174,86 @@ enum ReportStatus {
 model User {
   /// Bumped on password change/reset and on suspension. Session tokens carry the value they were
   /// issued with, so bumping it signs out every other device holding an older token.
-  sessionVersion      Int                   @default(0)
-  id                  String                @id @default(cuid())
-  displayName         String
-  handle              String                @unique
-  emailOrPhone        String                @unique
-  passwordHash        String?
-  avatarUrl           String?
+  sessionVersion        Int                   @default(0)
+  id                    String                @id @default(cuid())
+  displayName           String
+  handle                String                @unique
+  emailOrPhone          String                @unique
+  passwordHash          String?
+  avatarUrl             String?
   /// Short public profile tagline (ACC-6 profile edit) — free text,
   /// entirely optional, never used anywhere else in the app.
-  bio                 String?
+  bio                   String?
   /// Free-text city/state/country — same optional-profile-field convention
   /// as bio. Not shown anywhere yet; exists so Player Discovery's region
   /// filter (a later phase) has real values to query instead of starting
   /// from zero once that filter ships.
-  region              String?
+  region                String?
   /// Self-curated list of games shown on the public profile — player-typed
   /// free text, not derived from real match history and NOT sourced from
   /// the `Game` catalog the way Tournament.game/Battle.game are: a
   /// player's "games I play" is a personal claim, not a real competition,
   /// so it isn't constrained to what organizers can actually host.
-  favoriteGames       String[]              @default([])
-  dateOfBirth         DateTime?
-  ageVerified         Boolean               @default(false)
+  favoriteGames         String[]              @default([])
+  dateOfBirth           DateTime?
+  ageVerified           Boolean               @default(false)
   /// P0-7: linked payout destination — what REG-6's payout actually pays out to.
-  payoutMethodRef     String?
+  payoutMethodRef       String?
   /// Real, validated email — separate from `emailOrPhone` above, which may
   /// hold a phone number instead and was never format-checked at signup.
   /// Only ever set through Account Settings' own validation. Nullable:
   /// nobody is required to add one, they just don't get the email side of
   /// notifyNewContent below until they do.
-  email               String?               @unique
+  email                 String?               @unique
   /// Set when they click the link in a verification email (or sign up
   /// with Google, which verifies the address). Cleared if the email changes.
-  emailVerifiedAt     DateTime?
+  emailVerifiedAt       DateTime?
   /// Finished (or skipped) the post-signup /welcome flow.
-  onboardedAt         DateTime?
+  onboardedAt           DateTime?
   /// Nigerian mobile in +234… form (src/lib/phone.ts). Optional at signup;
   /// not SMS-verified. Can be used to log in when present.
-  phone               String?               @unique
+  phone                 String?               @unique
   /// ISO 3166-1 alpha-2 code picked at signup (src/lib/countries.ts). Null
   /// for accounts created before the country field existed.
-  country             String?
+  country               String?
   /// When they ticked "I agree to the Terms and Privacy Policy" at signup.
   /// Null for accounts created before the checkbox existed.
-  termsAcceptedAt     DateTime?
+  termsAcceptedAt       DateTime?
   /// Privacy: false hides them from search and Discover (their profile is
   /// still reachable by direct link). See src/lib/privacy.ts.
-  searchable          Boolean               @default(true)
+  searchable            Boolean               @default(true)
   /// SEO: true lets search engines index their public profile (opt-in; never for under-18s or suspended accounts).
   /// See src/lib/profileSeo.ts.
-  searchEngineIndexable Boolean             @default(false)
+  searchEngineIndexable Boolean               @default(false)
   /// Privacy: who may send them a direct challenge (a challenge aimed at
   /// them, or a Quick Match request).
-  directChallenges    DirectChallengePolicy @default(ANYONE)
+  directChallenges      DirectChallengePolicy @default(ANYONE)
   /// Set when they asked for their account to be deleted. Staff process it
   /// by hand (money and records have to be settled first); null otherwise.
-  deletionRequestedAt DateTime?
+  deletionRequestedAt   DateTime?
   /// Single opt-out switch for "new tournament/challenge" broadcast
   /// announcements (email + push only — in-app notifications are always-on
   /// regardless, per InAppChannel's own comment in notifications.ts).
   /// Defaults to on so a real audience exists for the feature at all.
-  notifyNewContent    Boolean               @default(true)
+  notifyNewContent      Boolean               @default(true)
   /// Set once this user's browser subscribes via OneSignal. Not the
   /// broadcast targeting mechanism (that uses OneSignal's own "Subscribed
   /// Users" segment) — kept mainly for future debugging/visibility.
-  oneSignalPlayerId   String?
+  oneSignalPlayerId     String?
   /// P6-1/P6-2/P6-4: Circuit staff access — dispute-queue escalation
   /// ruling, account suspension. No self-serve grant path exists yet;
   /// setting this currently means a direct DB write, which is fine at V1's
   /// staffing size but is itself worth flagging as a gap.
-  isStaff             Boolean               @default(false)
+  isStaff               Boolean               @default(false)
   /// Only meaningful when `isStaff` is true — which of the two fixed
   /// admin roles this staff account has. Null for an ordinary player.
   /// See `AdminRole`'s own comment for what each role can actually do.
-  adminRole           AdminRole?
+  adminRole             AdminRole?
   /// P6-4/TRU-4: blocks registering, paying, or accepting Battles —
   /// checked at those specific write actions, never at login or browsing
   /// (same "don't touch the read path" discipline as the age gate, TRU-5).
-  isSuspended         Boolean               @default(false)
-  suspensionReason    String?
+  isSuspended           Boolean               @default(false)
+  suspensionReason      String?
   /// Self-exclusion / cool-off — the player asked to be barred from staking,
   /// and this is when that bar lifts. The staff-imposed counterpart of
   /// `isSuspended` above; nothing but the player sets it, and only staff can
@@ -252,17 +265,17 @@ model User {
   /// can talk themselves out of; expired means not excluded, so no cleanup
   /// job is needed to end one. Players may push it further out but never pull
   /// it in — an early lift is a staff action, and `logAdminAction` records it.
-  selfExcludedUntil   DateTime?
+  selfExcludedUntil     DateTime?
   /// When this run of exclusion began. Kept separately from `updatedAt`
   /// because an extension overwrites that, and "on a break since X" is the
   /// fact worth showing — including after an extension moves the end date.
-  selfExcludedAt      DateTime?
+  selfExcludedAt        DateTime?
   /// Real, spendable Circuit balance (kobo) — funded via Fund Wallet,
   /// spent on entry fees, cashed out via Withdraw. The authoritative
   /// running total; `WalletTransaction` below is the immutable ledger
   /// that justifies it, kept in sync in the same DB transaction as every
   /// balance change so the two can never drift apart.
-  walletBalance       Int                   @default(0)
+  walletBalance         Int                   @default(0)
   /// Quick Match presence (BTL-Q1): refreshed every ~25s by a client
   /// heartbeat while a signed-in tab is open (`PresenceHeartbeat.tsx`) —
   /// "online" for Quick Match eligibility means this timestamp is within
@@ -271,71 +284,79 @@ model User {
   /// an "online now" signal from stale login timestamps, so this is a
   /// narrowly-scoped, frequently-refreshed field for Quick Match only,
   /// not a general presence system other features should assume is fresh.
-  lastActiveAt        DateTime?
-  createdAt           DateTime              @default(now())
+  lastActiveAt          DateTime?
+  createdAt             DateTime              @default(now())
   /// V1 audit follow-up (money-relevant models) — walletBalance and the
   /// suspension/staff flags above all mutate after creation with no
   /// signal of when; useful for debugging a balance that looks stale and
   /// for reconciliation, same reasoning as the other money-relevant
   /// models this was added to alongside (WalletTransaction,
   /// EscrowTransaction, Registration, Tournament, Battle).
-  updatedAt           DateTime              @updatedAt
+  updatedAt             DateTime              @updatedAt
 
-  organizerProfile        OrganizerProfile?
-  blocking                UserBlock[]              @relation("Blocker")
-  blockedBy               UserBlock[]              @relation("Blocked")
-  tournamentUpdates       TournamentUpdate[]       @relation("TournamentUpdateAuthor")
-  registrations           Registration[]
-  matchesAsPlayerA        Match[]                  @relation("MatchPlayerA")
-  matchesAsPlayerB        Match[]                  @relation("MatchPlayerB")
-  matchesWon              Match[]                  @relation("MatchWinner")
-  listings                Listing[]
-  marketplaceOrders       Order[]
-  battlesCreated          Battle[]                 @relation("BattleCreator")
-  battlesTargeted         Battle[]                 @relation("BattleTarget")
-  quickMatchesHosted      QuickMatchChallenge[]    @relation("QuickMatchHost")
-  quickMatchesAccepted    QuickMatchChallenge[]    @relation("QuickMatchAcceptedBy")
-  quickMatchInvites       QuickMatchRecipient[]    @relation("QuickMatchRecipient")
-  disputesRaised          Dispute[]                @relation("DisputeRaisedBy")
-  notifications           Notification[]
-  reportsFiled            Report[]                 @relation("ReportFiledBy")
-  reportsReceived         Report[]                 @relation("ReportAgainstUser")
-  communityPosts          CommunityPost[]          @relation("CommunityPostAuthor")
-  passwordResetTokens     PasswordResetToken[]
-  emailVerificationTokens EmailVerificationToken[]
-  communityMutes          CommunityMute[]          @relation("CommunityMuted")
-  communityReportsFiled   CommunityReport[]        @relation("CommunityReportFiledBy")
-  communityReportsAgainst CommunityReport[]        @relation("CommunityReportAgainst")
-  appeals                 Appeal[]
-  eventRsvps              EventRsvp[]
-  rosterMemberships       RosterMember[]           @relation("RosterMemberships")
-  gameNames               UserGameName[]
-  lobbyFlags              LobbyFlag[]              @relation("LobbyFlagsRaised")
-  stakePatternFlagsAsA    StakePatternFlag[]       @relation("StakePatternFlagsOnA")
-  stakePatternFlagsAsB    StakePatternFlag[]       @relation("StakePatternFlagsOnB")
-  stakePatternReviews     StakePatternFlag[]       @relation("StakePatternFlagsReviewed")
-  sponsorshipsRecorded    TournamentSponsorship[]  @relation("SponsorshipsRecorded")
-  walletTransactions      WalletTransaction[]
-  auditLogEntries         AuditLogEntry[]
-  friendshipsSent         Friendship[]             @relation("FriendshipRequester")
-  friendshipsReceived     Friendship[]             @relation("FriendshipAddressee")
-  teamsCaptained          Team[]                   @relation("TeamCaptain")
-  teamMemberships         TeamMembership[]
-  escrowTransactions      EscrowTransaction[]
-  videoLikes              VideoLike[]
-  videoSaves              VideoSave[]
-  communityMemberships    CommunityMember[]
-  ownedCommunities        Community[]              @relation("CommunityOwner")
-  communityInvites        CommunityInvite[]        @relation("CommunityInviteCreator")
-  communityApplications   CommunityApplication[]   @relation("CommunityApplicant")
-  communityBans           CommunityBan[]           @relation("CommunityBanned")
+  organizerProfile           OrganizerProfile?
+  blocking                   UserBlock[]                 @relation("Blocker")
+  blockedBy                  UserBlock[]                 @relation("Blocked")
+  tournamentUpdates          TournamentUpdate[]          @relation("TournamentUpdateAuthor")
+  registrations              Registration[]
+  matchesAsPlayerA           Match[]                     @relation("MatchPlayerA")
+  matchesAsPlayerB           Match[]                     @relation("MatchPlayerB")
+  matchesWon                 Match[]                     @relation("MatchWinner")
+  listings                   Listing[]
+  marketplaceOrders          Order[]
+  battlesCreated             Battle[]                    @relation("BattleCreator")
+  battlesTargeted            Battle[]                    @relation("BattleTarget")
+  quickMatchesHosted         QuickMatchChallenge[]       @relation("QuickMatchHost")
+  quickMatchesAccepted       QuickMatchChallenge[]       @relation("QuickMatchAcceptedBy")
+  quickMatchInvites          QuickMatchRecipient[]       @relation("QuickMatchRecipient")
+  disputesRaised             Dispute[]                   @relation("DisputeRaisedBy")
+  notifications              Notification[]
+  reportsFiled               Report[]                    @relation("ReportFiledBy")
+  reportsReceived            Report[]                    @relation("ReportAgainstUser")
+  communityPosts             CommunityPost[]             @relation("CommunityPostAuthor")
+  passwordResetTokens        PasswordResetToken[]
+  emailVerificationTokens    EmailVerificationToken[]
+  communityMutes             CommunityMute[]             @relation("CommunityMuted")
+  communityReportsFiled      CommunityReport[]           @relation("CommunityReportFiledBy")
+  communityReportsAgainst    CommunityReport[]           @relation("CommunityReportAgainst")
+  appeals                    Appeal[]
+  eventRsvps                 EventRsvp[]
+  rosterMemberships          RosterMember[]              @relation("RosterMemberships")
+  gameNames                  UserGameName[]
+  lobbyFlags                 LobbyFlag[]                 @relation("LobbyFlagsRaised")
+  stakePatternFlagsAsA       StakePatternFlag[]          @relation("StakePatternFlagsOnA")
+  stakePatternFlagsAsB       StakePatternFlag[]          @relation("StakePatternFlagsOnB")
+  stakePatternReviews        StakePatternFlag[]          @relation("StakePatternFlagsReviewed")
+  sponsorshipsRecorded       TournamentSponsorship[]     @relation("SponsorshipsRecorded")
+  dailyChallengesCreated     DailyChallenge[]            @relation("DailyChallengesCreated")
+  challengeTemplateStates    ChallengeTemplateState[]    @relation("TemplateStateUpdatedBy")
+  dailyChallengeEntries      DailyChallengeEntry[]
+  dailyChallengeReviews      DailyChallengeReview[]      @relation("DailyChallengeReviewer")
+  dailyChallengeDisputes     DailyChallengeDispute[]     @relation("DailyChallengeDisputeRaisedBy")
+  dailyChallengeRulings      DailyChallengeDispute[]     @relation("DailyChallengeDisputeRuledBy")
+  dailyChallengeSponsorships DailyChallengeSponsorship[] @relation("DailyChallengeSponsorshipsRecorded")
+  dailyChallengePrizeAwards  DailyChallengePrizeAward[]  @relation("DailyChallengePrizeAwards")
+  walletTransactions         WalletTransaction[]
+  auditLogEntries            AuditLogEntry[]
+  friendshipsSent            Friendship[]                @relation("FriendshipRequester")
+  friendshipsReceived        Friendship[]                @relation("FriendshipAddressee")
+  teamsCaptained             Team[]                      @relation("TeamCaptain")
+  teamMemberships            TeamMembership[]
+  escrowTransactions         EscrowTransaction[]
+  videoLikes                 VideoLike[]
+  videoSaves                 VideoSave[]
+  communityMemberships       CommunityMember[]
+  ownedCommunities           Community[]                 @relation("CommunityOwner")
+  communityInvites           CommunityInvite[]           @relation("CommunityInviteCreator")
+  communityApplications      CommunityApplication[]      @relation("CommunityApplicant")
+  communityBans              CommunityBan[]              @relation("CommunityBanned")
   /// The community whose tag shows next to their name (must be a member).
-  featuredCommunityId     String?
-  featuredCommunity       Community?               @relation("FeaturedCommunity", fields: [featuredCommunityId], references: [id], onDelete: SetNull)
-  messages                Message[]
-  messageMentions         MessageMention[]         @relation("MessageMentions")
-  messageReactions        MessageReaction[]        @relation("MessageReactions")
-  authIdentities          AuthIdentity[]
+  featuredCommunityId        String?
+  featuredCommunity          Community?                  @relation("FeaturedCommunity", fields: [featuredCommunityId], references: [id], onDelete: SetNull)
+  messages                   Message[]
+  messageMentions            MessageMention[]            @relation("MessageMentions")
+  messageReactions           MessageReaction[]           @relation("MessageReactions")
+  authIdentities             AuthIdentity[]
 
   @@index([emailOrPhone])
   @@index([lastActiveAt])
@@ -402,6 +423,12 @@ enum WalletTransactionType {
   /// payment. Withdrawing it afterward reuses the existing Withdraw from
   /// Wallet flow unchanged — no separate organizer payout route needed.
   ORGANIZER_REVENUE_CREDIT
+  /// A Daily Challenge entry paid from the wallet — internal only, no provider touched.
+  CHALLENGE_ENTRY_DEBIT
+  /// A Daily Challenge entry fee back in the wallet (withdrawn before the window, or cancelled).
+  CHALLENGE_ENTRY_REFUND
+  /// A Daily Challenge prize share credited to the winner's wallet. Withdrawing it reuses the normal flow.
+  CHALLENGE_PRIZE_CREDIT
 }
 
 enum WalletTransactionStatus {
@@ -545,10 +572,11 @@ model Game {
   /// DB default only so the column could be added to existing rows.
   updatedAt   DateTime  @default(now()) @updatedAt
 
-  modes       GameMode[]
-  communities Community[]
-  tournaments Tournament[]
-  playerNames UserGameName[]
+  modes           GameMode[]
+  communities     Community[]
+  tournaments     Tournament[]
+  playerNames     UserGameName[]
+  dailyChallenges DailyChallenge[]
 
   @@index([enabled])
 }
@@ -586,8 +614,9 @@ model GameMode {
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
-  formats     GameFormat[]
-  tournaments Tournament[]
+  formats         GameFormat[]
+  tournaments     Tournament[]
+  dailyChallenges DailyChallenge[]
 
   @@unique([gameId, name])
   @@index([gameId, sortOrder])
@@ -783,7 +812,7 @@ model Tournament {
   /// community's event and is announced there. The organizer must be an
   /// owner or moderator of it.
   hostCommunityId String?
-  hostCommunity   Community?          @relation("TournamentHostCommunity", fields: [hostCommunityId], references: [id], onDelete: SetNull)
+  hostCommunity   Community?             @relation("TournamentHostCommunity", fields: [hostCommunityId], references: [id], onDelete: SetNull)
   /// Where the money for a sponsored prize is coming from — see TournamentSponsorship.
   sponsorship     TournamentSponsorship?
 
@@ -993,47 +1022,47 @@ model LobbyFlag {
 /// second flag for a pair every two minutes; the sweep refreshes the evidence
 /// below on the flag it already has instead, and only alerts once.
 model StakePatternFlag {
-  id          String             @id @default(cuid())
-  userAId     String
-  userA       User               @relation("StakePatternFlagsOnA", fields: [userAId], references: [id], onDelete: Cascade)
-  userBId     String
-  userB       User               @relation("StakePatternFlagsOnB", fields: [userBId], references: [id], onDelete: Cascade)
-  status      StakePatternStatus @default(OPEN)
+  id            String             @id @default(cuid())
+  userAId       String
+  userA         User               @relation("StakePatternFlagsOnA", fields: [userAId], references: [id], onDelete: Cascade)
+  userBId       String
+  userB         User               @relation("StakePatternFlagsOnB", fields: [userBId], references: [id], onDelete: Cascade)
+  status        StakePatternStatus @default(OPEN)
   /// Which rules fired, as `StakePatternReason` values from
   /// src/lib/stakePatterns.ts. Kept as a list rather than a single value
   /// because both rules fire on the same pair often, and "one-sided AND
   /// high-value" is a different thing to look at than either alone. The
   /// staff queue prints these, so the reason a pair is here is never a
   /// number someone has to re-derive.
-  reasons     String[]
+  reasons       String[]
   /// The evidence as it stood on the most recent sweep that looked at this
   /// pair — not frozen at creation, because a pair still playing while the
   /// flag waits in the queue is exactly when the numbers matter most. A
   /// snapshot rather than a live re-query so the queue can render without
   /// re-walking every Battle, and so what staff acted on stays readable
   /// after the window has moved past it.
-  battleCount Int
+  battleCount   Int
   /// Settled staked Battles in the window that `userA`/`userB` won.
-  userAWins   Int
-  userBWins   Int
+  userAWins     Int
+  userBWins     Int
   /// Kobo that crossed from one account to the other over those Battles,
   /// signed from `userA`'s side: positive means A is up on B. The per-Battle
   /// amount is the stake (the pot is both stakes, so the winner's own comes
   /// back — see settleBattleOnComplete), so this is the net the loser is
   /// actually down, not the gross the winner's wallet saw.
-  netKobo     Int
+  netKobo       Int
   /// The lookback this was measured over, so a row still reads correctly
   /// after someone changes the settings that produced it.
-  windowDays  Int
+  windowDays    Int
   firstBattleAt DateTime?
   lastBattleAt  DateTime?
   /// Who looked at it and what they concluded. Null until then.
-  reviewedById String?
-  reviewedBy   User?              @relation("StakePatternFlagsReviewed", fields: [reviewedById], references: [id], onDelete: SetNull)
-  reviewNote   String?
-  reviewedAt   DateTime?
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
+  reviewedById  String?
+  reviewedBy    User?              @relation("StakePatternFlagsReviewed", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewNote    String?
+  reviewedAt    DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
 
   @@index([status, createdAt])
   @@index([userAId, status])
@@ -1307,6 +1336,12 @@ model EscrowTransaction {
   /// window before any Battle exists.
   quickMatchChallengeId String?
   quickMatchChallenge   QuickMatchChallenge? @relation(fields: [quickMatchChallengeId], references: [id])
+  /// Set on every Daily Challenge row (CHALLENGE_*). Fill-in-only like the other links: the ledger guard
+  /// lets an empty link be filled and a deleted record's link be cleared, never re-pointed.
+  dailyChallengeId      String?
+  dailyChallenge        DailyChallenge?      @relation(fields: [dailyChallengeId], references: [id])
+  dailyChallengeEntryId String?
+  dailyChallengeEntry   DailyChallengeEntry? @relation(fields: [dailyChallengeEntryId], references: [id])
   userId                String?
   /// V1 audit follow-up — matches WalletTransaction.userId's onDelete
   /// (RESTRICT): a User with financial history (a Battle payout, or
@@ -1338,6 +1373,8 @@ model EscrowTransaction {
   @@index([tournamentId, type])
   @@index([battleId, type])
   @@index([quickMatchChallengeId, type])
+  @@index([dailyChallengeId, type])
+  @@index([dailyChallengeEntryId])
   // V1 audit follow-up — the wallet page's own Battle-activity section
   // filters by userId directly (`where: { userId, battleId: { not: null } }`),
   // which neither composite index above serves.
@@ -1641,6 +1678,14 @@ model PlatformSetting {
   /// move real money, so it never produces a lopsided record for the other
   /// rule to catch, and the size itself is the reason to look.
   stakePatternNetAlertKobo         Int     @default(50000000)
+  /// Kill switch for Daily Challenges. Off by default: nobody can enter and nothing new can be published
+  /// until staff turn it on. Challenges already running keep running and can still be cancelled or refunded.
+  dailyChallengesEnabled           Boolean @default(false)
+  /// Pilot ceilings, enforced when a challenge is saved and again at entry. Kobo / head-count.
+  maxChallengeEntryFeeKobo         Int     @default(200000)
+  maxChallengeEntrants             Int     @default(50)
+  /// The most a challenge's prizes may add up to, as a share of what its minimum field would pay in (basis points). A sponsor's top-up is allowed on top.
+  maxChallengePayoutBps            Int     @default(7000)
 }
 
 /// Every real write an admin makes anywhere in `/admin` appends one row
@@ -2447,4 +2492,388 @@ enum StreamMode {
   TOURNAMENT_ONLY
   PLAYERS_ONLY
   NONE
+}
+
+// ---------------------------------------------------------------------------
+// Daily Challenges — solo, scored, asynchronous competitions (docs/daily-challenges-spec.md).
+// ---------------------------------------------------------------------------
+
+enum DailyChallengeStatus {
+  DRAFT
+  SCHEDULED
+  OPEN
+  LIVE
+  SUBMISSIONS_CLOSED
+  UNDER_REVIEW
+  PROVISIONAL
+  FINALIZED
+  SETTLING
+  COMPLETED
+  CANCELLED
+}
+
+/// Which way a score is better. HIGHER for kills and points, LOWER for a time.
+enum ScoreDirection {
+  HIGHER
+  LOWER
+}
+
+enum DailyChallengeEntryStatus {
+  ENTERED
+  SUBMITTED
+  VERIFIED
+  REJECTED
+  DISQUALIFIED
+  WITHDRAWN
+  REFUNDED
+}
+
+enum DailyChallengeSubmissionStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum DailyChallengeDisputeStatus {
+  OPEN
+  UPHELD
+  DISMISSED
+}
+
+model DailyChallenge {
+  id                   String                     @id @default(cuid())
+  gameId               String
+  game                 Game                       @relation(fields: [gameId], references: [id])
+  gameModeId           String?
+  gameMode             GameMode?                  @relation(fields: [gameModeId], references: [id], onDelete: SetNull)
+  /// Snapshots, like Tournament's: renaming a game or mode in the catalog never rewrites a running challenge.
+  gameName             String
+  modeName             String?
+  title                String
+  /// Shown before anyone enters: the game mode, map and any match settings that make a match eligible.
+  rules                String
+  /// What a player has to upload, in words.
+  evidenceRequirements String
+  requireRecording     Boolean                    @default(false)
+  /// What kind of challenge this is, and the weapon it is about (free text: "AK-47", "Sniper rifles").
+  kind                 ChallengeKind              @default(STANDARD)
+  weaponLabel          String?
+  /// The ranked score can't be read off a scoreboard (a headshot count, a streak), so it needs a recording to check.
+  scoreNeedsRecording  Boolean                    @default(false)
+  /// A mandatory minimum for the ranked score: an entry below it does not qualify, however it ranks. Null = highest wins.
+  minScore             Int?
+  noWinnerPolicy       NoWinnerPolicy             @default(HOUSE_KEEPS)
+  cadence              ChallengeCadence           @default(ONE_OFF)
+  /// Set when the scheduler launched it from a template: which one, and for which Lagos day. Unique together, so a
+  /// template can never launch twice for the same day, whatever races.
+  templateKey          String?
+  launchedForDate      String?
+  /// Reconciliation, written once at settlement: net entry money held, prizes awarded, and what the house kept.
+  collectedKobo        Int?
+  awardedKobo          Int?
+  houseKobo            Int?
+  settlementNote       String?
+  prizeAwards          DailyChallengePrizeAward[]
+
+  /// What is being scored ("Kills"), how, and which way is better. Scores are whole numbers; a time is stored
+  /// in whole seconds or milliseconds and `metricUnit` says which.
+  metricLabel       String
+  metricUnit        String?
+  direction         ScoreDirection @default(HIGHER)
+  tiebreakLabel     String?
+  tiebreakDirection ScoreDirection @default(HIGHER)
+  /// What happens when two entries are still level after both numbers. Shown before entry.
+  tiebreakRule      String         @default("Prize shares are split between the entries that are level.")
+
+  /// Kobo. 0 = a free challenge (it can still pay a sponsor-funded prize).
+  entryFee       Int   @default(0)
+  minEntrants    Int   @default(2)
+  maxEntrants    Int
+  /// Percentage per place, like Tournament.prizeSplit. Empty = winner takes all.
+  prizeSplit     Int[] @default([])
+  /// Snapshot of PlatformSetting.platformFeeBps at publish time, so what a player agreed to is what applies.
+  platformFeeBps Int   @default(0)
+
+  entryOpensAt         DateTime
+  entryClosesAt        DateTime
+  windowStartsAt       DateTime
+  windowEndsAt         DateTime
+  submissionsCloseAt   DateTime
+  /// Minutes the provisional results stay open to disputes before they are final.
+  disputeWindowMinutes Int      @default(30)
+
+  status             DailyChallengeStatus @default(DRAFT)
+  /// Staff pause for a technical problem or suspected abuse. While set, the sweep does not advance the
+  /// challenge, nobody can enter, and the clock-driven deadlines are treated as frozen by staff extending them.
+  pausedAt           DateTime?
+  pausedReason       String?
+  cancelledAt        DateTime?
+  cancelledReason    String?
+  publishedAt        DateTime?
+  provisionalAt      DateTime?
+  finalizedAt        DateTime?
+  settledAt          DateTime?
+  /// Named staff approval to release the prize, like Tournament.payoutApprovedAt.
+  payoutApprovedAt   DateTime?
+  payoutApprovedById String?
+
+  createdById String
+  createdBy   User     @relation("DailyChallengesCreated", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  entries         DailyChallengeEntry[]
+  escrowTxns      EscrowTransaction[]
+  sponsorship     DailyChallengeSponsorship?
+  requirements    DailyChallengeRequirement[]
+  prizeCategories DailyChallengePrizeCategory[]
+
+  @@unique([templateKey, launchedForDate])
+  @@index([status, entryOpensAt])
+  @@index([gameId, status])
+  @@index([windowEndsAt])
+}
+
+model DailyChallengeEntry {
+  id               String                    @id @default(cuid())
+  challengeId      String
+  challenge        DailyChallenge            @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User                      @relation(fields: [userId], references: [id])
+  /// Snapshot of the player's in-game name for this game at entry. Staff match the evidence to it.
+  inGameName       String
+  /// A short code shown only to this entrant. A recording has to begin by showing it, so old or borrowed footage can't be reused.
+  verificationCode String?
+  status           DailyChallengeEntryStatus @default(ENTERED)
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+
+  submission DailyChallengeSubmission?
+  escrowTxns EscrowTransaction[]
+
+  /// One entry per player per challenge — at the database, so a double tap cannot take two places.
+  @@unique([challengeId, userId])
+  @@index([userId])
+  @@index([challengeId, status])
+}
+
+model DailyChallengeSubmission {
+  id                    String                         @id @default(cuid())
+  entryId               String                         @unique
+  entry                 DailyChallengeEntry            @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  score                 Int
+  tiebreakScore         Int?
+  /// Opaque storage reference (src/lib/storage.ts), never a public URL. Served through proofResponse.ts.
+  evidenceRef           String
+  evidenceMime          String
+  /// sha256 of the uploaded bytes. Not unique at the database: staff can knowingly accept a re-upload, so the
+  /// duplicate check is a flag to review, not a hard stop. See src/lib/dailyChallenges.ts.
+  evidenceHash          String
+  /// Optional short screen recording, for a challenge that requires one. Same storage and access rules as the screenshot.
+  recordingRef          String?
+  recordingMime         String?
+  /// When the screenshot's own metadata says it was taken, if it says. Advisory for reviewers only (src/lib/evidenceCheck.ts).
+  evidenceCapturedAt    DateTime?
+  /// Advisory flags from that check (BEFORE_WINDOW, AFTER_DEADLINE, NO_TIMESTAMP...). Never decide anything on their own.
+  evidenceFlags         String[]                       @default([])
+  /// Server clock at the moment the upload was stored. Never taken from the client.
+  submittedAt           DateTime                       @default(now())
+  status                DailyChallengeSubmissionStatus @default(PENDING)
+  /// What staff confirmed from the evidence. This, not `score`, is what ranks.
+  verifiedScore         Int?
+  verifiedTiebreakScore Int?
+  reviewedById          String?
+  reviewedAt            DateTime?
+  updatedAt             DateTime                       @updatedAt
+
+  reviews            DailyChallengeReview[]
+  disputes           DailyChallengeDispute[]
+  requirementResults DailyChallengeRequirementResult[]
+
+  @@index([evidenceHash])
+  @@index([status])
+}
+
+/// Append-only: every decision a reviewer makes about a submission, with the reason. A change of mind is a new row.
+model DailyChallengeReview {
+  id           String                   @id @default(cuid())
+  submissionId String
+  submission   DailyChallengeSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  reviewerId   String
+  reviewer     User                     @relation("DailyChallengeReviewer", fields: [reviewerId], references: [id])
+  /// APPROVE | CORRECT | REJECT | DISQUALIFY
+  decision     String
+  /// A short code from a fixed list (src/lib/dailyChallenges.ts), so reasons can be counted.
+  reasonCode   String?
+  note         String?
+  scoreBefore  Int?
+  scoreAfter   Int?
+  createdAt    DateTime                 @default(now())
+
+  @@index([submissionId])
+}
+
+model DailyChallengeDispute {
+  id           String                      @id @default(cuid())
+  submissionId String
+  submission   DailyChallengeSubmission    @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  raisedById   String
+  raisedBy     User                        @relation("DailyChallengeDisputeRaisedBy", fields: [raisedById], references: [id])
+  reason       String
+  status       DailyChallengeDisputeStatus @default(OPEN)
+  ruling       String?
+  ruledById    String?
+  ruledBy      User?                       @relation("DailyChallengeDisputeRuledBy", fields: [ruledById], references: [id])
+  ruledAt      DateTime?
+  createdAt    DateTime                    @default(now())
+
+  @@index([submissionId])
+  @@index([status])
+}
+
+/// Declares where a challenge's extra prize money comes from, the way TournamentSponsorship does. Moves no money.
+model DailyChallengeSponsorship {
+  id           String         @id @default(cuid())
+  challengeId  String         @unique
+  challenge    DailyChallenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  recordedById String
+  recordedBy   User           @relation("DailyChallengeSponsorshipsRecorded", fields: [recordedById], references: [id], onDelete: Cascade)
+  amountKobo   Int
+  source       String
+  note         String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@index([recordedById])
+}
+
+/// What a requirement asks of a submission: a pass/fail condition, or a number that has to reach a threshold.
+enum RequirementKind {
+  CONDITION
+  TARGET
+}
+
+/// One thing, besides the ranked score, a submission has to satisfy to qualify (docs/daily-challenges-spec.md §6b).
+/// Checked by hand by staff. Locked once the challenge is published, by a database trigger as well as by the admin code.
+model DailyChallengeRequirement {
+  id             String          @id @default(cuid())
+  challengeId    String
+  challenge      DailyChallenge  @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  kind           RequirementKind
+  /// "Win the match", "Kills".
+  label          String
+  unit           String?
+  /// TARGET only: HIGHER = at least `threshold`, LOWER = at most.
+  direction      ScoreDirection?
+  threshold      Int?
+  sortOrder      Int             @default(0)
+  /// true: an entry must meet this to rank at all. false: only prize categories that name it care.
+  gate           Boolean         @default(true)
+  /// The stat can't be read off a scoreboard (a weapon or headshot count), so a prize that depends on it needs a recording.
+  needsRecording Boolean         @default(false)
+
+  results        DailyChallengeRequirementResult[]
+  prizeMetricFor DailyChallengePrizeCategory[]     @relation("PrizeMetric")
+
+  @@index([challengeId, sortOrder])
+}
+
+/// What the player said about one requirement, and what staff decided. The claim never changes after it is written;
+/// the verdict (`met`, `verifiedValue`) is written by the review action only.
+model DailyChallengeRequirementResult {
+  id            String                    @id @default(cuid())
+  submissionId  String
+  submission    DailyChallengeSubmission  @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  requirementId String
+  requirement   DailyChallengeRequirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  claimedMet    Boolean?
+  claimedValue  Int?
+  met           Boolean?
+  verifiedValue Int?
+
+  @@unique([submissionId, requirementId])
+}
+
+/// What kind of challenge this is, which decides how it is presented and what it must be checked against.
+enum ChallengeKind {
+  STANDARD
+  WEAPON
+  SKILL
+  COMBINED
+}
+
+/// What happens to the money when no entry meets a mandatory target. Stored before entries open and locked at publish.
+enum NoWinnerPolicy {
+  /// Nobody qualified: everything collected stays with the house. The owner's default.
+  HOUSE_KEEPS
+  /// Every entry's fee goes back to the player.
+  REFUND_ENTRIES
+}
+
+enum ChallengeCadence {
+  ONE_OFF
+  DAILY
+}
+
+/// One prize a challenge can pay, with a fixed amount and a rule from a closed set (src/lib/challengePrizes.ts).
+/// Locked once the challenge is published, by a database trigger as well as by the admin code.
+model DailyChallengePrizeCategory {
+  id                     String                     @id @default(cuid())
+  challengeId            String
+  challenge              DailyChallenge             @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  name                   String
+  /// Kobo, fixed. What the house keeps is everything collected that is not awarded.
+  amountKobo             Int
+  /// The number-target this category ranks by. Null = the challenge's ranked score.
+  metricRequirementId    String?
+  metricRequirement      DailyChallengeRequirement? @relation("PrizeMetric", fields: [metricRequirementId], references: [id], onDelete: Cascade)
+  /// 1 = the best entry. Level entries share the place.
+  place                  Int                        @default(1)
+  /// Requirement ids that must all be met for an entry to be considered for this category.
+  requiresRequirementIds String[]                   @default([])
+  /// Combined prize: ids of the categories whose winner must be the same player. Empty for an ordinary category.
+  comboOfCategoryIds     String[]                   @default([])
+  sortOrder              Int                        @default(0)
+
+  @@index([challengeId, sortOrder])
+}
+
+/// Which of the code-defined challenge templates (src/lib/challengeTemplates.ts) are switched on, and when they run. The
+/// templates themselves live in code; this remembers only the owner's switches. Switching one ON puts its challenge on the
+/// homepage on its chosen weekdays, published automatically if the full configuration passes the publish rules.
+model ChallengeTemplateState {
+  templateKey String   @id
+  enabled     Boolean  @default(false)
+  /// 0 = Sunday … 6 = Saturday, Lagos time.
+  weekdays    Int[]    @default([0, 1, 2, 3, 4, 5, 6])
+  /// Overrides, in kobo and head-count. Null = the template's own. An entry fee of 0 runs the template free (no prizes).
+  entryFee    Int?
+  minEntrants Int?
+  maxEntrants Int?
+  /// The Lagos date (YYYY-MM-DD) it last launched for.
+  launchedOn  String?
+  /// What happened the last time the scheduler tried: "Launched", or the reason it didn't.
+  lastResult  String?
+  updatedById String?
+  updatedBy   User?    @relation("TemplateStateUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  updatedAt   DateTime @updatedAt
+}
+
+/// One prize paid to one player at settlement. Append-only, and unique per (challenge, category, player) so the same prize
+/// can never be paid twice however many times settlement runs. `categoryKey` is the prize category's id, or "place-N" for
+/// the older rank split.
+model DailyChallengePrizeAward {
+  id           String         @id @default(cuid())
+  challengeId  String
+  challenge    DailyChallenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  categoryKey  String
+  /// The prize's name as players saw it, kept so history still reads right if a category is ever removed.
+  categoryName String
+  userId       String
+  user         User           @relation("DailyChallengePrizeAwards", fields: [userId], references: [id])
+  amountKobo   Int
+  createdAt    DateTime       @default(now())
+
+  @@unique([challengeId, categoryKey, userId])
+  @@index([userId])
 }

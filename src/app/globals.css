@@ -1742,6 +1742,10 @@ html:not([data-nav-morph])::view-transition-new(.tournament-morph) {
     padding: 0.65rem 1rem;
     font-variant-numeric: tabular-nums;
   }
+  /* Right-aligned cells hold dates, amounts and counts: keep each on one line rather than wrapping "4 Oct 2026" onto three. */
+  [data-admin] .table td.text-right {
+    white-space: nowrap;
+  }
   [data-admin] .table tbody tr:hover {
     background: rgba(255, 255, 255, 0.025);
   }

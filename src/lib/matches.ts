@@ -1440,6 +1440,10 @@ export async function runScheduledSweep(): Promise<{
   transfersSettled: number;
   latePaymentsChecked: number;
   rateLimitAttemptsPurged: number;
+  dailyChallengesMoved: number;
+  dailyChallengesCancelled: number;
+  dailyChallengeRefunds: number;
+  templatesLaunched: number;
   errors?: string[];
 }> {
   const now = new Date();
@@ -1563,6 +1567,35 @@ export async function runScheduledSweep(): Promise<{
   const stakePatterns = await detectStakePatterns(now);
   if (stakePatterns.errors.length > 0) errors.push(...stakePatterns.errors);
 
+  // Daily Challenges: open, go live, close submissions, and cancel-and-refund an under-filled one. Also finishes any
+  // refund run that was interrupted. See advanceDailyChallenges for why it stops at UNDER_REVIEW for now.
+  let dailyChallenges = { moved: 0, cancelled: 0, refunded: 0 };
+  try {
+    const { advanceDailyChallenges } = await import("@/lib/dailyChallengeEntries");
+    const r = await advanceDailyChallenges(now);
+    dailyChallenges = r;
+    if (r.errors.length > 0) errors.push(...r.errors);
+    // Then pay what is final. A challenge that needs a named approval first just waits.
+    const { settleReadyChallenges } = await import("@/lib/challengeSettlement");
+    const settled = await settleReadyChallenges(now);
+    if (settled.errors.length > 0) errors.push(...settled.errors);
+  } catch (err) {
+    captureException(err, { source: "sweep:dailyChallenges" });
+    errors.push("dailyChallenges");
+  }
+
+  // Switched-on challenge templates launch today's challenge, published automatically if it passes the publish rules.
+  let templatesLaunched = 0;
+  try {
+    const { runTemplateRotation } = await import("@/lib/challengeTemplateAdmin");
+    const r = await runTemplateRotation(now);
+    templatesLaunched = r.launched;
+    if (r.errors.length > 0) errors.push(...r.errors);
+  } catch (err) {
+    captureException(err, { source: "sweep:templateRotation" });
+    errors.push("templateRotation");
+  }
+
   // Money backstop for webhooks that never arrive — see src/lib/payments/transfers.ts.
   let money = { transfersSettled: 0, latePaymentsChecked: 0 };
   try {
@@ -1599,6 +1632,10 @@ export async function runScheduledSweep(): Promise<{
     battlesExpired: battleExpiry.expired,
     stakePatternsFlagged: stakePatterns.flagged,
     rateLimitAttemptsPurged,
+    dailyChallengesMoved: dailyChallenges.moved,
+    dailyChallengesCancelled: dailyChallenges.cancelled,
+    dailyChallengeRefunds: dailyChallenges.refunded,
+    templatesLaunched,
     ...money,
     ...(errors.length > 0 ? { errors } : {}),
   };

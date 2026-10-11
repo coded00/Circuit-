@@ -13,8 +13,9 @@ import { prisma } from "@/lib/db";
 import { battleStatusInfo } from "@/components/StatusPill";
 import { EmptyState, Field, FilterBar, naira, PageHeader, Pagination, StatusBadge, SubNav, toneFor } from "@/components/admin/ui";
 import { RowLink } from "@/components/admin/ui-client";
+import { DailyChallengesAdminList } from "@/components/admin/DailyChallengesAdminList";
 
-type SearchParams = { q?: string; status?: string; page?: string };
+type SearchParams = { q?: string; status?: string; page?: string; kind?: string; tab?: string };
 
 const PAGE_SIZE = 30;
 
@@ -31,7 +32,7 @@ const STATUS_OPTIONS: { value: BattleStatus | ""; label: string }[] = [
 ];
 
 export default async function AdminChallengesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const { q, status, page: pageParam } = await searchParams;
+  const { q, status, page: pageParam, kind, tab } = await searchParams;
   const page = Math.max(1, Number(pageParam) || 1);
 
   const and: Prisma.BattleWhereInput[] = [];
@@ -39,9 +40,10 @@ export default async function AdminChallengesPage({ searchParams }: { searchPara
   if (status) and.push({ status: status as BattleStatus });
   const where: Prisma.BattleWhereInput = and.length ? { AND: and } : {};
 
-  const [total, quickMatchCount, battles] = await Promise.all([
+  const [total, quickMatchCount, dailyCount, battles] = await Promise.all([
     prisma.battle.count({ where }),
     prisma.quickMatchChallenge.count(),
+    prisma.dailyChallenge.count(),
     prisma.battle.findMany({
     where,
     orderBy: { createdAt: "desc" },
@@ -60,6 +62,26 @@ export default async function AdminChallengesPage({ searchParams }: { searchPara
   }),
   ]);
 
+  // Daily Challenges are a tab of this same page, with the same sub-navigation.
+  if (kind === "daily") {
+    return (
+      <DailyChallengesAdminList
+        tab={tab}
+        page={pageParam}
+        subNav={
+          <SubNav
+            active="daily"
+            items={[
+              { key: "challenges", label: "Head-to-head", href: "/admin/challenges", count: total },
+              { key: "daily", label: "Daily", href: "/admin/challenges?kind=daily", count: dailyCount },
+              { key: "quick", label: "Quick Matches", href: "/admin/quick-matches", count: quickMatchCount },
+            ]}
+          />
+        }
+      />
+    );
+  }
+
   const hasFilters = !!(q || status);
   const pageHref = (n: number) => {
     const params = new URLSearchParams();
@@ -76,7 +98,8 @@ export default async function AdminChallengesPage({ searchParams }: { searchPara
       <SubNav
         active="challenges"
         items={[
-          { key: "challenges", label: "Challenges", href: "/admin/challenges", count: total },
+          { key: "challenges", label: "Head-to-head", href: "/admin/challenges", count: total },
+          { key: "daily", label: "Daily", href: "/admin/challenges?kind=daily", count: dailyCount },
           { key: "quick", label: "Quick Matches", href: "/admin/quick-matches", count: quickMatchCount },
         ]}
       />

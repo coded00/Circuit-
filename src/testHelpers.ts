@@ -128,6 +128,15 @@ export async function cleanupAll(): Promise<void> {
   await prisma.quickMatchRecipient.deleteMany({ where: { challengeId: { in: quickMatchIds } } });
   await prisma.quickMatchChallenge.deleteMany({ where: { id: { in: quickMatchIds } } });
   await prisma.battle.deleteMany({ where: { id: { in: battleIds } } });
+  // Daily Challenges: the challenge, its entries (RESTRICT on the player) and everything hanging off them. Reviews
+  // and disputes cascade from the submission, which cascades from the entry.
+  const challengeIds = (await prisma.dailyChallenge.findMany({ where: { createdById: { in: userIds } }, select: { id: true } })).map((c) => c.id);
+  await prisma.escrowTransaction.deleteMany({ where: { dailyChallengeId: { in: challengeIds } } });
+  await prisma.dailyChallengePrizeAward.deleteMany({ where: { OR: [{ challengeId: { in: challengeIds } }, { userId: { in: userIds } }] } }).catch(() => {});
+  await prisma.dailyChallengeEntry.deleteMany({ where: { OR: [{ challengeId: { in: challengeIds } }, { userId: { in: userIds } }] } });
+  await prisma.dailyChallengeReview.deleteMany({ where: { reviewerId: { in: userIds } } });
+  await prisma.dailyChallengeDispute.deleteMany({ where: { OR: [{ raisedById: { in: userIds } }, { ruledById: { in: userIds } }] } });
+  await prisma.dailyChallenge.deleteMany({ where: { id: { in: challengeIds } } });
   await prisma.escrowTransaction.deleteMany({ where: { OR: [{ tournamentId: { in: tournamentIds } }, { userId: { in: userIds } }] } });
   await prisma.registration.deleteMany({ where: { tournamentId: { in: tournamentIds } } });
   // Marketplace: orders (RESTRICT on buyer/listing) before listings before users.

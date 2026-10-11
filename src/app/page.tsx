@@ -19,6 +19,7 @@ import { CircuitHero } from "@/components/CircuitHero";
 import { FeaturedCompetitions } from "@/components/FeaturedCompetitions";
 import { ExploreTheCircuit } from "@/components/ExploreTheCircuit";
 import { OpenChallenges } from "@/components/OpenChallenges";
+import { loadDailyChallengeCards } from "@/lib/dailyChallengeFeed";
 import { UpcomingCompetitions } from "@/components/UpcomingCompetitions";
 import { GamerNews } from "@/components/GamerNews";
 import { YourCircuit } from "@/components/YourCircuit";
@@ -145,7 +146,13 @@ async function HomeContent({ searchParams }: { searchParams: Promise<{ leaderboa
     ? leaderboard.filter((s) => s.userId === user!.id || friendIds.includes(s.userId))
     : leaderboard;
   const topLeaderboard = scopedLeaderboard.slice(0, 5);
-  const openChallengesPreview = openBattles.slice(0, 3);
+  // One row for both kinds of challenge: up to two Daily Challenges first, then Battles to fill three slots.
+  // Open challenges are the ones a player can enter or play now; the ones announced but not yet open go under Upcoming.
+  const [dailyPreview, dailyUpcoming] = await Promise.all([
+    loadDailyChallengeCards({ userId: user?.id, limit: 2, statuses: ["OPEN", "LIVE"] }),
+    loadDailyChallengeCards({ userId: user?.id, limit: 6, statuses: ["SCHEDULED"] }),
+  ]);
+  const openChallengesPreview = openBattles.slice(0, Math.max(1, 3 - dailyPreview.cards.length));
   const challengeRecordsByKey = await challengeRecords(openChallengesPreview.map((b) => b.game));
 
   return (
@@ -165,7 +172,7 @@ async function HomeContent({ searchParams }: { searchParams: Promise<{ leaderboa
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_var(--right-rail-width)]">
         <div className="flex min-w-0 flex-col gap-8">
-          {featuredTournaments.length === 0 && upcomingTournaments.length === 0 && (
+          {featuredTournaments.length === 0 && upcomingTournaments.length === 0 && dailyUpcoming.cards.length === 0 && (
             <div className="card state-block">
               <h2 className="state-title">No battles on the board. Not for long.</h2>
               <p className="state-description">Nothing is open or announced right now. Start one, or challenge a player to a 1v1 while you wait.</p>
@@ -185,11 +192,11 @@ async function HomeContent({ searchParams }: { searchParams: Promise<{ leaderboa
           <ExploreTheCircuit games={gameCounts} />
 
           <div className="cv-auto">
-            <OpenChallenges battles={openChallengesPreview} records={challengeRecordsByKey} total={openChallengeCount} viewerId={user?.id} />
+            <OpenChallenges battles={openChallengesPreview} records={challengeRecordsByKey} total={openChallengeCount} viewerId={user?.id} daily={dailyPreview.cards} dailyTotal={dailyPreview.total} />
           </div>
 
           <div className="cv-auto">
-            <UpcomingCompetitions tournaments={upcomingTournaments} />
+            <UpcomingCompetitions tournaments={upcomingTournaments} daily={dailyUpcoming.cards} />
           </div>
         </div>
 

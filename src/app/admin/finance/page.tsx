@@ -61,6 +61,9 @@ const WALLET_TYPE: Record<string, { label: string; credit: boolean }> = {
   MARKETPLACE_REFUND: { label: "Marketplace refund", credit: true },
   STAKE_CREDIT: { label: "Challenge winnings", credit: true },
   ORGANIZER_REVENUE_CREDIT: { label: "Organizer revenue", credit: true },
+  CHALLENGE_ENTRY_DEBIT: { label: "Daily challenge entry", credit: false },
+  CHALLENGE_ENTRY_REFUND: { label: "Daily challenge refund", credit: true },
+  CHALLENGE_PRIZE_CREDIT: { label: "Daily challenge prize", credit: true },
 };
 
 function escrowTypeLabel(type: EscrowType): string {
@@ -79,6 +82,18 @@ function escrowTypeLabel(type: EscrowType): string {
       return "Platform fee";
     case "ORGANIZER_REVENUE":
       return "Organizer revenue";
+    case "CHALLENGE_ENTRY":
+      return "Daily challenge entry";
+    case "CHALLENGE_PLATFORM_FEE":
+      return "Daily challenge platform fee";
+    case "CHALLENGE_PRIZE":
+      return "Daily challenge prize";
+    case "CHALLENGE_REFUND":
+      return "Daily challenge refund";
+    case "CHALLENGE_PLATFORM_FEE_REVERSAL":
+      return "Daily challenge fee returned";
+    case "CHALLENGE_HOUSE_REVENUE":
+      return "Daily challenge house revenue";
   }
 }
 

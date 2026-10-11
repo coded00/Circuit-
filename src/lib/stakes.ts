@@ -27,7 +27,7 @@
  * debit.
  */
 
-import type { Prisma } from "@prisma/client";
+import type { DailyChallengeStatus, Prisma } from "@prisma/client";
 import { isSelfExcluded, selfExclusionMessage } from "@/lib/selfExclusion";
 
 /** ₦100,000 — the most a single Battle or Quick Match challenge may stake. */
@@ -46,6 +46,9 @@ export const DEFAULT_MAX_DAILY_STAKE = 100_000_000; // ₦1,000,000
 export const STAKE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export class InsufficientWalletBalanceError extends Error {}
+
+/** Challenge states in which an entry fee is still at risk: the challenge has not finished paying out or been cancelled. */
+const CHALLENGE_IN_PLAY: DailyChallengeStatus[] = ["SCHEDULED", "OPEN", "LIVE", "SUBMISSIONS_CLOSED", "UNDER_REVIEW", "PROVISIONAL"];
 
 export type StakeLimitCode = "DISABLED" | "SELF_EXCLUDED" | "PER_BATTLE" | "LOCKED_TOTAL" | "DAILY_TOTAL";
 
@@ -76,6 +79,80 @@ type StakeTarget = {
   /** Set for the Quick Match host's stake, locked before any Battle exists. */
   quickMatchChallengeId?: string;
 };
+
+/**
+ * One responsible-play budget per account, shared by everything that puts a player's own money at risk on a
+ * result: Battle stakes and Daily Challenge entry fees. Two separate budgets would let a player run both at
+ * full size, which is exactly the exposure the limits exist to bound, so both kinds of money are counted in
+ * both limits and both entry points call this.
+ *
+ * The caller has already taken the account's row lock (see lockStake) — that is what makes these reads safe
+ * against a double-click. This only reads and compares; it writes nothing.
+ *
+ * - "In play at once": stakes on open or accepted Battles and unaccepted Quick Matches, plus the entry fees of
+ *   challenge entries that are still in the running in a challenge that hasn't finished.
+ * - "In 24 hours": every stake and every challenge entry fee in the rolling window, refunded or not, so a
+ *   withdraw-and-re-enter loop cannot hand the day's budget back.
+ */
+export async function assertWithinStakeBudget(
+  tx: Prisma.TransactionClient,
+  opts: { userId: string; amount: number; now: number; setting: { maxLockedStakeKobo: number; maxDailyStakeKobo: number } | null },
+): Promise<void> {
+  const { userId, amount, now, setting } = opts;
+  const [locked, daily, challengeEntries, challengeDaily] = await Promise.all([
+    tx.escrowTransaction.aggregate({
+      where: {
+        userId,
+        type: "STAKE",
+        OR: [
+          { battle: { status: { in: ["OPEN", "ACCEPTED"] } } },
+          // The host's stake on a challenge nobody has accepted yet: locked,
+          // but with no Battle to hang off. Filtering on the battle relation
+          // alone — as the wallet page's held-in-challenges figure does —
+          // misses these, which would leave the gap exactly where a host
+          // running many open challenges needs it counted.
+          { battleId: null, quickMatchChallenge: { status: "PENDING" } },
+        ],
+      },
+      _sum: { amount: true },
+    }),
+    // Every stake in the window, settled or refunded alike. Intentionally not
+    // narrowed to still-locked rows: a refund that restored the day's budget
+    // would let a pair move any amount by opening and cancelling in a loop.
+    tx.escrowTransaction.aggregate({
+      where: { userId, type: "STAKE", createdAt: { gte: new Date(now - STAKE_WINDOW_MS) } },
+      _sum: { amount: true },
+    }),
+    // Challenge entry fees still in play: counted once per entry, by the challenge's own fee (immutable once
+    // published), so a withdrawn-and-re-entered entry is not counted twice.
+    tx.dailyChallengeEntry.findMany({
+      where: { userId, status: { in: ["ENTERED", "SUBMITTED", "VERIFIED"] }, challenge: { status: { in: CHALLENGE_IN_PLAY } } },
+      select: { challenge: { select: { entryFee: true } } },
+    }),
+    tx.escrowTransaction.aggregate({
+      where: { userId, type: "CHALLENGE_ENTRY", createdAt: { gte: new Date(now - STAKE_WINDOW_MS) } },
+      _sum: { amount: true },
+    }),
+  ]);
+
+  const maxLocked = setting?.maxLockedStakeKobo ?? DEFAULT_MAX_LOCKED_STAKE;
+  const lockedTotal = (locked._sum.amount ?? 0) + challengeEntries.reduce((a, e) => a + e.challenge.entryFee, 0);
+  if (lockedTotal + amount > maxLocked) {
+    throw new StakeLimitError(
+      "LOCKED_TOTAL",
+      `That would put ${naira(lockedTotal + amount)} of stakes and challenge entries in play at once, over your ${naira(maxLocked)} limit. A smaller amount, or wait for something open to settle.`
+    );
+  }
+
+  const maxDaily = setting?.maxDailyStakeKobo ?? DEFAULT_MAX_DAILY_STAKE;
+  const dailyTotal = (daily._sum.amount ?? 0) + (challengeDaily._sum.amount ?? 0);
+  if (dailyTotal + amount > maxDaily) {
+    throw new StakeLimitError(
+      "DAILY_TOTAL",
+      `That would put ${naira(dailyTotal + amount)} at stake in 24 hours, over your ${naira(maxDaily)} limit. Try again tomorrow.`
+    );
+  }
+}
 
 /**
  * The gates, then the debit, then the escrow row. Order matters: nothing is
@@ -124,49 +201,7 @@ export async function lockStake(tx: Prisma.TransactionClient, target: StakeTarge
     throw new StakeLimitError("PER_BATTLE", `Stake amount can't exceed ${naira(MAX_STAKE_AMOUNT)}.`);
   }
 
-  const [locked, daily] = await Promise.all([
-    tx.escrowTransaction.aggregate({
-      where: {
-        userId,
-        type: "STAKE",
-        OR: [
-          { battle: { status: { in: ["OPEN", "ACCEPTED"] } } },
-          // The host's stake on a challenge nobody has accepted yet: locked,
-          // but with no Battle to hang off. Filtering on the battle relation
-          // alone — as the wallet page's held-in-challenges figure does —
-          // misses these, which would leave the gap exactly where a host
-          // running many open challenges needs it counted.
-          { battleId: null, quickMatchChallenge: { status: "PENDING" } },
-        ],
-      },
-      _sum: { amount: true },
-    }),
-    // Every stake in the window, settled or refunded alike. Intentionally not
-    // narrowed to still-locked rows: a refund that restored the day's budget
-    // would let a pair move any amount by opening and cancelling in a loop.
-    tx.escrowTransaction.aggregate({
-      where: { userId, type: "STAKE", createdAt: { gte: new Date(now - STAKE_WINDOW_MS) } },
-      _sum: { amount: true },
-    }),
-  ]);
-
-  const maxLocked = setting?.maxLockedStakeKobo ?? DEFAULT_MAX_LOCKED_STAKE;
-  const lockedTotal = locked._sum.amount ?? 0;
-  if (lockedTotal + amount > maxLocked) {
-    throw new StakeLimitError(
-      "LOCKED_TOTAL",
-      `That would put ${naira(lockedTotal + amount)} of stakes in play at once, over your ${naira(maxLocked)} limit. Smaller stake, or settle an open challenge first.`
-    );
-  }
-
-  const maxDaily = setting?.maxDailyStakeKobo ?? DEFAULT_MAX_DAILY_STAKE;
-  const dailyTotal = daily._sum.amount ?? 0;
-  if (dailyTotal + amount > maxDaily) {
-    throw new StakeLimitError(
-      "DAILY_TOTAL",
-      `That would stake ${naira(dailyTotal + amount)} in 24 hours, over your ${naira(maxDaily)} limit. Try again tomorrow.`
-    );
-  }
+  await assertWithinStakeBudget(tx, { userId, amount, now, setting });
 
   // Atomic guard: a single conditional UPDATE, not a read-then-write — same
   // pattern as paid tournament registration, and still needed here even

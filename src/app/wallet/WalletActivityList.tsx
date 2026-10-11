@@ -13,7 +13,7 @@ import { ChevronDown } from "lucide-react";
 import { ArrowDownLeft, ArrowUpRight, RotateCcw, ShoppingBag, Swords, Trophy, Ticket } from "lucide-react";
 import { Panel, PanelEmpty } from "@/components/ui/Panel";
 
-export type WalletEntryKind = "FUND" | "WITHDRAWAL" | "ENTRY_FEE" | "REFUND" | "PRIZE_PAYOUT" | "STAKE" | "STAKE_PAYOUT" | "PURCHASE" | "PURCHASE_REFUND";
+export type WalletEntryKind = "FUND" | "WITHDRAWAL" | "ENTRY_FEE" | "REFUND" | "PRIZE_PAYOUT" | "STAKE" | "STAKE_PAYOUT" | "PURCHASE" | "PURCHASE_REFUND" | "CHALLENGE_ENTRY" | "CHALLENGE_REFUND" | "CHALLENGE_PRIZE";
 
 export type WalletEntry = {
   id: string;
@@ -40,6 +40,9 @@ const TYPE_LABEL: Record<WalletEntryKind, string> = {
   STAKE_PAYOUT: "Challenge winnings",
   PURCHASE: "Marketplace purchase",
   PURCHASE_REFUND: "Marketplace refund",
+  CHALLENGE_ENTRY: "Daily challenge entry",
+  CHALLENGE_REFUND: "Daily challenge refund",
+  CHALLENGE_PRIZE: "Daily challenge prize",
 };
 const STATUS_LABEL = { COMPLETE: "Successful", PENDING: "Processing", FAILED: "Failed" } as const;
 
@@ -60,6 +63,9 @@ const ICON: Record<WalletEntryKind, { Icon: typeof Trophy; className: string }> 
   STAKE_PAYOUT: { Icon: Trophy, className: "bg-gold/15 text-gold" },
   PURCHASE: { Icon: ShoppingBag, className: "bg-accent-blue-soft text-accent-blue" },
   PURCHASE_REFUND: { Icon: RotateCcw, className: "bg-surface-elevated text-muted" },
+  CHALLENGE_ENTRY: { Icon: Ticket, className: "bg-accent-blue-soft text-accent-blue" },
+  CHALLENGE_REFUND: { Icon: RotateCcw, className: "bg-surface-elevated text-muted" },
+  CHALLENGE_PRIZE: { Icon: Trophy, className: "bg-gold/15 text-gold" },
 };
 
 function formatNaira(kobo: number): string {

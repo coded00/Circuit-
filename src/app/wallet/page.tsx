@@ -47,6 +47,9 @@ const COMPETITION_TITLE: Record<string, string> = {
   PRIZE_PAYOUT: "Prize payout",
   STAKE: "Stake locked",
   STAKE_PAYOUT: "Challenge winnings",
+  CHALLENGE_ENTRY: "Daily challenge entry",
+  CHALLENGE_REFUND: "Daily challenge refund",
+  CHALLENGE_PRIZE: "Daily challenge prize",
 };
 
 export default async function WalletPage() {
@@ -90,7 +93,7 @@ export default async function WalletPage() {
             ? `${r.contextName} · paid to your payout account`
             : [r.contextName, r.contextGame].filter(Boolean).join(" · "),
         amount: r.amount,
-        credit: r.type === "REFUND" || r.type === "PRIZE_PAYOUT" || r.type === "STAKE_PAYOUT",
+        credit: r.type === "REFUND" || r.type === "PRIZE_PAYOUT" || r.type === "STAKE_PAYOUT" || r.type === "CHALLENGE_REFUND" || r.type === "CHALLENGE_PRIZE",
         status: normalizeStatus(r.status),
         reference: r.reference,
         href: r.href,

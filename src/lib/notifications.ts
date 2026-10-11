@@ -82,7 +82,15 @@ export type NotificationType =
   | "ENTRY_FEE_REFUND"
   | "REGISTRATION_NAME_TAKEN"
   | "SELF_EXCLUSION_SET"
-  | "STAKE_PATTERN_FLAGGED";
+  | "STAKE_PATTERN_FLAGGED"
+  | "DAILY_CHALLENGE_LIVE"
+  | "DAILY_CHALLENGE_CANCELLED"
+  | "DAILY_CHALLENGE_SCORE_VERIFIED"
+  | "DAILY_CHALLENGE_SCORE_REJECTED"
+  | "DAILY_CHALLENGE_PRIZE"
+  | "DAILY_CHALLENGE_RESULT"
+  | "DAILY_CHALLENGE_DISPUTE_RULED"
+  | "DAILY_CHALLENGE_DISPUTE_RAISED";
 
 export interface NotificationChannel {
   send(userId: string, type: NotificationType, payload: Record<string, unknown>): Promise<void>;

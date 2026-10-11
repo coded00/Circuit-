@@ -33,7 +33,7 @@
 
 import { cache } from "react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { DailyChallengeDetail } from "@/components/DailyChallengeDetail";
 import type { Metadata } from "next";
 import { ArrowLeft, CheckCircle2, Tv, Zap } from "lucide-react";
 import { prisma } from "@/lib/db";
@@ -205,7 +205,15 @@ const getBattle = cache(async (id: string) =>
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id: rawId } = await params;
   const battle = await getBattle(parseIdSegment(rawId));
-  if (!battle) return buildMetadata({ title: "Challenge not found", description: DEFAULT_DESCRIPTION, path: `/battles/${rawId}`, noindex: true });
+  if (!battle) {
+    // The same address serves a Daily Challenge when the id is one.
+    // A Daily Challenge is addressed by its full id (no slug), so it is looked up by the whole segment, not the part before a hyphen.
+    const daily = await prisma.dailyChallenge.findUnique({ where: { id: rawId }, select: { title: true, gameName: true, status: true } });
+    if (daily && daily.status !== "DRAFT") {
+      return buildMetadata({ title: `${daily.title} · ${daily.gameName} Daily Challenge`, description: `Play one ${daily.gameName} match on your own time, submit your score, and the highest verified score wins.`, path: `/battles/${rawId}` });
+    }
+    return buildMetadata({ title: "Challenge not found", description: DEFAULT_DESCRIPTION, path: `/battles/${rawId}`, noindex: true });
+  }
 
   const stakeText = battle.stakeAmount > 0 ? `₦${(battle.stakeAmount / 100).toLocaleString("en-NG")} stake` : "free to enter";
   return buildMetadata({
@@ -227,7 +235,10 @@ export default async function BattlePage({
   const id = parseIdSegment(rawId);
 
   const battle = await getBattle(id);
-  if (!battle) notFound();
+  if (!battle) {
+    // Not a Battle: it may be a Daily Challenge, which lives at the same address (DailyChallengeDetail 404s if not).
+    return <DailyChallengeDetail id={rawId} />;
+  }
 
   const user = await getCurrentUser();
   const isCreator = user !== null && user.id === battle.creatorId;

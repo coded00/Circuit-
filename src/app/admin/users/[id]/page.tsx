@@ -31,6 +31,9 @@ const WALLET_TYPE: Record<string, { label: string; credit: boolean }> = {
   MARKETPLACE_REFUND: { label: "Marketplace refund", credit: true },
   STAKE_CREDIT: { label: "Challenge winnings", credit: true },
   ORGANIZER_REVENUE_CREDIT: { label: "Organizer revenue", credit: true },
+  CHALLENGE_ENTRY_DEBIT: { label: "Daily challenge entry", credit: false },
+  CHALLENGE_ENTRY_REFUND: { label: "Daily challenge refund", credit: true },
+  CHALLENGE_PRIZE_CREDIT: { label: "Daily challenge prize", credit: true },
 };
 
 const TX_STATUS: Record<string, { tone: "success" | "attention" | "danger"; label: string }> = {

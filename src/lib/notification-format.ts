@@ -214,6 +214,25 @@ export function formatNotification(type: string, payload: unknown): FormattedNot
       return { message: `${str(p, "fromHandle")} wants to join ${str(p, "teamName")}.`, href: `/teams/${str(p, "teamId")}` };
     case "NEW_TOURNAMENT":
       return { message: `New tournament: ${str(p, "name")}`, href: `/tournaments/${str(p, "tournamentId")}` };
+    case "DAILY_CHALLENGE_LIVE":
+      return { message: `${str(p, "title") || "Your daily challenge"} is live. Play your match and upload the scoreboard.`, href: `/battles/${str(p, "challengeId")}` };
+    case "DAILY_CHALLENGE_SCORE_VERIFIED":
+      return { message: `Your score for ${str(p, "title") || "a daily challenge"} was verified${typeof p.score === "number" ? `: ${p.score}` : ""}.`, href: `/battles/${str(p, "challengeId")}` };
+    case "DAILY_CHALLENGE_SCORE_REJECTED":
+      return { message: `Your score for ${str(p, "title") || "a daily challenge"} wasn't accepted${str(p, "reason") ? `: ${str(p, "reason")}` : ""}.`, href: `/battles/${str(p, "challengeId")}` };
+    case "DAILY_CHALLENGE_PRIZE":
+      return { message: `You won ${money(p, "amount")} in ${str(p, "title") || "a daily challenge"}${str(p, "category") ? ` (${str(p, "category")})` : ""}. It's in your wallet.`, href: "/wallet" };
+    case "DAILY_CHALLENGE_RESULT":
+      return { message: `${str(p, "title") || "A daily challenge"} is settled${str(p, "note") ? `: ${str(p, "note")}` : "."}`, href: `/battles/${str(p, "challengeId")}` };
+    case "DAILY_CHALLENGE_DISPUTE_RULED":
+      return { message: `Your dispute on ${str(p, "title") || "a daily challenge"} was ${p.upheld ? "upheld — your entry will be reviewed again" : "dismissed"}${str(p, "ruling") ? `: ${str(p, "ruling")}` : "."}`, href: `/battles/${str(p, "challengeId")}` };
+    case "DAILY_CHALLENGE_DISPUTE_RAISED":
+      return { message: `A player disputed a decision in ${str(p, "title") || "a daily challenge"}.`, href: `/admin/challenges/daily/${str(p, "challengeId")}/review?tab=disputes` };
+    case "DAILY_CHALLENGE_CANCELLED":
+      return {
+        message: `${str(p, "title") || "A daily challenge"} was cancelled${str(p, "reason") ? `: ${str(p, "reason")}` : ""}.${typeof p.refunded === "number" && p.refunded > 0 ? ` ${money(p, "refunded")} is back in your wallet.` : ""}`,
+        href: `/battles/${str(p, "challengeId")}`,
+      };
     case "NEW_CHALLENGE":
       return { message: `New open Challenge: ${str(p, "game")}`, href: `/battles/${str(p, "battleId")}` };
     case "WITHDRAWAL_RETURNED":

@@ -176,7 +176,7 @@ export function KeyValue({ items }: { items: { label: string; value: React.React
       {items.map((i) => (
         <div key={i.label} className="flex min-w-0 flex-col gap-0.5">
           <dt className="text-[12px] text-muted">{i.label}</dt>
-          <dd className="truncate text-[13px] text-foreground">{i.value}</dd>
+          <dd className="text-[13px] break-words text-foreground">{i.value}</dd>
         </div>
       ))}
     </dl>

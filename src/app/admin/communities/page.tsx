@@ -101,8 +101,8 @@ export default async function AdminCommunitiesPage({ searchParams }: { searchPar
                       </span>
                     </Link>
                   </td>
-                  <td className="text-muted">{kindLabel(c)}</td>
-                  <td className="text-muted">{c.owner ? `@${c.owner.handle}` : "Staff"}</td>
+                  <td className="whitespace-nowrap text-muted">{kindLabel(c)}</td>
+                  <td className="whitespace-nowrap text-muted">{c.owner ? `@${c.owner.handle}` : "Staff"}</td>
                   <td className="text-right">{c._count.members.toLocaleString("en-NG")}</td>
                   <td className="text-right text-muted">{formatDate(c.lastActivityAt)}</td>
                   <td>

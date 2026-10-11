@@ -27,6 +27,18 @@ function escrowTypeLabel(type: EscrowType): string {
       return "Platform fee";
     case "ORGANIZER_REVENUE":
       return "Organizer revenue";
+    case "CHALLENGE_ENTRY":
+      return "Daily challenge entry";
+    case "CHALLENGE_PLATFORM_FEE":
+      return "Daily challenge platform fee";
+    case "CHALLENGE_PRIZE":
+      return "Daily challenge prize";
+    case "CHALLENGE_REFUND":
+      return "Daily challenge refund";
+    case "CHALLENGE_PLATFORM_FEE_REVERSAL":
+      return "Daily challenge fee returned";
+    case "CHALLENGE_HOUSE_REVENUE":
+      return "Daily challenge house revenue";
   }
 }
 

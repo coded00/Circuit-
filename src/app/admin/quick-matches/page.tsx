@@ -36,9 +36,10 @@ export default async function AdminQuickMatchesPage({ searchParams }: { searchPa
   if (status) and.push({ status: status as QuickMatchStatus });
   const where: Prisma.QuickMatchChallengeWhereInput = and.length ? { AND: and } : {};
 
-  const [total, battleCount, challenges] = await Promise.all([
+  const [total, battleCount, dailyCount, challenges] = await Promise.all([
     prisma.quickMatchChallenge.count({ where }),
     prisma.battle.count(),
+    prisma.dailyChallenge.count(),
     prisma.quickMatchChallenge.findMany({
     where,
     orderBy: { createdAt: "desc" },
@@ -68,7 +69,8 @@ export default async function AdminQuickMatchesPage({ searchParams }: { searchPa
       <SubNav
         active="quick"
         items={[
-          { key: "challenges", label: "Challenges", href: "/admin/challenges", count: battleCount },
+          { key: "challenges", label: "Head-to-head", href: "/admin/challenges", count: battleCount },
+          { key: "daily", label: "Daily", href: "/admin/challenges?kind=daily", count: dailyCount },
           { key: "quick", label: "Quick Matches", href: "/admin/quick-matches", count: total },
         ]}
       />

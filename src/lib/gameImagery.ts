@@ -20,6 +20,9 @@ export const GAME_IMAGES: Record<string, string> = {
   "gta v": "https://images.unsplash.com/photo-1616063971315-5500225a0aaf",
   "apex legends": "https://images.unsplash.com/photo-1558743941-459179fe00e7",
   efootball: "https://images.unsplash.com/photo-1569531955323-33c6b2dca44b",
+  "pubg mobile": "https://images.unsplash.com/photo-1564049489314-60d154ff107d",
+  "free fire": "https://images.unsplash.com/photo-1688986760609-47835488547a",
+  "mobile legends": "https://images.unsplash.com/photo-1639656333010-b6a054423b63",
   "rocket league": "https://images.unsplash.com/photo-1760604359281-b738de589439",
 };
 
