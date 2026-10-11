@@ -22,6 +22,7 @@
  */
 
 import { prisma } from "@/lib/db";
+import { tournamentWinnerId } from "@/lib/lobby";
 
 export type WalletRow = {
   id: string;
@@ -29,9 +30,13 @@ export type WalletRow = {
   /** A tournament name ("Lagos Cup") or a Battle's own label ("Challenge vs @handle"). */
   contextName: string;
   contextGame: string;
-  type: "ENTRY_FEE" | "REFUND" | "PRIZE_PAYOUT" | "STAKE" | "STAKE_PAYOUT";
+  type: "ENTRY_FEE" | "REFUND" | "PRIZE_PAYOUT" | "STAKE" | "STAKE_PAYOUT" | "CHALLENGE_ENTRY" | "CHALLENGE_REFUND" | "CHALLENGE_PRIZE";
   amount: number;
   status: string;
+  /** The tournament or challenge this money belongs to, as a page link. */
+  href: string | null;
+  /** The provider reference when there is one, otherwise Circuit's own record id. */
+  reference: string;
 };
 
 export type FundingRow = {
@@ -40,6 +45,8 @@ export type FundingRow = {
   type: "FUND" | "WITHDRAWAL";
   amount: number;
   status: string;
+  /** The payment provider's reference for this top-up or withdrawal. */
+  providerRef: string | null;
 };
 
 export type WalletActivity = {
@@ -50,15 +57,21 @@ export type WalletActivity = {
   totalRefunded: number;
   totalWon: number;
   net: number;
+  /** Withdrawals requested but not yet confirmed by the bank transfer (already out of the balance). */
+  pendingWithdrawals: number;
+  /** Stakes locked in challenges that are still open or being played. */
+  heldInChallenges: number;
 };
 
 export async function getWalletActivity(userId: string): Promise<WalletActivity> {
-  const [user, fundingTxns] = await Promise.all([
+  const [user, fundingTxns, pendingOut, held] = await Promise.all([
     prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { walletBalance: true } }),
     prisma.walletTransaction.findMany({
       where: { userId, type: { in: ["FUND", "WITHDRAWAL"] } },
       orderBy: { createdAt: "desc" },
     }),
+    prisma.walletTransaction.aggregate({ where: { userId, type: "WITHDRAWAL", status: "PENDING" }, _sum: { amount: true } }),
+    prisma.escrowTransaction.aggregate({ where: { userId, type: "STAKE", battle: { status: { in: ["OPEN", "ACCEPTED"] } } }, _sum: { amount: true } }),
   ]);
   const fundingHistory: FundingRow[] = fundingTxns.map((t) => ({
     id: t.id,
@@ -66,11 +79,18 @@ export async function getWalletActivity(userId: string): Promise<WalletActivity>
     type: t.type as "FUND" | "WITHDRAWAL",
     amount: t.amount,
     status: t.status,
+    providerRef: t.providerRef ?? null,
   }));
+
+  // Entry fees in challenges that haven't finished: the money is spent from the balance but not yet won or lost.
+  const challengeHeld = await prisma.dailyChallengeEntry.findMany({
+    where: { userId, status: { in: ["ENTERED", "SUBMITTED", "VERIFIED"] }, challenge: { status: { in: ["SCHEDULED", "OPEN", "LIVE", "SUBMISSIONS_CLOSED", "UNDER_REVIEW", "PROVISIONAL"] } } },
+    select: { challenge: { select: { entryFee: true } } },
+  });
 
   const myRegistrations = await prisma.registration.findMany({
     where: { userId },
-    select: { id: true, tournament: { select: { name: true, game: true } } },
+    select: { id: true, tournament: { select: { id: true, name: true, game: true } } },
   });
   const registrationById = new Map(myRegistrations.map((r) => [r.id, r.tournament]));
 
@@ -82,36 +102,27 @@ export async function getWalletActivity(userId: string): Promise<WalletActivity>
     : [];
 
   // A prize payout has no direct recipient field — derive "is this mine"
-  // the same way the payout route itself decides who's allowed to claim:
-  // whoever won the tournament's real final round (highest `round`
-  // number for that tournament), not just any match they happened to win.
-  const myMatches = await prisma.match.findMany({
-    where: { tournamentId: { not: null }, OR: [{ playerAId: userId }, { playerBId: userId }] },
-    select: { tournamentId: true, round: true, winnerId: true },
+  // the same way the payout route decides who may claim: the tournament's
+  // winner (bracket final, round robin standings or lobby leaderboard —
+  // tournamentWinnerId) for every finished tournament this user entered.
+  const finished = await prisma.tournament.findMany({
+    where: { status: "COMPLETE", registrations: { some: { userId, status: "CONFIRMED" } } },
+    select: { id: true, status: true, competitionStyle: true, format: true, placementPoints: true, killPoints: true, lobbyGroups: true, lobbyQualifiers: true, lobbyFinalRounds: true, leagueWinPoints: true, leagueDrawPoints: true },
   });
-  const myTournamentIds = [...new Set(myMatches.map((m) => m.tournamentId!))];
-  const allMatchesInThoseTournaments = myTournamentIds.length
-    ? await prisma.match.findMany({
-        where: { tournamentId: { in: myTournamentIds } },
-        select: { tournamentId: true, round: true },
-      })
-    : [];
-  const finalRoundByTournament = new Map<string, number>();
-  for (const m of allMatchesInThoseTournaments) {
-    const current = finalRoundByTournament.get(m.tournamentId!) ?? 0;
-    if ((m.round ?? 0) > current) finalRoundByTournament.set(m.tournamentId!, m.round ?? 0);
-  }
-  const championTournamentIds = myTournamentIds.filter((tid) =>
-    myMatches.some((m) => m.tournamentId === tid && m.round === finalRoundByTournament.get(tid) && m.winnerId === userId)
+  const championTournamentIds = (await Promise.all(finished.map(async (t) => ((await tournamentWinnerId(t)) === userId ? t.id : null)))).filter(
+    (id): id is string => id !== null
   );
 
-  const prizeTxns = championTournamentIds.length
-    ? await prisma.escrowTransaction.findMany({
-        where: { tournamentId: { in: championTournamentIds }, type: "PRIZE_PAYOUT" },
-        include: { tournament: { select: { name: true, game: true } } },
-        orderBy: { createdAt: "desc" },
-      })
-    : [];
+  // Split-prize payouts carry the recipient's userId; older ones don't
+  // and were always the champion's.
+  const prizeTxns = await prisma.escrowTransaction.findMany({
+    where: {
+      type: "PRIZE_PAYOUT",
+      OR: [{ userId }, ...(championTournamentIds.length ? [{ userId: null, tournamentId: { in: championTournamentIds } }] : [])],
+    },
+    include: { tournament: { select: { id: true, name: true, game: true } } },
+    orderBy: { createdAt: "desc" },
+  });
 
   // Battle-stake side: unlike the tournament rows above, these already
   // carry `userId` directly (no Registration indirection needed — see
@@ -129,6 +140,14 @@ export async function getWalletActivity(userId: string): Promise<WalletActivity>
     orderBy: { createdAt: "desc" },
   });
 
+  // Daily Challenge money: the fee going in and, if the entry is withdrawn or the challenge cancelled, coming back.
+  // Circuit's own cut and its reversal carry no userId and are not the player's movement, so they are not here.
+  const challengeTxns = await prisma.escrowTransaction.findMany({
+    where: { userId, type: { in: ["CHALLENGE_ENTRY", "CHALLENGE_REFUND", "CHALLENGE_PRIZE"] } },
+    include: { dailyChallenge: { select: { id: true, title: true, gameName: true } } },
+    orderBy: { createdAt: "desc" },
+  });
+
   const rows: WalletRow[] = [
     ...entryAndRefundTxns
       .filter((t): t is typeof t & { type: "ENTRY_FEE" | "REFUND" } => t.type === "ENTRY_FEE" || t.type === "REFUND")
@@ -142,6 +161,8 @@ export async function getWalletActivity(userId: string): Promise<WalletActivity>
           type: t.type,
           amount: t.amount,
           status: t.status,
+          href: tournament ? `/tournaments/${tournament.id}` : null,
+          reference: t.providerRef ?? t.id,
         };
       }),
     ...prizeTxns.map((t) => ({
@@ -152,6 +173,19 @@ export async function getWalletActivity(userId: string): Promise<WalletActivity>
       type: "PRIZE_PAYOUT" as const,
       amount: t.amount,
       status: t.status,
+      href: t.tournament ? `/tournaments/${t.tournament.id}` : null,
+      reference: t.providerRef ?? t.id,
+    })),
+    ...challengeTxns.map((t) => ({
+      id: t.id,
+      createdAt: t.createdAt,
+      contextName: t.dailyChallenge?.title ?? "Daily challenge",
+      contextGame: t.dailyChallenge?.gameName ?? "",
+      type: t.type as "CHALLENGE_ENTRY" | "CHALLENGE_REFUND" | "CHALLENGE_PRIZE",
+      amount: t.amount,
+      status: t.status,
+      href: t.dailyChallenge ? `/battles/${t.dailyChallenge.id}` : null,
+      reference: t.providerRef ?? t.id,
     })),
     ...battleTxns.map((t) => ({
       id: t.id,
@@ -161,17 +195,22 @@ export async function getWalletActivity(userId: string): Promise<WalletActivity>
       type: t.type as "STAKE" | "STAKE_PAYOUT" | "REFUND",
       amount: t.amount,
       status: t.status,
+      href: t.battleId ? `/battles/${t.battleId}` : null,
+      reference: t.providerRef ?? t.id,
     })),
   ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
   const totalPaid =
     entryAndRefundTxns.filter((t) => t.type === "ENTRY_FEE" && t.status === "COMPLETE").reduce((s, t) => s + t.amount, 0) +
-    battleTxns.filter((t) => t.type === "STAKE" && t.status === "COMPLETE").reduce((s, t) => s + t.amount, 0);
+    battleTxns.filter((t) => t.type === "STAKE" && t.status === "COMPLETE").reduce((s, t) => s + t.amount, 0) +
+    challengeTxns.filter((t) => t.type === "CHALLENGE_ENTRY" && t.status === "COMPLETE").reduce((s, t) => s + t.amount, 0);
   const totalRefunded =
     entryAndRefundTxns.filter((t) => t.type === "REFUND" && t.status === "COMPLETE").reduce((s, t) => s + t.amount, 0) +
-    battleTxns.filter((t) => t.type === "REFUND" && t.status === "COMPLETE").reduce((s, t) => s + t.amount, 0);
+    battleTxns.filter((t) => t.type === "REFUND" && t.status === "COMPLETE").reduce((s, t) => s + t.amount, 0) +
+    challengeTxns.filter((t) => t.type === "CHALLENGE_REFUND" && t.status === "COMPLETE").reduce((s, t) => s + t.amount, 0);
   const totalWon =
     prizeTxns.filter((t) => t.status === "COMPLETE").reduce((s, t) => s + t.amount, 0) +
+    challengeTxns.filter((t) => t.type === "CHALLENGE_PRIZE" && t.status === "COMPLETE").reduce((s, t) => s + t.amount, 0) +
     battleTxns.filter((t) => t.type === "STAKE_PAYOUT" && t.status === "COMPLETE").reduce((s, t) => s + t.amount, 0);
 
   return {
@@ -182,5 +221,7 @@ export async function getWalletActivity(userId: string): Promise<WalletActivity>
     totalRefunded,
     totalWon,
     net: totalWon + totalRefunded - totalPaid,
+    pendingWithdrawals: pendingOut._sum.amount ?? 0,
+    heldInChallenges: (held._sum.amount ?? 0) + challengeHeld.reduce((a, e) => a + e.challenge.entryFee, 0),
   };
 }

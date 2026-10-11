@@ -74,14 +74,16 @@ export function CardCarousel({ children, label }: { children: React.ReactNode; l
         // `relative` makes each card's offsetLeft relative to this row.
         // py-1/-my-1 leaves room for the cards' hover lift, which an
         // overflow-x container would otherwise clip at the top.
-        className="scrollbar-hide relative -my-1 flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain py-1 focus-visible:outline-none lg:my-0 lg:grid lg:snap-none lg:grid-cols-3 lg:overflow-visible lg:py-0"
+        className="scrollbar-hide relative -my-1 flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain py-1 lg:my-0 lg:grid lg:snap-none lg:grid-cols-3 lg:overflow-visible lg:py-0"
       >
         {items.map((child, i) => (
           <div
             key={i}
             aria-roledescription="slide"
             aria-label={`${i + 1} of ${items.length}`}
-            className="w-[85%] shrink-0 snap-start sm:w-[46%] lg:w-auto"
+            // Capped on phones so a card never becomes a full-width slab;
+            // the next card peeking in is the swipe affordance.
+            className="w-[78%] max-w-[300px] shrink-0 snap-start sm:w-[46%] sm:max-w-none lg:w-auto"
           >
             {child}
           </div>
@@ -97,7 +99,7 @@ export function CardCarousel({ children, label }: { children: React.ReactNode; l
               onClick={() => goTo(i)}
               aria-label={`Show ${i + 1} of ${items.length}`}
               aria-current={i === active ? "true" : undefined}
-              className="flex h-6 items-center justify-center px-0.5"
+              className="flex h-8 items-center justify-center px-1.5"
             >
               <span
                 className={`block h-1.5 rounded-full transition-all duration-[var(--duration-base)] ease-[var(--ease-standard)] ${

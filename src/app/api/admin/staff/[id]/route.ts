@@ -46,7 +46,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     (await prisma.user.count({ where: { adminRole: "SUPER_ADMIN", id: { notIn: [id, admin.id] } } })) === 0;
   if (removesLastOtherSuperAdmin) {
     return NextResponse.json(
-      { error: "This is the only other Super Admin — promote someone else first." },
+      { error: "This is the only other Super Admin. Promote someone else first." },
       { status: 409 }
     );
   }

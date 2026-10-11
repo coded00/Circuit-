@@ -39,7 +39,7 @@ export async function POST(
 
   await prisma.user.update({
     where: { id },
-    data: { isSuspended: true, suspensionReason: reason },
+    data: { isSuspended: true, suspensionReason: reason, sessionVersion: { increment: 1 } },
   });
 
   // V1 audit follow-up: this route (driven by the Reports queue) did the

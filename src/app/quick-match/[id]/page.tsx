@@ -8,6 +8,7 @@
  */
 
 import { notFound, redirect } from "next/navigation";
+import { loginPath } from "@/lib/safeRedirect";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { QuickMatchSearchingScreen } from "@/components/QuickMatchSearchingScreen";
@@ -17,7 +18,7 @@ export default async function QuickMatchPage({ params }: { params: Promise<{ id:
   const { id } = await params;
   const user = await getCurrentUser();
   if (!user) {
-    redirect(`/login?next=/quick-match/${id}`);
+    redirect(loginPath(`/quick-match/${id}`));
   }
 
   const challenge = await prisma.quickMatchChallenge.findUnique({
@@ -34,7 +35,7 @@ export default async function QuickMatchPage({ params }: { params: Promise<{ id:
       prisma.quickMatchRecipient.count({ where: { challengeId: id, status: { not: "PENDING" } } }),
     ]);
     return (
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-6 p-6 sm:p-8">
+      <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-6 px-4 py-6 sm:px-8 sm:py-10">
         <QuickMatchSearchingScreen
           challengeId={id}
           initial={{
@@ -61,7 +62,7 @@ export default async function QuickMatchPage({ params }: { params: Promise<{ id:
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-6 p-6 sm:p-8">
+    <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-6 px-4 py-6 sm:px-8 sm:py-10">
       <QuickMatchRecipientPageView
         challenge={{
           id: challenge.id,

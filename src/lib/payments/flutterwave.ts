@@ -13,15 +13,17 @@ import type {
   MinorAmount,
   PaymentProviderClient,
   RefundChargeResult,
+  TransferStatus,
   VerifyChargeResult,
 } from "./types";
+import { ProviderRequestError } from "./errors";
 
 const FLUTTERWAVE_BASE_URL = "https://api.flutterwave.com/v3";
 
 function getSecretKey(): string {
   const key = process.env.FLUTTERWAVE_SECRET_KEY;
   if (!key) {
-    throw new Error("FLUTTERWAVE_SECRET_KEY is not set — check your .env file.");
+    throw new Error("FLUTTERWAVE_SECRET_KEY is not set. Check your .env file.");
   }
   return key;
 }
@@ -37,9 +39,26 @@ async function flutterwaveFetch<T>(path: string, init?: RequestInit): Promise<T>
   });
   const body = await res.json();
   if (!res.ok || body.status === "error") {
-    throw new Error(`Flutterwave request failed: ${body.message ?? res.statusText}`);
+    throw new ProviderRequestError(`Flutterwave request failed: ${body.message ?? res.statusText}`, res.status);
   }
   return body.data as T;
+}
+
+/**
+ * Flutterwave's charge status, mapped onto ours — the same shape as
+ * mapPaystackChargeStatus, and the same bug fixed for the same reason.
+ *
+ * This used to be `status === "successful" ? "SUCCESS" : status === "pending" ? "PENDING" : "FAILED"`,
+ * which made every status Flutterwave might add — or any settling state that isn't literally "pending" —
+ * a terminal FAILED. FAILED is not a label here, it's a decision: the confirmation path refunds the
+ * charge and releases the entry, so calling a live payment FAILED returns the player's money while the
+ * payment itself still lands. Only "failed" is treated as terminal; anything unrecognised stays PENDING,
+ * where the sweep re-verifies it later. Wrong-PENDING costs a delay, wrong-FAILED costs money.
+ */
+export function mapFlutterwaveChargeStatus(status: string): VerifyChargeResult["status"] {
+  if (status === "successful" || status === "completed") return "SUCCESS";
+  if (status === "failed") return "FAILED";
+  return "PENDING";
 }
 
 export const flutterwaveClient: PaymentProviderClient = {
@@ -72,7 +91,7 @@ export const flutterwaveClient: PaymentProviderClient = {
       created_at: string;
     }>(`/transactions/verify_by_reference?tx_ref=${encodeURIComponent(providerReference)}`);
     return {
-      status: data.status === "successful" ? "SUCCESS" : data.status === "pending" ? "PENDING" : "FAILED",
+      status: mapFlutterwaveChargeStatus(data.status),
       amount: Math.round(data.amount * 100), // normalize back to minor units
       currency: "NGN",
       providerReference: data.tx_ref,
@@ -98,6 +117,26 @@ export const flutterwaveClient: PaymentProviderClient = {
       status: data.status === "completed" ? "SUCCESS" : "PENDING",
       providerReference,
     };
+  },
+
+  async verifyTransfer(reference: string): Promise<TransferStatus> {
+    const data = await flutterwaveFetch<{ status: string }[]>(`/transfers?reference=${encodeURIComponent(reference)}`);
+    // No transfer under this reference: Flutterwave never received it. Callers only ask about transfers that
+    // are already old, so this is one that did not happen and the money can go back.
+    if (Array.isArray(data) && data.length === 0) return "FAILED";
+    const status = Array.isArray(data) ? data[0]?.status : undefined;
+    if (status === "SUCCESSFUL") return "SUCCESS";
+    if (status === "FAILED") return "FAILED";
+    return "PENDING";
+  },
+
+  async availableBalance(): Promise<number | null> {
+    try {
+      const data = await flutterwaveFetch<{ available_balance: number }>("/balances/NGN");
+      return typeof data?.available_balance === "number" ? Math.round(data.available_balance * 100) : null; // naira -> kobo
+    } catch {
+      return null;
+    }
   },
 
   async initiateTransfer(input: InitiateTransferInput): Promise<InitiateTransferResult> {

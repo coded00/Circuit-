@@ -12,7 +12,7 @@
 
 import type { TimelineEvent } from "@/components/ActivityTimeline";
 
-type ResultPayload = { winnerId: string; score: string; submittedAt: string };
+type ResultPayload = { winnerId: string; score: string; submittedAt: string; confirmed?: boolean };
 
 export function buildMatchTimeline(match: {
   createdAt: Date;
@@ -37,13 +37,13 @@ export function buildMatchTimeline(match: {
   if (resultA) {
     events.push({
       at: new Date(resultA.submittedAt),
-      label: `${match.playerA.displayName} submitted a result: ${resultA.score}`,
+      label: resultA.confirmed ? `${match.playerA.displayName} confirmed the result: ${resultA.score}` : `${match.playerA.displayName} submitted a result: ${resultA.score}`,
     });
   }
   if (resultB) {
     events.push({
       at: new Date(resultB.submittedAt),
-      label: `${match.playerB.displayName} submitted a result: ${resultB.score}`,
+      label: resultB.confirmed ? `${match.playerB.displayName} confirmed the result: ${resultB.score}` : `${match.playerB.displayName} submitted a result: ${resultB.score}`,
     });
   }
 

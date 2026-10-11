@@ -28,7 +28,7 @@ export function OptionCard({
       disabled={disabled}
       title={disabled ? disabledTitle : undefined}
       aria-pressed={selected}
-      className={`flex w-full flex-col items-start gap-1 rounded-[10px] border px-4 py-3 text-left text-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${
+      className={`flex w-full flex-col items-start gap-1 rounded-none border px-4 py-3 text-left text-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${
         selected
           ? "border-accent-blue bg-accent-blue-soft text-foreground"
           : "border-border bg-surface-elevated text-muted hover:border-border-hover hover:text-foreground"

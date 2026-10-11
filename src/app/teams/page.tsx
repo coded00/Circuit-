@@ -8,12 +8,13 @@
  */
 
 import { redirect } from "next/navigation";
+import { loginPath } from "@/lib/safeRedirect";
 import { getCurrentUser } from "@/lib/session";
 
 export default async function TeamsRedirectPage() {
   const user = await getCurrentUser();
   if (!user) {
-    redirect("/login?next=/teams");
+    redirect(loginPath("/teams"));
   }
   redirect(`/players/${user.handle}?tab=teams`);
 }

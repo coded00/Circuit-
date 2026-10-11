@@ -56,3 +56,9 @@ next-env.d.ts
 /playwright-report/
 /blob-report/
 
+.dev-login.txt
+
+# local-only test tooling and scratch output (contains test credentials)
+/scripts/create-test-players.mjs
+/scripts/.load-state.json
+/Claude outputs/

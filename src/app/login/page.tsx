@@ -1,18 +1,52 @@
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
+import { getCurrentUser } from "@/lib/session";
+import { sessionCookie } from "@/lib/auth";
+import { safeNextPath } from "@/lib/safeRedirect";
 import { AuthSplitLayout } from "@/components/auth/AuthSplitLayout";
+import { AuthHeading } from "@/components/auth/AuthHeading";
+import { AuthModeSwitch } from "@/components/auth/AuthModeSwitch";
+import { AuthMethods } from "@/components/auth/AuthMethods";
+import { isGoogleSignInEnabled } from "@/lib/oauth/google";
 import LoginForm from "./LoginForm";
+import { buildMetadata } from "@/lib/seo";
 
-export default function LoginPage() {
+export const metadata = buildMetadata({
+  title: "Log In",
+  description:
+    "Log in to Circuit to register for tournaments, play challenges and track your rank.",
+  path: "/login",
+});
+
+
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string | string[] }> }) {
+  // Already signed in: this page has nothing to offer, so continue to
+  // wherever they were headed (redirect() replaces the history entry).
+  if (await getCurrentUser()) {
+    const { next } = await searchParams;
+    redirect(safeNextPath(typeof next === "string" ? next : null));
+  }
+  // A session cookie is still here but no longer valid: it expired (or was
+  // revoked), as opposed to someone who was never signed in.
+  const sessionExpired = (await cookies()).has(sessionCookie.name);
+
   return (
     <AuthSplitLayout>
-      <div className="card flex w-full flex-col gap-6">
-        <div className="flex flex-col items-center gap-3 text-center">
-          {/* eslint-disable-next-line @next/next/no-img-element -- local /public asset, no next/image usage elsewhere in this codebase */}
-          <img src="/circuit-logo.png" alt="Circuit" width={700} height={347} className="h-12 w-auto max-w-none lg:hidden" />
-          <h1 className="text-section-heading">Log in to Circuit</h1>
-        </div>
+      <div className="flex flex-col gap-7">
         <Suspense>
-          <LoginForm />
+          <AuthModeSwitch active="login" />
+        </Suspense>
+        <AuthHeading eyebrow="Log in" title="The arena's waiting." sub="Your tournaments, challenges and wallet are right where you left them." />
+        {sessionExpired && (
+          <p role="status" className="cut-sm border border-warning/30 bg-warning/[0.12] px-3.5 py-3 text-sm leading-relaxed text-foreground">
+            Your session expired. Log in again to pick up where you left off.
+          </p>
+        )}
+        <Suspense>
+          <AuthMethods from="login" googleEnabled={isGoogleSignInEnabled()}>
+            <LoginForm />
+          </AuthMethods>
         </Suspense>
       </div>
     </AuthSplitLayout>

@@ -28,6 +28,7 @@ async function makeReadyTournament(organizerId: string) {
       startAt: new Date(Date.now() - 900_000),
       status: "COMPLETE",
       completedAt: new Date(Date.now() - 48 * 3600_000), // well past the 24h default window
+      payoutApprovedAt: new Date(), // staff have approved the payout
     },
   });
 }
@@ -156,5 +157,59 @@ describe("settleOrganizerRevenue", () => {
     await settleOrganizerRevenue();
     const after = await prisma.user.findUniqueOrThrow({ where: { id: organizer.id } });
     expect(after.walletBalance).toBe(before.walletBalance);
+  });
+
+
+  it("holds the organizer's share until staff approve the payout", async () => {
+    const organizer = await createTestOrganizer();
+    const tournament = await makeReadyTournament(organizer.id);
+    await prisma.tournament.update({ where: { id: tournament.id }, data: { payoutApprovedAt: null } });
+    await prisma.escrowTransaction.create({ data: { tournamentId: tournament.id, userId: organizer.id, type: "ORGANIZER_REVENUE", amount: 20_000, status: "PENDING" } });
+
+    const before = await prisma.user.findUniqueOrThrow({ where: { id: organizer.id } });
+    await settleOrganizerRevenue();
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: organizer.id } })).walletBalance).toBe(before.walletBalance);
+
+    await prisma.tournament.update({ where: { id: tournament.id }, data: { payoutApprovedAt: new Date() } });
+    await settleOrganizerRevenue();
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: organizer.id } })).walletBalance).toBe(before.walletBalance + 20_000);
+  });
+
+  describe("prizes come out of entry fees", () => {
+    it("sets the prize aside and credits the organizer only what is left", async () => {
+      const organizer = await createTestOrganizer();
+      const tournament = await prisma.tournament.update({ where: { id: (await makeReadyTournament(organizer.id)).id }, data: { prizeAmount: 30_000 } });
+      await prisma.escrowTransaction.createMany({
+        data: [
+          { tournamentId: tournament.id, userId: organizer.id, type: "ORGANIZER_REVENUE", amount: 25_000, status: "PENDING" },
+          { tournamentId: tournament.id, userId: organizer.id, type: "ORGANIZER_REVENUE", amount: 25_000, status: "PENDING" },
+        ],
+      });
+      const before = await prisma.user.findUniqueOrThrow({ where: { id: organizer.id } });
+      await settleOrganizerRevenue();
+      const after = await prisma.user.findUniqueOrThrow({ where: { id: organizer.id } });
+      expect(after.walletBalance).toBe(before.walletBalance + 20_000); // 50,000 collected - 30,000 prize
+    });
+
+    it("credits nothing when the prize uses up everything collected", async () => {
+      const organizer = await createTestOrganizer();
+      const tournament = await prisma.tournament.update({ where: { id: (await makeReadyTournament(organizer.id)).id }, data: { prizeAmount: 100_000 } });
+      await prisma.escrowTransaction.create({ data: { tournamentId: tournament.id, userId: organizer.id, type: "ORGANIZER_REVENUE", amount: 40_000, status: "PENDING" } });
+      const before = await prisma.user.findUniqueOrThrow({ where: { id: organizer.id } });
+      await settleOrganizerRevenue();
+      const after = await prisma.user.findUniqueOrThrow({ where: { id: organizer.id } });
+      expect(after.walletBalance).toBe(before.walletBalance);
+      expect(await prisma.walletTransaction.count({ where: { userId: organizer.id, type: "ORGANIZER_REVENUE_CREDIT" } })).toBe(0);
+    });
+
+    it("keeps nothing back on a staff-run (sponsored) tournament", async () => {
+      const staff = await createTestOrganizer({ isStaff: true });
+      const tournament = await prisma.tournament.update({ where: { id: (await makeReadyTournament(staff.id)).id }, data: { prizeAmount: 30_000 } });
+      await prisma.escrowTransaction.create({ data: { tournamentId: tournament.id, userId: staff.id, type: "ORGANIZER_REVENUE", amount: 50_000, status: "PENDING" } });
+      const before = await prisma.user.findUniqueOrThrow({ where: { id: staff.id } });
+      await settleOrganizerRevenue();
+      const after = await prisma.user.findUniqueOrThrow({ where: { id: staff.id } });
+      expect(after.walletBalance).toBe(before.walletBalance + 50_000);
+    });
   });
 });

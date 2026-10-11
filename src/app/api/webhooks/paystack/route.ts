@@ -1,7 +1,20 @@
 import { NextResponse } from "next/server";
 import { confirmEntryFeePayment, confirmWalletFunding } from "@/lib/payments/confirm";
+import { confirmMarketplacePayment } from "@/lib/marketplaceCheckout";
+import { applyMarketplaceRefundOutcome } from "@/lib/marketplaceCardRefund";
 import { verifyPaystackSignature } from "@/lib/payments/webhookVerification";
+import { applyRefundOutcome, applyTransferOutcome } from "@/lib/payments/transfers";
+import { paystackClient } from "@/lib/payments/paystack";
 import { captureMessage, captureException } from "@/lib/observability";
+
+// Events handled here (subscribe to these on the Paystack dashboard):
+// - charge.success — an entry fee or wallet deposit was paid.
+// - transfer.success / transfer.failed / transfer.reversed — a withdrawal
+//   or prize payout finished. Re-verified with Paystack before it's
+//   recorded, same as charges.
+// - refund.processed / refund.failed — an entry-fee refund finished.
+// Anything else is acknowledged and ignored.
+const TRANSFER_EVENTS = new Set(["transfer.success", "transfer.failed", "transfer.reversed"]);
 
 export async function POST(request: Request) {
   const rawBody = await request.text();
@@ -16,7 +29,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
-  let event: { event?: string; data?: { reference?: string } };
+  let event: {
+    event?: string;
+    data?: { reference?: string; transaction_reference?: string; transaction?: { reference?: string } };
+  };
   try {
     event = JSON.parse(rawBody);
   } catch (err) {
@@ -31,23 +47,28 @@ export async function POST(request: Request) {
   // Both confirm functions are no-ops for a reference they don't own (a
   // Registration lookup miss, or a WalletTransaction lookup miss) — safe
   // to try both rather than parsing the reference's own prefix to decide.
-  if (event?.event === "charge.success" && typeof reference === "string") {
-    try {
+  const type = event?.event ?? "";
+  try {
+    if (type === "charge.success" && typeof reference === "string") {
       await confirmEntryFeePayment(reference);
       await confirmWalletFunding(reference);
-    } catch (err) {
-      // V1 audit follow-up: previously an uncaught throw here became a
-      // generic 500 with no monitoring context — a real failure
-      // confirming a live entry-fee/wallet-funding payment was invisible.
-      // Still rethrown (not swallowed): the 500 makes Paystack retry this
-      // webhook later, which is the actual recovery path.
-      captureException(err, { source: "webhooks/paystack", reference });
-      throw err;
+      await confirmMarketplacePayment(reference);
+    } else if (TRANSFER_EVENTS.has(type) && typeof reference === "string") {
+      const status = await paystackClient.verifyTransfer(reference);
+      if (status !== "PENDING") await applyTransferOutcome(reference, status);
+    } else if (type === "refund.processed" || type === "refund.failed") {
+      const chargeRef = event.data?.transaction_reference ?? event.data?.transaction?.reference;
+      if (typeof chargeRef === "string") {
+        const outcome = type === "refund.processed" ? "SUCCESS" : "FAILED";
+        await applyRefundOutcome(chargeRef, outcome);
+        await applyMarketplaceRefundOutcome(chargeRef, outcome);
+      }
     }
+  } catch (err) {
+    // Rethrown so Paystack gets a 5xx and retries; every handler above is idempotent.
+    captureException(err, { source: "webhooks/paystack", event: type, reference });
+    throw err;
   }
 
-  // Always 200 once the signature checks out — anything else makes
-  // Paystack retry, and an event we don't act on (wrong type, unknown
-  // reference) is still a successfully handled webhook from its perspective.
   return NextResponse.json({ received: true });
 }

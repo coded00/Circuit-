@@ -29,8 +29,8 @@ export function ConnectAccountsRow() {
             key={platform.name}
             type="button"
             disabled
-            title={`${platform.name} — coming soon`}
-            className="flex items-center gap-2 rounded-[10px] border border-border bg-surface-elevated py-2 pr-3.5 pl-2 text-sm font-medium text-muted transition disabled:cursor-not-allowed disabled:opacity-60"
+            title={`${platform.name}. Coming soon`}
+            className="flex items-center gap-2 rounded-none border border-border bg-surface-elevated py-2 pr-3.5 pl-2 text-sm font-medium text-muted transition disabled:cursor-not-allowed disabled:opacity-60"
           >
             <span
               className="flex h-6 w-6 items-center justify-center rounded-full"

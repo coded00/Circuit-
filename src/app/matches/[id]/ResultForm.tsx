@@ -8,11 +8,16 @@
  * since that's what binds a screenshot to this specific match.
  */
 
+import { InfoTip } from "@/components/InfoTip";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, ImageUp } from "lucide-react";
 import { Spinner } from "@/components/Spinner";
 import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
+import { useToast } from "@/components/ToastProvider";
+
+/** Mirrors the server limit, so a too-big clip fails here and not after a long upload. */
+const MAX_PROOF_BYTES = 10 * 1024 * 1024;
 
 type PlayerOption = { id: string; displayName: string; handle: string; avatarUrl: string | null };
 
@@ -21,13 +26,17 @@ export default function ResultForm({
   matchCode,
   playerA,
   playerB,
+  drawAllowed = false,
 }: {
   matchId: string;
   matchCode: string;
   playerA: PlayerOption;
   playerB: PlayerOption;
+  /** League fixtures that can end level. */
+  drawAllowed?: boolean;
 }) {
   const router = useRouter();
+  const toast = useToast();
   const [winnerId, setWinnerId] = useState("");
   const [score, setScore] = useState("");
   const [kills, setKills] = useState("");
@@ -39,7 +48,12 @@ export default function ResultForm({
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!winnerId) {
-      setError("Pick who won.");
+      setError(drawAllowed ? "Pick who won, or a draw." : "Pick who won.");
+      return;
+    }
+    const file = new FormData(event.currentTarget).get("proof");
+    if (file instanceof File && file.size > MAX_PROOF_BYTES) {
+      setError(`That file is ${(file.size / 1024 / 1024).toFixed(1)}MB. Proof can be up to 10MB, so trim the clip or send a screenshot.`);
       return;
     }
     setError(null);
@@ -51,7 +65,14 @@ export default function ResultForm({
     if (kills.trim()) form.set("kills", kills.trim());
     form.set("proofShowsMatchCode", confirmed ? "true" : "false");
 
-    const res = await fetch(`/api/matches/${matchId}/results`, { method: "POST", body: form });
+    let res: Response;
+    try {
+      res = await fetch(`/api/matches/${matchId}/results`, { method: "POST", body: form });
+    } catch {
+      setError("We couldn't reach Circuit, so nothing was submitted. Check your connection and try again.");
+      setSubmitting(false);
+      return;
+    }
     const data = await res.json().catch(() => null);
 
     if (!res.ok) {
@@ -60,14 +81,17 @@ export default function ResultForm({
       return;
     }
 
+    if (data?.status === "AUTO_COMPLETED") toast({ title: "Result confirmed", message: "Both reports match, so the match is complete." });
+    else if (data?.status === "DISPUTED") toast({ title: "Reports don't match", message: "The match has gone to review.", tone: "info" });
+    else toast({ title: "Result submitted", message: "Waiting for your opponent to confirm or dispute it." });
     router.refresh();
   }
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5">
       <fieldset className="flex flex-col gap-2">
-        <legend className="field-label mb-2">Who won?</legend>
-        <div className="grid grid-cols-2 gap-3">
+        <legend className="field-label mb-2">{drawAllowed ? "Who won. Or was it a draw?" : "Who won?"}</legend>
+        <div className={`grid gap-3 ${drawAllowed ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2"}`}>
           {[playerA, playerB].map((player) => {
             const selected = winnerId === player.id;
             return (
@@ -79,7 +103,7 @@ export default function ResultForm({
                   setError(null);
                 }}
                 aria-pressed={selected}
-                className={`relative flex flex-col items-center gap-2 rounded-[12px] border px-3 py-4 text-center transition duration-[var(--duration-fast)] active:scale-[0.98] ${
+                className={`relative flex flex-col items-center gap-2 cut-sm [--cut-line:var(--border)] border px-3 py-4 text-center transition duration-[var(--duration-fast)] active:scale-[0.98] ${
                   selected ? "border-accent-volt bg-accent-volt-soft" : "border-border hover:border-border-strong hover:bg-surface-elevated"
                 }`}
               >
@@ -96,6 +120,27 @@ export default function ResultForm({
               </button>
             );
           })}
+          {drawAllowed && (
+            <button
+              type="button"
+              onClick={() => {
+                setWinnerId("DRAW");
+                setError(null);
+              }}
+              aria-pressed={winnerId === "DRAW"}
+              className={`relative col-span-2 flex flex-col items-center justify-center gap-1 cut-sm [--cut-line:var(--border)] border px-3 py-4 text-center transition duration-[var(--duration-fast)] active:scale-[0.98] sm:col-span-1 ${
+                winnerId === "DRAW" ? "border-accent-volt bg-accent-volt-soft" : "border-border hover:border-border-strong hover:bg-surface-elevated"
+              }`}
+            >
+              {winnerId === "DRAW" && (
+                <span className="absolute top-2 right-2 flex h-5 w-5 items-center justify-center rounded-full bg-accent-volt text-accent-volt-foreground">
+                  <Check size={12} strokeWidth={3} />
+                </span>
+              )}
+              <span className="text-sm font-semibold">Draw</span>
+              <span className="text-xs text-muted">Level score</span>
+            </button>
+          )}
         </div>
       </fieldset>
 
@@ -134,17 +179,18 @@ export default function ResultForm({
         <span className="field-label">Proof</span>
         <label
           htmlFor="proof"
-          className={`flex cursor-pointer items-center gap-3 rounded-[12px] border border-dashed px-4 py-4 transition hover:bg-surface-elevated ${
+          className={`flex cursor-pointer items-center gap-3 cut-sm [--cut-line:var(--border)] border border-dashed px-4 py-4 transition hover:bg-surface-elevated ${
             fileName ? "border-success/50" : "border-border-strong"
           }`}
         >
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-surface-elevated text-muted">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center cut-avatar bg-surface-elevated text-muted">
             <ImageUp size={18} />
           </span>
           <span className="flex min-w-0 flex-col">
             <span className="truncate text-sm font-medium">{fileName ?? "Upload a screenshot or clip"}</span>
             <span className="text-xs text-muted">
-              Must show the final score and code <span className="font-mono font-semibold text-foreground">{matchCode}</span>
+              Must show the final score and code <span className="font-mono font-semibold text-foreground">{matchCode}</span>{" "}
+              <InfoTip align="end" text="The match code links your proof to this exact match. A screenshot without it can be rejected if the other player disputes the result." />
             </span>
           </span>
         </label>

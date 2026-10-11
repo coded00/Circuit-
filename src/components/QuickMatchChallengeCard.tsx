@@ -50,13 +50,21 @@ export function QuickMatchChallengeCard({
   challenge,
   onAccept,
   onDecline,
+  framed = true,
 }: {
   challenge: QuickMatchChallengeInfo;
   onAccept: () => Promise<void>;
   onDecline?: () => Promise<void>;
+  /** False when a parent (the incoming-request dialog) already supplies the surface and edge. */
+  framed?: boolean;
 }) {
   const remainingMs = useCountdown(challenge.expiresAt);
+  // The window's full length isn't stored, so the drain bar measures
+  // against whatever was left when this card first appeared.
+  const [windowMs] = useState(() => Math.max(1, new Date(challenge.expiresAt).getTime() - Date.now()));
   const [submitting, setSubmitting] = useState<"accept" | "decline" | null>(null);
+  const expired = remainingMs <= 0;
+  const urgent = !expired && remainingMs < 10_000;
 
   async function handleAccept() {
     setSubmitting("accept");
@@ -72,54 +80,61 @@ export function QuickMatchChallengeCard({
   }
 
   return (
-    <div className="card flex flex-col gap-4 p-5">
-      <div className="flex items-center gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-surface-elevated text-accent-blue">
-          <Swords size={18} />
+    <div className={`flex flex-col overflow-hidden ${framed ? "cut-lg [--cut-line:var(--border)] border border-border bg-surface" : ""}`}>
+      <div data-surface="dark" className="relative flex items-center gap-3.5 px-5 pt-5 pb-4">
+        <span className="font-display flex h-12 w-12 shrink-0 items-center justify-center cut-sm bg-accent-volt text-lg font-bold text-accent-volt-foreground">
+          {challenge.hostDisplayName.slice(0, 1).toUpperCase()}
         </span>
-        <div>
-          <p className="text-card-title font-semibold">Battle Request</p>
-          <p className="text-sm text-muted">
-            {challenge.hostDisplayName} (@{challenge.hostHandle}) wants to battle you
-          </p>
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="flex items-center gap-1.5 font-mono text-[11px] font-semibold tracking-[0.16em] text-accent-volt uppercase">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent-volt" aria-hidden />
+            <Swords size={11} /> Battle request
+          </span>
+          <p className="truncate font-display text-base font-bold tracking-tight">{challenge.hostDisplayName}</p>
+          <p className="truncate text-xs text-muted">@{challenge.hostHandle} wants to play you</p>
         </div>
+        <span className={`font-mono text-2xl font-semibold tabular-nums ${urgent ? "text-live" : "text-foreground"}`}>
+          {expired ? "--" : formatCountdown(remainingMs).slice(3)}
+          <span className="ml-0.5 text-xs text-muted">s</span>
+        </span>
+        <span
+          aria-hidden
+          className={`absolute bottom-0 left-0 h-[3px] transition-[width] duration-1000 ease-linear ${urgent ? "bg-live" : "bg-accent-volt"}`}
+          style={{ width: `${Math.min(100, (remainingMs / windowMs) * 100)}%` }}
+        />
       </div>
 
-      <div className="flex flex-col gap-1 rounded-[10px] border border-border bg-surface-elevated p-3 text-sm">
-        <div className="flex justify-between">
-          <span className="text-muted">Game</span>
-          <span className="font-medium">{challenge.game}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-muted">Format</span>
-          <span className="font-medium">{formatFormat(challenge.format)}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-muted">Entry</span>
-          <span className="font-medium">{formatNaira(challenge.stakeAmount)}</span>
-        </div>
-      </div>
+      <dl className="grid grid-cols-3 divide-x divide-border border-b border-border">
+        {[
+          ["Game", challenge.game],
+          ["Format", formatFormat(challenge.format)],
+          ["Entry", formatNaira(challenge.stakeAmount)],
+        ].map(([label, value]) => (
+          <div key={label} className="flex min-w-0 flex-col gap-0.5 px-4 py-3">
+            <dt className="font-mono text-[11px] tracking-[0.12em] text-muted-strong uppercase">{label}</dt>
+            <dd className="truncate text-sm font-semibold">{value}</dd>
+          </div>
+        ))}
+      </dl>
 
-      <p className="text-metadata">First player to accept gets the battle.</p>
-
-      {remainingMs <= 0 ? (
-        <p className="field-error">This challenge has expired.</p>
-      ) : (
-        <div className="flex items-center justify-between gap-3">
-          <span className="font-mono text-sm text-muted">{formatCountdown(remainingMs)}</span>
+      <div className="flex flex-col gap-3 px-5 py-4">
+        {expired ? (
+          <p className="text-sm text-danger">This request has expired.</p>
+        ) : (
           <div className="flex gap-2">
             {onDecline && (
               <button type="button" onClick={handleDecline} disabled={!!submitting} className="btn-secondary">
                 {submitting === "decline" ? "Declining…" : "Decline"}
               </button>
             )}
-            <button type="button" onClick={handleAccept} disabled={!!submitting} className="btn-primary">
-              {submitting && <Spinner />}
-              {submitting === "accept" ? "Accepting…" : "Accept"}
+            <button type="button" onClick={handleAccept} disabled={!!submitting} className="btn-primary flex-1">
+              {submitting === "accept" && <Spinner />}
+              {submitting === "accept" ? "Accepting…" : "Accept battle"}
             </button>
           </div>
-        </div>
-      )}
+        )}
+        <p className="text-metadata">First player to accept gets the battle.</p>
+      </div>
     </div>
   );
 }

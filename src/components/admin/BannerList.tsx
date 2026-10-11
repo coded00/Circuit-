@@ -47,7 +47,7 @@ export function BannerList({ banners }: { banners: Banner[] }) {
   return (
     <div className="flex flex-col gap-1">
       {banners.length === 0 ? (
-        <p className="py-4 text-center text-sm text-muted">No banners yet — the homepage falls back to Circuit&apos;s default pitch.</p>
+        <p className="py-4 text-center text-sm text-muted">No banners yet. The homepage falls back to Circuit&apos;s default pitch.</p>
       ) : (
         banners.map((b, i) => (
           <BannerRow key={b.id} banner={b} isFirst={i === 0} isLast={i === banners.length - 1} onSwap={swap} />

@@ -34,6 +34,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     where: { id },
     data: {
       isSuspended: body.isSuspended,
+      ...(body.isSuspended ? { sessionVersion: { increment: 1 } } : {}), // sign out any session held by the suspended account
       suspensionReason: body.isSuspended ? reason || null : null,
     },
   });

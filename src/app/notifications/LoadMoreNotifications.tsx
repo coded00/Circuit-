@@ -1,19 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { NotificationGroupLabel, NotificationItem, type NotificationRow } from "@/components/notifications/NotificationItem";
 
-type NotificationRow = { id: string; message: string; href: string; readAt: string | null; createdAt: string };
-
-const relativeTime = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
-function formatRelative(dateIso: string): string {
-  const diffMin = Math.round((new Date(dateIso).getTime() - Date.now()) / 60000);
-  if (Math.abs(diffMin) < 60) return relativeTime.format(diffMin, "minute");
-  const diffHour = Math.round(diffMin / 60);
-  if (Math.abs(diffHour) < 24) return relativeTime.format(diffHour, "hour");
-  return relativeTime.format(Math.round(diffHour / 24), "day");
-}
-
-export default function LoadMoreNotifications({ initialCursor }: { initialCursor: string | null }) {
+export default function LoadMoreNotifications({ initialCursor, unreadOnly }: { initialCursor: string | null; unreadOnly: boolean }) {
   const [rows, setRows] = useState<NotificationRow[]>([]);
   const [cursor, setCursor] = useState(initialCursor);
   const [loading, setLoading] = useState(false);
@@ -21,7 +11,7 @@ export default function LoadMoreNotifications({ initialCursor }: { initialCursor
   async function loadMore() {
     if (!cursor) return;
     setLoading(true);
-    const res = await fetch(`/api/notifications?cursor=${cursor}`);
+    const res = await fetch(`/api/notifications?cursor=${cursor}${unreadOnly ? "&unread=true" : ""}`);
     if (res.ok) {
       const data = await res.json();
       setRows((prev) => [...prev, ...data.notifications]);
@@ -33,22 +23,19 @@ export default function LoadMoreNotifications({ initialCursor }: { initialCursor
   return (
     <>
       {rows.length > 0 && (
-        <div className="flex flex-col gap-2">
+        <section>
+          <NotificationGroupLabel>Older</NotificationGroupLabel>
           {rows.map((n) => (
-            <a key={n.id} href={n.href} className="card-row flex items-start gap-3 p-3">
-              {!n.readAt && <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent-blue" aria-hidden />}
-              <span className="flex flex-1 flex-col gap-0.5">
-                <span className={n.readAt ? "text-sm text-muted" : "text-sm"}>{n.message}</span>
-                <span className="text-metadata">{formatRelative(n.createdAt)}</span>
-              </span>
-            </a>
+            <NotificationItem key={n.id} notification={n} />
           ))}
-        </div>
+        </section>
       )}
       {cursor && (
-        <button type="button" onClick={loadMore} disabled={loading} className="btn-secondary self-center">
-          {loading ? "Loading…" : "Load more"}
-        </button>
+        <div className="border-t border-border px-4 pt-3 pb-1 sm:px-5">
+          <button type="button" onClick={loadMore} disabled={loading} className="btn-ghost w-full py-2 text-[13px]">
+            {loading ? "Loading…" : "Load older notifications"}
+          </button>
+        </div>
       )}
     </>
   );

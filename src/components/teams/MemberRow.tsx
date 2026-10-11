@@ -16,6 +16,7 @@ export function MemberRow({
   isJoinRequest = false,
   canRemove,
   canAccept = false,
+  hidden = false,
 }: {
   teamId: string;
   person: Person;
@@ -26,6 +27,8 @@ export function MemberRow({
   canRemove: boolean;
   /** Only meaningful alongside isJoinRequest — the captain can accept a join request (an invite instead waits on the invitee, not the captain). */
   canAccept?: boolean;
+  /** A signed-out visitor (and so a search engine) doesn't get the name of a player who hasn't made their profile public. */
+  hidden?: boolean;
 }) {
   const router = useRouter();
   const confirmDialog = useConfirmDialog();
@@ -52,12 +55,18 @@ export function MemberRow({
 
   return (
     <div className="card-row flex items-center gap-3 p-3">
+      {hidden ? (
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center cut-avatar border border-border bg-surface-elevated font-semibold text-muted">C</div>
+          <span className="truncate font-medium text-muted">Circuit player</span>
+        </div>
+      ) : (
       <Link href={`/players/${person.handle}`} className="flex min-w-0 flex-1 items-center gap-3">
         {person.avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs
-          <img src={person.avatarUrl} alt="" className="h-10 w-10 shrink-0 rounded-full border border-border object-cover" />
+          <img src={person.avatarUrl} alt="" className="h-10 w-10 shrink-0 cut-avatar border border-border object-cover" />
         ) : (
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-surface-elevated font-semibold text-muted">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center cut-avatar border border-border bg-surface-elevated font-semibold text-muted">
             {person.displayName.slice(0, 1).toUpperCase()}
           </div>
         )}
@@ -66,6 +75,7 @@ export function MemberRow({
           <span className="text-metadata">@{person.handle}</span>
         </div>
       </Link>
+      )}
 
       {isCaptain && <span className="badge badge-brand shrink-0">Captain</span>}
       {isPending && <span className="badge badge-neutral shrink-0">{isJoinRequest ? "Wants to join" : "Invited"}</span>}

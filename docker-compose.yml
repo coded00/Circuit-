@@ -9,10 +9,13 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=postgresql://circuit_user:circuit_secure_pass@postgres:5432/circuit?schema=public
-      - JWT_SECRET=${JWT_SECRET:-change_this_to_a_random_32_byte_secret}
+      - DATABASE_URL=postgresql://circuit_user:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD (use the current database password if the database already exists)}@postgres:5432/circuit?schema=public
+      # Used by `prisma migrate deploy` (schema.prisma's directUrl). Same database, no pooler in between.
+      - DIRECT_URL=postgresql://circuit_user:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD (use the current database password if the database already exists)}@postgres:5432/circuit?schema=public
+      # No defaults for secrets: a value that ships in the repo is a value everyone knows.
+      - JWT_SECRET=${JWT_SECRET:?Set JWT_SECRET to a random value, e.g. openssl rand -base64 48}
       - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
-      - CRON_SECRET=${CRON_SECRET:-circuit_cron_secret_vps}
+      - CRON_SECRET=${CRON_SECRET:?Set CRON_SECRET, e.g. openssl rand -base64 32}
       - PAYSTACK_SECRET_KEY=${PAYSTACK_SECRET_KEY:-}
       - PAYSTACK_PUBLIC_KEY=${PAYSTACK_PUBLIC_KEY:-}
       - FLUTTERWAVE_SECRET_KEY=${FLUTTERWAVE_SECRET_KEY:-}
@@ -21,6 +24,9 @@ services:
       - RESEND_API_KEY=${RESEND_API_KEY:-}
       - ONESIGNAL_API_KEY=${ONESIGNAL_API_KEY:-}
       - NEXT_PUBLIC_ONESIGNAL_APP_ID=${NEXT_PUBLIC_ONESIGNAL_APP_ID:-}
+      - TWITCH_CLIENT_ID=${TWITCH_CLIENT_ID:-}
+      - TWITCH_CLIENT_SECRET=${TWITCH_CLIENT_SECRET:-}
+      - YOUTUBE_API_KEY=${YOUTUBE_API_KEY:-}
       - R2_BUCKET=${R2_BUCKET:-}
       - R2_ACCOUNT_ID=${R2_ACCOUNT_ID:-}
       - R2_ENDPOINT=${R2_ENDPOINT:-}
@@ -38,10 +44,10 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: circuit_user
-      POSTGRES_PASSWORD: circuit_secure_pass
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
       POSTGRES_DB: circuit
-    ports:
-      - "5432:5432"
+    # No `ports:` on purpose. The app reaches the database over the compose network; publishing 5432
+    # would expose it to the internet. For a one-off shell: docker compose exec postgres psql -U circuit_user circuit
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:

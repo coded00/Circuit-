@@ -21,7 +21,7 @@ export default function PlayerProfileError({ error, reset }: { error: Error & { 
         <AlertTriangle size={22} />
       </div>
       <h1 className="state-title">Couldn&apos;t load this profile</h1>
-      <p className="state-description">Something failed loading this player&apos;s profile — try again.</p>
+      <p className="state-description">Something failed loading this player&apos;s profile. Try again.</p>
       <button type="button" onClick={reset} className="btn-primary">
         Try again
       </button>

@@ -10,14 +10,21 @@
 
 import { NextResponse, after } from "next/server";
 import { prisma } from "@/lib/db";
-import { getCurrentUser } from "@/lib/session";
-import { parseOptionalUrl, parseOptionalImageUrl } from "@/lib/validation";
-import { ALL_TEAM_SIZE_VALUES } from "@/lib/gameFormats";
+import { getCurrentUser, suspendedResponse } from "@/lib/session";
+import { parseOptionalImageUrl } from "@/lib/validation";
+import { parseLobbyGroups, parseLobbyRounds, type LobbyGroupsConfig } from "@/lib/lobbyScoring";
+import { getStructure } from "@/lib/competitionStructures";
+import { maxPrizePlaces, parsePrizeSplit } from "@/lib/prizes";
+import { resolveCompetition } from "@/lib/competitionConfig";
+import { parseLeagueSettings } from "@/lib/leagueTable";
 import { notifyAllUsers } from "@/lib/notifications";
-import { enableCommunity } from "@/lib/community";
+import { enableCommunity, postSystemMessage } from "@/lib/community";
+import { hostableCommunities } from "@/lib/communityDirectory";
 import { trackEvent } from "@/lib/analytics";
 import { isRateLimited, recordAttempt } from "@/lib/rateLimit";
 import { captureException } from "@/lib/observability";
+import { prizeCapError } from "@/lib/prizePool";
+import { resolveTournamentStream } from "@/lib/streams";
 
 const MAX_PARTICIPANT_CAP = 128; // D2: V1 bracket ceiling.
 
@@ -44,6 +51,8 @@ export async function POST(request: Request) {
       { status: 401 }
     );
   }
+  const suspended = suspendedResponse(user);
+  if (suspended) return suspended;
 
   const rateLimitKey = `tournament-create:${user.id}`;
   const { limited, retryAfterSeconds } = await isRateLimited(rateLimitKey, {
@@ -68,8 +77,6 @@ export async function POST(request: Request) {
   }
 
   const name = typeof body.name === "string" ? body.name.trim() : "";
-  const game = typeof body.game === "string" ? body.game.trim() : "";
-  const teamSize = typeof body.teamSize === "string" ? body.teamSize.trim() : "1v1";
   const rulesText = typeof body.rulesText === "string" ? body.rulesText.trim() : "";
   const participantCap = Number(body.participantCap);
   const entryFee = Number(body.entryFee);
@@ -82,28 +89,76 @@ export async function POST(request: Request) {
   const registrationOpenAt = parseDate(body.registrationOpenAt);
   const registrationCloseAt = parseDate(body.registrationCloseAt);
   const startAt = parseDate(body.startAt);
-  const streamUrlResult = parseOptionalUrl(body.streamUrl);
+  const streamResult = resolveTournamentStream(body);
   const posterUrlResult = parseOptionalImageUrl(body.posterUrl);
 
   // TRN-1: all fields required except prize info.
-  if (!name || !game || !rulesText) {
+  if (!name || !rulesText) {
+    return NextResponse.json({ error: "Name and rules are required." }, { status: 400 });
+  }
+  // Game → Mode → Format → Structure, checked against the game catalog.
+  const competition = await resolveCompetition(body);
+  if (!competition.ok) {
+    return NextResponse.json({ error: competition.error }, { status: 400 });
+  }
+  // Lobby tournaments are one lobby, so the lobby's size is the cap.
+  // Round robins are capped by the structure (every pairing is a match).
+  const structureMax = getStructure(competition.fields.format)?.maxEntries ?? null;
+  // Groups, then a final: each group is a lobby, so the cap can be groups × lobby size.
+  const groupCount = competition.fields.competitionStyle === "LOBBY" && Number(body.lobbyGroups) >= 2 ? Number(body.lobbyGroups) : 1;
+  const capLimit = competition.lobbyCapacity ? competition.lobbyCapacity * groupCount : (structureMax ?? MAX_PARTICIPANT_CAP);
+  if (!Number.isInteger(participantCap) || participantCap < 2 || participantCap > capLimit) {
     return NextResponse.json(
-      { error: "Name, game, and rules are required." },
+      {
+        error: competition.lobbyCapacity
+          ? groupCount > 1
+            ? `${groupCount} group lobbies hold ${capLimit} entries. Set a cap between 2 and ${capLimit}.`
+            : `This format's lobby holds ${competition.lobbyCapacity} entries. Set a cap between 2 and ${competition.lobbyCapacity}, or split into groups.`
+          : structureMax
+            ? `A ${getStructure(competition.fields.format)!.label.toLowerCase()} can have at most ${structureMax} entries.`
+            : `Participant cap must be a whole number between 2 and ${MAX_PARTICIPANT_CAP}.`,
+      },
       { status: 400 }
     );
   }
-  if (!ALL_TEAM_SIZE_VALUES.includes(teamSize)) {
-    return NextResponse.json(
-      { error: "Game mode isn't a recognized option for this game." },
-      { status: 400 }
+  let lobbyRounds: number | null = null;
+  let groups: LobbyGroupsConfig | null = null;
+  if (competition.fields.competitionStyle === "LOBBY") {
+    const rounds = parseLobbyRounds(body.lobbyRounds);
+    if (!rounds.ok) return NextResponse.json({ error: rounds.error }, { status: 400 });
+    lobbyRounds = rounds.value;
+    const parsedGroups = parseLobbyGroups(
+      { groups: body.lobbyGroups, qualifiers: body.lobbyQualifiers, finalRounds: body.lobbyFinalRounds },
+      competition.lobbyCapacity,
+      participantCap
     );
+    if (!parsedGroups.ok) return NextResponse.json({ error: parsedGroups.error }, { status: 400 });
+    groups = parsedGroups.value;
   }
-  if (!Number.isInteger(participantCap) || participantCap < 2 || participantCap > MAX_PARTICIPANT_CAP) {
-    return NextResponse.json(
-      { error: `Participant cap must be a whole number between 2 and ${MAX_PARTICIPANT_CAP}.` },
-      { status: 400 }
-    );
+
+  // League: points, draws, home-and-away and matchday length (src/lib/leagueTable.ts).
+  let leagueData: { leagueWinPoints: number | null; leagueDrawPoints: number | null; leagueLegs: number | null; leagueMatchdayDays: number | null } = {
+    leagueWinPoints: null,
+    leagueDrawPoints: null,
+    leagueLegs: null,
+    leagueMatchdayDays: null,
+  };
+  if (competition.fields.format === "LEAGUE") {
+    const league = parseLeagueSettings({
+      winPoints: body.leagueWinPoints,
+      drawPoints: body.leagueDrawPoints,
+      allowDraws: body.leagueAllowDraws,
+      legs: body.leagueLegs,
+      matchdayDays: body.leagueMatchdayDays,
+    });
+    if (!league.ok) return NextResponse.json({ error: league.error }, { status: 400 });
+    leagueData = { leagueWinPoints: league.value.winPoints, leagueDrawPoints: league.value.drawPoints, leagueLegs: league.value.legs, leagueMatchdayDays: league.value.matchdayDays };
   }
+
+  // How the prize pool is shared (src/lib/prizes.ts); only with a cash prize.
+  const finalists = groups ? groups.groups * groups.qualifiers : null;
+  const split = parsePrizeSplit(body.prizeSplit, maxPrizePlaces(competition.fields.format, participantCap, finalists));
+  if (!split.ok) return NextResponse.json({ error: split.error }, { status: 400 });
   if (!Number.isInteger(entryFee) || entryFee < 0) {
     return NextResponse.json(
       { error: "Entry fee must be a whole number of kobo, 0 or more." },
@@ -116,6 +171,11 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
+  // The prize comes out of entry fees, so it can't promise more than they could collect. A staff-run
+  // tournament is sponsored instead — its prize is Circuit's own money — which is a different rule with
+  // its own ceiling, not the absence of one (src/lib/prizePool.ts).
+  const capError = await prizeCapError({ prizeAmount, entryFee, participantCap, sponsored: user.isStaff });
+  if (capError) return NextResponse.json({ error: capError }, { status: 400 });
   if (!registrationOpenAt || !registrationCloseAt || !startAt) {
     return NextResponse.json(
       { error: "Registration open, registration close, and start dates must all be valid." },
@@ -135,17 +195,24 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
-  if (!streamUrlResult.ok) {
-    return NextResponse.json(
-      { error: "Stream link must be a valid http(s) URL." },
-      { status: 400 }
-    );
+  if (!streamResult.ok) {
+    return NextResponse.json({ error: streamResult.error }, { status: 400 });
   }
   if (!posterUrlResult.ok) {
     return NextResponse.json(
       { error: "Poster link must be a valid http(s) URL." },
       { status: 400 }
     );
+  }
+
+  // Hosting as a community event: only a community they own/moderate.
+  let hostCommunityId: string | null = null;
+  if (typeof body.hostCommunityId === "string" && body.hostCommunityId) {
+    const allowed = await hostableCommunities(user);
+    if (!allowed.some((c) => c.id === body.hostCommunityId)) {
+      return NextResponse.json({ error: "You can only host for a community you run." }, { status: 403 });
+    }
+    hostCommunityId = body.hostCommunityId;
   }
 
   const organizerProfile = await prisma.organizerProfile.upsert({
@@ -167,9 +234,15 @@ export async function POST(request: Request) {
   const tournament = await prisma.tournament.create({
     data: {
       organizerId: organizerProfile.userId,
+      country: user.country,
       name,
-      game,
-      teamSize,
+      ...competition.fields,
+      ...leagueData,
+      lobbyRounds,
+      lobbyGroups: groups?.groups ?? null,
+      lobbyQualifiers: groups?.qualifiers ?? null,
+      lobbyFinalRounds: groups?.finalRounds ?? null,
+      prizeSplit: prizeAmount ? split.value : [],
       rulesText,
       participantCap,
       entryFee,
@@ -179,11 +252,18 @@ export async function POST(request: Request) {
       registrationCloseAt,
       startAt,
       cancellationLockAt,
-      streamUrl: streamUrlResult.url,
+      ...streamResult.data,
       posterUrl: posterUrlResult.url,
       status,
+      hostCommunityId,
     },
   });
+
+  if (hostCommunityId) {
+    await postSystemMessage(hostCommunityId, user.id, `🏆 New tournament: ${tournament.name} (${tournament.game}). Details and registration: /tournaments/${tournament.id}`).catch((err) =>
+      captureException(err, { source: "tournaments/route.ts:announce", tournamentId: tournament.id })
+    );
+  }
 
   trackEvent("tournament_created", { userId: user.id, tournamentId: tournament.id, game: tournament.game });
 

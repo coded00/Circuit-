@@ -19,7 +19,7 @@ export async function sendEmail(to: string, subject: string, text: string): Prom
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     console.warn(
-      `[email] RESEND_API_KEY not set — logging instead of sending.\nTo: ${to}\nSubject: ${subject}\n\n${text}\n`
+      `[email] RESEND_API_KEY not set. Logging instead of sending.\nTo: ${to}\nSubject: ${subject}\n\n${text}\n`
     );
     return;
   }
@@ -51,7 +51,7 @@ export async function sendEmailBatch(recipients: string[], subject: string, text
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     console.warn(
-      `[email] RESEND_API_KEY not set — logging instead of sending.\nTo: ${recipients.length} recipients\nSubject: ${subject}\n\n${text}\n`
+      `[email] RESEND_API_KEY not set. Logging instead of sending.\nTo: ${recipients.length} recipients\nSubject: ${subject}\n\n${text}\n`
     );
     return;
   }

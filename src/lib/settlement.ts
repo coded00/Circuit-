@@ -33,6 +33,8 @@ export async function settleOrganizerRevenue(): Promise<{ settled: number; error
     where: {
       completedAt: { lte: new Date(now.getTime() - settlementHours * 60 * 60 * 1000) },
       fundsFrozen: false,
+      // Staff have reviewed the results and the money collected (admin Payouts page).
+      payoutApprovedAt: { not: null },
       escrowTxns: { some: { type: "ORGANIZER_REVENUE", status: "PENDING" } },
       // A dispute still open/under review/escalated on any of this
       // tournament's matches means the final result isn't settled yet —
@@ -40,7 +42,7 @@ export async function settleOrganizerRevenue(): Promise<{ settled: number; error
       // fundsFrozen check right above.
       matches: { none: { dispute: { status: { in: ["OPEN", "ORGANIZER_REVIEW", "ESCALATED"] } } } },
     },
-    select: { id: true, organizerId: true },
+    select: { id: true, organizerId: true, prizeAmount: true },
   });
 
   for (const tournament of readyTournaments) {
@@ -87,19 +89,26 @@ export async function settleOrganizerRevenue(): Promise<{ settled: number; error
         const flippedTotal = flippedRows.reduce((sum, row) => sum + row.amount, 0);
         if (flippedTotal <= 0) return 0;
 
+        // The prize is paid out of these same entry fees (see prizePool.ts), so it is set aside here and the
+        // organizer is credited what is left. A staff-run (sponsored) tournament keeps nothing back.
+        const organizer = await tx.user.findUnique({ where: { id: tournament.organizerId }, select: { isStaff: true } });
+        const prizeHold = organizer?.isStaff ? 0 : Math.min(tournament.prizeAmount ?? 0, flippedTotal);
+        const organizerShare = flippedTotal - prizeHold;
+        if (organizerShare <= 0) return 0;
+
         await tx.user.update({
           where: { id: tournament.organizerId },
-          data: { walletBalance: { increment: flippedTotal } },
+          data: { walletBalance: { increment: organizerShare } },
         });
         await tx.walletTransaction.create({
           data: {
             userId: tournament.organizerId,
             type: "ORGANIZER_REVENUE_CREDIT",
-            amount: flippedTotal,
+            amount: organizerShare,
             status: "COMPLETE",
           },
         });
-        return flippedTotal;
+        return organizerShare;
       });
 
       if (credited > 0) {

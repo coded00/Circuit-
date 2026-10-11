@@ -19,77 +19,64 @@ import { CircuitHero } from "@/components/CircuitHero";
 import { FeaturedCompetitions } from "@/components/FeaturedCompetitions";
 import { ExploreTheCircuit } from "@/components/ExploreTheCircuit";
 import { OpenChallenges } from "@/components/OpenChallenges";
+import { loadDailyChallengeCards } from "@/lib/dailyChallengeFeed";
 import { UpcomingCompetitions } from "@/components/UpcomingCompetitions";
 import { GamerNews } from "@/components/GamerNews";
+import { YourCircuit } from "@/components/YourCircuit";
 import { CommunitiesCard } from "@/components/CommunitiesCard";
 import { getJoinedCommunities } from "@/lib/community";
-import { GAME_ACTIVITY } from "@/lib/circuitActivity";
-import { globalStandings } from "@/lib/standings";
+import { publishedGames } from "@/lib/gameCatalogQueries";
+import { challengeRecords, globalStandings } from "@/lib/standings";
 import { getFriendIds } from "@/lib/friends";
 import { getActiveAnnouncement } from "@/lib/announcements";
 import { openDueTournaments } from "@/lib/tournaments";
+import { getFeaturedTournaments, getUpcomingTournaments } from "@/lib/homeTournaments";
+import { openBattleFilter } from "@/lib/battles";
 import { AnnouncementBanner } from "@/components/AnnouncementBanner";
 import { Panel, PanelEmpty, PanelRows, panelRowClass } from "@/components/ui/Panel";
 import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
 import { buildMetadata } from "@/lib/seo";
 
 export const metadata = buildMetadata({
-  title: "Gaming Tournaments & Esports Competitions in Nigeria",
+  title: "Gaming Tournaments & Esports Competitions",
   description:
-    "Compete in real gaming tournaments and esports competitions on Circuit — register for Call of Duty, eFootball, PUBG Mobile and more, climb the leaderboard, win real prizes, and join a real gaming community.",
+    "Circuit is a competitive gaming platform where players enter tournaments, challenge opponents, climb the rankings, watch live matches and build their name. Register for Call of Duty, eFootball, PUBG Mobile and more.",
   path: "/",
 });
 
 
-const cardSelect = {
-  id: true,
-  name: true,
-  game: true,
-  status: true,
-  format: true,
-  teamSize: true,
-  entryFee: true,
-  participantCap: true,
-  streamUrl: true,
-  registrationOpenAt: true,
-  posterUrl: true,
-  startAt: true,
-  prizeAmount: true,
-  prizeText: true,
-  _count: { select: { registrations: { where: { status: "CONFIRMED" as const } } } },
-} as const;
-
-/**
- * Real prize pools first (what "Featured" is supposed to mean), then
- * top up with other real OPEN/LIVE tournaments by soonest start date —
- * otherwise this row shows just one card whenever the dev/early-traffic
- * data happens to have only one prize-backed tournament, which reads as
- * broken rather than "not much on Circuit yet." Every card is still a
- * real tournament; nothing here is invented.
- */
-async function getFeaturedTournaments(limit: number) {
-  const prized = await prisma.tournament.findMany({
-    where: { status: { in: ["OPEN", "LIVE"] }, prizeAmount: { not: null } },
-    orderBy: { prizeAmount: "desc" },
-    take: limit,
-    select: cardSelect,
-  });
-  if (prized.length >= limit) return prized;
-
-  const filler = await prisma.tournament.findMany({
-    where: { status: { in: ["OPEN", "LIVE"] }, id: { notIn: prized.map((t) => t.id) } },
-    orderBy: { startAt: "asc" },
-    take: limit - prized.length,
-    select: cardSelect,
-  });
-  return [...prized, ...filler];
+/** Shown while the page's data loads: the hero and a row of cards, same footprint as the real thing. */
+function HomeSkeleton() {
+  return (
+    <div className="flex w-full flex-1 flex-col gap-8 px-4 py-6 sm:px-8 sm:py-10" aria-busy="true" aria-label="Loading">
+      <div className="skeleton h-[340px] w-full cut-lg" />
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_var(--right-rail-width)]">
+        <div className="flex flex-col gap-4">
+          <div className="skeleton h-6 w-48" />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-3">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="skeleton h-64 w-full cut-lg" />
+            ))}
+          </div>
+        </div>
+        <div className="flex flex-col gap-6">
+          <div className="skeleton h-40 w-full cut-lg" />
+          <div className="skeleton h-56 w-full cut-lg" />
+        </div>
+      </div>
+    </div>
+  );
 }
 
-export default async function Home({
-  searchParams,
-}: {
-  searchParams: Promise<{ leaderboard?: string }>;
-}) {
+export default function Home({ searchParams }: { searchParams: Promise<{ leaderboard?: string }> }) {
+  return (
+    <Suspense fallback={<HomeSkeleton />}>
+      <HomeContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function HomeContent({ searchParams }: { searchParams: Promise<{ leaderboard?: string }> }) {
   const { leaderboard: leaderboardScope } = await searchParams;
   await openDueTournaments();
   const user = await getCurrentUser();
@@ -108,41 +95,27 @@ export default async function Home({
     openTournamentStats,
     openChallengeCount,
   ] = await Promise.all([
-    getFeaturedTournaments(6),
-    // "Upcoming" includes DRAFT on purpose (unlike Featured, which stays
-    // OPEN/LIVE-only) — DRAFT here just means "hasn't reached its own
-    // registrationOpenAt yet," not "not real." A tournament announced for
-    // next week should read as upcoming today, not disappear until the
-    // exact moment registration opens. The tournament page itself already
-    // gates the actual Register button on the real date regardless of
-    // status, so this can't let anyone register early.
-    prisma.tournament.findMany({
-      where: { status: { in: ["DRAFT", "OPEN", "LIVE"] } },
-      orderBy: { startAt: "asc" },
-      take: 6,
-      select: cardSelect,
-    }),
-    // One query for every open/live tournament's game, then matched against
-    // each GAME_ACTIVITY name in memory — not 5 concurrent `count()` calls
-    // (one per game), which was needlessly competing for connections
-    // against the rest of this same Promise.all on every page load.
-    prisma.tournament
-      .findMany({ where: { status: { in: ["OPEN", "LIVE"] } }, select: { game: true } })
-      .then((tournaments) =>
-        GAME_ACTIVITY.map((g) => ({
-          name: g.name,
-          activeCompetitions: tournaments.filter((t) => t.game.toLowerCase().includes(g.name.toLowerCase())).length,
-        })),
-      ),
+    getFeaturedTournaments(3),
+    getUpcomingTournaments(6),
+    // The published game catalog (Admin → Games), each with its real count
+    // of open/live tournaments — games with something happening first.
+    Promise.all([publishedGames(), prisma.tournament.groupBy({ by: ["game"], where: { status: { in: ["OPEN", "LIVE"] } }, _count: { _all: true } })]).then(
+      ([games, counts]) =>
+        games
+          .map((g) => ({ name: g.name, iconUrl: g.iconUrl, activeCompetitions: counts.find((c) => c.game === g.name)?._count._all ?? 0 }))
+          .sort((a, b) => b.activeCompetitions - a.activeCompetitions || a.name.localeCompare(b.name)),
+    ),
     prisma.battle.findMany({
       where: {
-        status: "OPEN",
-        OR: [{ visibility: "OPEN" }, ...(friendIds.length ? [{ visibility: "FRIENDS" as const, creatorId: { in: friendIds } }] : [])],
+        AND: [
+          openBattleFilter(),
+          { OR: [{ visibility: "OPEN" }, ...(friendIds.length ? [{ visibility: "FRIENDS" as const, creatorId: { in: friendIds } }] : [])] },
+        ],
       },
       orderBy: { createdAt: "desc" },
       take: 6,
       include: {
-        creator: { select: { displayName: true, avatarUrl: true } },
+        creator: { select: { displayName: true, handle: true, avatarUrl: true } },
       },
     }),
     globalStandings(),
@@ -152,12 +125,19 @@ export default async function Home({
     }),
     getActiveAnnouncement(),
     user ? getJoinedCommunities(user.id) : Promise.resolve([]),
-    // Hero's live numbers — real counts/sums, same visibility rules as the lists.
-    prisma.tournament.aggregate({ where: { status: { in: ["OPEN", "LIVE"] } }, _count: { _all: true }, _sum: { prizeAmount: true } }),
+    // Hero's live numbers. "Open tournaments" = registration open (the same
+    // number /compete calls "open for registration"); prize money is the
+    // pool across everything open or live.
+    Promise.all([
+      prisma.tournament.count({ where: { status: "OPEN" } }),
+      prisma.tournament.aggregate({ where: { status: { in: ["OPEN", "LIVE"] } }, _sum: { prizeAmount: true } }),
+    ]),
     prisma.battle.count({
       where: {
-        status: "OPEN",
-        OR: [{ visibility: "OPEN" }, ...(friendIds.length ? [{ visibility: "FRIENDS" as const, creatorId: { in: friendIds } }] : [])],
+        AND: [
+          openBattleFilter(),
+          { OR: [{ visibility: "OPEN" }, ...(friendIds.length ? [{ visibility: "FRIENDS" as const, creatorId: { in: friendIds } }] : [])] },
+        ],
       },
     }),
   ]);
@@ -166,31 +146,58 @@ export default async function Home({
     ? leaderboard.filter((s) => s.userId === user!.id || friendIds.includes(s.userId))
     : leaderboard;
   const topLeaderboard = scopedLeaderboard.slice(0, 5);
-  const openChallengesPreview = openBattles.slice(0, 4);
+  // One row for both kinds of challenge: up to two Daily Challenges first, then Battles to fill three slots.
+  // Open challenges are the ones a player can enter or play now; the ones announced but not yet open go under Upcoming.
+  const [dailyPreview, dailyUpcoming] = await Promise.all([
+    loadDailyChallengeCards({ userId: user?.id, limit: 2, statuses: ["OPEN", "LIVE"] }),
+    loadDailyChallengeCards({ userId: user?.id, limit: 6, statuses: ["SCHEDULED"] }),
+  ]);
+  const openChallengesPreview = openBattles.slice(0, Math.max(1, 3 - dailyPreview.cards.length));
+  const challengeRecordsByKey = await challengeRecords(openChallengesPreview.map((b) => b.game));
 
   return (
-    <div className="flex w-full flex-1 flex-col gap-8 px-4 py-6 sm:p-8">
+    <div className="flex w-full flex-1 flex-col gap-8 px-4 py-6 sm:px-8 sm:py-10">
+      <h1 className="sr-only">Gaming tournaments and esports competitions</h1>
       {activeAnnouncement && <AnnouncementBanner title={activeAnnouncement.title} body={activeAnnouncement.body} />}
 
       <CircuitHero
         tournaments={featuredTournaments}
         banners={homepageBanners}
         stats={{
-          openTournaments: openTournamentStats._count._all,
+          openTournaments: openTournamentStats[0],
           openChallenges: openChallengeCount,
-          prizeMoney: openTournamentStats._sum.prizeAmount ?? 0,
+          prizeMoney: openTournamentStats[1]._sum.prizeAmount ?? 0,
         }}
       />
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_var(--right-rail-width)]">
         <div className="flex min-w-0 flex-col gap-8">
+          {featuredTournaments.length === 0 && upcomingTournaments.length === 0 && dailyUpcoming.cards.length === 0 && (
+            <div className="card state-block">
+              <h2 className="state-title">No battles on the board. Not for long.</h2>
+              <p className="state-description">Nothing is open or announced right now. Start one, or challenge a player to a 1v1 while you wait.</p>
+              <div className="flex flex-wrap justify-center gap-2">
+                <Link href="/tournaments/new" className="btn-primary">
+                  Create a tournament
+                </Link>
+                <Link href="/battles" className="btn-secondary">
+                  Challenge a player
+                </Link>
+              </div>
+            </div>
+          )}
+
           <FeaturedCompetitions tournaments={featuredTournaments} />
 
           <ExploreTheCircuit games={gameCounts} />
 
-          <OpenChallenges battles={openChallengesPreview} viewerId={user?.id} />
+          <div className="cv-auto">
+            <OpenChallenges battles={openChallengesPreview} records={challengeRecordsByKey} total={openChallengeCount} viewerId={user?.id} daily={dailyPreview.cards} dailyTotal={dailyPreview.total} />
+          </div>
 
-          <UpcomingCompetitions tournaments={upcomingTournaments} />
+          <div className="cv-auto">
+            <UpcomingCompetitions tournaments={upcomingTournaments} daily={dailyUpcoming.cards} />
+          </div>
         </div>
 
         <div className="flex min-w-0 flex-col gap-6">
@@ -200,7 +207,7 @@ export default async function Home({
             <Panel
               title="Leaderboard"
               action={
-                <Link href="/leaderboard" className="text-xs font-medium text-accent-blue hover:underline">
+                <Link href="/leaderboard" className="-my-2.5 py-2.5 pl-3 text-xs font-medium text-accent-blue hover:underline">
                   View all
                 </Link>
               }
@@ -208,19 +215,19 @@ export default async function Home({
               <div className="flex gap-1.5 border-t border-border px-5 py-3">
                 <Link
                   href="/"
-                  className={`rounded-full px-3 py-1 text-xs font-medium transition ${!friendLeaderboardActive ? "bg-foreground text-background" : "bg-surface-elevated text-muted hover:text-foreground"}`}
+                  className={`cut-xs px-3 py-1 text-xs font-medium transition ${!friendLeaderboardActive ? "bg-foreground text-background" : "bg-surface-elevated text-muted hover:text-foreground"}`}
                 >
                   Global
                 </Link>
                 {user ? (
                   <Link
                     href="/?leaderboard=friends"
-                    className={`rounded-full px-3 py-1 text-xs font-medium transition ${friendLeaderboardActive ? "bg-foreground text-background" : "bg-surface-elevated text-muted hover:text-foreground"}`}
+                    className={`cut-xs px-3 py-1 text-xs font-medium transition ${friendLeaderboardActive ? "bg-foreground text-background" : "bg-surface-elevated text-muted hover:text-foreground"}`}
                   >
                     Friends
                   </Link>
                 ) : (
-                  <span title="Log in to see your friends' ranking" className="cursor-not-allowed rounded-full bg-surface-elevated px-3 py-1 text-xs font-medium text-muted/50">
+                  <span title="Log in to see your friends' ranking" className="cursor-not-allowed cut-xs bg-surface-elevated px-3 py-1 text-xs font-medium text-muted/50">
                     Friends
                   </span>
                 )}
@@ -236,7 +243,9 @@ export default async function Home({
                       >
                         {i + 1}
                       </span>
-                      <PlayerAvatar person={s} size="sm" className={i === 0 ? "ring-2 ring-gold" : ""} />
+                      <span className={i === 0 ? "cut-avatar bg-gold p-[2px]" : ""}>
+                        <PlayerAvatar person={s} size="sm" />
+                      </span>
                       <span className="min-w-0 flex-1 truncate text-sm font-medium">{s.displayName}</span>
                       <span className="text-stat shrink-0 text-xs text-muted">
                         <span className="text-foreground">{s.wins}</span>W
@@ -255,7 +264,7 @@ export default async function Home({
                 <div className="flex flex-col gap-3">
                   {[0, 1, 2].map((i) => (
                     <div key={i} className="flex items-start gap-3">
-                      <div className="skeleton h-14 w-14 shrink-0 rounded-[8px]" />
+                      <div className="skeleton h-14 w-14 shrink-0 cut-avatar" />
                       <div className="flex flex-1 flex-col gap-1.5 pt-1">
                         <div className="skeleton h-3 w-20" />
                         <div className="skeleton h-4 w-full" />
@@ -269,6 +278,8 @@ export default async function Home({
           >
             <GamerNews />
           </Suspense>
+
+          {user && <YourCircuit user={user} />}
         </div>
       </div>
     </div>

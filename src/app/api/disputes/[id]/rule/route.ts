@@ -3,7 +3,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, suspendedResponse } from "@/lib/session";
 import { MatchError, ruleDispute } from "@/lib/matches";
 
 const STATUS_BY_CODE: Record<MatchError["code"], number> = {
@@ -19,6 +19,7 @@ const STATUS_BY_CODE: Record<MatchError["code"], number> = {
   WINDOW_EXPIRED: 409,
   VOID_UNSUPPORTED: 409,
   TOURNAMENT_CANCELLED: 409,
+  NOTHING_TO_CONFIRM: 409,
 };
 
 export async function POST(
@@ -29,6 +30,8 @@ export async function POST(
   if (!user) {
     return NextResponse.json({ error: "You must be signed in." }, { status: 401 });
   }
+  const suspended = suspendedResponse(user);
+  if (suspended) return suspended;
 
   const { id } = await params;
   const body = await request.json().catch(() => null);

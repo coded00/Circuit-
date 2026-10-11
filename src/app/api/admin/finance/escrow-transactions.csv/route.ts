@@ -9,10 +9,7 @@ import { NextResponse } from "next/server";
 import type { EscrowStatus, EscrowType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireStaff } from "@/lib/session";
-
-function csvEscape(value: string): string {
-  return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
-}
+import { csvEscape } from "@/lib/csv";
 
 function escrowTypeLabel(type: EscrowType): string {
   switch (type) {
@@ -30,6 +27,18 @@ function escrowTypeLabel(type: EscrowType): string {
       return "Platform fee";
     case "ORGANIZER_REVENUE":
       return "Organizer revenue";
+    case "CHALLENGE_ENTRY":
+      return "Daily challenge entry";
+    case "CHALLENGE_PLATFORM_FEE":
+      return "Daily challenge platform fee";
+    case "CHALLENGE_PRIZE":
+      return "Daily challenge prize";
+    case "CHALLENGE_REFUND":
+      return "Daily challenge refund";
+    case "CHALLENGE_PLATFORM_FEE_REVERSAL":
+      return "Daily challenge fee returned";
+    case "CHALLENGE_HOUSE_REVENUE":
+      return "Daily challenge house revenue";
   }
 }
 

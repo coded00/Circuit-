@@ -13,9 +13,11 @@
  *   Evidence, Activity.
  */
 
+import { InfoTip } from "@/components/InfoTip";
 import Link from "next/link";
 import { ArrowLeft, Check, Flag, Share2, Timer, Trophy, Wallet } from "lucide-react";
 import { GameArtTile } from "@/components/GameArtTile";
+import { ArenaBackdrop } from "@/components/ArenaBackdrop";
 import { StatusPill, type StatusTone } from "@/components/StatusPill";
 import { CountdownTimer } from "@/components/CountdownTimer";
 import { Spinner } from "@/components/Spinner";
@@ -25,6 +27,9 @@ import { CopyCode } from "@/components/ui/CopyCode";
 import ResultForm from "./ResultForm";
 import RulingForm from "./RulingForm";
 import EnterMatchButton from "./EnterMatchButton";
+import ConfirmOrDispute from "./ConfirmOrDispute";
+import { StreamLink } from "@/components/streams/StreamLink";
+import type { StreamPlatform } from "@prisma/client";
 
 export type MatchPlayer = {
   id: string;
@@ -36,6 +41,8 @@ export type MatchPlayer = {
   ready: boolean;
   reported: boolean;
   proofUrl: string | null;
+  /** The player's own stream for this tournament, if they added one. */
+  stream: { platform: StreamPlatform | null; platformName: string | null; url: string } | null;
 };
 
 export type MatchViewData = {
@@ -54,6 +61,10 @@ export type MatchViewData = {
   playerA: MatchPlayer;
   playerB: MatchPlayer;
   winnerId: string | null;
+  /** The match finished level (a league draw). */
+  isDraw: boolean;
+  /** A league fixture where a draw can be reported or ruled. */
+  drawAllowed: boolean;
   /** The agreed score once decided (from the accepted report). */
   finalScore: string | null;
   viewer: {
@@ -64,7 +75,14 @@ export type MatchViewData = {
     canShareWin: boolean;
   };
   reportWindowExpiresAt: Date | null;
-  dispute: { id: string } | null;
+  /** Where a dispute stands: with the organizer (until a deadline) or with Circuit staff. */
+  dispute: { id: string; status: string; organizerDeadline: Date | null } | null;
+  /** The first player's claimed result, shown to the second so they can confirm or dispute it. */
+  opponentReport: { claimText: string; score: string; proofUrl: string | null } | null;
+  /** Each player's report, in words — shown once a match is under review. */
+  reports: { name: string; claimText: string; score: string; confirmed: boolean }[];
+  /** League fixtures: when this matchday's game is due. */
+  playBy: Date | null;
   ruling: { endpoint: string } | null;
   voidUnsupportedReason?: string;
   timeline: { at: Date; label: string }[];
@@ -108,11 +126,11 @@ function PlayerSide({
       : { label: "Not ready", className: "bg-surface-elevated text-muted" };
 
   return (
-    <div className={`flex min-w-0 flex-col items-center gap-3 text-center transition-opacity ${isLoser ? "opacity-60" : ""}`}>
+    <div className={`flex min-w-0 flex-col items-center gap-3 text-center transition-opacity ${side === "A" ? "vs-left" : "vs-right"} ${isLoser ? "opacity-60" : ""}`}>
       <div className="relative">
         <div
-          className={`rounded-full p-[3px] ring-2 ${
-            isWinner ? "ring-gold" : isYou ? "ring-accent-volt" : "ring-border-strong"
+          className={`cut-avatar p-[3px] ${
+            isWinner ? "bg-gold" : isYou ? "bg-accent-volt" : "bg-border-strong"
           }`}
         >
           <PlayerAvatar person={player} size="xl" />
@@ -133,7 +151,7 @@ function PlayerSide({
         </Link>
         <span className="flex items-center justify-center gap-1.5 text-xs text-muted">
           <span className="truncate">@{player.handle}</span>
-          {isYou && <span className="rounded-full bg-accent-volt px-1.5 py-px text-[10px] font-bold text-accent-volt-foreground">YOU</span>}
+          {isYou && <span className="cut-xs bg-accent-volt px-1.5 py-px text-[11px] font-bold text-accent-volt-foreground">YOU</span>}
           {data.viewer.signedIn && !isYou && (
             <Link
               href={`/players/${player.handle}/report`}
@@ -158,10 +176,11 @@ function PlayerSide({
 
 function HeadToHead({ data }: { data: MatchViewData }) {
   return (
-    <section className="overflow-hidden rounded-[var(--radius-hero)] border border-border bg-surface">
+    <section className={`relative isolate overflow-hidden cut-lg border bg-surface ${data.statusPill.pulse ? "live-glow border-live/60" : "border-border"}`}>
+      {data.game && <ArenaBackdrop game={data.game} art={0.36} />}
       <div className="flex items-center justify-between gap-3 px-5 pt-5 sm:px-7">
         <div className="flex min-w-0 items-center gap-2.5">
-          {data.game && <GameArtTile game={data.game} className="h-8 w-8 shrink-0 rounded-[8px]" hideLabel imgWidth={80} />}
+          {data.game && <GameArtTile thumb game={data.game} className="h-8 w-8 shrink-0 cut-avatar" hideLabel imgWidth={80} />}
           <div className="flex min-w-0 flex-col">
             <span className="truncate text-sm font-semibold">{data.tournament?.name ?? data.game ?? "Match"}</span>
             <span className="truncate text-xs text-muted">
@@ -171,16 +190,31 @@ function HeadToHead({ data }: { data: MatchViewData }) {
           </div>
         </div>
         {data.stakeAmount > 0 && (
-          <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-gold/15 px-3 py-1 text-xs font-semibold text-gold">
+          <span className="flex shrink-0 items-center gap-1.5 cut-xs bg-gold/15 px-3 py-1 text-xs font-semibold text-gold">
             <Wallet size={12} />
             {formatNaira(data.stakeAmount * 2)} pot
           </span>
         )}
       </div>
 
+      {(data.playerA.stream || data.playerB.stream) && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 pt-4 sm:px-7">
+          <span className="text-xs text-muted">Watch live</span>
+          {[data.playerA, data.playerB].map(
+            (pl) =>
+              pl.stream && (
+                <span key={pl.id} className="flex items-center gap-1.5 text-xs">
+                  <span className="text-muted">{pl.displayName}</span>
+                  <StreamLink platform={pl.stream.platform} platformName={pl.stream.platformName} url={pl.stream.url} />
+                </span>
+              ),
+          )}
+        </div>
+      )}
+
       <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-2 px-3 py-8 sm:gap-6 sm:px-7">
         <PlayerSide player={data.playerA} data={data} side="A" />
-        <div className="flex flex-col items-center gap-1 pt-6 sm:pt-8">
+        <div className="vs-mid flex flex-col items-center gap-1 pt-6 sm:pt-8">
           {data.finalScore ? (
             <>
               <span className="text-stat text-3xl leading-none sm:text-4xl">{data.finalScore}</span>
@@ -195,9 +229,18 @@ function HeadToHead({ data }: { data: MatchViewData }) {
 
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-border px-5 py-4 sm:px-7">
         <div className="flex flex-col gap-0.5">
-          <span className="text-eyebrow text-muted">Match code</span>
+          <span className="text-eyebrow flex items-center gap-1.5 text-muted">
+            Match code
+            <InfoTip text="A code made just for this match. Put it in your custom room name or chat, then make sure it shows in your result screenshot. It proves the screenshot is from this game and not an old one." />
+          </span>
           <CopyCode code={data.code} label="Copy match code" />
         </div>
+        {data.playBy && (
+          <div className="flex flex-col gap-0.5">
+            <span className="text-eyebrow text-muted">Play by</span>
+            <span className="text-stat text-sm">{formatTimestamp(data.playBy)}</span>
+          </div>
+        )}
         <div className="flex flex-col items-end gap-0.5 text-right">
           <span className="text-eyebrow text-muted">{data.stakeAmount > 0 ? "Stake each" : "Entry"}</span>
           <span className="text-stat text-lg">{data.stakeAmount > 0 ? formatNaira(data.stakeAmount) : "Free"}</span>
@@ -266,9 +309,19 @@ function NextStep({ data }: { data: MatchViewData }) {
   // --- Finished ---
   if (data.status === "COMPLETE") {
     const winner = data.winnerId === playerA.id ? playerA : data.winnerId === playerB.id ? playerB : null;
+    if (me && data.isDraw) {
+      return (
+        <section className="card flex flex-col gap-1">
+          <span className="font-display text-xl font-bold tracking-tight uppercase">Draw</span>
+          <span className="text-sm text-muted">
+            You and {opponent.displayName} finished level{data.finalScore ? ` (${data.finalScore})` : ""}. A draw earns a point in the table.
+          </span>
+        </section>
+      );
+    }
     if (me && winner?.id === me.id) {
       return (
-        <section className="celebrate-fade flex flex-col gap-4 rounded-[var(--radius-lg)] border border-gold/30 bg-gold/10 p-5 sm:flex-row sm:items-center sm:justify-between">
+        <section className="celebrate-fade flex flex-col gap-4 cut-lg border border-gold/30 bg-gold/10 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <Trophy size={28} className="trophy-pop shrink-0 text-gold" aria-hidden />
             <div className="flex flex-col">
@@ -302,7 +355,7 @@ function NextStep({ data }: { data: MatchViewData }) {
     }
     return (
       <section className="card text-sm text-muted">
-        {winner ? `${winner.displayName} won this match.` : "This match was voided — neither side takes the win."}
+        {winner ? `${winner.displayName} won this match.` : data.isDraw ? "This match ended in a draw." : "This match was voided. Neither side takes the win."}
       </section>
     );
   }
@@ -315,6 +368,33 @@ function NextStep({ data }: { data: MatchViewData }) {
           <p className="text-sm text-muted">
             The two reports didn&apos;t match, so this result is being reviewed. You&apos;ll get a notification when it&apos;s decided.
           </p>
+          {data.reports.length > 0 && (
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+              {data.reports.map((r) => (
+                <div key={r.name} className="flex flex-col gap-0.5 cut-sm [--cut-line:var(--border)] border border-border bg-surface-elevated p-3.5">
+                  <span className="text-eyebrow text-muted">{r.name} reported</span>
+                  <span className="text-sm font-semibold">{r.claimText}</span>
+                  <span className="text-stat text-sm">{r.score}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {data.dispute && (
+            <p className="flex flex-wrap items-center gap-x-1.5 text-sm">
+              <span className="font-semibold">{data.dispute.status === "ESCALATED" ? "With Circuit staff." : "With the organizer."}</span>
+              <span className="text-muted">
+                {data.dispute.status === "ESCALATED" ? "Their ruling is final." : "If they don't rule in time it goes to Circuit staff."}
+              </span>
+              {data.dispute.status === "ORGANIZER_REVIEW" && data.dispute.organizerDeadline && (
+                <span className="flex items-center gap-1.5 text-muted">
+                  <Timer size={14} aria-hidden /> Escalates in{" "}
+                  <span className="text-stat text-foreground">
+                    <CountdownTimer target={data.dispute.organizerDeadline.toISOString()} zeroLabel="a moment" />
+                  </span>
+                </span>
+              )}
+            </p>
+          )}
           {data.ruling && data.dispute && (
             <RulingForm
               bare
@@ -323,6 +403,7 @@ function NextStep({ data }: { data: MatchViewData }) {
               playerA={playerA}
               playerB={playerB}
               voidUnsupportedReason={data.voidUnsupportedReason}
+              drawAllowed={data.drawAllowed}
             />
           )}
         </PanelBody>
@@ -374,7 +455,7 @@ function NextStep({ data }: { data: MatchViewData }) {
       <Panel title="Result reported">
         <PanelBody className="flex flex-col gap-2">
           <p className="text-sm text-muted">
-            Waiting for {opponent.displayName} to report. If they don&apos;t, your result is accepted automatically.
+            Waiting for {opponent.displayName} to confirm or dispute it. If they don&apos;t respond, your result is accepted automatically.
           </p>
           {data.reportWindowExpiresAt && (
             <p className="flex items-center gap-1.5 text-sm">
@@ -393,7 +474,7 @@ function NextStep({ data }: { data: MatchViewData }) {
   // --- Play + report ---
   if (reportingOpen) {
     return (
-      <Panel title={data.status === "NEEDS_RESULT" ? "Report your result" : "Match live"}>
+      <Panel title={data.opponentReport ? "Confirm the result" : data.status === "NEEDS_RESULT" ? "Report your result" : "Match live"}>
         <PanelBody className="flex flex-col gap-5">
           {data.status !== "NEEDS_RESULT" && (
             <ol className="flex flex-col gap-2 text-sm text-muted">
@@ -409,7 +490,19 @@ function NextStep({ data }: { data: MatchViewData }) {
               </li>
             </ol>
           )}
-          <ResultForm matchId={data.id} matchCode={data.code} playerA={playerA} playerB={playerB} />
+          {data.opponentReport ? (
+            <ConfirmOrDispute
+              matchId={data.id}
+              matchCode={data.code}
+              opponentName={opponent.displayName}
+              claim={data.opponentReport}
+              playerA={playerA}
+              playerB={playerB}
+              drawAllowed={data.drawAllowed}
+            />
+          ) : (
+            <ResultForm matchId={data.id} matchCode={data.code} playerA={playerA} playerB={playerB} drawAllowed={data.drawAllowed} />
+          )}
         </PanelBody>
       </Panel>
     );

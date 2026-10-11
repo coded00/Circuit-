@@ -8,8 +8,9 @@
  */
 
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { PageHeader, Panel } from "@/components/admin/ui";
+import { loadOrganizerCatalog } from "@/lib/competitionConfig";
 import EditForm from "@/app/tournaments/[id]/edit/EditForm";
 
 export default async function AdminCompetitionEditPage({ params }: { params: Promise<{ id: string }> }) {
@@ -21,26 +22,33 @@ export default async function AdminCompetitionEditPage({ params }: { params: Pro
   const hasPaidRegistration =
     tournament.entryFee > 0 &&
     (await prisma.registration.count({ where: { tournamentId: id, status: "CONFIRMED" } })) > 0;
-  const [games, community] = await Promise.all([
-    prisma.game.findMany({ where: { enabled: true }, orderBy: { name: "asc" } }),
+  const [catalog, activeRegistrations, community] = await Promise.all([
+    loadOrganizerCatalog(),
+    prisma.registration.count({ where: { tournamentId: id, status: { in: ["PENDING_PAYMENT", "CONFIRMED"] } } }),
     prisma.community.findUnique({ where: { tournamentId: id }, select: { enabled: true } }),
   ]);
 
   return (
-    <div className="flex flex-1 flex-col gap-6">
-      <Link href={`/admin/competitions/${id}`} className="w-fit text-sm font-medium text-muted transition hover:text-foreground">
-        ← Back
-      </Link>
-      <h1 className="font-display text-2xl font-bold tracking-tight">Edit {tournament.name}</h1>
-      <div className="card max-w-2xl">
+    <>
+      <PageHeader
+        back={{ href: `/admin/competitions/${id}`, label: tournament.name }}
+        title="Edit competition"
+        description={
+          hasPaidRegistration
+            ? "Players have paid. Entry fee and prize are locked. Everything else can still change until registration closes."
+            : "Changes apply immediately. The game and format lock once anyone registers."
+        }
+      />
+      <Panel className="max-w-2xl">
         <EditForm
           tournament={tournament}
           moneyFieldsLocked={hasPaidRegistration}
           redirectTo={`/admin/competitions/${id}`}
-          games={games}
+          catalog={catalog}
+          competitionLocked={activeRegistrations > 0}
           communityEnabled={community?.enabled ?? false}
         />
-      </div>
-    </div>
+      </Panel>
+    </>
   );
 }

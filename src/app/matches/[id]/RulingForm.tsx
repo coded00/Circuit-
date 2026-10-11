@@ -12,6 +12,7 @@ export default function RulingForm({
   playerA,
   playerB,
   voidUnsupportedReason,
+  drawAllowed = false,
   bare = false,
 }: {
   disputeId: string;
@@ -25,6 +26,8 @@ export default function RulingForm({
    *  bracket match) — shown disabled with this explanation rather than
    *  omitted, so the ruler sees the option exists and why it's blocked. */
   voidUnsupportedReason?: string;
+  /** League fixtures that can end level. */
+  drawAllowed?: boolean;
 }) {
   const router = useRouter();
   const [winnerId, setWinnerId] = useState("");
@@ -74,6 +77,16 @@ export default function RulingForm({
               title={`${player.displayName} wins`}
             />
           ))}
+          {drawAllowed && (
+            <OptionCard
+              selected={!voidMatch && winnerId === "DRAW"}
+              onSelect={() => {
+                setWinnerId("DRAW");
+                setVoidMatch(false);
+              }}
+              title="Draw"
+            />
+          )}
         </div>
         {voidUnsupportedReason ? (
           <OptionCard
@@ -89,7 +102,7 @@ export default function RulingForm({
             selected={voidMatch}
             onSelect={() => setVoidMatch(true)}
             title="Void this match"
-            description="No winner — Battle only, nothing to return"
+            description="No winner. Battle only, nothing to return"
           />
         )}
       </div>

@@ -24,11 +24,19 @@ import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
-import { getDefaultPaymentProvider, toCheckoutEmail } from "@/lib/payments";
+import { getDefaultPaymentProvider, initializeChargeWithFallback, toCheckoutEmail } from "@/lib/payments";
 import { maybeGenerateBracketOnCapFill } from "@/lib/matches";
 import { AgeGateError, assertAgeGate } from "@/lib/age-gate";
 import { computePlatformFee } from "@/lib/platformFee";
 import { trackEvent } from "@/lib/analytics";
+import { notify } from "@/lib/notifications";
+import { claimSlot, RegistrationFullError } from "@/lib/registrationCapacity";
+import { assertInGameNamesFree, InGameNameTakenError, rememberInGameName, requestedInGameNames } from "@/lib/inGameNames";
+import { notifyRoster, saveRoster, TeamEntryError, validateTeamEntry, type ValidRoster } from "@/lib/teamEntries";
+import { AbandonedError, withKeyedLock } from "@/lib/keyedLock";
+import { emailVerificationRequired } from "@/lib/emailGate";
+import { modeAllowsPlayerStreams, parseStream } from "@/lib/streams";
+import type { StreamPlatform } from "@prisma/client";
 
 class InsufficientWalletBalanceError extends Error {}
 
@@ -73,11 +81,10 @@ export async function POST(
     return NextResponse.json({ error: "Registration is closed." }, { status: 409 });
   }
 
-  // Known gap, accepted for V1: this count-then-write isn't inside a
-  // serializable transaction, so two concurrent requests landing on the
-  // last open slot could both pass this check. Not worth a row lock at
-  // V1's expected concurrency (docs/circuit-stack.md's minimal-infra
-  // stance) — revisit if a real tournament ever actually oversells its cap.
+  // Fast-path check only. The real one is claimSlot() inside each write
+  // below (src/lib/registrationCapacity.ts), which locks the tournament so
+  // two requests for the last slot can't both get it. A paid checkout is
+  // checked again when its payment confirms (confirmEntryFeePayment).
   const confirmedCount = await prisma.registration.count({
     where: { tournamentId, status: "CONFIRMED" },
   });
@@ -98,15 +105,71 @@ export async function POST(
     );
   }
 
+  // TEAM tournaments: the registering user is the captain entering a
+  // team, with a roster (see src/lib/teamEntries.ts). The captain's own
+  // registration is the entry, so every path below stays the same.
+  let roster: ValidRoster | null = null;
+  if (tournament.entryType === "TEAM") {
+    try {
+      roster = await validateTeamEntry(tournament, user.id, body ?? {});
+    } catch (err) {
+      if (err instanceof TeamEntryError) return NextResponse.json({ error: err.message }, { status: err.status });
+      throw err;
+    }
+  }
+  const teamData = roster ? { teamId: roster.teamId, teamName: roster.teamName } : {};
+
+  // A player's own stream (optional), only for tournaments that take them.
+  let streamData: { streamPlatform: StreamPlatform; streamPlatformName: string | null; streamUrl: string } | Record<string, never> = {};
+  if (body?.stream && typeof body.stream === "object") {
+    if (!modeAllowsPlayerStreams(tournament.streamMode)) {
+      return NextResponse.json({ error: "This tournament doesn't take player streams." }, { status: 400 });
+    }
+    const parsedStream = parseStream(body.stream);
+    if (!parsedStream.ok) return NextResponse.json({ error: parsedStream.error, field: "stream" }, { status: 400 });
+    if (parsedStream.stream) streamData = { streamPlatform: parsedStream.stream.platform, streamPlatformName: parsedStream.stream.platformName, streamUrl: parsedStream.stream.url };
+  }
+
+  // In-game names are unique per tournament. This early check gives a clear
+  // error; the locked one inside each transaction below is the real guard.
+  const requestedNames = requestedInGameNames(inGameId, user.id, roster);
+  try {
+    await assertInGameNamesFree(prisma, tournamentId, user.id, requestedNames);
+  } catch (err) {
+    if (err instanceof InGameNameTakenError) return NextResponse.json({ error: err.message }, { status: 409 });
+    throw err;
+  }
+  const rememberName = body?.saveInGameName === true;
+
   if (tournament.entryFee === 0) {
-    const registration = existing
-      ? await prisma.registration.update({
-          where: { id: existing.id },
-          data: { inGameId, status: "CONFIRMED" },
-        })
-      : await prisma.registration.create({
-          data: { tournamentId, userId: user.id, inGameId, status: "CONFIRMED" },
-        });
+    let registration;
+    try {
+      registration = await withKeyedLock(`tournament:${tournamentId}`, () => prisma.$transaction(async (tx) => {
+        await claimSlot(tx, tournamentId, tournament.participantCap);
+        await assertInGameNamesFree(tx, tournamentId, user.id, requestedNames);
+        return existing
+          ? tx.registration.update({
+              where: { id: existing.id },
+              data: { inGameId, status: "CONFIRMED", ...teamData, ...streamData },
+            })
+          : tx.registration.create({
+              data: { tournamentId, userId: user.id, inGameId, status: "CONFIRMED", ...teamData, ...streamData },
+            });
+      }), request.signal);
+    } catch (err) {
+      if (err instanceof AbandonedError) return new NextResponse(null, { status: 499 });
+      if (err instanceof RegistrationFullError) return NextResponse.json({ error: "Registration is full." }, { status: 409 });
+      if (err instanceof InGameNameTakenError) return NextResponse.json({ error: err.message }, { status: 409 });
+      throw err;
+    }
+    if (rememberName) await rememberInGameName(user.id, tournament.gameId, inGameId);
+    if (roster) {
+      await saveRoster(registration.id, roster.members);
+      await notifyRoster(registration.id);
+    }
+    // Free entries confirm right here, so this is where they hear about it
+    // (card payments are told from confirmEntryFeePayment instead).
+    await notify(user.id, "REGISTRATION_CONFIRMED", { tournamentId, tournamentName: tournament.name }).catch(() => undefined);
     await maybeGenerateBracketOnCapFill(tournamentId); // BRK-1's cap-fill path
     trackEvent("tournament_joined", { userId: user.id, tournamentId, game: tournament.game, amountMinor: 0 });
     return NextResponse.json(
@@ -117,6 +180,8 @@ export async function POST(
 
   // ACC-3: paid registration is a cash-touching action — age-gated, unlike
   // free registration or plain browsing (TRU-5).
+  const unverified = emailVerificationRequired(user);
+  if (unverified) return unverified;
   try {
     assertAgeGate(user.dateOfBirth);
   } catch (err) {
@@ -143,7 +208,9 @@ export async function POST(
     const feeAmount = computePlatformFee(tournament.entryFee, platformSetting?.platformFeeBps ?? 0);
 
     try {
-      const registration = await prisma.$transaction(async (tx) => {
+      const registration = await withKeyedLock(`tournament:${tournamentId}`, () => prisma.$transaction(async (tx) => {
+        await claimSlot(tx, tournamentId, tournament.participantCap);
+        await assertInGameNamesFree(tx, tournamentId, user.id, requestedNames);
         // Atomic guard: a single conditional UPDATE, not a read-then-write —
         // two concurrent registration attempts can't both pass this check
         // and overdraw the balance.
@@ -156,48 +223,27 @@ export async function POST(
         const reg = existing
           ? await tx.registration.update({
               where: { id: existing.id },
-              data: { inGameId, status: "CONFIRMED", paymentRef: reference },
+              data: { inGameId, status: "CONFIRMED", paymentRef: reference, ...teamData, ...streamData },
             })
           : await tx.registration.create({
-              data: { tournamentId, userId: user.id, inGameId, status: "CONFIRMED", paymentRef: reference },
+              data: { tournamentId, userId: user.id, inGameId, status: "CONFIRMED", paymentRef: reference, ...teamData, ...streamData },
             });
 
-        await tx.escrowTransaction.create({
-          data: {
-            tournamentId,
-            registrationId: reg.id,
-            type: "ENTRY_FEE",
-            // `provider` here reflects Circuit's configured provider, not
-            // that it was actually charged for this transaction — see
-            // WalletTransactionType.ENTRY_FEE_DEBIT's own schema comment.
-            provider: provider.name,
-            amount: tournament.entryFee,
-            providerRef: reference,
-            status: "COMPLETE",
-          },
-        });
-        // Same fee logic as confirmEntryFeePayment's own comment — carved
-        // out of the entry fee that already arrived, not charged on top.
-        if (feeAmount > 0) {
-          await tx.escrowTransaction.create({
-            data: { tournamentId, registrationId: reg.id, type: "PLATFORM_FEE", amount: feeAmount, status: "COMPLETE" },
-          });
-        }
-        // The organizer's own cut — same PENDING-until-settled shape as
-        // confirmEntryFeePayment's own ORGANIZER_REVENUE row.
+        // The fee rows go in as one statement: this transaction holds the tournament lock.
+        // The provider on the entry row reflects Circuit's configured provider, not that it
+        // was charged for this transaction (see WalletTransactionType.ENTRY_FEE_DEBIT).
+        // The platform fee is carved out of the entry fee that already arrived, and the
+        // organizer's cut stays PENDING until settled, same as confirmEntryFeePayment.
         const organizerRevenueAmount = tournament.entryFee - feeAmount;
-        if (organizerRevenueAmount > 0) {
-          await tx.escrowTransaction.create({
-            data: {
-              tournamentId,
-              registrationId: reg.id,
-              userId: tournament.organizerId,
-              type: "ORGANIZER_REVENUE",
-              amount: organizerRevenueAmount,
-              status: "PENDING",
-            },
-          });
-        }
+        await tx.escrowTransaction.createMany({
+          data: [
+            { tournamentId, registrationId: reg.id, type: "ENTRY_FEE", provider: provider.name, amount: tournament.entryFee, providerRef: reference, status: "COMPLETE" },
+            ...(feeAmount > 0 ? [{ tournamentId, registrationId: reg.id, type: "PLATFORM_FEE" as const, amount: feeAmount, status: "COMPLETE" as const }] : []),
+            ...(organizerRevenueAmount > 0
+              ? [{ tournamentId, registrationId: reg.id, userId: tournament.organizerId, type: "ORGANIZER_REVENUE" as const, amount: organizerRevenueAmount, status: "PENDING" as const }]
+              : []),
+          ],
+        });
         await tx.walletTransaction.create({
           data: {
             userId: user.id,
@@ -209,15 +255,24 @@ export async function POST(
         });
 
         return reg;
-      });
+      }), request.signal);
 
+      if (rememberName) await rememberInGameName(user.id, tournament.gameId, inGameId);
+      if (roster) {
+        await saveRoster(registration.id, roster.members);
+        await notifyRoster(registration.id);
+      }
+      await notify(user.id, "REGISTRATION_CONFIRMED", { tournamentId, tournamentName: tournament.name }).catch(() => undefined);
       await maybeGenerateBracketOnCapFill(tournamentId); // BRK-1's cap-fill path
       trackEvent("tournament_joined", { userId: user.id, tournamentId, game: tournament.game, amountMinor: tournament.entryFee });
       return NextResponse.json({ id: registration.id, status: "CONFIRMED" }, { status: 201 });
     } catch (err) {
+      if (err instanceof AbandonedError) return new NextResponse(null, { status: 499 });
       if (err instanceof InsufficientWalletBalanceError) {
         return NextResponse.json({ error: "Insufficient wallet balance." }, { status: 402 });
       }
+      if (err instanceof RegistrationFullError) return NextResponse.json({ error: "Registration is full." }, { status: 409 });
+      if (err instanceof InGameNameTakenError) return NextResponse.json({ error: err.message }, { status: 409 });
       throw err;
     }
   }
@@ -225,25 +280,28 @@ export async function POST(
   const registration = existing
     ? await prisma.registration.update({
         where: { id: existing.id },
-        data: { inGameId, status: "PENDING_PAYMENT" },
+        data: { inGameId, status: "PENDING_PAYMENT", ...teamData, ...streamData },
       })
     : await prisma.registration.create({
-        data: { tournamentId, userId: user.id, inGameId, status: "PENDING_PAYMENT" },
+        data: { tournamentId, userId: user.id, inGameId, status: "PENDING_PAYMENT", ...teamData, ...streamData },
       });
+  if (rememberName) await rememberInGameName(user.id, tournament.gameId, inGameId);
+  // Held while the captain pays; roster players are told once it's confirmed.
+  if (roster) await saveRoster(registration.id, roster.members);
 
   const reference = `reg_${registration.id}_${randomUUID().slice(0, 8)}`;
-  const provider = getDefaultPaymentProvider();
 
   let chargeResult;
+  let provider;
   try {
-    chargeResult = await provider.initializeCharge({
+    ({ provider, charge: chargeResult } = await initializeChargeWithFallback({
       amount: tournament.entryFee,
       currency: "NGN",
       email: toCheckoutEmail(user.emailOrPhone, user.id),
       reference,
       callbackUrl: `${process.env.NEXT_PUBLIC_APP_URL}/tournaments/${tournamentId}/register/callback?ref=${reference}`,
       metadata: { tournamentId, userId: user.id },
-    });
+    }));
   } catch (err) {
     // Don't leave a fresh PENDING_PAYMENT row with no charge behind it —
     // only rolls back if we just created it (a reused row predates this

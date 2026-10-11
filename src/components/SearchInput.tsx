@@ -10,9 +10,11 @@ type SearchResults = {
   tournaments: { id: string; name: string; game: string; status: string }[];
   battles: { id: string; game: string; format: string; status: string }[];
   users: { id: string; displayName: string; handle: string; avatarUrl: string | null }[];
+  games: { name: string; slug: string }[];
+  communities: { id: string; name: string | null; slug: string | null }[];
 };
 
-const EMPTY: SearchResults = { tournaments: [], battles: [], users: [] };
+const EMPTY: SearchResults = { tournaments: [], battles: [], users: [], games: [], communities: [] };
 const DEBOUNCE_MS = 300;
 
 export function SearchInput({ className = "" }: { className?: string }) {
@@ -60,7 +62,8 @@ export function SearchInput({ className = "" }: { className?: string }) {
   }, []);
 
   const hasQuery = query.trim().length >= 2;
-  const hasResults = results.tournaments.length > 0 || results.battles.length > 0 || results.users.length > 0;
+  const hasResults =
+    results.tournaments.length > 0 || results.battles.length > 0 || results.users.length > 0 || results.games.length > 0 || results.communities.length > 0;
 
   return (
     <div ref={containerRef} className={`relative ${className}`}>
@@ -72,10 +75,10 @@ export function SearchInput({ className = "" }: { className?: string }) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => setOpen(true)}
-          placeholder="Search games, players, tournaments…"
-          className="field-input min-w-0 truncate pl-9"
+          placeholder="Search players, tournaments, games, communities"
+          className="h-10 w-full min-w-0 truncate rounded-none border border-white/[0.07] bg-white/[0.04] pr-12 pl-9 text-sm text-foreground outline-none transition placeholder:text-white/35 hover:border-white/[0.14] focus:border-accent-volt/50 focus:bg-white/[0.06]"
         />
-        <kbd className="pointer-events-none absolute top-1/2 right-3 hidden -translate-y-1/2 items-center gap-0.5 rounded-md border border-border-strong bg-surface-elevated px-1.5 py-0.5 font-mono text-[10px] text-muted sm:flex">
+        <kbd className="pointer-events-none absolute top-1/2 right-3 hidden -translate-y-1/2 items-center gap-0.5 rounded-none border border-border-strong bg-surface-elevated px-1.5 py-0.5 font-mono text-[11px] text-muted sm:flex">
           ⌘K
         </kbd>
       </div>
@@ -121,6 +124,26 @@ export function SearchInput({ className = "" }: { className?: string }) {
                     >
                       <span className="truncate">{b.game}</span>
                       <span className="text-xs text-muted">{b.format === "BEST_OF_3" ? "Best of 3" : "Single"}</span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+              {results.games.length > 0 && (
+                <div className="flex flex-col">
+                  <span className="text-eyebrow px-4 py-1">Games</span>
+                  {results.games.map((g) => (
+                    <Link key={g.slug} href={`/games/${g.slug}`} onClick={() => setOpen(false)} className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-surface-elevated">
+                      <span className="truncate">{g.name}</span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+              {results.communities.length > 0 && (
+                <div className="flex flex-col">
+                  <span className="text-eyebrow px-4 py-1">Communities</span>
+                  {results.communities.map((c) => (
+                    <Link key={c.id} href={`/communities/${c.slug}`} onClick={() => setOpen(false)} className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-surface-elevated">
+                      <span className="truncate">{c.name}</span>
                     </Link>
                   ))}
                 </div>

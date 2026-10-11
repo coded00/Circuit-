@@ -8,12 +8,23 @@
  */
 
 import { redirect } from "next/navigation";
+import { loginPath } from "@/lib/safeRedirect";
 import { getCurrentUser } from "@/lib/session";
+import { buildMetadata } from "@/lib/seo";
+
+export const metadata = buildMetadata({
+  title: "Friends",
+  description:
+    "Your Circuit friends.",
+  path: "/friends",
+  noindex: true,
+});
+
 
 export default async function FriendsRedirectPage() {
   const user = await getCurrentUser();
   if (!user) {
-    redirect("/login?next=/friends");
+    redirect(loginPath("/friends"));
   }
   redirect(`/players/${user.handle}?tab=friends`);
 }

@@ -82,12 +82,12 @@ export function Avatar({ player, size, ringClass }: { player: Player | null; siz
       src={player.avatarUrl}
       alt=""
       style={{ height: px, width: px }}
-      className={`rounded-full border-2 object-cover ${ringClass}`}
+      className={`cut-avatar border-2 object-cover ${ringClass}`}
     />
   ) : (
     <div
       style={{ height: px, width: px }}
-      className={`flex items-center justify-center rounded-full border-2 bg-surface-elevated text-sm font-semibold text-muted ${ringClass}`}
+      className={`flex items-center justify-center cut-avatar border-2 bg-surface-elevated text-sm font-semibold text-muted ${ringClass}`}
     >
       {player.displayName.slice(0, 1).toUpperCase()}
     </div>
@@ -117,9 +117,9 @@ function computePlacements(structure: BracketStructure): Placement[] {
     } else if (isFinalRound && slot.winnerId) {
       placements.push({ userId, label: "Runner-up", roundReached: round, status: "runner-up" });
     } else if (slot.winnerId && slot.winnerId !== userId) {
-      placements.push({ userId, label: `Eliminated — ${roundName(round, structure.totalRounds)}`, roundReached: round, status: "eliminated" });
+      placements.push({ userId, label: `Eliminated, ${roundName(round, structure.totalRounds)}`, roundReached: round, status: "eliminated" });
     } else {
-      placements.push({ userId, label: `Competing — ${roundName(round, structure.totalRounds)}`, roundReached: round, status: "active" });
+      placements.push({ userId, label: `Competing, ${roundName(round, structure.totalRounds)}`, roundReached: round, status: "active" });
     }
   }
 
@@ -272,9 +272,9 @@ export function BracketView({
 
   return (
     <div className="flex w-full flex-1 flex-col gap-6">
-      <header data-surface="dark" className="flex flex-col gap-4 rounded-[var(--radius-hero)] border border-border bg-surface p-5 sm:flex-row sm:items-center sm:justify-between sm:p-7">
+      <header data-surface="dark" className="flex flex-col gap-4 cut-lg [--cut-line:var(--border)] border border-border bg-surface p-5 sm:flex-row sm:items-center sm:justify-between sm:p-7">
         <div className="flex min-w-0 items-center gap-4">
-          <GameArtTile game={tournament.game} posterUrl={tournament.posterUrl} className="hidden h-16 w-24 shrink-0 rounded-[10px] sm:block" hideLabel imgWidth={240} />
+          <GameArtTile game={tournament.game} posterUrl={tournament.posterUrl} className="hidden h-16 w-24 shrink-0 cut-avatar sm:block" hideLabel imgWidth={240} />
           <div className="flex min-w-0 flex-col gap-1.5">
             <Link href={backHref} className="inline-flex w-fit items-center gap-1.5 text-sm font-medium text-muted transition hover:text-foreground">
               <ArrowLeft size={15} />
@@ -295,7 +295,7 @@ export function BracketView({
         <aside className="flex h-fit flex-col gap-4 lg:sticky lg:top-[76px]">
           <section className={`card flex flex-col items-center gap-3 p-6 text-center ${champion ? "border-gold/40" : ""}`}>
             <span className="text-eyebrow text-gold">Champion</span>
-            <div className={`rounded-full p-[3px] ring-2 ${champion ? "motion-scale-in ring-gold" : "ring-border-strong"}`}>
+            <div className={`cut-avatar p-[3px] ${champion ? "motion-scale-in bg-gold" : "bg-border-strong"}`}>
               <Avatar player={championPlayer} size={80} ringClass="border-transparent" />
             </div>
             <div className="flex flex-col gap-0.5">

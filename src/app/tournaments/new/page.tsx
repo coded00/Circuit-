@@ -1,17 +1,30 @@
 import { redirect } from "next/navigation";
+import { loginPath } from "@/lib/safeRedirect";
 import { getCurrentUser } from "@/lib/session";
-import { prisma } from "@/lib/db";
+import { hostableCommunities } from "@/lib/communityDirectory";
+import { loadOrganizerCatalog } from "@/lib/competitionConfig";
 import TournamentForm from "./TournamentForm";
+import { buildMetadata } from "@/lib/seo";
 
-export default async function NewTournamentPage() {
+export const metadata = buildMetadata({
+  title: "Host a Tournament",
+  description:
+    "Create a tournament on Circuit.",
+  path: "/tournaments/new",
+  noindex: true,
+});
+
+
+export default async function NewTournamentPage({ searchParams }: { searchParams: Promise<{ community?: string }> }) {
+  const { community } = await searchParams;
   const user = await getCurrentUser();
   if (!user) {
-    redirect("/login?next=/tournaments/new");
+    redirect(loginPath("/tournaments/new"));
   }
-  const games = await prisma.game.findMany({ where: { enabled: true }, orderBy: { name: "asc" } });
+  const [catalog, hostCommunities] = await Promise.all([loadOrganizerCatalog(), hostableCommunities(user)]);
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-6 sm:p-8">
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-6 sm:px-8 sm:py-10">
       <div className="flex flex-col gap-2">
         <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Create a tournament</h1>
         <p className="text-sm text-muted">
@@ -19,7 +32,7 @@ export default async function NewTournamentPage() {
         </p>
       </div>
       <div className="card">
-        <TournamentForm games={games} />
+        <TournamentForm catalog={catalog} hostCommunities={hostCommunities} defaultHostCommunityId={community} />
       </div>
     </div>
   );

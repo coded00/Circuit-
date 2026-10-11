@@ -8,12 +8,8 @@
  * marked used, so an earlier, still-unused reset email can't reset the
  * password again after this one already has.
  *
- * KNOWN GAP: existing sessions aren't revoked. Sessions are stateless
- * signed JWTs (src/lib/auth.ts) with no server-side session table, so
- * there's nothing to invalidate short of adding a session-version column
- * to User and checking it on every request — real scope beyond this
- * request, tracked here rather than silently assumed away. A session
- * issued before the reset stays valid until its own 30-day expiry.
+ * Existing sessions are revoked: the update bumps User.sessionVersion, so every token issued before
+ * the reset stops working (see getCurrentUser).
  */
 
 import { NextResponse } from "next/server";
@@ -44,7 +40,7 @@ export async function POST(request: Request) {
   const passwordHash = await hashPassword(password);
   const now = new Date();
   await prisma.$transaction([
-    prisma.user.update({ where: { id: resetToken.userId }, data: { passwordHash } }),
+    prisma.user.update({ where: { id: resetToken.userId }, data: { passwordHash, sessionVersion: { increment: 1 } } }),
     prisma.passwordResetToken.updateMany({
       where: { userId: resetToken.userId, usedAt: null },
       data: { usedAt: now },

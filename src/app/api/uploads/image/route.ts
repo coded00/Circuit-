@@ -5,7 +5,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, suspendedResponse } from "@/lib/session";
 import { isRateLimited, recordAttempt } from "@/lib/rateLimit";
 import { IMAGE_PURPOSES, MAX_PUBLIC_IMAGE_BYTES, UploadError, isImagePurpose, storePublicImage } from "@/lib/uploads";
 
@@ -13,9 +13,25 @@ import { IMAGE_PURPOSES, MAX_PUBLIC_IMAGE_BYTES, UploadError, isImagePurpose, st
  *  cap it per user — plenty for re-picking a photo a few times. */
 const UPLOAD_RATE_LIMIT = { max: 30, windowMs: 10 * 60 * 1000 };
 
+/** Multipart framing (boundaries, part headers, the purpose field) sits on top of the file itself, so the
+ *  declared length of a legitimate 4MB upload is a little over 4MB. Generous, because this check exists to
+ *  avoid buffering something enormous, not to be exact — `file.size` below is the exact check. */
+const MULTIPART_OVERHEAD_ALLOWANCE = 64 * 1024;
+
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "You must be signed in." }, { status: 401 });
+  const suspended = suspendedResponse(user);
+  if (suspended) return suspended;
+
+  // Before formData(), which buffers the whole body before `file.size` can be looked at — so on a
+  // deployment with no platform body limit in front (the self-hosted Docker one), a huge POST used to cost
+  // the full allocation just to be rejected afterwards. Best-effort: a chunked upload declares no length
+  // and falls through to the exact check on `file.size`.
+  const declared = Number(request.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > MAX_PUBLIC_IMAGE_BYTES + MULTIPART_OVERHEAD_ALLOWANCE) {
+    return NextResponse.json({ error: "Images are limited to 4MB." }, { status: 413 });
+  }
 
   const form = await request.formData().catch(() => null);
   const file = form?.get("file");

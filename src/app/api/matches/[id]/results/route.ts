@@ -9,8 +9,9 @@
  */
 
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, suspendedResponse } from "@/lib/session";
 import { MatchError, submitResult } from "@/lib/matches";
+import { PROOF_TYPE_ERROR, sniffProofType } from "@/lib/imageSniff";
 
 const MAX_PROOF_BYTES = 10 * 1024 * 1024;
 
@@ -27,6 +28,7 @@ const STATUS_BY_CODE: Record<MatchError["code"], number> = {
   WINDOW_EXPIRED: 409,
   VOID_UNSUPPORTED: 409,
   TOURNAMENT_CANCELLED: 409,
+  NOTHING_TO_CONFIRM: 409,
 };
 
 export async function POST(
@@ -37,6 +39,8 @@ export async function POST(
   if (!user) {
     return NextResponse.json({ error: "You must be signed in." }, { status: 401 });
   }
+  const suspended = suspendedResponse(user);
+  if (suspended) return suspended;
 
   const { id } = await params;
   const form = await request.formData().catch(() => null);
@@ -80,6 +84,8 @@ export async function POST(
   }
 
   const proofBuffer = Buffer.from(await proofFile.arrayBuffer());
+  const proofType = sniffProofType(proofBuffer);
+  if (!proofType) return NextResponse.json({ error: PROOF_TYPE_ERROR }, { status: 400 });
 
   try {
     const result = await submitResult({
@@ -89,7 +95,7 @@ export async function POST(
       score: score.trim(),
       kills,
       proofBuffer,
-      proofContentType: proofFile.type || "application/octet-stream",
+      proofContentType: proofType,
     });
     return NextResponse.json({ status: result.outcome });
   } catch (err) {

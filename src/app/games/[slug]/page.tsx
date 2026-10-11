@@ -15,13 +15,21 @@
 
 import { cache } from "react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
 import { Trophy, Swords, Users } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { findGameBySlug, realGameNames } from "@/lib/games";
 import { gameStandings } from "@/lib/standings";
-import { buildMetadata, gamePath } from "@/lib/seo";
+import { buildMetadata, tournamentPath } from "@/lib/seo";
+import { getCurrentUser } from "@/lib/session";
+import { safeJsonLd } from "@/lib/jsonLd";
+import { breadcrumbJsonLd } from "@/lib/breadcrumbs";
+import { gameCountryIsIndexable, gameIsIndexable, leaderboardIsIndexable } from "@/lib/seoEligibility";
+import { countryName } from "@/lib/countries";
+import { countrySlug } from "@/lib/countrySeo";
+import { standingsForViewer } from "@/lib/leaderboardSeo";
+import { canonicalGamePath, displayGameName, gameSeoForName } from "@/lib/gameSeo";
 import { GameArtTile } from "@/components/GameArtTile";
 import { FeaturedCompetitions } from "@/components/FeaturedCompetitions";
 import { UpcomingCompetitions } from "@/components/UpcomingCompetitions";
@@ -52,7 +60,7 @@ const getGamePageData = cache(async (slug: string) => {
   const game = await findGameBySlug(slug);
   if (!game) return null;
 
-  const [active, completedCount, prizeSum, standings, allNames] = await Promise.all([
+  const [active, completedCount, prizeSum, standings, allNames, publicTournaments, recentResults, watchable, countryRows, streamedCount] = await Promise.all([
     prisma.tournament.findMany({
       where: { game, status: { in: ["OPEN", "LIVE", "DRAFT"] } },
       orderBy: { startAt: "asc" },
@@ -63,15 +71,38 @@ const getGamePageData = cache(async (slug: string) => {
     prisma.tournament.aggregate({ where: { game }, _sum: { prizeAmount: true } }),
     gameStandings(game),
     realGameNames(),
+    prisma.tournament.count({ where: { game, status: { in: ["OPEN", "CLOSED", "LIVE", "COMPLETE"] } } }),
+    prisma.tournament.findMany({
+      where: { game, status: "COMPLETE" },
+      orderBy: { startAt: "desc" },
+      take: 8,
+      select: { id: true, name: true, startAt: true, prizeAmount: true, _count: { select: { registrations: { where: { status: "CONFIRMED" } } } } },
+    }),
+    prisma.tournament.findFirst({
+      where: { game, status: "LIVE", OR: [{ streamUrl: { not: null } }, { registrations: { some: { status: "CONFIRMED", streamUrl: { not: null } } } }] },
+      select: { id: true, name: true },
+    }),
+    prisma.tournament.groupBy({ by: ["country"], where: { game, country: { not: null }, status: { in: ["OPEN", "CLOSED", "LIVE", "COMPLETE"] } }, _count: { _all: true } }),
+    prisma.tournament.count({ where: { game, status: { in: ["OPEN", "CLOSED", "LIVE", "COMPLETE"] }, OR: [{ streamUrl: { not: null } }, { registrations: { some: { status: "CONFIRMED", streamUrl: { not: null } } } }] } }),
   ]);
 
+  const info = await gameSeoForName(game);
+  const related = allNames.filter((n) => n !== game).slice(0, 6);
   return {
     game,
+    displayName: displayGameName(game, info),
+    canonicalPath: await canonicalGamePath(game),
+    relatedGames: await Promise.all(related.map(async (name) => ({ name, path: await canonicalGamePath(name) }))),
     active,
     completedCount,
     totalPrize: prizeSum._sum.prizeAmount ?? 0,
-    standings: standings.slice(0, 5),
-    relatedGames: allNames.filter((n) => n !== game).slice(0, 6),
+    standings,
+    publicTournaments,
+    recentResults,
+    watchable,
+    streamedCount,
+    countries: countryRows.filter((r) => r.country && gameCountryIsIndexable(r._count._all)).map((r) => r.country as string),
+    indexable: gameIsIndexable({ publicTournaments, completedWithEightEntrants: recentResults.filter((t) => t._count.registrations >= 8).length }),
   };
 });
 
@@ -80,16 +111,17 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const data = await getGamePageData(slug);
   if (!data) return buildMetadata({ title: "Game not found", description: "", path: `/games/${slug}`, noindex: true });
 
-  const { game, active, standings } = data;
+  const { displayName, canonicalPath, active, standings, indexable } = data;
   const description =
     active.length > 0
-      ? `${active.length} open ${game} tournament${active.length === 1 ? "" : "s"} on Circuit right now. Register, compete, and climb the ${game} leaderboard.`
-      : `Real ${game} tournaments and 1v1 Challenges on Circuit — Nigeria-first esports competitions with real prizes.${standings.length ? ` See the current ${game} leaderboard.` : ""}`;
+      ? `${active.length} open ${displayName} tournament${active.length === 1 ? "" : "s"} on Circuit right now. Register, compete, and climb the ${displayName} leaderboard.`
+      : `Real ${displayName} tournaments and 1v1 Challenges on Circuit. Esports competitions with real prizes.${standings.length ? ` See the current ${displayName} leaderboard.` : ""}`;
 
   return buildMetadata({
-    title: `${game} Tournaments & Esports Competitions`,
+    title: `${displayName} Tournaments & Esports Competitions`,
     description,
-    path: gamePath(game),
+    path: canonicalPath,
+    noindex: !indexable,
   });
 }
 
@@ -98,15 +130,25 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
   const data = await getGamePageData(slug);
   if (!data) notFound();
 
-  const { game, active, completedCount, totalPrize, standings, relatedGames } = data;
+  // An old or alternate address (/games/codm) goes to the canonical one.
+  if (`/games/${slug}` !== data.canonicalPath) permanentRedirect(data.canonicalPath);
+
+  const { game, displayName, active, completedCount, totalPrize, standings, relatedGames, recentResults, watchable, countries, streamedCount } = data;
+  const viewer = await getCurrentUser();
+  const topPlayers = await standingsForViewer(standings.slice(0, 5), !!viewer);
+  const boardPath = `/leaderboard/${data.canonicalPath.replace("/games/", "")}`;
   const openNow = active.filter((t) => t.status === "OPEN" || t.status === "LIVE");
   const announced = active.filter((t) => t.status === "DRAFT");
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 p-6 sm:p-8">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-6 sm:px-8 sm:py-10">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: safeJsonLd(breadcrumbJsonLd([{ name: "Home", path: "/" }, { name: "Tournaments", path: "/compete" }, { name: displayName, path: data.canonicalPath }])) }}
+      />
       <div
         data-surface="dark"
-        className="relative flex min-h-[180px] w-full flex-col justify-end overflow-hidden rounded-[var(--radius-hero)] border border-border p-6 sm:p-8"
+        className="relative flex min-h-[180px] w-full flex-col justify-end overflow-hidden cut-lg [--cut-line:var(--border)] border border-border p-6 sm:p-8"
       >
         <GameArtTile game={game} fill hideLabel imgWidth={1200} />
         <div
@@ -116,7 +158,7 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
         />
         <div className="relative z-10 flex flex-col gap-2">
           <h1 className="font-display text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-            {game} Tournaments
+            {displayName} Tournaments
           </h1>
           <div className="flex flex-wrap gap-2 pt-1">
             <span className="badge badge-neutral bg-surface-elevated/80 text-foreground">
@@ -138,6 +180,18 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
           </div>
         </div>
       </div>
+
+      {!watchable && streamedCount > 0 && (
+        <Link href={`/watch/${data.canonicalPath.replace("/games/", "")}`} className="btn-secondary self-start">
+          Watch {displayName} tournaments
+        </Link>
+      )}
+
+      {watchable && (
+        <Link href={`/tournaments/${watchable.id}/watch`} className="btn-primary watch-attn self-start">
+          <span className="watch-dot" aria-hidden /> Watch {watchable.name} live
+        </Link>
+      )}
 
       {openNow.length > 0 && (
         <FeaturedCompetitions
@@ -164,25 +218,76 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
         </div>
       )}
 
-      {standings.length > 0 && (
-        <div className="flex flex-col gap-3">
-          <h2 className="text-section-heading">{game} Leaderboard</h2>
-          <div className="flex flex-col gap-2">
-            {standings.map((s, i) => (
-              <Link key={s.userId} href={`/players/${s.handle}`} className="card-row flex items-center gap-3 p-3">
-                <span className="w-5 shrink-0 text-center text-sm font-bold text-muted">{i + 1}</span>
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-surface-elevated text-xs font-semibold text-muted">
-                  {s.displayName.slice(0, 1).toUpperCase()}
-                </span>
-                <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-sm font-medium">{s.displayName}</span>
-                  <span className="text-metadata truncate">@{s.handle}</span>
-                </div>
-                <span className="shrink-0 text-xs font-semibold text-muted">
-                  {s.wins}W – {s.losses}L
-                </span>
-              </Link>
+      {countries.length > 0 && (
+        <section className="flex flex-col gap-2">
+          <h2 className="text-section-heading">{displayName} by country</h2>
+          <ul className="flex flex-wrap gap-2">
+            {countries.map((code) => (
+              <li key={code}>
+                <Link href={`${data.canonicalPath}/${countrySlug(code)}`} className="badge badge-neutral bg-surface-elevated">
+                  {countryName(code)}
+                </Link>
+              </li>
             ))}
+          </ul>
+        </section>
+      )}
+
+      {recentResults.length > 0 && (
+        <div className="flex flex-col gap-3">
+          <h2 className="text-section-heading">Recent {displayName} results</h2>
+          <ul className="divide-y divide-border border-y border-border">
+            {recentResults.map((t) => (
+              <li key={t.id}>
+                <Link href={tournamentPath(t)} className="flex items-center justify-between gap-3 py-2.5 text-sm transition-colors hover:text-accent-volt">
+                  <span className="min-w-0 truncate font-medium">{t.name}</span>
+                  <span className="shrink-0 text-xs text-muted">
+                    {t.startAt.toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })} · {t._count.registrations} {t._count.registrations === 1 ? "entry" : "entries"}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {topPlayers.length > 0 && (
+        <div className="flex flex-col gap-3">
+          <div className="flex items-end justify-between gap-3">
+            <h2 className="text-section-heading">{displayName} Leaderboard</h2>
+            {leaderboardIsIndexable(standings.length) && (
+              <Link href={boardPath} className="text-sm text-accent-volt hover:underline">
+                Full leaderboard
+              </Link>
+            )}
+          </div>
+          <div className="flex flex-col gap-2">
+            {topPlayers.map((s) => {
+              const row = (
+                <>
+                  <span className="w-5 shrink-0 text-center text-sm font-bold text-muted">{s.rank}</span>
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center cut-avatar border border-border bg-surface-elevated text-xs font-semibold text-muted">
+                    {s.displayName.slice(0, 1).toUpperCase()}
+                  </span>
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate text-sm font-medium">{s.displayName}</span>
+                    {s.handle && <span className="text-metadata truncate">@{s.handle}</span>}
+                  </div>
+                  <span className="shrink-0 text-xs font-semibold text-muted">
+                    {s.wins}W – {s.losses}L
+                  </span>
+                </>
+              );
+              return s.handle ? (
+                <Link key={s.rank} href={`/players/${s.handle}`} className="card-row flex items-center gap-3 p-3">
+                  {row}
+                </Link>
+              ) : (
+                <div key={s.rank} className="card-row flex items-center gap-3 p-3">
+                  {row}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -191,8 +296,8 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
         <div className="flex flex-col gap-3 border-t border-border pt-6">
           <h2 className="text-section-heading">Other Games on Circuit</h2>
           <div className="flex flex-wrap gap-2">
-            {relatedGames.map((name) => (
-              <Link key={name} href={gamePath(name)} className="badge badge-neutral bg-surface-elevated">
+            {relatedGames.map(({ name, path }) => (
+              <Link key={name} href={path} className="badge badge-neutral bg-surface-elevated">
                 {name}
               </Link>
             ))}

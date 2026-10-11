@@ -14,6 +14,7 @@
 
 import { prisma } from "@/lib/db";
 import { slugify } from "@/lib/seo";
+import { gameSeoForSlug } from "@/lib/gameSeo";
 
 export async function realGameNames(): Promise<string[]> {
   const [tournamentGames, battleGames] = await Promise.all([
@@ -29,5 +30,11 @@ export async function realGameNames(): Promise<string[]> {
  *  Battle has ever used that game — the page should 404, not render thin. */
 export async function findGameBySlug(slug: string): Promise<string | null> {
   const names = await realGameNames();
+  // A catalog address (canonical or alternate) points at a stored game name; match it case-insensitively.
+  const info = await gameSeoForSlug(slug);
+  if (info) {
+    const hit = names.find((name) => name.toLowerCase() === info.name.toLowerCase());
+    if (hit) return hit;
+  }
   return names.find((name) => slugify(name) === slug) ?? null;
 }

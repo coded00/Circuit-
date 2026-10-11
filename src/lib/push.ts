@@ -25,7 +25,7 @@ export async function sendPushToAll(title: string, message: string, url?: string
   const apiKey = process.env.ONESIGNAL_API_KEY;
 
   if (!appId || !apiKey) {
-    console.warn(`[push] OneSignal not configured — logging instead of sending.\nTitle: ${title}\nMessage: ${message}\n`);
+    console.warn(`[push] OneSignal not configured. Logging instead of sending.\nTitle: ${title}\nMessage: ${message}\n`);
     return;
   }
 

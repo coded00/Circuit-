@@ -1,105 +1,168 @@
 "use client";
 
 /**
- * Circuit — notification bell + slide-in panel. Its own setInterval +
- * fetch, not a rendered <Poller/> — Poller's router.refresh() re-runs a
- * whole Server Component page, the wrong mechanism for a header-mounted
- * badge that needs local client state instead.
+ * Circuit — notification bell. Its own setInterval + fetch, not a
+ * rendered <Poller/> — Poller's router.refresh() re-runs a whole Server
+ * Component page, the wrong mechanism for a header-mounted badge that
+ * needs local client state instead.
  *
- * Same open/backdrop/click-outside shape as AdminMobileNav's drawer
- * (globals.css's own comment on that pattern), mirrored to the right
- * edge, with framer-motion driving the enter/exit animation instead of
- * the CSS-only `.drawer-panel-enter` keyframe — that class has no exit
- * animation (the drawer just unmounts), and this panel needs one both
- * ways.
- *
- * Rendered via a portal to `document.body`, not inline where this
- * component sits in TopBar's tree: TopBar's header bar has
- * `backdrop-blur-md`, and `backdrop-filter` establishes a new containing
- * block for `position: fixed` descendants (same rule as `transform`) —
- * without the portal, this panel's `fixed inset-y-0` computes against
- * that 60px header bar instead of the viewport, clipping it to the
- * header's own height.
+ * Desktop: a popover anchored under the bell (no page-dimming backdrop —
+ * glancing at notifications shouldn't black out the page you're on).
+ * Phones: a bottom sheet via ui/Overlay.tsx's DialogOverlay. Both render
+ * the same NotificationInbox body; rows come from
+ * notifications/NotificationItem.tsx, shared with /notifications.
  */
 
-import { useEffect, useState } from "react";
+import { feedback } from "@/lib/feedback";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bell, X } from "lucide-react";
-import { getNotificationCategory, NOTIFICATION_ICON_CLASS_NAME } from "@/lib/notification-icon";
+import { ArrowRight, Bell, BellOff, CheckCheck, X } from "lucide-react";
+import {
+  NotificationGroupLabel,
+  NotificationItem,
+  groupNotificationsByDay,
+  type NotificationRow,
+} from "@/components/notifications/NotificationItem";
 
-type NotificationRow = {
-  id: string;
-  type: string;
-  message: string;
-  href: string;
-  readAt: string | null;
-  createdAt: string;
-};
-
-const POLL_INTERVAL_MS = 5000;
+const POLL_INTERVAL_MS = 15_000;
 const PREVIEW_TAKE = 5;
 const PANEL_TAKE = 30;
 
-const relativeTime = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+type Filter = "all" | "unread";
 
-function formatRelative(dateIso: string): string {
-  const diffMs = new Date(dateIso).getTime() - Date.now();
-  const diffMin = Math.round(diffMs / 60000);
-  if (Math.abs(diffMin) < 60) return relativeTime.format(diffMin, "minute");
-  const diffHour = Math.round(diffMin / 60);
-  if (Math.abs(diffHour) < 24) return relativeTime.format(diffHour, "hour");
-  return relativeTime.format(Math.round(diffHour / 24), "day");
+function NotificationInbox({
+  notifications,
+  unreadCount,
+  markingAll,
+  onMarkAll,
+  onItemClick,
+  onClose,
+}: {
+  notifications: NotificationRow[];
+  unreadCount: number;
+  markingAll: boolean;
+  onMarkAll: () => void;
+  onItemClick: (n: NotificationRow) => void;
+  onClose: () => void;
+}) {
+  const [filter, setFilter] = useState<Filter>("all");
+  const visible = filter === "unread" ? notifications.filter((n) => !n.readAt) : notifications;
+  const groups = groupNotificationsByDay(visible);
+
+  return (
+    <>
+      <div className="flex shrink-0 flex-col gap-3 border-b border-border px-4 pt-2 pb-0 sm:px-5 sm:pt-4">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-display flex items-center gap-2 text-[17px] font-bold tracking-tight">
+            Notifications
+            {unreadCount > 0 && (
+              <span className="cut-xs bg-accent-volt px-1.5 py-0.5 font-mono text-[11px] leading-none font-bold text-accent-volt-foreground">
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            )}
+          </h2>
+          <div className="flex items-center gap-1">
+            {unreadCount > 0 && (
+              <button
+                type="button"
+                onClick={onMarkAll}
+                disabled={markingAll}
+                className="flex items-center gap-1 rounded-none px-1.5 py-1 text-xs font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground disabled:opacity-50"
+              >
+                <CheckCheck size={14} />
+                {markingAll ? "Marking…" : "Mark all read"}
+              </button>
+            )}
+            <button type="button" onClick={onClose} aria-label="Close notifications" className="btn-icon h-9 w-9">
+              <X size={18} className="text-muted" />
+            </button>
+          </div>
+        </div>
+        <div className="-mb-px flex gap-4" role="tablist">
+          {(["all", "unread"] as const).map((f) => (
+            <button
+              key={f}
+              type="button"
+              role="tab"
+              aria-selected={filter === f}
+              onClick={() => setFilter(f)}
+              className={`border-b-2 pb-2.5 text-[13px] font-semibold capitalize transition-colors ${
+                filter === f ? "border-foreground text-foreground" : "border-transparent text-muted hover:text-foreground"
+              }`}
+            >
+              {f}
+              {f === "unread" && unreadCount > 0 && <span className="ml-1 text-muted-strong">{unreadCount}</span>}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto pb-2">
+        {visible.length === 0 ? (
+          <div className="flex flex-col items-center gap-3 px-8 py-14 text-center">
+            <span className="flex h-11 w-11 items-center justify-center cut-sm bg-surface-elevated text-muted">
+              <BellOff size={20} />
+            </span>
+            <div className="flex flex-col gap-1">
+              <p className="text-sm font-semibold">{filter === "unread" ? "Nothing unread" : "No notifications yet"}</p>
+              <p className="text-xs leading-relaxed text-muted">
+                Match calls, results, disputes and invites will show up here.
+              </p>
+            </div>
+          </div>
+        ) : (
+          groups.map((group) => (
+            <div key={group.label}>
+              <NotificationGroupLabel>{group.label}</NotificationGroupLabel>
+              {group.items.map((n) => (
+                <NotificationItem key={n.id} notification={n} onClick={() => onItemClick(n)} />
+              ))}
+            </div>
+          ))
+        )}
+      </div>
+
+      <Link
+        href="/notifications"
+        onClick={onClose}
+        className="group flex shrink-0 items-center justify-between border-t border-border px-4 py-3 text-[13px] font-semibold transition hover:bg-surface-elevated/70 sm:px-5"
+      >
+        See all notifications
+        <ArrowRight size={14} className="text-muted transition-transform group-hover:translate-x-0.5" />
+      </Link>
+    </>
+  );
 }
 
-function isSameLocalDay(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
-
-/** Today/Yesterday/Earlier, in that fixed order — an empty group is
- *  dropped rather than shown as a header with nothing under it. */
-function groupByDay(notifications: NotificationRow[]): { label: string; items: NotificationRow[] }[] {
-  const now = new Date();
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-
-  const today: NotificationRow[] = [];
-  const yest: NotificationRow[] = [];
-  const earlier: NotificationRow[] = [];
-  for (const n of notifications) {
-    const createdAt = new Date(n.createdAt);
-    if (isSameLocalDay(createdAt, now)) today.push(n);
-    else if (isSameLocalDay(createdAt, yesterday)) yest.push(n);
-    else earlier.push(n);
-  }
-
-  return [
-    { label: "Today", items: today },
-    { label: "Yesterday", items: yest },
-    { label: "Earlier", items: earlier },
-  ].filter((group) => group.items.length > 0);
-}
-
-export function NotificationBell({ initialUnreadCount = 0 }: { initialUnreadCount?: number }) {
+export function NotificationBell({
+  initialUnreadCount = 0,
+  buttonClassName = "btn-icon",
+}: {
+  initialUnreadCount?: number;
+  /** Trigger styling — the header's HUD strip passes its own compact segment style. */
+  buttonClassName?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
   const [unreadCount, setUnreadCount] = useState(initialUnreadCount);
+  const lastUnread = useRef(initialUnreadCount);
   const [markingAll, setMarkingAll] = useState(false);
-  // document.body doesn't exist during SSR — the portal only mounts once
-  // this effect confirms we're in the browser, same render-after-mount
-  // guard any portal-to-body needs.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- deliberate one-time post-mount flag to gate the portal target (document.body), not a data-fetch/subscription effect
-    setMounted(true);
-  }, []);
+  // The panel is portaled to <body> so nothing in the header can clip it; that needs the client.
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
 
   useEffect(() => {
     let cancelled = false;
     const take = open ? PANEL_TAKE : PREVIEW_TAKE;
 
     async function poll() {
+      // A hidden tab has nobody to notify; it catches up the moment it is visible again.
+      if (document.visibilityState !== "visible") return;
       // A transient network blip (offline, a dev-server restart, the tab
       // waking from sleep) shouldn't crash this background poll — any
       // unguarded fetch failure becomes an unhandled rejection, which
@@ -111,6 +174,9 @@ export function NotificationBell({ initialUnreadCount = 0 }: { initialUnreadCoun
         const data = await res.json();
         if (cancelled) return;
         setNotifications(data.notifications);
+        // A new notification since the last look: a short chime and buzz.
+        if (data.unreadCount > lastUnread.current) feedback("alert");
+        lastUnread.current = data.unreadCount;
         setUnreadCount(data.unreadCount);
       } catch {
         // Ignored — the next interval tick retries.
@@ -124,26 +190,19 @@ export function NotificationBell({ initialUnreadCount = 0 }: { initialUnreadCoun
     };
   }, [open]);
 
-  // The backdrop dims the page but doesn't stop wheel/touch scroll from
-  // passing through to it — without this, scrolling while the panel is
-  // open moves the page behind it, undercutting the point of a panel
-  // that's supposed to keep you on the current page.
+  // While the panel is open: Escape closes it, and the page behind it doesn't scroll.
   useEffect(() => {
     if (!open) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") setOpen(false);
     }
     document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", onKeyDown);
+    };
   }, [open]);
 
   async function markRead(id: string) {
@@ -165,25 +224,35 @@ export function NotificationBell({ initialUnreadCount = 0 }: { initialUnreadCoun
     setOpen(false);
   }
 
-  const groups = groupByDay(notifications);
+  const inbox = (
+    <NotificationInbox
+      notifications={notifications}
+      unreadCount={unreadCount}
+      markingAll={markingAll}
+      onMarkAll={markAllRead}
+      onItemClick={closeAndMark}
+      onClose={() => setOpen(false)}
+    />
+  );
 
   return (
     <>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        aria-label="Notifications"
+        aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
         aria-expanded={open}
-        className="btn-icon relative"
+        className={`${buttonClassName} relative ${open ? "bg-surface-elevated text-foreground" : ""}`}
       >
-        <Bell size={18} />
+        <Bell size={20} className={unreadCount > 0 ? "translate-y-0.5 -translate-x-0.5" : undefined} />
         {unreadCount > 0 && (
-          <span className="absolute top-1 right-1 flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-live px-1 text-[10px] leading-none font-semibold text-white">
+          <span className="absolute top-0 right-0 flex h-4 min-w-4 items-center justify-center cut-xs bg-live px-1 font-mono text-[9px] leading-none font-bold text-white">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
       </button>
 
+      {/* Slides in from the right over a dimmed page, on every screen size. */}
       {mounted &&
         createPortal(
           <AnimatePresence>
@@ -203,96 +272,20 @@ export function NotificationBell({ initialUnreadCount = 0 }: { initialUnreadCoun
                   role="dialog"
                   aria-modal="true"
                   aria-label="Notifications"
-                  className="fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l border-border bg-surface sm:w-[400px]"
-                  style={{ boxShadow: "0 16px 40px rgba(0, 0, 0, 0.45)" }}
+                  data-surface="dark"
+                  className="fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l border-border bg-surface text-foreground sm:w-[420px]"
+                  style={{ boxShadow: "-16px 0 40px rgba(0, 0, 0, 0.45)", paddingBottom: "env(safe-area-inset-bottom)" }}
                   initial={{ x: "100%" }}
                   animate={{ x: 0 }}
                   exit={{ x: "100%" }}
                   transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
                 >
-                  <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
-                    <h2 className="text-base font-semibold">Notifications</h2>
-                    <div className="flex items-center gap-3">
-                      {unreadCount > 0 && (
-                        <button
-                          type="button"
-                          onClick={markAllRead}
-                          disabled={markingAll}
-                          className="text-xs font-medium text-accent-blue hover:underline disabled:opacity-50"
-                        >
-                          {markingAll ? "Marking…" : "Mark all read"}
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => setOpen(false)}
-                        aria-label="Close notifications"
-                        className="btn-icon"
-                      >
-                        <X size={18} className="text-muted" />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="scrollbar-hide flex-1 overflow-y-auto">
-                    {notifications.length === 0 ? (
-                      <p className="p-8 text-center text-sm text-muted">You&apos;re all caught up.</p>
-                    ) : (
-                      groups.map((group) => (
-                        <div key={group.label}>
-                          <p className="px-5 pt-4 pb-1.5 text-xs font-semibold tracking-wide text-muted-strong uppercase">
-                            {group.label}
-                          </p>
-                          {group.items.map((n) => {
-                            const category = getNotificationCategory(n.type);
-                            const Icon = category.Icon;
-                            const unread = !n.readAt;
-                            return (
-                              <Link
-                                key={n.id}
-                                href={n.href}
-                                onClick={() => closeAndMark(n)}
-                                className={`flex items-start gap-3 px-5 py-3 transition hover:bg-surface-elevated ${
-                                  unread ? "bg-accent-blue-soft/40" : ""
-                                }`}
-                              >
-                                <span
-                                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] ${NOTIFICATION_ICON_CLASS_NAME}`}
-                                >
-                                  <Icon size={16} />
-                                </span>
-                                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                                  <span className="flex items-center gap-2">
-                                    <span className={`text-sm font-medium ${unread ? "text-foreground" : "text-muted"}`}>
-                                      {category.label}
-                                    </span>
-                                    {unread && (
-                                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent-blue" aria-hidden />
-                                    )}
-                                  </span>
-                                  <span className={`text-sm ${unread ? "text-foreground" : "text-muted"}`}>{n.message}</span>
-                                  <span className="text-metadata">{formatRelative(n.createdAt)}</span>
-                                </span>
-                              </Link>
-                            );
-                          })}
-                        </div>
-                      ))
-                    )}
-                  </div>
-
-                  <Link
-                    href="/notifications"
-                    onClick={() => setOpen(false)}
-                    className="block border-t border-border px-5 py-3 text-center text-sm font-medium text-accent-blue hover:underline"
-                  >
-                    View all
-                  </Link>
+                  {inbox}
                 </motion.div>
               </>
             )}
           </AnimatePresence>,
-          document.body
+          document.body,
         )}
     </>
   );

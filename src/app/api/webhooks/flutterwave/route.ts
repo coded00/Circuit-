@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { confirmEntryFeePayment, confirmWalletFunding } from "@/lib/payments/confirm";
+import { confirmMarketplacePayment } from "@/lib/marketplaceCheckout";
 import { verifyFlutterwaveSignature } from "@/lib/payments/webhookVerification";
 import { captureMessage, captureException } from "@/lib/observability";
 
@@ -30,6 +31,7 @@ export async function POST(request: Request) {
     try {
       await confirmEntryFeePayment(reference);
       await confirmWalletFunding(reference);
+      await confirmMarketplacePayment(reference);
     } catch (err) {
       // Same reasoning as the Paystack webhook's own comment — still
       // rethrown so Flutterwave retries, not swallowed.

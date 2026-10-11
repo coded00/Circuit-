@@ -33,19 +33,24 @@
 
 import { cache } from "react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { DailyChallengeDetail } from "@/components/DailyChallengeDetail";
 import type { Metadata } from "next";
 import { ArrowLeft, CheckCircle2, Tv, Zap } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
+import { loginPath, signupPath } from "@/lib/safeRedirect";
 import { GameArtTile } from "@/components/GameArtTile";
 import { ShareButton } from "@/components/ShareButton";
-import { StatusPill, battleStatusInfo } from "@/components/StatusPill";
+import { ArenaBackdrop } from "@/components/ArenaBackdrop";
+import { StatusPill } from "@/components/StatusPill";
 import { gameStandings, type Standing } from "@/lib/standings";
 import { getFriendIds } from "@/lib/friends";
 import { CountUp } from "@/components/CountUp";
 import AcceptButton from "./AcceptButton";
 import CancelBattleButton from "./CancelBattleButton";
+import DeclineButton from "./DeclineButton";
+import { battleExpiresAt } from "@/lib/battleExpiry";
+import { challengeStage } from "@/lib/challengeStage";
 import { buildMetadata, parseIdSegment, battlePath, absoluteUrl, DEFAULT_DESCRIPTION } from "@/lib/seo";
 
 function formatNaira(kobo: number): string {
@@ -87,11 +92,11 @@ function Avatar({
   const style = { height: fluidCircle(size), width: fluidCircle(size) };
   return avatarUrl ? (
     // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs
-    <img src={avatarUrl} alt="" style={style} className={`rounded-full border-2 object-cover ${ringClass}`} />
+    <img src={avatarUrl} alt="" style={style} className={`cut-avatar border-2 object-cover ${ringClass}`} />
   ) : (
     <div
       style={style}
-      className={`flex items-center justify-center rounded-full border-2 bg-surface text-2xl font-semibold text-muted ${ringClass}`}
+      className={`flex items-center justify-center cut-avatar border-2 bg-surface text-2xl font-semibold text-muted ${ringClass}`}
     >
       {name.slice(0, 1).toUpperCase()}
     </div>
@@ -117,7 +122,7 @@ function Tag({ children, tone }: { children: React.ReactNode; tone: "volt" | "or
         ? "border-accent-orange/50 text-accent-orange"
         : "border-border-strong text-muted";
   return (
-    <span className={`rounded-full border px-3 py-1 text-[11px] font-bold tracking-wide uppercase ${toneClass}`}>
+    <span className={`cut-xs border px-3 py-1 text-[11px] font-bold tracking-wide uppercase ${toneClass}`}>
       {children}
     </span>
   );
@@ -146,7 +151,7 @@ function StatsRow({ standing }: { standing: Standing | undefined }) {
       ].map((s) => (
         <div key={s.label} className="flex flex-col items-center">
           <span className="text-sm font-bold text-foreground">{s.value}</span>
-          <span className="text-[10px] tracking-wide text-muted uppercase">{s.label}</span>
+          <span className="text-[11px] tracking-wide text-muted uppercase">{s.label}</span>
         </div>
       ))}
     </div>
@@ -164,11 +169,11 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 
 function howItWorks(stakeAmount: number): string[] {
   return [
-    "Both players submit their result — matching reports settle the match instantly.",
+    "Both players submit their result. Matching reports settle the match instantly.",
     "Reports don't match? Circuit staff step in to review and rule.",
     stakeAmount > 0
-      ? `Staked ${formatNaira(stakeAmount)} each — the winner takes the full ${formatNaira(stakeAmount * 2)} pot. A voided dispute returns both stakes.`
-      : "Free to enter — no stakes, no entry fee.",
+      ? `Staked ${formatNaira(stakeAmount)} each. The winner takes the full ${formatNaira(stakeAmount * 2)} pot. A voided dispute returns both stakes.`
+      : "Free to enter. No stakes, no entry fee.",
   ];
 }
 
@@ -184,6 +189,9 @@ const getBattle = cache(async (id: string) =>
         select: {
           id: true,
           createdAt: true,
+          status: true,
+          playerAReadyAt: true,
+          playerBReadyAt: true,
           playerA: { select: { id: true, displayName: true, handle: true, avatarUrl: true } },
           playerB: { select: { id: true, displayName: true, handle: true, avatarUrl: true } },
         },
@@ -197,12 +205,20 @@ const getBattle = cache(async (id: string) =>
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id: rawId } = await params;
   const battle = await getBattle(parseIdSegment(rawId));
-  if (!battle) return buildMetadata({ title: "Challenge not found", description: DEFAULT_DESCRIPTION, path: `/battles/${rawId}`, noindex: true });
+  if (!battle) {
+    // The same address serves a Daily Challenge when the id is one.
+    // A Daily Challenge is addressed by its full id (no slug), so it is looked up by the whole segment, not the part before a hyphen.
+    const daily = await prisma.dailyChallenge.findUnique({ where: { id: rawId }, select: { title: true, gameName: true, status: true } });
+    if (daily && daily.status !== "DRAFT") {
+      return buildMetadata({ title: `${daily.title} · ${daily.gameName} Daily Challenge`, description: `Play one ${daily.gameName} match on your own time, submit your score, and the highest verified score wins.`, path: `/battles/${rawId}` });
+    }
+    return buildMetadata({ title: "Challenge not found", description: DEFAULT_DESCRIPTION, path: `/battles/${rawId}`, noindex: true });
+  }
 
   const stakeText = battle.stakeAmount > 0 ? `₦${(battle.stakeAmount / 100).toLocaleString("en-NG")} stake` : "free to enter";
   return buildMetadata({
     title: `${battle.game} 1v1 Challenge`,
-    description: `Join a ${battle.game} 1v1 Challenge on Circuit — ${stakeText}. Real opponents, real results.`,
+    description: `Join a ${battle.game} 1v1 Challenge on Circuit, ${stakeText}. Real opponents, real results.`,
     path: battlePath(battle),
     // Targeted (FRIENDS) challenges aren't genuinely public content —
     // only real open, anyone-can-accept challenges are worth indexing.
@@ -219,16 +235,25 @@ export default async function BattlePage({
   const id = parseIdSegment(rawId);
 
   const battle = await getBattle(id);
-  if (!battle) notFound();
+  if (!battle) {
+    // Not a Battle: it may be a Daily Challenge, which lives at the same address (DailyChallengeDetail 404s if not).
+    return <DailyChallengeDetail id={rawId} />;
+  }
 
   const user = await getCurrentUser();
   const isCreator = user !== null && user.id === battle.creatorId;
   const isFriendOfCreator =
     user !== null && battle.visibility === "FRIENDS" ? (await getFriendIds(battle.creatorId)).includes(user.id) : false;
+  // An OPEN challenge past its expiry is expired for everyone, even if the
+  // sweep hasn't closed it (and returned any stake) yet.
+  const now = new Date();
+  const expiresAt = battleExpiresAt(battle);
+  const lapsed = battle.status === "EXPIRED" || (battle.status === "OPEN" && expiresAt <= now);
   const canAccept =
     user !== null &&
     !isCreator &&
     battle.status === "OPEN" &&
+    !lapsed &&
     (battle.visibility === "OPEN" || battle.targetUserId === user.id || isFriendOfCreator);
 
   // A real Match row is the only thing that means "matched" — targetUserId
@@ -254,7 +279,7 @@ export default async function BattlePage({
   const opponentRank = opponentIndex === -1 ? null : opponentIndex + 1;
   const opponentStanding = opponentIndex === -1 ? undefined : standings[opponentIndex];
 
-  const status = battleStatusInfo(battle.status);
+  const status = challengeStage(battle, battle.matches[0] ?? null, expiresAt, now);
   const formatText = formatLabel(battle.format);
 
   // Only a viewer who could personally accept an open-to-anyone slot right
@@ -278,7 +303,7 @@ export default async function BattlePage({
 
   return (
     <div data-surface="dark" className="dark-page w-full flex-1 bg-background">
-      <div className="mx-auto grid w-full max-w-[1400px] gap-6 px-6 py-8 sm:px-8 sm:py-10 lg:grid-cols-[1fr_340px] lg:items-start">
+      <div className="mx-auto grid w-full max-w-[1400px] gap-6 px-4 py-6 sm:px-8 sm:py-10 lg:grid-cols-[1fr_340px] lg:items-start">
         <div className="flex flex-col gap-6">
           <div className="flex items-center justify-between gap-3">
             <Link
@@ -289,7 +314,7 @@ export default async function BattlePage({
               Back to Challenges
             </Link>
             <StatusPill tone={status.tone} pulse={status.pulse}>
-              {battle.status === "OPEN" ? (
+              {battle.status === "OPEN" && !lapsed ? (
                 <>
                   <Zap size={13} />
                   Open Challenge
@@ -302,7 +327,7 @@ export default async function BattlePage({
 
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-4">
-              <GameArtTile game={battle.game} hideLabel className="h-16 w-16 shrink-0 rounded-[var(--radius-md)]" />
+              <GameArtTile thumb game={battle.game} hideLabel className="h-16 w-16 shrink-0 cut-sm" />
               <div className="flex flex-col gap-1.5">
                 <h1 className="font-display text-3xl leading-none font-bold tracking-tight uppercase sm:text-4xl">
                   {battle.game}
@@ -322,13 +347,8 @@ export default async function BattlePage({
             </div>
           </div>
 
-          <div className="relative overflow-hidden rounded-[var(--radius-hero)] border border-border bg-surface p-6 sm:p-10">
-            <GameArtTile game={battle.game} className="opacity-[0.18]" fill hideLabel imgWidth={1200} />
-            <div
-              aria-hidden
-              className="absolute inset-0"
-              style={{ backgroundImage: "linear-gradient(180deg, transparent, var(--surface) 78%)" }}
-            />
+          <div className={`relative isolate overflow-hidden cut-lg border bg-surface p-6 sm:p-10 ${status.pulse && battle.status === "ACCEPTED" ? "live-glow border-live/60" : "border-border"}`}>
+            <ArenaBackdrop game={battle.game} art={0.4} />
 
             <div className="relative z-10 flex flex-col items-center gap-6">
               <div className="flex w-full items-start justify-center gap-4 sm:gap-12">
@@ -367,7 +387,7 @@ export default async function BattlePage({
                   {opponentStanding ? (
                     <StatsRow standing={opponentStanding} />
                   ) : (
-                    <p className="max-w-[160px] rounded-[10px] bg-surface-elevated px-3 py-2 text-center text-xs text-muted">
+                    <p className="max-w-[160px] rounded-none bg-surface-elevated px-3 py-2 text-center text-xs text-muted">
                       {viewerIsInvitee ? "Your stats could show here." : "Stats will show here once matched."}
                     </p>
                   )}
@@ -392,6 +412,16 @@ export default async function BattlePage({
           </div>
 
           {cancelled && <p className="alert alert-danger">This Challenge was cancelled.</p>}
+          {lapsed && (
+            <p className="alert alert-warning">
+              This Challenge expired with no takers.{battle.stakeAmount > 0 ? " The stake was returned to the host's wallet." : ""}
+            </p>
+          )}
+          {battle.status === "OPEN" && !lapsed && (
+            <p className="text-center text-xs text-muted" suppressHydrationWarning>
+              Expires {formatRelative(expiresAt)}
+            </p>
+          )}
 
           <div className="flex flex-col items-center gap-2">
             {isMatched && realMatch && (
@@ -399,7 +429,8 @@ export default async function BattlePage({
                 {battle.status === "COMPLETE" ? "View Result →" : "View Matchup →"}
               </Link>
             )}
-            {isCreator && battle.status === "OPEN" && <CancelBattleButton battleId={battle.id} />}
+            {isCreator && battle.status === "OPEN" && !lapsed && <CancelBattleButton battleId={battle.id} />}
+            {canAccept && battle.visibility === "TARGETED" && battle.targetUserId === user?.id && <DeclineButton battleId={battle.id} />}
             {canAccept && (
               <>
                 <AcceptButton battleId={battle.id} />
@@ -410,14 +441,14 @@ export default async function BattlePage({
                 </p>
               </>
             )}
-            {!user && battle.status === "OPEN" && (
+            {!user && battle.status === "OPEN" && !lapsed && (
               <>
-                <Link href={`/login?next=${encodeURIComponent(`/battles/${battle.id}`)}`} className="btn-primary w-full sm:w-fit">
+                <Link href={loginPath(`/battles/${battle.id}`)} className="btn-primary w-full sm:w-fit">
                   Log in to accept →
                 </Link>
                 <p className="text-xs text-muted">
                   Don&apos;t have an account?{" "}
-                  <Link href="/signup" className="font-medium text-accent-blue hover:underline">
+                  <Link href={signupPath(`/battles/${battle.id}`)} className="font-medium text-accent-blue hover:underline">
                     Sign up free
                   </Link>
                 </p>

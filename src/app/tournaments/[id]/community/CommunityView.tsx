@@ -1,118 +1,32 @@
 "use client";
 
 /**
- * Circuit Community — Phase 1's Discord-style chat UI. Channel sidebar
- * (collapses into a slide-over on mobile) + a single message pane.
- *
- * No members column, no reactions, no roles — those are Phase 2. No
- * WebSocket — see `Poller.tsx`'s own doc and this feature's schema
- * comment on why: this component runs its own short interval against
- * the messages API (not the generic `Poller`/`router.refresh()`
- * mechanism, which would blow away this component's own local state on
- * every tick) and only fetches messages newer than the last one it has.
+ * Circuit Community — the chat. Channel sidebar (a slide-over on phones)
+ * with the community's threads and events, the channel's message feed,
+ * and a side panel (a sheet on phones) for a thread, the member list,
+ * pinned messages or search. Messages support replies, @mentions,
+ * reactions, threads and pins; streams poll (see chatShared.tsx).
  */
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Hash, Menu, X } from "lucide-react";
+import { ArrowLeft, CalendarDays, Hash, Lock, Menu, MessagesSquare, Pin, Plus, Search, Users, X } from "lucide-react";
 import { Spinner } from "@/components/Spinner";
+import { useConfirmDialog } from "@/components/ConfirmDialogProvider";
+import { DialogOverlay } from "@/components/ui/Overlay";
 import { ChatComposer, type ComposerSubmit } from "@/components/community/ChatComposer";
-import { MessageBody, type MessageContent } from "@/components/community/MessageBody";
+import { CommunityAvatar } from "@/components/community/CommunityAvatar";
+import { CommunityMenu, type CommunityMenuProps } from "@/components/community/CommunityMenu";
+import { MembersPanel, PinsPanel, SearchPanel, ThreadPanel } from "@/components/community/CommunityPanels";
+import { LOCAL_TIME_ZONE, MessageList, useMessageStream, type MessageInfo } from "@/components/community/chatShared";
 
-type ChannelInfo = { id: string; key: string; name: string };
-type Author = { id: string; displayName: string; handle: string; avatarUrl: string | null };
-type MessageInfo = MessageContent & { id: string; createdAt: string; isSystem: boolean; author: Author };
+type ChannelInfo = { id: string; key: string; name: string; modOnly?: boolean };
+type Role = "OWNER" | "MODERATOR" | "MEMBER";
+export type CommunityEvent = { id: string; name: string; startAt: string; status: string; href: string; going?: number };
+type ThreadListItem = { id: string; title: string; channelId: string; channelName: string; messageCount: number; lastMessageAt: string; locked: boolean };
+type Panel = { type: "thread"; id: string } | { type: "members" } | { type: "pins" } | { type: "search" } | null;
 
-const POLL_INTERVAL_MS = 4000;
-/** Consecutive messages from the same author within this window render
- *  grouped (no repeated avatar/name) — same idea as Discord/Slack, using
- *  only data already on the message (author, createdAt), nothing new. */
-const GROUP_WINDOW_MS = 5 * 60 * 1000;
-
-// V1 audit follow-up: `Intl`'s default timeZone is the *runtime's own*
-// local zone — the server (likely UTC) and a visitor's browser almost
-// never agree, which both produces a React hydration-mismatch warning
-// (this is a "use client" component, so it's still server-rendered for
-// the initial HTML) and can show the wrong day/time until the client
-// re-renders. Pinning Africa/Lagos explicitly — Circuit's own locale
-// throughout ("en-NG" everywhere) — makes server and client compute the
-// exact same value regardless of where either actually runs.
-const LOCAL_TIME_ZONE = "Africa/Lagos";
-
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString("en-NG", { hour: "numeric", minute: "2-digit", timeZone: LOCAL_TIME_ZONE });
-}
-
-/** The LOCAL_TIME_ZONE calendar date as a stable string key — used both
- *  to decide "Today"/"Yesterday" below and to decide where a day divider
- *  goes in groupMessages, so both agree on the same day boundary
- *  regardless of the runtime's own timezone. */
-function dayKeyIn(date: Date): string {
-  return date.toLocaleDateString("en-CA", { timeZone: LOCAL_TIME_ZONE }); // en-CA => YYYY-MM-DD
-}
-
-/** "Today" / "Yesterday" / a real date — for the divider between
- *  messages sent on different days, not a relative "3h ago" (that's
- *  what the per-message time next to the name is already for). */
-function formatDayDivider(iso: string): string {
-  const date = new Date(iso);
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  if (dayKeyIn(date) === dayKeyIn(today)) return "Today";
-  if (dayKeyIn(date) === dayKeyIn(yesterday)) return "Yesterday";
-  return date.toLocaleDateString("en-NG", { day: "numeric", month: "long", year: "numeric", timeZone: LOCAL_TIME_ZONE });
-}
-
-type MessageGroup = { author: Author; dayLabel: string | null; messages: MessageInfo[] };
-
-/** Folds a flat, oldest-first message list into day dividers +
- *  same-author/within-window clusters — purely a rendering concern, the
- *  underlying data/API is unchanged. */
-function groupMessages(messages: MessageInfo[]): MessageGroup[] {
-  const groups: MessageGroup[] = [];
-  let lastDayKey: string | null = null;
-
-  for (const message of messages) {
-    const dayKey = dayKeyIn(new Date(message.createdAt));
-    const isNewDay = dayKey !== lastDayKey;
-    lastDayKey = dayKey;
-
-    const lastGroup = groups[groups.length - 1];
-    const lastMessage = lastGroup?.messages[lastGroup.messages.length - 1];
-    const withinWindow =
-      lastMessage && new Date(message.createdAt).getTime() - new Date(lastMessage.createdAt).getTime() < GROUP_WINDOW_MS;
-
-    if (!isNewDay && lastGroup && lastGroup.author.id === message.author.id && withinWindow) {
-      lastGroup.messages.push(message);
-    } else {
-      groups.push({ author: message.author, dayLabel: isNewDay ? formatDayDivider(message.createdAt) : null, messages: [message] });
-    }
-  }
-  return groups;
-}
-
-/** Appends `incoming` to `existing`, dropping any message whose id is
- *  already present — both the poller and a just-sent message can end up
- *  offering the same row (e.g. a send's own response arriving right as
- *  the next poll also picks it up), and a plain concat would render it
- *  twice with a duplicate React key. */
-function mergeMessages(existing: MessageInfo[], incoming: MessageInfo[]): MessageInfo[] {
-  const seen = new Set(existing.map((m) => m.id));
-  const deduped = incoming.filter((m) => !seen.has(m.id));
-  return deduped.length > 0 ? [...existing, ...deduped] : existing;
-}
-
-function Avatar({ author }: { author: Author }) {
-  return author.avatarUrl ? (
-    // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs, same as BracketView's own Avatar
-    <img src={author.avatarUrl} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" />
-  ) : (
-    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-surface-elevated text-xs font-semibold text-muted">
-      {author.displayName.slice(0, 1).toUpperCase()}
-    </div>
-  );
-}
+const THREADS_POLL_MS = 20_000;
 
 export function CommunityView({
   communityId,
@@ -121,216 +35,255 @@ export function CommunityView({
   channels,
   memberCount,
   initialChannelMessages,
+  initialChannelId,
+  initialServerTime,
+  highlightMessageId,
+  initialThreadId,
+  viewerId,
   isMember: initialIsMember,
+  iconUrl = null,
+  tag = null,
+  viewerRole = null,
+  roleBadges = {},
+  events = [],
+  menu,
+  mutedUntil = null,
 }: {
   communityId: string;
-  /** Where the back arrow goes — the tournament page for a tournament
-   *  community, the homepage for Circuit's own platform-wide one. */
+  /** Where the back arrow goes. */
   backHref: string;
-  /** Header title — the tournament name, or "Circuit" for the
-   *  platform-wide community. */
   title: string;
   channels: ChannelInfo[];
-  /** Real `CommunityMember` count — not a members list/roles (Phase 2),
-   *  just the header's own "X members" line. */
   memberCount: number;
   initialChannelMessages: MessageInfo[];
+  /** Channel the page opened on; `initialChannelMessages` belong to it. */
+  initialChannelId?: string;
+  /** Server time the initial messages were read at (first poll's reactionsSince). */
+  initialServerTime: string;
+  /** Message to scroll to and flash (from a notification or search link). */
+  highlightMessageId?: string;
+  /** Thread to open in the side panel (a mention inside a thread). */
+  initialThreadId?: string;
+  viewerId: string;
   isMember: boolean;
+  iconUrl?: string | null;
+  tag?: string | null;
+  /** The viewer's effective role — moderators post in mod-only channels,
+   *  remove anyone's messages, pin and lock threads. */
+  viewerRole?: Role | null;
+  /** Owners/moderators, for the badge next to their name. */
+  roleBadges?: Record<string, "OWNER" | "MODERATOR">;
+  /** Upcoming tournaments this community hosts. */
+  events?: CommunityEvent[];
+  /** Header "…" menu (invite, about, settings, leave). */
+  menu?: CommunityMenuProps;
+  /** ISO time their timeout ends, if they're muted here. */
+  mutedUntil?: string | null;
 }) {
-  const [activeChannelId, setActiveChannelId] = useState(channels[0]?.id ?? "");
-  const [messagesByChannel, setMessagesByChannel] = useState<Record<string, MessageInfo[]>>(() =>
-    channels[0] ? { [channels[0].id]: initialChannelMessages } : {}
-  );
+  const confirm = useConfirmDialog();
+  const isModerator = viewerRole === "OWNER" || viewerRole === "MODERATOR";
+  const startChannelId = initialChannelId ?? channels[0]?.id ?? "";
+  const [activeChannelId, setActiveChannelId] = useState(startChannelId);
+  const [flashId, setFlashId] = useState<string | null>(highlightMessageId ?? null);
   const [isMember, setIsMember] = useState(initialIsMember);
   const [joining, setJoining] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [panel, setPanel] = useState<Panel>(initialThreadId ? { type: "thread", id: initialThreadId } : null);
+  const [replyingTo, setReplyingTo] = useState<MessageInfo | null>(null);
+  const [threads, setThreads] = useState<ThreadListItem[]>([]);
+  const [newThread, setNewThread] = useState<{ fromMessage: MessageInfo | null } | null>(null);
+  const [threadTitle, setThreadTitle] = useState("");
+  /** A message to scroll to once the list containing it has loaded. */
+  const pendingJumpRef = useRef<string | null>(null);
+  /** Set when jumping to a message in another channel: load around it once that channel opens. */
+  const pendingAroundRef = useRef<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  /** Whether the list was scrolled to (near) the bottom before the latest
-   *  render — only then do new messages auto-scroll, so reading older
-   *  history isn't yanked away by someone else's message arriving. */
+  /** Only auto-scroll on new messages when already near the bottom. */
   const stickToBottomRef = useRef(true);
-  const forceScrollRef = useRef(true);
+  const forceScrollRef = useRef(!highlightMessageId);
 
+  const muted = !!mutedUntil && new Date(mutedUntil) > new Date();
   const activeChannel = channels.find((c) => c.id === activeChannelId) ?? null;
-  const activeMessages = messagesByChannel[activeChannelId] ?? [];
-  const channelLoading = isMember && activeChannelId !== "" && messagesByChannel[activeChannelId] === undefined;
-  const messageGroups = groupMessages(activeMessages);
-
-  // Read inside the poll interval via a ref, not the `messagesByChannel`
-  // state directly — keeping it out of that effect's dependency array
-  // (see below) means one interval lives for the whole time a channel is
-  // active, instead of being torn down and recreated on every single
-  // message arrival. That churn was the real cause of a since-seen bug:
-  // an in-flight poll from an interval that's already being replaced
-  // could still resolve and append its results after the new interval
-  // also appended the same message, duplicating it in state.
-  const messagesByChannelRef = useRef(messagesByChannel);
-  useEffect(() => {
-    messagesByChannelRef.current = messagesByChannel;
-  }, [messagesByChannel]);
+  const readOnlyHere = !!activeChannel?.modOnly && !isModerator;
+  const stream = useMessageStream({
+    channelId: activeChannelId,
+    enabled: isMember && !!activeChannelId,
+    initialMessages: initialChannelMessages,
+    initialServerTime,
+    onError: setError,
+  });
+  const messages = stream.messages ?? [];
 
   // Mark the whole community read once, on arrival.
   useEffect(() => {
     fetch(`/api/communities/${communityId}/read`, { method: "POST" });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally once per mount, not per communityId re-render
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per mount
   }, []);
 
-  // Load a channel's history the first time it's opened. `channelLoading`
-  // above is derived from `messagesByChannel` rather than a separate
-  // state flag set here — nothing to set synchronously in the effect
-  // body, only the async fetch result once it actually resolves.
-  // Non-members can't read channels (the API 403s), and an error must
-  // still store *something* — leaving the entry undefined would re-run
-  // this effect and refetch in an endless loop.
+  // Keep the sidebar's thread list fresh.
   useEffect(() => {
-    if (!isMember || !activeChannelId || messagesByChannel[activeChannelId]) return;
+    if (!isMember) return;
     let cancelled = false;
-    fetch(`/api/channels/${activeChannelId}/messages`)
-      .then(async (res) => (res.ok ? ((await res.json()) as { messages: MessageInfo[] }).messages : []))
-      .catch(() => [] as MessageInfo[])
-      .then((messages) => {
-        if (!cancelled) setMessagesByChannel((prev) => ({ ...prev, [activeChannelId]: messages ?? [] }));
-      });
+    const load = () =>
+      fetch(`/api/communities/${communityId}/threads`)
+        .then(async (res) => (res.ok ? ((await res.json()) as { threads: ThreadListItem[] }).threads : null))
+        .then((list) => !cancelled && list && setThreads(list))
+        .catch(() => undefined);
+    load();
+    const interval = setInterval(load, THREADS_POLL_MS);
     return () => {
       cancelled = true;
+      clearInterval(interval);
     };
-  }, [activeChannelId, messagesByChannel, isMember]);
+  }, [communityId, isMember]);
 
-  // Poll the active channel for anything newer than the last message
-  // already shown — not a full refetch, and not the generic Poller
-  // (which would re-run this whole page's server component instead).
-  // `messagesByChannel` deliberately isn't a dependency — see the ref's
-  // own comment above. Merging by id (not a plain append) is a second,
-  // independent safety net against the same duplicate-message class of
-  // bug, not just a fix for the one race this happened to catch.
+  // Scroll to a highlighted/jumped-to message once it's rendered, else to the bottom.
   useEffect(() => {
-    if (!isMember || !activeChannelId) return;
-    const interval = setInterval(async () => {
-      // Same reasoning as NotificationBell's own poll — a transient
-      // network blip shouldn't crash this background poll; skip the
-      // tick and retry next interval instead of an unhandled rejection.
-      try {
-        const current = messagesByChannelRef.current[activeChannelId] ?? [];
-        const since = current.length > 0 ? current[current.length - 1].createdAt : new Date(0).toISOString();
-        const res = await fetch(`/api/channels/${activeChannelId}/messages?since=${encodeURIComponent(since)}`);
-        if (!res.ok) return;
-        const data: { messages: MessageInfo[] } = await res.json();
-        if (data.messages.length > 0) {
-          setMessagesByChannel((prev) => ({
-            ...prev,
-            [activeChannelId]: mergeMessages(prev[activeChannelId] ?? [], data.messages),
-          }));
-        }
-      } catch {
-        // Ignored — the next interval tick retries.
-      }
-    }, POLL_INTERVAL_MS);
-    return () => clearInterval(interval);
-  }, [activeChannelId, isMember]);
-
-  useEffect(() => {
+    const target = pendingJumpRef.current ?? flashId;
+    if (target && stream.messages && scrollToMessage(target)) {
+      pendingJumpRef.current = null;
+      return;
+    }
     const el = scrollRef.current;
     if (!el || !(stickToBottomRef.current || forceScrollRef.current)) return;
     el.scrollTo({ top: el.scrollHeight, behavior: forceScrollRef.current ? "auto" : "smooth" });
     forceScrollRef.current = false;
-  }, [activeMessages.length, activeChannelId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs when the list changes
+  }, [messages.length, activeChannelId, stream.messages === null]);
+
+  // A flash fades a moment after its message is actually on screen (a
+  // jump may first have to load the messages around it).
+  const flashVisible = !!flashId && messages.some((m) => m.id === flashId);
+  useEffect(() => {
+    if (!flashVisible) return;
+    const timer = setTimeout(() => setFlashId(null), 2600);
+    return () => clearTimeout(timer);
+  }, [flashVisible, flashId]);
+
+  function scrollToMessage(id: string): boolean {
+    const el = document.getElementById(`msg-${id}`);
+    if (!el) return false;
+    stickToBottomRef.current = false;
+    el.scrollIntoView({ block: "center" });
+    return true;
+  }
+
+  function openChannel(id: string) {
+    forceScrollRef.current = true;
+    setReplyingTo(null);
+    setActiveChannelId(id);
+    setSidebarOpen(false);
+  }
+
+  /** Jump to a message in this channel's feed — loads the window around it if it isn't on screen. */
+  function jumpTo(messageId: string, channelId = activeChannelId) {
+    setFlashId(messageId);
+    if (channelId === activeChannelId && scrollToMessage(messageId)) return;
+    pendingJumpRef.current = messageId;
+    if (channelId !== activeChannelId) {
+      setActiveChannelId(channelId);
+      // The new stream loads around the message (see effect below).
+      pendingAroundRef.current = messageId;
+      return;
+    }
+    if (!messages.some((m) => m.id === messageId)) stream.loadAround(messageId);
+  }
+  useEffect(() => {
+    if (pendingAroundRef.current && stream.messages) {
+      const id = pendingAroundRef.current;
+      pendingAroundRef.current = null;
+      if (!stream.messages.some((m) => m.id === id)) stream.loadAround(id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- after the new channel's first load
+  }, [stream.messages === null, activeChannelId]);
 
   async function handleJoin() {
     setJoining(true);
     setError(null);
-    const res = await fetch(`/api/communities/${communityId}/join`, { method: "POST" });
+    const res = await fetch(`/api/communities/${communityId}/join`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
     const data = await res.json().catch(() => null);
-    if (res.ok) {
-      // Drop the empty placeholder lists a non-member was shown, so the
-      // history effect loads real messages now that reads are allowed.
-      setMessagesByChannel({});
-      setIsMember(true);
-    }
+    if (res.ok) setIsMember(true);
     else setError(data?.error ?? "Couldn't join. Try again.");
     setJoining(false);
+  }
+
+  async function handleDelete(messageId: string) {
+    const ok = await confirm({ title: "Remove this message?", message: "It will disappear for everyone.", confirmLabel: "Remove" });
+    if (ok) await stream.remove(messageId);
   }
 
   async function handleSend(message: ComposerSubmit): Promise<boolean> {
     if (sending || !activeChannelId) return false;
     setSending(true);
     setError(null);
-    const channelId = activeChannelId;
-
-    let res: Response;
-    try {
-      if (message.kind === "IMAGE") {
-        const form = new FormData();
-        form.append("image", message.image.blob);
-        form.append("caption", message.caption);
-        form.append("width", String(message.image.width));
-        form.append("height", String(message.image.height));
-        res = await fetch(`/api/channels/${channelId}/messages`, { method: "POST", body: form });
-      } else {
-        res = await fetch(`/api/channels/${channelId}/messages`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(message.kind === "STICKER" ? { stickerId: message.stickerId } : { content: message.content }),
-        });
-      }
-    } catch {
-      setError("Message didn't send — check your connection and try again.");
-      setSending(false);
-      return false;
-    }
-
-    const data = await res.json().catch(() => null);
+    const sent = await stream.send(message, replyingTo?.id);
     setSending(false);
-    if (!res.ok) {
-      setError(data?.error ?? "Message didn't send. Try again.");
-      return false;
-    }
+    if (!sent) return false;
+    setReplyingTo(null);
     forceScrollRef.current = true; // always jump to your own message
-    setMessagesByChannel((prev) => ({ ...prev, [channelId]: mergeMessages(prev[channelId] ?? [], [data]) }));
     return true;
   }
 
+  async function createThread() {
+    const fromMessage = newThread?.fromMessage ?? null;
+    const res = await fetch(`/api/communities/${communityId}/threads`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ channelId: activeChannelId, title: threadTitle, messageId: fromMessage?.id }),
+    }).catch(() => null);
+    const data = await res?.json().catch(() => null);
+    if (!res?.ok) return setError(data?.error ?? "Couldn't start the thread.");
+    setNewThread(null);
+    setThreadTitle("");
+    setPanel({ type: "thread", id: data.id });
+    setThreads((list) => [
+      { id: data.id, title: data.title, channelId: activeChannelId, channelName: activeChannel?.name ?? "", messageCount: 0, lastMessageAt: new Date().toISOString(), locked: false },
+      ...list.filter((t) => t.id !== data.id),
+    ]);
+    if (fromMessage) stream.update((list) => list.map((m) => (m.id === fromMessage.id ? { ...m, thread: { id: data.id, title: data.title, messageCount: 0, lastMessageAt: new Date().toISOString(), locked: false } } : m)));
+  }
+
+  const headerButton = (label: string, icon: React.ReactNode, active: boolean, onClick: () => void) => (
+    <button type="button" onClick={onClick} aria-label={label} title={label} aria-pressed={active} className={`btn-icon !h-9 !w-9 sm:!h-11 sm:!w-11 ${active ? "bg-surface-elevated text-foreground" : ""}`}>
+      {icon}
+    </button>
+  );
+
   return (
-    // Mobile: pinned between the fixed TopBar (60px) and the fixed
-    // MobileTabBar (3.5rem + safe area), app-style — the message list
-    // scrolls on its own and the composer always sits right above the tab
-    // bar, instead of floating mid-screen under a short conversation.
-    // `fixed` (not a 100dvh height calc) so AppShell's own bottom padding
-    // for the tab bar can't double-count. The page exports
-    // `interactiveWidget: "resizes-content"`, so on Android the keyboard
-    // shrinks this box rather than covering the composer.
-    // sm+ has no bottom tab bar, so the in-flow fixed-height panel is fine.
-    <div className="fixed inset-x-0 top-[60px] bottom-[calc(3.5rem_+_env(safe-area-inset-bottom))] z-[1] flex flex-col bg-background sm:static sm:mx-auto sm:h-[calc(100dvh-96px)] sm:w-full sm:max-w-6xl sm:bg-transparent sm:p-6">
-      <div className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-3 sm:rounded-t-[14px] sm:border sm:border-b-0 sm:bg-surface sm:px-5 sm:py-4">
-        <button type="button" onClick={() => setSidebarOpen(true)} className="btn-icon sm:hidden" aria-label="Open channels">
+    // Phones: pinned between the fixed TopBar (60px) and the fixed tab bar,
+    // app-style. The page exports `interactiveWidget: "resizes-content"`,
+    // so the Android keyboard shrinks this box rather than covering the composer.
+    <div className="fixed inset-x-0 top-[60px] bottom-[calc(3.5rem_+_env(safe-area-inset-bottom))] z-[1] flex flex-col bg-background sm:static sm:mx-auto sm:h-[calc(100dvh-96px)] sm:w-full sm:max-w-7xl sm:bg-transparent sm:p-6">
+      <div className="flex shrink-0 items-center gap-1.5 border-b border-border px-2 py-2.5 sm:gap-3 sm:rounded-t-[14px] sm:border sm:border-b-0 sm:bg-surface sm:px-5 sm:py-4">
+        <button type="button" onClick={() => setSidebarOpen(true)} className="btn-icon !h-9 !w-9 sm:hidden" aria-label="Open channels">
           <Menu size={18} />
         </button>
         <Link href={backHref} className="flex items-center gap-1.5 text-sm font-medium text-muted transition hover:text-foreground">
           <ArrowLeft size={15} />
           <span className="hidden sm:inline">Back</span>
         </Link>
-        <span className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-blue-soft text-accent-blue sm:flex">
-          <Hash size={16} />
-        </span>
+        <CommunityAvatar name={title} iconUrl={iconUrl} tag={tag} size="sm" className="hidden sm:flex" />
         <div className="flex min-w-0 flex-1 flex-col">
           <span className="truncate font-display text-base font-bold tracking-tight">{title}</span>
           <span className="text-metadata truncate">
             #{activeChannel?.name ?? "community"} · {memberCount} {memberCount === 1 ? "member" : "members"}
           </span>
         </div>
+        {isMember && (
+          <div className="flex items-center">
+            {headerButton("Search", <Search size={17} />, panel?.type === "search", () => setPanel(panel?.type === "search" ? null : { type: "search" }))}
+            {headerButton("Pinned messages", <Pin size={17} />, panel?.type === "pins", () => setPanel(panel?.type === "pins" ? null : { type: "pins" }))}
+            {headerButton("Members", <Users size={17} />, panel?.type === "members", () => setPanel(panel?.type === "members" ? null : { type: "members" }))}
+          </div>
+        )}
+        {menu && isMember && <CommunityMenu {...menu} />}
       </div>
 
       <div className="relative flex min-h-0 flex-1 sm:rounded-b-[14px] sm:border sm:border-border sm:bg-surface">
-        {/* Channel sidebar — a normal column at sm+, a slide-over below it.
-            `relative` on the parent above is load-bearing: without a
-            positioned ancestor, this `absolute inset-0` has nothing to
-            anchor to and renders against whatever positioned ancestor is
-            further up the tree instead — invisible/mispositioned rather
-            than a visible drawer over the message pane. */}
-        <div
-          className={`${sidebarOpen ? "flex" : "hidden"} absolute inset-0 z-20 flex-col bg-surface sm:relative sm:z-0 sm:flex sm:w-52 sm:shrink-0 sm:border-r sm:border-border sm:bg-surface-elevated/40`}
-        >
+        {/* Channel sidebar — a column at sm+, a slide-over below it. */}
+        <div className={`${sidebarOpen ? "flex" : "hidden"} absolute inset-0 z-20 flex-col overflow-y-auto bg-surface sm:relative sm:z-0 sm:flex sm:w-56 sm:shrink-0 sm:border-r sm:border-border sm:bg-surface-elevated/40`}>
           <div className="flex items-center justify-between border-b border-border p-3 sm:hidden">
             <span className="text-eyebrow">Channels</span>
             <button type="button" onClick={() => setSidebarOpen(false)} className="btn-icon" aria-label="Close channels">
@@ -345,23 +298,83 @@ export function CommunityView({
                 <button
                   key={channel.id}
                   type="button"
-                  onClick={() => {
-                    forceScrollRef.current = true;
-                    setActiveChannelId(channel.id);
-                    setSidebarOpen(false);
-                  }}
-                  className={`flex items-center gap-1.5 rounded-[8px] border-l-2 px-2.5 py-1.5 text-left text-sm font-medium transition ${
-                    active
-                      ? "border-accent-blue bg-surface-elevated text-foreground"
-                      : "border-transparent text-muted hover:bg-surface-elevated/60 hover:text-foreground"
+                  onClick={() => openChannel(channel.id)}
+                  className={`flex items-center gap-1.5 rounded-none border-l-2 px-2.5 py-1.5 text-left text-sm font-medium transition ${
+                    active ? "border-accent-blue bg-surface-elevated text-foreground" : "border-transparent text-muted hover:bg-surface-elevated/60 hover:text-foreground"
                   }`}
                 >
                   <Hash size={14} className="shrink-0" />
                   <span className="truncate">{channel.name}</span>
+                  {channel.modOnly && <Lock size={11} className="ml-auto shrink-0 opacity-60" aria-label="Moderators post here" />}
                 </button>
               );
             })}
           </div>
+
+          {isMember && (
+            <>
+              <div className="flex items-center justify-between px-3 pt-3 pb-1">
+                <span className="text-eyebrow">Threads</span>
+                {!muted && (!activeChannel?.modOnly || isModerator) && (
+                  <button type="button" onClick={() => setNewThread({ fromMessage: null })} aria-label="New thread" title="New thread" className="rounded-none p-0.5 text-muted hover:bg-surface-elevated hover:text-foreground">
+                    <Plus size={14} />
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-col gap-0.5 p-2 pt-0">
+                {threads.length === 0 ? (
+                  <p className="px-2.5 py-1 text-xs text-muted">No threads yet.</p>
+                ) : (
+                  threads.slice(0, 10).map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => {
+                        setPanel({ type: "thread", id: t.id });
+                        setSidebarOpen(false);
+                      }}
+                      className={`flex items-start gap-2 rounded-none px-2.5 py-1.5 text-left text-sm transition ${
+                        panel?.type === "thread" && panel.id === t.id ? "bg-surface-elevated text-foreground" : "text-muted hover:bg-surface-elevated/60 hover:text-foreground"
+                      }`}
+                    >
+                      <MessagesSquare size={14} className="mt-0.5 shrink-0" />
+                      <span className="flex min-w-0 flex-col">
+                        <span className="flex items-center gap-1 truncate font-medium">
+                          <span className="truncate">{t.title}</span>
+                          {t.locked && <Lock size={10} className="shrink-0 opacity-60" />}
+                        </span>
+                        <span className="text-[11px]">
+                          #{t.channelName} · {t.messageCount} {t.messageCount === 1 ? "reply" : "replies"}
+                        </span>
+                      </span>
+                    </button>
+                  ))
+                )}
+              </div>
+            </>
+          )}
+
+          {events.length > 0 && (
+            <>
+              <span className="text-eyebrow px-3 pt-3 pb-1">Events</span>
+              <div className="flex flex-col gap-0.5 p-2 pt-0">
+                {events.map((event) => (
+                  <Link key={event.id} href={event.href} className="flex items-start gap-2 rounded-none px-2.5 py-1.5 text-sm text-muted transition hover:bg-surface-elevated/60 hover:text-foreground">
+                    <CalendarDays size={14} className="mt-0.5 shrink-0" />
+                    <span className="flex min-w-0 flex-col">
+                      <span className="truncate font-medium">{event.name}</span>
+                      <span className="text-[11px]">
+                        {event.status === "LIVE"
+                          ? "Live now"
+                          : new Date(event.startAt).toLocaleString("en-NG", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: LOCAL_TIME_ZONE })}
+                        {event.going ? ` · ${event.going} going` : ""}
+                      </span>
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Message pane */}
@@ -372,60 +385,57 @@ export function CommunityView({
               const el = e.currentTarget;
               stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
             }}
-            className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pt-4 pb-6"
+            className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pt-5 pb-6"
           >
-            {channelLoading ? (
+            {stream.loading ? (
               <div className="flex flex-1 items-center justify-center">
                 <Spinner size={20} className="text-muted" />
               </div>
-            ) : activeMessages.length === 0 ? (
+            ) : messages.length === 0 ? (
               <p className="flex flex-1 items-center justify-center text-center text-sm text-muted">
-                No messages yet — be the first to say something in #{activeChannel?.name}.
+                {isMember ? `No messages yet. Be the first to say something in #${activeChannel?.name}.` : "Join to read and post in this community."}
               </p>
             ) : (
-              messageGroups.map((group) => (
-                <div key={group.messages[0].id} className="flex flex-col gap-1.5">
-                  {group.dayLabel && (
-                    <div className="flex items-center gap-3 py-1">
-                      <div className="h-px flex-1 bg-border" />
-                      <span className="text-metadata shrink-0">{group.dayLabel}</span>
-                      <div className="h-px flex-1 bg-border" />
-                    </div>
-                  )}
-                  <div className="flex items-start gap-2.5 pt-1">
-                    <Avatar author={group.author} />
-                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <div className="flex items-baseline gap-2">
-                        <span className="truncate text-sm font-semibold">{group.author.displayName}</span>
-                        <span className="text-metadata shrink-0">{formatTime(group.messages[0].createdAt)}</span>
-                      </div>
-                      <MessageBody message={group.messages[0]} />
-                    </div>
-                  </div>
-                  {/* Same author, within GROUP_WINDOW_MS — no repeated
-                      avatar/name, just the text aligned under it. */}
-                  {group.messages.slice(1).map((message) => (
-                    <div key={message.id} className="flex items-start gap-2.5">
-                      <span className="w-8 shrink-0" aria-hidden />
-                      <div className="min-w-0 flex-1">
-                        <MessageBody message={message} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ))
+              <MessageList
+                messages={messages}
+                viewerId={viewerId}
+                isModerator={isModerator}
+                roleBadges={roleBadges}
+                flashId={flashId}
+                handlers={{
+                  onReact: stream.react,
+                  onDelete: handleDelete,
+                  onReply: muted || readOnlyHere ? undefined : setReplyingTo,
+                  onStartThread: muted || (activeChannel?.modOnly && !isModerator) ? undefined : (m) => (setThreadTitle(m.content.slice(0, 80)), setNewThread({ fromMessage: m })),
+                  onTogglePin: (m) => stream.togglePin(m.id, !m.pinned),
+                  onOpenThread: (id) => setPanel({ type: "thread", id }),
+                  onJumpTo: (id) => jumpTo(id),
+                }}
+              />
             )}
           </div>
 
           {error && <p className="field-error shrink-0 px-4 pb-1">{error}</p>}
 
           <div className="shrink-0 border-t border-border bg-background sm:rounded-br-[14px] sm:bg-surface">
-            {isMember ? (
+            {isMember && muted ? (
+              <p className="flex items-center justify-center gap-1.5 px-4 py-4 text-center text-sm text-muted">
+                <Lock size={14} /> You&apos;re muted here until{" "}
+                {new Date(mutedUntil!).toLocaleString("en-NG", { hour: "numeric", minute: "2-digit", day: "numeric", month: "short", timeZone: LOCAL_TIME_ZONE })}.
+              </p>
+            ) : isMember && readOnlyHere ? (
+              <p className="flex items-center justify-center gap-1.5 px-4 py-4 text-center text-sm text-muted">
+                <Lock size={14} /> Only moderators post in #{activeChannel?.name}.
+              </p>
+            ) : isMember ? (
               <ChatComposer
+                communityId={communityId}
                 channelName={activeChannel?.name ?? ""}
                 sending={sending}
                 onSubmit={handleSend}
                 onError={setError}
+                replyingTo={replyingTo ? { authorName: replyingTo.author.displayName, snippet: replyingTo.content.slice(0, 80) } : null}
+                onCancelReply={() => setReplyingTo(null)}
               />
             ) : (
               <div className="p-3">
@@ -436,7 +446,64 @@ export function CommunityView({
             )}
           </div>
         </div>
+
+        {/* Side panel — a column at lg+, a full sheet below it. */}
+        {panel && isMember && (
+          <div className="absolute inset-0 z-30 flex flex-col bg-surface lg:relative lg:inset-auto lg:z-0 lg:w-[360px] lg:shrink-0 lg:border-l lg:border-border lg:rounded-br-[14px]">
+            {panel.type === "thread" && (
+              <ThreadPanel key={panel.id} threadId={panel.id} communityId={communityId} viewerId={viewerId} roleBadges={roleBadges} muted={muted} onClose={() => setPanel(null)} />
+            )}
+            {panel.type === "members" && <MembersPanel communityId={communityId} onClose={() => setPanel(null)} />}
+            {panel.type === "pins" && activeChannel && (
+              <PinsPanel
+                channelId={activeChannel.id}
+                channelName={activeChannel.name}
+                onJump={(id) => {
+                  jumpTo(id);
+                  if (window.innerWidth < 1024) setPanel(null);
+                }}
+                onClose={() => setPanel(null)}
+              />
+            )}
+            {panel.type === "search" && (
+              <SearchPanel
+                communityId={communityId}
+                onOpen={({ messageId, channelId, threadId }) => {
+                  if (threadId) setPanel({ type: "thread", id: threadId });
+                  else {
+                    jumpTo(messageId, channelId);
+                    if (window.innerWidth < 1024) setPanel(null);
+                  }
+                }}
+                onClose={() => setPanel(null)}
+              />
+            )}
+          </div>
+        )}
       </div>
+
+      <DialogOverlay open={!!newThread} onClose={() => setNewThread(null)} label="Start a thread" maxWidth={440}>
+        <div className="flex flex-col gap-3 px-5 pb-5 sm:pt-5">
+          <p className="font-mono text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">New thread in #{activeChannel?.name}</p>
+          {newThread?.fromMessage && (
+            <p className="line-clamp-2 rounded-none border-l-2 border-border-strong bg-surface-elevated/50 px-3 py-2 text-sm text-muted">
+              <span className="font-semibold text-foreground">{newThread.fromMessage.author.displayName}:</span> {newThread.fromMessage.content || "📷 Image"}
+            </p>
+          )}
+          <input
+            value={threadTitle}
+            onChange={(e) => setThreadTitle(e.target.value)}
+            maxLength={80}
+            placeholder="e.g. Looking for COD teammates"
+            className="field-input h-11"
+            aria-label="Thread title"
+            autoFocus
+          />
+          <button type="button" onClick={createThread} disabled={threadTitle.trim().length < 2} className="btn-primary h-11">
+            Start thread
+          </button>
+        </div>
+      </DialogOverlay>
     </div>
   );
 }

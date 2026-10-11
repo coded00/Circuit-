@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import type { Metadata } from "next";
 import { Inter, Barlow_Condensed, Geist_Mono } from "next/font/google";
 import { MotionConfig } from "framer-motion";
@@ -9,11 +10,16 @@ import { TopBar } from "@/components/nav/TopBar";
 import { MobileTabBar } from "@/components/nav/MobileTabBar";
 import { AppShell } from "@/components/AppShell";
 import { ConfirmDialogProvider } from "@/components/ConfirmDialogProvider";
+import { ToastProvider } from "@/components/ToastProvider";
+import { FeedbackProvider } from "@/components/FeedbackProvider";
 import { OneSignalInit } from "@/components/OneSignalInit";
 import { PresenceHeartbeat } from "@/components/PresenceHeartbeat";
+import { BackForwardRefresh } from "@/components/BackForwardRefresh";
 import { QuickMatchIncomingListener } from "@/components/QuickMatchIncomingListener";
 import { SITE_NAME, SITE_URL, DEFAULT_DESCRIPTION } from "@/lib/seo";
-import { THEME_INIT_SCRIPT } from "@/lib/theme";
+import { gameImageMap } from "@/lib/gameCatalogQueries";
+import { GameImageProvider } from "@/components/GameImageProvider";
+import { safeJsonLd } from "@/lib/jsonLd";
 
 // Phase 14: Inter for UI text, Barlow Condensed ExtraBold for display/hero
 // headlines — a tall, condensed weight suited to the CIRCUIT wordmark's
@@ -48,7 +54,7 @@ const geistMono = Geist_Mono({
 // no metadata export of its own.
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: "Circuit — Gaming Tournaments & Esports Competitions",
+  title: "Circuit | Gaming Tournaments & Esports Competitions",
   description: DEFAULT_DESCRIPTION,
   openGraph: {
     siteName: SITE_NAME,
@@ -80,9 +86,14 @@ const WEBSITE_JSON_LD = {
   url: SITE_URL,
 };
 
+// Both are read on every page view but change only when an admin edits them, so
+// a short shared cache keeps them from taking two database connections per request.
+const cachedPlatformSetting = unstable_cache(() => prisma.platformSetting.findUnique({ where: { id: "singleton" } }), ["platform-setting"], { revalidate: 15, tags: ["platform-setting"] });
+const cachedGameImageMap = unstable_cache(() => gameImageMap(), ["game-image-map"], { revalidate: 60, tags: ["games"] });
+
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const user = await getCurrentUser();
-  const [disputeCount, platformSetting] = await Promise.all([
+  const [disputeCount, platformSetting, gameImages] = await Promise.all([
     user
       ? prisma.dispute.count({
           where: {
@@ -91,7 +102,8 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           },
         })
       : 0,
-    prisma.platformSetting.findUnique({ where: { id: "singleton" } }),
+    cachedPlatformSetting(),
+    cachedGameImageMap(),
   ]);
   const navUser = user ? { handle: user.handle, displayName: user.displayName, isStaff: user.isStaff } : null;
 
@@ -99,15 +111,10 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       data-scroll-behavior="smooth"
+      data-theme="dark"
       className={`${bodyFont.variable} ${displayFont.variable} ${geistMono.variable} h-full antialiased`}
-      // THEME_INIT_SCRIPT below may set data-theme before React hydrates.
       suppressHydrationWarning
     >
-      <head>
-        {/* Applies the saved dark-mode choice before first paint, so a
-            dark-mode user never sees a flash of the light theme. */}
-        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
-      </head>
       {/* suppressHydrationWarning is scoped to this element's own attributes
           only (not its children) — needed because extensions like Grammarly
           inject data-gr-* attributes onto <body> before React hydrates,
@@ -118,8 +125,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             counterpart to globals.css's own `prefers-reduced-motion` CSS
             override just above — that override only silences CSS
             transitions/animations, never the JS-driven `motion.*` components
-            (PageTransition, Modal, NotificationBell, QuickMatchIncomingListener,
-            MatchFoundHud, and AppShell's own transitions all use framer-motion).
+            (Modal, NotificationBell, QuickMatchIncomingListener and
+            MatchFoundHud use framer-motion; page transitions are CSS view
+            transitions, covered by globals.css's reduced-motion rule).
             One root-level wrapper covers all of them without touching each
             component individually. */}
         <MotionConfig reducedMotion="user">
@@ -129,9 +137,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             pages, etc.) lives on those pages themselves, not here. */}
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(ORGANIZATION_JSON_LD) }}
+          dangerouslySetInnerHTML={{ __html: safeJsonLd(ORGANIZATION_JSON_LD) }}
         />
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(WEBSITE_JSON_LD) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(WEBSITE_JSON_LD) }} />
         {/* Phase 1: left nav + flexible main content. The persistent 330px
             right rail is homepage-specific composition (Phases 5/10-12 all
             describe homepage widgets), not a universal shell column — other
@@ -146,7 +154,10 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             AppShell decides whether this shell renders at all — the four
             auth routes skip it entirely for their own full-bleed split
             layout (see AppShell.tsx / AuthSplitLayout.tsx). */}
+        <GameImageProvider images={gameImages}>
         <ConfirmDialogProvider>
+        <ToastProvider>
+          <FeedbackProvider />
           <AppShell
             sidebar={<AppSidebar user={navUser} />}
             topBar={<TopBar user={user} disputeCount={disputeCount} />}
@@ -156,9 +167,12 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           >
             {children}
           </AppShell>
+        </ToastProvider>
         </ConfirmDialogProvider>
+        </GameImageProvider>
         {user && <OneSignalInit userId={user.id} notifyNewContent={user.notifyNewContent} />}
         {user && <PresenceHeartbeat />}
+        <BackForwardRefresh />
         {user && <QuickMatchIncomingListener />}
         </MotionConfig>
       </body>

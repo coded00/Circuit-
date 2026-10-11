@@ -24,6 +24,13 @@ import { playerRankInGame } from "@/lib/standings";
 import { getWalletActivity } from "@/lib/wallet";
 import { friendStatusBetween } from "@/lib/friends";
 import { matchStatusInfo } from "@/components/StatusPill";
+import { countryName, isCountryCode } from "@/lib/countries";
+import { hasBlocked } from "@/lib/blocks";
+import { openBattleFilter } from "@/lib/battles";
+import type { Metadata } from "next";
+import { absoluteUrl, buildMetadata } from "@/lib/seo";
+import { safeJsonLd } from "@/lib/jsonLd";
+import { isProfileIndexable } from "@/lib/profileSeo";
 import { ProfileView, type AttentionItem, type MatchSummary, type ProfileData } from "./ProfileView";
 
 const ACTIVE_MATCH_PRIORITY: Record<string, number> = { DISPUTED: 0, NEEDS_RESULT: 1, UPCOMING: 2 };
@@ -40,6 +47,24 @@ const TAB_ALIASES: Record<string, string> = {
   wallet: "wallet",
 };
 
+/** Indexed only when the player opted in, is an adult and has played; every other profile is noindex. */
+export async function generateMetadata({ params }: { params: Promise<{ handle: string }> }): Promise<Metadata> {
+  const { handle } = await params;
+  const player = await prisma.user.findUnique({
+    where: { handle },
+    select: { id: true, displayName: true, handle: true, bio: true, searchEngineIndexable: true, dateOfBirth: true, isSuspended: true, deletionRequestedAt: true },
+  });
+  const path = `/players/${handle}`;
+  if (!player) return buildMetadata({ title: "Player not found", description: "", path, noindex: true });
+  const played = player.searchEngineIndexable ? (await prisma.match.count({ where: { OR: [{ playerAId: player.id }, { playerBId: player.id }] } })) > 0 : false;
+  return buildMetadata({
+    title: `${player.displayName} (@${player.handle}) | Player Profile`,
+    description: player.bio?.slice(0, 155) || `${player.displayName}'s competitive record on Circuit: matches, tournaments, teams and ranking.`,
+    path,
+    noindex: !isProfileIndexable(player, played),
+  });
+}
+
 export default async function PlayerProfilePage({
   params,
   searchParams,
@@ -49,12 +74,16 @@ export default async function PlayerProfilePage({
 }) {
   const [{ handle }, { tab }] = await Promise.all([params, searchParams]);
 
-  const player = await prisma.user.findUnique({ where: { handle } });
+  const player = await prisma.user.findUnique({
+    where: { handle },
+    include: { featuredCommunity: { select: { tag: true, slug: true, name: true, enabled: true } } },
+  });
   if (!player) notFound();
 
   const viewer = await getCurrentUser();
   const isOwnProfile = viewer?.id === player.id;
-  const friendStatus = viewer && !isOwnProfile ? await friendStatusBetween(viewer.id, player.id) : null;
+  const [friendStatus, viewerBlocked] =
+    viewer && !isOwnProfile ? await Promise.all([friendStatusBetween(viewer.id, player.id), hasBlocked(viewer.id, player.id)]) : [null, false];
 
   const [
     activeMatches,
@@ -93,7 +122,7 @@ export default async function PlayerProfilePage({
         })
       : Promise.resolve([]),
     isOwnProfile
-      ? prisma.battle.findMany({ where: { creatorId: player.id, status: "OPEN" }, select: { id: true, game: true, format: true } })
+      ? prisma.battle.findMany({ where: { creatorId: player.id, ...openBattleFilter() }, select: { id: true, game: true, format: true } })
       : Promise.resolve([]),
     prisma.registration.findMany({
       where: { userId: player.id },
@@ -202,6 +231,13 @@ export default async function PlayerProfilePage({
 
   // --- Achievements (derived, with real progress) --------------------------
   const tournamentsJoined = allRegistrations.filter((r) => r.status === "CONFIRMED").length;
+  // A tournament prize actually paid out to them — real money movement, not a claim.
+  const prizesWon = await prisma.escrowTransaction.count({ where: { type: "PRIZE_PAYOUT", registration: { userId: player.id } } });
+  let bestWinRun = 0;
+  for (let i = 0, run = 0; i < decided.length; i++) {
+    run = decided[i] === "W" ? run + 1 : 0;
+    bestWinRun = Math.max(bestWinRun, run);
+  }
   const achievements: ProfileData["achievements"] = [
     { key: "first-match", label: "First Match", description: "Played a first match", unlocked: played >= 1, progress: { current: played, target: 1 } },
     { key: "five-wins", label: "5 Wins", description: "Won 5 matches", unlocked: wins >= 5, progress: { current: wins, target: 5 } },
@@ -212,6 +248,10 @@ export default async function PlayerProfilePage({
       unlocked: tournamentsJoined >= 1,
       progress: { current: tournamentsJoined, target: 1 },
     },
+    { key: "ten-wins", label: "10 Wins", description: "Won 10 matches", unlocked: wins >= 10, progress: { current: wins, target: 10 } },
+    { key: "hot-streak", label: "Hot Streak", description: "Won 3 matches in a row", unlocked: bestWinRun >= 3, progress: { current: bestWinRun, target: 3 } },
+    { key: "versatile", label: "Versatile", description: "Played matches in 3 different games", unlocked: gameStats.length >= 3, progress: { current: gameStats.length, target: 3 } },
+    { key: "prize-winner", label: "Prize Winner", description: "Won a tournament prize", unlocked: prizesWon >= 1, progress: { current: prizesWon, target: 1 } },
     { key: "top-10", label: "Top 10", description: "Ranked top 10 in a game", unlocked: (bestRank?.rank ?? 99) <= 10, progress: null },
   ];
 
@@ -258,13 +298,19 @@ export default async function PlayerProfilePage({
       avatarUrl: player.avatarUrl,
       bio: player.bio,
       region: player.region,
+      country: player.country && isCountryCode(player.country) ? { code: player.country, name: countryName(player.country) } : null,
       favoriteGames: player.favoriteGames,
       createdAt: player.createdAt,
+      communityTag:
+        player.featuredCommunity?.enabled && player.featuredCommunity.tag && player.featuredCommunity.slug
+          ? { tag: player.featuredCommunity.tag, name: player.featuredCommunity.name ?? "", href: `/communities/${player.featuredCommunity.slug}` }
+          : null,
     },
     isOwnProfile,
     viewerSignedIn: Boolean(viewer),
     friendStatus,
     profileUrl: `${process.env.NEXT_PUBLIC_APP_URL}/players/${player.handle}`,
+    viewerBlocked,
     stats: {
       wins,
       losses,
@@ -314,5 +360,14 @@ export default async function PlayerProfilePage({
     initialTab: tab ? TAB_ALIASES[tab] : undefined,
   };
 
-  return <ProfileView data={data} viewerId={viewer?.id ?? null} />;
+  // Structured data only on a profile that's allowed to be indexed (see lib/profileSeo.ts).
+  const personLd = isProfileIndexable(player, matches.length > 0)
+    ? { "@context": "https://schema.org", "@type": "Person", name: player.displayName, url: absoluteUrl(`/players/${player.handle}`), ...(player.avatarUrl ? { image: player.avatarUrl } : {}) }
+    : null;
+  return (
+    <>
+      {personLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(personLd) }} />}
+      <ProfileView data={data} viewerId={viewer?.id ?? null} />
+    </>
+  );
 }

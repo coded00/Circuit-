@@ -8,6 +8,8 @@
  * bank number. Maps to D5 and NFR-3.
  */
 
+export type ProviderName = "PAYSTACK" | "FLUTTERWAVE" | "BACHS";
+
 export type MinorAmount = number; // always minor currency units (kobo), never a float
 
 export type InitializeChargeInput = {
@@ -60,13 +62,17 @@ export type InitiateTransferResult = {
   providerReference: string;
 };
 
+/** A transfer's current state at the provider. REVERSED = it had gone out
+ *  and came back (the money is in our balance again). */
+export type TransferStatus = "SUCCESS" | "PENDING" | "FAILED" | "REVERSED";
+
 /**
  * Implemented by src/lib/payments/paystack.ts and flutterwave.ts.
  * Phase 2 code (P2-2 paid registration, P2-6 prize payout) depends on this
  * interface, not on either provider's SDK/REST shape directly.
  */
 export interface PaymentProviderClient {
-  readonly name: "PAYSTACK" | "FLUTTERWAVE";
+  readonly name: ProviderName;
   initializeCharge(input: InitializeChargeInput): Promise<InitializeChargeResult>;
   verifyCharge(providerReference: string): Promise<VerifyChargeResult>;
   initiateTransfer(input: InitiateTransferInput): Promise<InitiateTransferResult>;
@@ -74,4 +80,9 @@ export interface PaymentProviderClient {
    *  from initiateTransfer, which pays out to a bank account (P2-6's prize
    *  payout) rather than reversing a charge on the original payment method. */
   refundCharge(providerReference: string, amount: MinorAmount): Promise<RefundChargeResult>;
+  /** Looks up a transfer we initiated, by our own reference — the backstop
+   *  for a transfer webhook that never arrives (src/lib/payments/transfers.ts). */
+  verifyTransfer(reference: string): Promise<TransferStatus>;
+  /** Money the provider can send out right now (settled, spendable), in kobo. Null if it can't be read. */
+  availableBalance(): Promise<number | null>;
 }

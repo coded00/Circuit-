@@ -17,7 +17,7 @@ export default function LeaderboardError({ error, reset }: { error: Error & { di
         <AlertTriangle size={22} />
       </div>
       <h1 className="state-title">Couldn&apos;t load the leaderboard</h1>
-      <p className="state-description">Standings failed to load — try again.</p>
+      <p className="state-description">Standings failed to load. Try again.</p>
       <button type="button" onClick={reset} className="btn-primary">
         Try again
       </button>

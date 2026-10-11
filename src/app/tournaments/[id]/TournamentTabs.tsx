@@ -8,6 +8,7 @@
  * data, client does interaction only).
  */
 
+import { ViewTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 export type TournamentTab = { key: string; label: string; content: React.ReactNode };
@@ -60,9 +61,12 @@ export default function TournamentTabs({
         </div>
         {trailing}
       </div>
-      <div key={activeTab?.key} className="tab-content-enter" role="tabpanel" id={`tabpanel-${activeTab?.key}`} aria-labelledby={`tab-${activeTab?.key}`}>
-        {activeTab?.content}
-      </div>
+      {/* router.replace is a navigation transition, so the keyed panel crossfades. */}
+      <ViewTransition key={activeTab?.key} name="tournament-tab-panel" share="content-swap" enter="content-swap" default="none">
+        <div role="tabpanel" id={`tabpanel-${activeTab?.key}`} aria-labelledby={`tab-${activeTab?.key}`}>
+          {activeTab?.content}
+        </div>
+      </ViewTransition>
     </div>
   );
 }

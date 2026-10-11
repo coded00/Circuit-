@@ -18,6 +18,7 @@ import { getCurrentUser } from "@/lib/session";
 import { getVideoBySlug, getFeedPage, FEED_PAGE_SIZE } from "@/lib/videos";
 import { buildMetadata, absoluteUrl, videoPath, DEFAULT_OG_IMAGE } from "@/lib/seo";
 import { FeedClient, FEED_VIEWPORT_CLASS } from "@/components/video-feed/FeedClient";
+import { safeJsonLd } from "@/lib/jsonLd";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
@@ -57,7 +58,7 @@ export default async function VideoPage({ params }: { params: Promise<{ slug: st
 
   return (
     <div className={FEED_VIEWPORT_CLASS}>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(videoJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(videoJsonLd) }} />
       <FeedClient
         initialVideos={[video, ...rest.filter((v) => v.id !== video.id)]}
         initialNextCursor={nextCursor}

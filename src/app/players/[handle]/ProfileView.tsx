@@ -33,6 +33,10 @@ import {
 } from "lucide-react";
 import { GameArtTile } from "@/components/GameArtTile";
 import { ShareButton } from "@/components/ShareButton";
+import { flagEmoji } from "@/lib/countries";
+import { slugify } from "@/lib/seo";
+import BlockButton from "./BlockButton";
+import { FormChips } from "@/components/ui/FormChips";
 import { StatusPill, registrationStatusInfo, type StatusTone } from "@/components/StatusPill";
 import { FriendButton, type FriendButtonStatus } from "@/components/FriendButton";
 import { FriendRequestRow } from "@/components/friends/FriendRequestRow";
@@ -78,13 +82,19 @@ export type ProfileData = {
     avatarUrl: string | null;
     bio: string | null;
     region: string | null;
+    /** From signup; null for accounts that predate the country field. */
+    country: { code: string; name: string } | null;
     favoriteGames: string[];
     createdAt: Date;
+    /** The community tag they chose to wear. */
+    communityTag: { tag: string; name: string; href: string } | null;
   };
   isOwnProfile: boolean;
   viewerSignedIn: boolean;
   friendStatus: FriendButtonStatus | null;
   profileUrl: string;
+  /** The signed-in viewer has blocked this player. */
+  viewerBlocked: boolean;
   stats: {
     wins: number;
     losses: number;
@@ -168,9 +178,9 @@ function MatchRow({ match }: { match: MatchSummary }) {
     >
       <span aria-hidden className={`h-9 w-1 shrink-0 rounded-full ${style.bar}`} />
       {match.game ? (
-        <GameArtTile game={match.game} className="h-10 w-10 shrink-0 rounded-[8px]" hideLabel imgWidth={120} />
+        <GameArtTile thumb game={match.game} className="h-10 w-10 shrink-0 cut-avatar" hideLabel imgWidth={120} />
       ) : (
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] bg-surface-elevated text-muted">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center cut-avatar bg-surface-elevated text-muted">
           <Trophy size={16} />
         </span>
       )}
@@ -187,39 +197,20 @@ function MatchRow({ match }: { match: MatchSummary }) {
   );
 }
 
-function FormStrip({ form }: { form: ("W" | "L")[] }) {
-  if (form.length === 0) return null;
-  return (
-    <div className="flex items-center gap-1" aria-label={`Last ${form.length} results, most recent first: ${form.join(" ")}`}>
-      {form.map((r, i) => (
-        <span
-          key={i}
-          aria-hidden
-          className={`flex h-5 w-5 items-center justify-center rounded-[5px] font-mono text-[10px] font-bold ${
-            r === "W" ? "bg-success/15 text-success" : "bg-danger/15 text-danger"
-          } ${i === 0 ? "ring-1 ring-current/40" : ""}`}
-        >
-          {r}
-        </span>
-      ))}
-    </div>
-  );
-}
-
 function WinRateBar({ value }: { value: number | null }) {
   return (
-    <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-elevated" aria-hidden>
+    <div className="h-1.5 w-full overflow-hidden rounded-none bg-surface-elevated" aria-hidden>
       <div className="h-full rounded-full bg-accent-blue" style={{ width: `${value ?? 0}%` }} />
     </div>
   );
 }
 
-function GameRows({ games }: { games: ProfileData["gameStats"] }) {
+function GameRows({ games, handle }: { games: ProfileData["gameStats"]; handle: string }) {
   return (
     <div className="divide-y divide-border border-t border-border">
       {games.map((g) => (
-        <div key={g.game} className="flex items-center gap-3 px-5 py-3">
-          <GameArtTile game={g.game} className="h-10 w-10 shrink-0 rounded-[8px]" hideLabel imgWidth={120} />
+        <Link key={g.game} href={`/players/${handle}/games/${slugify(g.game)}`} className="flex items-center gap-3 px-5 py-3 transition hover:bg-surface-elevated/60">
+          <GameArtTile thumb game={g.game} className="h-10 w-10 shrink-0 cut-avatar" hideLabel imgWidth={120} />
           <div className="flex min-w-0 flex-1 flex-col gap-1.5">
             <div className="flex items-baseline justify-between gap-2">
               <span className="truncate text-sm font-medium">{g.game}</span>
@@ -235,7 +226,7 @@ function GameRows({ games }: { games: ProfileData["gameStats"] }) {
           >
             {g.rank ? `#${g.rank}` : "—"}
           </span>
-        </div>
+        </Link>
       ))}
     </div>
   );
@@ -286,13 +277,13 @@ function ProfileHeader({ data }: { data: ProfileData }) {
   ];
 
   return (
-    <header data-surface="dark" className="overflow-hidden rounded-[var(--radius-hero)] border border-border">
+    <header data-surface="dark" className="overflow-hidden cut-lg [--cut-line:var(--border)] border border-border">
       <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-end sm:justify-between sm:p-7">
         {/* Grid, not nested flex: on phones the bio/details drop below the
             avatar+name row and use the full width; from sm up they sit in
             the name column beside a taller avatar. */}
         <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4 gap-y-3 sm:gap-x-5">
-          <div className="relative shrink-0 rounded-full p-[3px] ring-2 ring-accent-volt sm:row-span-2">
+          <div className="relative shrink-0 cut-avatar bg-accent-volt p-[3px] sm:row-span-2">
             <PlayerAvatar person={player} size="lg" />
             {isOwnProfile && (
               <Link
@@ -308,15 +299,27 @@ function ProfileHeader({ data }: { data: ProfileData }) {
             <h1 className="truncate font-display text-3xl leading-none font-bold tracking-tight uppercase sm:text-[40px]">
               {player.displayName}
             </h1>
-            <span className="truncate text-sm font-medium text-foreground/80">@{player.handle}</span>
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="truncate text-sm font-medium text-foreground/80">@{player.handle}</span>
+              {player.communityTag && (
+                <Link
+                  href={player.communityTag.href}
+                  title={player.communityTag.name}
+                  className="shrink-0 rounded-none border border-border bg-surface/60 px-1.5 py-0.5 font-mono text-[11px] font-semibold tracking-wide transition hover:border-border-hover"
+                >
+                  {player.communityTag.tag}
+                </Link>
+              )}
+            </span>
           </div>
           <div className="col-span-2 flex min-w-0 flex-col gap-2 sm:col-span-1 sm:col-start-2 sm:self-start">
             {player.bio ? (
               <p className="max-w-lg text-sm text-foreground/80">{player.bio}</p>
             ) : (
               isOwnProfile && (
-                <Link href="/account" className="w-fit text-sm text-muted transition hover:text-foreground">
-                  Add a short bio →
+                <Link href="/account" className="flex w-fit flex-col text-sm text-muted transition hover:text-foreground">
+                  <span className="font-medium text-foreground/80">Every player has a name. Make yours known.</span>
+                  <span>Add a short bio →</span>
                 </Link>
               )
             )}
@@ -325,10 +328,10 @@ function ProfileHeader({ data }: { data: ProfileData }) {
                 <CalendarDays size={12} />
                 Joined {joined}
               </span>
-              {player.region && (
+              {(player.region || player.country) && (
                 <span className="flex items-center gap-1.5">
                   <MapPin size={12} />
-                  {player.region}
+                  {[player.region, player.country ? `${flagEmoji(player.country.code)} ${player.country.name}` : null].filter(Boolean).join(", ")}
                 </span>
               )}
             </p>
@@ -355,6 +358,7 @@ function ProfileHeader({ data }: { data: ProfileData }) {
               <Flag size={16} />
             </Link>
           )}
+          {!isOwnProfile && data.viewerSignedIn && <BlockButton handle={player.handle} displayName={player.displayName} blocked={data.viewerBlocked} />}
         </div>
       </div>
 
@@ -387,7 +391,7 @@ function Overview({ data }: { data: ProfileData }) {
                     href={item.href}
                     className="group flex items-center gap-3 px-5 py-3 transition-colors duration-[var(--duration-fast)] hover:bg-surface-elevated/60"
                   >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] bg-surface-elevated text-muted">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center cut-avatar bg-surface-elevated text-muted">
                       <Icon size={16} />
                     </span>
                     <div className="flex min-w-0 flex-1 flex-col">
@@ -415,7 +419,7 @@ function Overview({ data }: { data: ProfileData }) {
           {data.form.length > 0 && (
             <div className="flex items-center justify-between gap-3 border-t border-border px-5 py-3">
               <span className="text-eyebrow text-muted">Form</span>
-              <FormStrip form={data.form} />
+              <FormChips form={data.form} />
             </div>
           )}
           {data.matches.length === 0 ? (
@@ -439,8 +443,8 @@ function Overview({ data }: { data: ProfileData }) {
         </Panel>
 
         {data.gameStats.length > 0 && (
-          <Panel title="Game performance" action={data.gameStats.length > 3 ? <ViewAll tab="matches" /> : undefined}>
-            <GameRows games={data.gameStats.slice(0, 3)} />
+          <Panel title="Game performance" meta="From confirmed results" action={data.gameStats.length > 3 ? <ViewAll tab="matches" /> : undefined}>
+            <GameRows games={data.gameStats.slice(0, 3)} handle={data.player.handle} />
           </Panel>
         )}
       </div>
@@ -468,7 +472,7 @@ function Overview({ data }: { data: ProfileData }) {
                     )}
                   </div>
                   {!a.unlocked && a.progress ? (
-                    <div className="h-1 w-full overflow-hidden rounded-full bg-surface-elevated" aria-hidden>
+                    <div className="h-1 w-full overflow-hidden rounded-none bg-surface-elevated" aria-hidden>
                       <div
                         className="h-full rounded-full bg-accent-blue"
                         style={{ width: `${Math.min(100, (a.progress.current / a.progress.target) * 100)}%` }}
@@ -485,9 +489,10 @@ function Overview({ data }: { data: ProfileData }) {
 
         <Panel
           title="Favourite games"
+          meta="Self-reported"
           action={
             isOwnProfile ? (
-              <Link href="/account" className="text-xs font-medium text-accent-blue hover:underline">
+              <Link href="/account" className="-my-2.5 py-2.5 pl-3 text-xs font-medium text-accent-blue hover:underline">
                 Edit
               </Link>
             ) : undefined
@@ -506,10 +511,10 @@ function Overview({ data }: { data: ProfileData }) {
           ) : (
             <div className="flex flex-wrap gap-2 border-t border-border px-5 py-4">
               {player.favoriteGames.map((game) => (
-                <span key={game} className="flex items-center gap-2 rounded-full border border-border py-1 pr-3 pl-1 text-xs font-medium">
-                  <GameArtTile game={game} className="h-6 w-6 shrink-0 rounded-full" hideLabel imgWidth={60} />
+                <Link key={game} href={`/players/${player.handle}/games/${slugify(game)}`} className="flex items-center gap-2 rounded-full border border-border py-1 pr-3 pl-1 text-xs font-medium transition hover:border-border-hover hover:bg-surface-elevated/60">
+                  <GameArtTile thumb game={game} className="h-6 w-6 shrink-0 rounded-full" hideLabel imgWidth={60} />
                   {game}
-                </span>
+                </Link>
               ))}
             </div>
           )}
@@ -529,7 +534,7 @@ function Overview({ data }: { data: ProfileData }) {
                       key={f.friendshipId}
                       href={`/players/${f.handle}`}
                       title={f.displayName}
-                      className="rounded-full ring-2 ring-surface transition hover:z-10 hover:-translate-y-0.5"
+                      className="cut-avatar transition hover:z-10 hover:-translate-y-0.5"
                     >
                       <PlayerAvatar person={f} size="sm" />
                     </Link>
@@ -573,11 +578,11 @@ function MatchesTab({ data }: { data: ProfileData }) {
     <div className="flex flex-col gap-6">
       {data.gameStats.length > 0 && (
         <Panel title="By game" meta={data.gameStats.length}>
-          <GameRows games={data.gameStats} />
+          <GameRows games={data.gameStats} handle={data.player.handle} />
         </Panel>
       )}
 
-      <Panel title="Match history" meta={data.matches.length || undefined} action={<FormStrip form={data.form.slice(0, 5)} />}>
+      <Panel title="Match history" meta={data.matches.length || undefined} action={<FormChips form={data.form.slice(0, 5)} />}>
         {data.matches.length === 0 ? (
           <PanelEmpty>No completed matches yet.</PanelEmpty>
         ) : (
@@ -618,7 +623,7 @@ function TournamentsTab({ data }: { data: ProfileData }) {
                 href={`/tournaments/${r.tournamentId}`}
                 className="group flex items-center gap-3 px-5 py-3 transition-colors duration-[var(--duration-fast)] hover:bg-surface-elevated/60"
               >
-                <GameArtTile game={r.game} className="h-10 w-10 shrink-0 rounded-[8px]" hideLabel imgWidth={120} />
+                <GameArtTile thumb game={r.game} className="h-10 w-10 shrink-0 cut-avatar" hideLabel imgWidth={120} />
                 <div className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-sm font-medium">{r.name}</span>
                   <span className="text-metadata truncate">
@@ -665,7 +670,7 @@ function FriendsTab({ data }: { data: ProfileData }) {
       )}
       <Panel title="Friends" meta={friends.accepted.length || undefined}>
         {friends.accepted.length === 0 ? (
-          <PanelEmpty>{isOwnProfile ? "No friends yet — add one above, or from their profile." : `${player.displayName} hasn't added any friends yet.`}</PanelEmpty>
+          <PanelEmpty>{isOwnProfile ? "No friends yet. Add one above, or from their profile." : `${player.displayName} hasn't added any friends yet.`}</PanelEmpty>
         ) : isOwnProfile ? (
           <div className="flex flex-col gap-2 border-t border-border p-3">
             {friends.accepted.map((f) => (
@@ -723,7 +728,7 @@ function TeamsTab({ data, viewerId }: { data: ProfileData; viewerId: string }) {
       )}
       <Panel title="Teams" meta={teams.mine.length || undefined}>
         {teams.mine.length === 0 ? (
-          <PanelEmpty>{isOwnProfile ? "Not on a team yet — create one above." : `${player.displayName} isn't on a team yet.`}</PanelEmpty>
+          <PanelEmpty>{isOwnProfile ? "Not on a team yet. Create one above." : `${player.displayName} isn't on a team yet.`}</PanelEmpty>
         ) : (
           <div className="divide-y divide-border border-t border-border">
             {teams.mine.map((t) => (
@@ -732,7 +737,7 @@ function TeamsTab({ data, viewerId }: { data: ProfileData; viewerId: string }) {
                 href={`/teams/${t.id}`}
                 className="group flex items-center gap-3 px-5 py-3 transition-colors duration-[var(--duration-fast)] hover:bg-surface-elevated/60"
               >
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] bg-surface-elevated font-mono text-xs font-bold text-muted uppercase">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center cut-avatar bg-surface-elevated font-mono text-xs font-bold text-muted uppercase">
                   {(t.tag ?? t.name).slice(0, 3)}
                 </span>
                 <div className="flex min-w-0 flex-1 flex-col">
@@ -753,7 +758,7 @@ function TeamsTab({ data, viewerId }: { data: ProfileData; viewerId: string }) {
 function WalletTab({ wallet }: { wallet: NonNullable<ProfileData["wallet"]> }) {
   return (
     <div className="flex flex-col gap-6">
-      <section data-surface="dark" className="overflow-hidden rounded-[var(--radius-hero)] border border-border">
+      <section data-surface="dark" className="overflow-hidden cut-lg [--cut-line:var(--border)] border border-border">
         <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-end sm:justify-between sm:p-7">
           <div className="flex flex-col gap-1">
             <span className="text-eyebrow text-muted">Available balance</span>
@@ -804,7 +809,7 @@ export function ProfileView({ data, viewerId }: { data: ProfileData; viewerId: s
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6 sm:px-8 sm:py-8">
+    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6 sm:px-8 sm:py-10">
       <ProfileHeader data={data} />
       <SectionTabs tabs={tabs} initialTab={data.initialTab} label="Profile sections" idPrefix="profile" />
     </div>

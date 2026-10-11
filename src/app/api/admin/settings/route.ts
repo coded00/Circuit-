@@ -1,8 +1,9 @@
 /**
  * Circuit — platform-wide settings (maintenance mode, the platform fee
- * rate, the organizer-revenue settlement window). SUPER_ADMIN only — all
- * three affect every visitor/transaction, not a single record. Any subset
- * of fields may be sent together; at least one is required.
+ * rate, the organizer-revenue settlement window, payout auto-approval, and
+ * the staked-Battles switch and per-account stake limits). SUPER_ADMIN only
+ * — all of these affect every visitor/transaction, not a single record. Any
+ * subset of fields may be sent together; at least one is required.
  */
 
 import { NextResponse } from "next/server";
@@ -10,6 +11,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireSuperAdmin } from "@/lib/session";
 import { logAdminAction } from "@/lib/auditLog";
+import { MAX_KOBO_COLUMN } from "@/lib/money";
 
 export async function PATCH(request: Request) {
   const superAdminAuth = await requireSuperAdmin("Only a Super Admin can change platform settings.");
@@ -21,7 +23,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const data: { maintenanceMode?: boolean; platformFeeBps?: number; organizerRevenueSettlementHours?: number } = {};
+  const data: { maintenanceMode?: boolean; platformFeeBps?: number; organizerRevenueSettlementHours?: number; payoutAutoApprove?: boolean; payoutAutoApproveMaxKobo?: number; stakedBattlesEnabled?: boolean; maxLockedStakeKobo?: number; maxDailyStakeKobo?: number; maxSponsoredPrizeKobo?: number; stakePatternWindowDays?: number; stakePatternMinBattles?: number; stakePatternWinShareBps?: number; dailyChallengesEnabled?: boolean; maxChallengeEntryFeeKobo?: number; maxChallengeEntrants?: number; maxChallengePayoutBps?: number; stakePatternNetAlertKobo?: number } = {};
   const actions: { action: string; metadata?: Prisma.InputJsonValue }[] = [];
 
   if (body.maintenanceMode !== undefined) {
@@ -62,6 +64,159 @@ export async function PATCH(request: Request) {
     actions.push({ action: "settings.organizerRevenueSettlementHoursChange", metadata: { organizerRevenueSettlementHours: hours } });
   }
 
+  if (body.payoutAutoApprove !== undefined) {
+    if (typeof body.payoutAutoApprove !== "boolean") {
+      return NextResponse.json({ error: "payoutAutoApprove must be a boolean." }, { status: 400 });
+    }
+    data.payoutAutoApprove = body.payoutAutoApprove;
+    actions.push({ action: body.payoutAutoApprove ? "settings.payoutAutoApproveOn" : "settings.payoutAutoApproveOff" });
+  }
+
+  if (body.payoutAutoApproveMaxKobo !== undefined) {
+    const max = Number(body.payoutAutoApproveMaxKobo);
+    // Kobo; 0 sends every payout to staff. The ceiling is only a guard against a mistyped amount.
+    if (!Number.isInteger(max) || max < 0 || max > MAX_KOBO_COLUMN) {
+      return NextResponse.json({ error: "The automatic approval limit must be a whole number of kobo, 0 or more." }, { status: 400 });
+    }
+    data.payoutAutoApproveMaxKobo = max;
+    actions.push({ action: "settings.payoutAutoApproveLimitChange", metadata: { payoutAutoApproveMaxKobo: max } });
+  }
+
+  if (body.maxSponsoredPrizeKobo !== undefined) {
+    const max = Number(body.maxSponsoredPrizeKobo);
+    // Whole naira only, same as the stake limits — nobody reasons about a prize ceiling in fractional
+    // kobo. Zero is allowed and is the kill switch: staff may not declare a cash prize at all, which is
+    // a legitimate tightening rather than a nonsense value.
+    if (!Number.isInteger(max) || max < 0 || max % 100 !== 0 || max > MAX_KOBO_COLUMN) {
+      return NextResponse.json({ error: "The sponsored-prize ceiling must be a whole number of naira, 0 or more." }, { status: 400 });
+    }
+    data.maxSponsoredPrizeKobo = max;
+    actions.push({ action: "settings.maxSponsoredPrizeChange", metadata: { maxSponsoredPrizeKobo: max } });
+  }
+
+  if (body.stakedBattlesEnabled !== undefined) {
+    if (typeof body.stakedBattlesEnabled !== "boolean") {
+      return NextResponse.json({ error: "stakedBattlesEnabled must be a boolean." }, { status: 400 });
+    }
+    data.stakedBattlesEnabled = body.stakedBattlesEnabled;
+    actions.push({ action: body.stakedBattlesEnabled ? "settings.stakedBattlesOn" : "settings.stakedBattlesOff" });
+  }
+
+  if (body.maxLockedStakeKobo !== undefined) {
+    const max = Number(body.maxLockedStakeKobo);
+    // Whole naira only: a stake is a whole number of kobo the player typed,
+    // and a limit in fractional kobo is a value nobody can reason about.
+    // Zero is allowed — it stops staking without turning the feature off,
+    // which is the softer version of the kill switch.
+    // A ceiling here is only a guard against a mistyped amount, same as the
+    // payout limit's — NGN 1bn is far above any real setting. Setting this
+    // below the per-Battle cap is allowed and simply makes the per-Battle cap
+    // unreachable, which is a legitimate way to tighten.
+    if (!Number.isInteger(max) || max < 0 || max % 100 !== 0 || max > MAX_KOBO_COLUMN) {
+      return NextResponse.json({ error: "The at-once stake limit must be a whole number of naira, 0 or more." }, { status: 400 });
+    }
+    data.maxLockedStakeKobo = max;
+    actions.push({ action: "settings.maxLockedStakeChange", metadata: { maxLockedStakeKobo: max } });
+  }
+
+  if (body.maxDailyStakeKobo !== undefined) {
+    const max = Number(body.maxDailyStakeKobo);
+    if (!Number.isInteger(max) || max < 0 || max % 100 !== 0 || max > MAX_KOBO_COLUMN) {
+      return NextResponse.json({ error: "The daily stake limit must be a whole number of naira, 0 or more." }, { status: 400 });
+    }
+    data.maxDailyStakeKobo = max;
+    actions.push({ action: "settings.maxDailyStakeChange", metadata: { maxDailyStakeKobo: max } });
+  }
+
+  // Daily Challenges: the kill switch and the pilot ceilings. Turning the switch off stops new entries and
+  // new publishes; challenges already running keep running and can still be paused or cancelled.
+  if (body.dailyChallengesEnabled !== undefined) {
+    if (typeof body.dailyChallengesEnabled !== "boolean") {
+      return NextResponse.json({ error: "dailyChallengesEnabled must be a boolean." }, { status: 400 });
+    }
+    data.dailyChallengesEnabled = body.dailyChallengesEnabled;
+    actions.push({ action: body.dailyChallengesEnabled ? "settings.dailyChallengesOn" : "settings.dailyChallengesOff" });
+  }
+
+  if (body.maxChallengeEntryFeeKobo !== undefined) {
+    const max = Number(body.maxChallengeEntryFeeKobo);
+    // Whole naira, like the other money ceilings. Zero is allowed: it limits the pilot to free challenges.
+    if (!Number.isInteger(max) || max < 0 || max % 100 !== 0 || max > MAX_KOBO_COLUMN) {
+      return NextResponse.json({ error: "The challenge entry-fee limit must be a whole number of naira, 0 or more." }, { status: 400 });
+    }
+    data.maxChallengeEntryFeeKobo = max;
+    actions.push({ action: "settings.maxChallengeEntryFeeChange", metadata: { maxChallengeEntryFeeKobo: max } });
+  }
+
+  if (body.maxChallengePayoutBps !== undefined) {
+    const bps = Number(body.maxChallengePayoutBps);
+    // The share of its minimum field's entries a challenge's prizes may add up to. 10000 = 100% (the house keeps nothing at
+    // the minimum); 0 allows no prizes at all.
+    if (!Number.isInteger(bps) || bps < 0 || bps > 10_000) {
+      return NextResponse.json({ error: "The payout cap must be a whole number of basis points from 0 to 10000 (0-100%)." }, { status: 400 });
+    }
+    data.maxChallengePayoutBps = bps;
+    actions.push({ action: "settings.maxChallengePayoutChange", metadata: { maxChallengePayoutBps: bps } });
+  }
+
+  if (body.maxChallengeEntrants !== undefined) {
+    const max = Number(body.maxChallengeEntrants);
+    if (!Number.isInteger(max) || max < 1 || max > 10_000) {
+      return NextResponse.json({ error: "The challenge entrant limit must be a whole number between 1 and 10,000." }, { status: 400 });
+    }
+    data.maxChallengeEntrants = max;
+    actions.push({ action: "settings.maxChallengeEntrantsChange", metadata: { maxChallengeEntrants: max } });
+  }
+
+  // The repeated-pair detection thresholds (src/lib/stakePatterns.ts). Read
+  // fresh at sweep time like the settlement window, so a change re-measures
+  // every pair on the next run rather than only affecting new flags.
+  if (body.stakePatternWindowDays !== undefined) {
+    const days = Number(body.stakePatternWindowDays);
+    // 0 is allowed and means "stop measuring" — the sweep returns early
+    // rather than treating an empty window as every pair being clean, which
+    // is the honest reading of "look back zero days".
+    if (!Number.isInteger(days) || days < 0 || days > 365) {
+      return NextResponse.json({ error: "The lookback window must be a whole number of days between 0 and 365." }, { status: 400 });
+    }
+    data.stakePatternWindowDays = days;
+    actions.push({ action: "settings.stakePatternWindowChange", metadata: { stakePatternWindowDays: days } });
+  }
+
+  if (body.stakePatternMinBattles !== undefined) {
+    const min = Number(body.stakePatternMinBattles);
+    // At least 2: a "pattern" between two accounts cannot be read off a
+    // single Battle, and one win is not a win record.
+    if (!Number.isInteger(min) || min < 2 || min > 500) {
+      return NextResponse.json({ error: "The minimum Battles must be a whole number between 2 and 500." }, { status: 400 });
+    }
+    data.stakePatternMinBattles = min;
+    actions.push({ action: "settings.stakePatternMinBattlesChange", metadata: { stakePatternMinBattles: min } });
+  }
+
+  if (body.stakePatternWinShareBps !== undefined) {
+    const bps = Number(body.stakePatternWinShareBps);
+    // Same 0-10000 bps convention as the platform fee. Anything under 5000
+    // is below an even split and would flag every pair that has ever played
+    // twice, so 5000 is the floor — it is a real boundary, not arbitrary.
+    if (!Number.isInteger(bps) || bps < 5000 || bps > 10000) {
+      return NextResponse.json({ error: "The win share must be a whole number of basis points between 5000 and 10000 (50-100%)." }, { status: 400 });
+    }
+    data.stakePatternWinShareBps = bps;
+    actions.push({ action: "settings.stakePatternWinShareChange", metadata: { stakePatternWinShareBps: bps } });
+  }
+
+  if (body.stakePatternNetAlertKobo !== undefined) {
+    const max = Number(body.stakePatternNetAlertKobo);
+    // Whole naira only, same as the stake limits — nobody reasons about a
+    // threshold in fractional kobo.
+    if (!Number.isInteger(max) || max < 0 || max % 100 !== 0 || max > MAX_KOBO_COLUMN) {
+      return NextResponse.json({ error: "The net-transfer threshold must be a whole number of naira, 0 or more." }, { status: 400 });
+    }
+    data.stakePatternNetAlertKobo = max;
+    actions.push({ action: "settings.stakePatternNetAlertChange", metadata: { stakePatternNetAlertKobo: max } });
+  }
+
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
   }
@@ -80,5 +235,19 @@ export async function PATCH(request: Request) {
     maintenanceMode: updated.maintenanceMode,
     platformFeeBps: updated.platformFeeBps,
     organizerRevenueSettlementHours: updated.organizerRevenueSettlementHours,
+    payoutAutoApprove: updated.payoutAutoApprove,
+    payoutAutoApproveMaxKobo: updated.payoutAutoApproveMaxKobo,
+    stakedBattlesEnabled: updated.stakedBattlesEnabled,
+    maxLockedStakeKobo: updated.maxLockedStakeKobo,
+    maxDailyStakeKobo: updated.maxDailyStakeKobo,
+    maxSponsoredPrizeKobo: updated.maxSponsoredPrizeKobo,
+    stakePatternWindowDays: updated.stakePatternWindowDays,
+    stakePatternMinBattles: updated.stakePatternMinBattles,
+    stakePatternWinShareBps: updated.stakePatternWinShareBps,
+    stakePatternNetAlertKobo: updated.stakePatternNetAlertKobo,
+    dailyChallengesEnabled: updated.dailyChallengesEnabled,
+    maxChallengeEntryFeeKobo: updated.maxChallengeEntryFeeKobo,
+    maxChallengeEntrants: updated.maxChallengeEntrants,
+    maxChallengePayoutBps: updated.maxChallengePayoutBps,
   });
 }

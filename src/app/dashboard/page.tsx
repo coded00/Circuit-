@@ -62,7 +62,7 @@ export default async function DashboardTournamentsPage() {
                     </Link>
                   ))}
                   {items.length === 0 && (
-                    <div className="rounded-[var(--radius-md)] border border-dashed border-border p-3 text-center text-xs text-muted">
+                    <div className="cut-sm [--cut-line:var(--border)] border border-dashed border-border p-3 text-center text-xs text-muted">
                       Nothing here
                     </div>
                   )}

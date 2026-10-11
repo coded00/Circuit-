@@ -1,6 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { CalendarClock } from "lucide-react";
+import { CountdownTimer } from "@/components/CountdownTimer";
+import { InfoTip } from "@/components/InfoTip";
+import { StatusPill } from "@/components/StatusPill";
+import { startsWithinADay, tournamentCtaLabel, tournamentDisplayStatus } from "@/lib/tournamentCta";
 import { useSpotlight } from "@/lib/useSpotlight";
 import { CINEMATIC_GAMING_IMAGE, realGameImage, unsplashUrl } from "@/lib/gameImagery";
 import { tournamentPath } from "@/lib/seo";
@@ -26,6 +31,9 @@ type Tournament = {
   id: string;
   name: string;
   game: string;
+  status: string;
+  teamSize: string;
+  startAt: Date;
   entryFee: number;
   participantCap: number;
   prizeAmount: number | null;
@@ -40,6 +48,8 @@ type Banner = {
   ctaLabel: string | null;
   ctaHref: string | null;
 };
+
+import { compactNaira } from "@/lib/money";
 
 function formatNaira(kobo: number): string {
   return `₦${(kobo / 100).toLocaleString("en-NG")}`;
@@ -76,7 +86,7 @@ export function CircuitHero({
   return (
     <div
       data-surface="dark"
-      className="flex w-full flex-col overflow-hidden rounded-[var(--radius-hero)] border border-border bg-surface"
+      className="flex w-full flex-col overflow-hidden cut-lg [--cut-line:var(--border)] border border-border bg-surface"
     >
       <div className="relative flex h-[280px] w-full overflow-hidden sm:h-[320px] lg:h-[340px]">
         {/* eslint-disable-next-line @next/next/no-img-element -- external CDN hero photo, or an admin-pasted banner URL */}
@@ -105,25 +115,58 @@ export function CircuitHero({
         >
           {tournament ? (
             <>
-              <span className="text-eyebrow text-accent-volt">Featured · {tournament.game}</span>
-              <h1 className="text-hero line-clamp-2">{tournament.name}</h1>
-              <p className="max-w-[440px] text-sm text-muted sm:text-base">
-                {tournament.prizeAmount
-                  ? `₦${(tournament.prizeAmount / 100).toLocaleString("en-NG")} prize pool · `
-                  : tournament.entryFee === 0
-                    ? "Free entry · "
-                    : `${formatNaira(tournament.entryFee)} entry · `}
-                {tournament._count.registrations}/{tournament.participantCap} players
-              </p>
-              <div className="flex flex-wrap gap-3 pt-1">
-                <Link href={tournamentPath(tournament)} className="btn-primary">
-                  View tournament
-                </Link>
-              </div>
+              {(() => {
+                const counts = { status: tournament.status, participantCap: tournament.participantCap, registered: tournament._count.registrations };
+                const status = tournamentDisplayStatus(counts);
+                const left = Math.max(0, tournament.participantCap - tournament._count.registrations);
+                const showCountdown = tournament.status === "OPEN" && startsWithinADay(new Date(tournament.startAt));
+                return (
+                  <>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <StatusPill tone={status.tone} pulse={status.pulse} solid>
+                        {status.label}
+                      </StatusPill>
+                      <span className="text-eyebrow text-accent-volt">
+                        {tournament.game} · {tournament.teamSize}
+                      </span>
+                    </div>
+                    <h2 className="text-hero line-clamp-2">{tournament.name}</h2>
+                    <p className="max-w-[440px] text-sm text-muted sm:text-base">
+                      {tournament.prizeAmount
+                        ? `₦${(tournament.prizeAmount / 100).toLocaleString("en-NG")} prize pool · `
+                        : tournament.entryFee === 0
+                          ? "Free entry · "
+                          : `${formatNaira(tournament.entryFee)} entry · `}
+                      {tournament.status === "OPEN"
+                        ? left > 0
+                          ? `${left} ${left === 1 ? "spot" : "spots"} left`
+                          : "No spots left"
+                        : `${tournament._count.registrations}/${tournament.participantCap} players`}
+                    </p>
+                    {(tournament.status === "OPEN" || tournament.status === "DRAFT") && (
+                      <p className="flex items-center gap-2 text-sm text-foreground/90">
+                        <CalendarClock size={16} className="text-accent-volt" aria-hidden />
+                        {showCountdown ? (
+                          <span>
+                            Starts in <CountdownTimer target={new Date(tournament.startAt).toISOString()} />
+                          </span>
+                        ) : (
+                          <span suppressHydrationWarning>Starts {new Date(tournament.startAt).toLocaleString("en-NG", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
+                        )}
+                      </p>
+                    )}
+                    <div className="flex flex-wrap gap-3 pt-1">
+                      <Link href={tournamentPath(tournament)} className="btn-primary">
+                        {tournamentCtaLabel(counts)}
+                      </Link>
+                    </div>
+                  </>
+                );
+              })()}
             </>
           ) : banner ? (
             <>
-              <h1 className="text-hero line-clamp-2">{banner.headline}</h1>
+              <h2 className="text-hero line-clamp-2">{banner.headline}</h2>
               {banner.description && <p className="max-w-[440px] text-sm text-muted sm:text-base">{banner.description}</p>}
               {banner.ctaLabel && banner.ctaHref && (
                 <div className="flex flex-wrap gap-3 pt-1">
@@ -135,20 +178,17 @@ export function CircuitHero({
             </>
           ) : (
             <>
-              <h1 className="text-hero line-clamp-3">
-                Compete on the games
-                <br />
-                <span className="text-accent-volt">you already play</span>
-              </h1>
-              <p className="max-w-[440px] text-sm text-muted sm:text-base">
-                Tournaments with real prize pools and 1v1 challenges — CODM, EA FC, PUBG Mobile and more.
-              </p>
-              <div className="flex flex-wrap gap-2 pt-1">
-                <Link href="/compete" className="btn-primary">
-                  Find a tournament
+              <h2 className="text-hero line-clamp-3 text-[26px] normal-case sm:text-[38px] lg:text-[46px]">
+                This is where <span className="text-accent-volt">your name takes shape.</span>
+              </h2>
+              <p className="max-w-[440px] text-sm text-muted sm:text-base">Enter the competition. Find your rivals. Build your legacy, one match at a time.</p>
+              {/* Side by side on a phone too, so the pair takes one row instead of two and stays clear of the slide dots. */}
+              <div className="flex gap-2 pt-1">
+                <Link href="/compete" className="btn-primary !px-4 !py-2 text-[13px] whitespace-nowrap sm:!px-5 sm:!py-2.5 sm:text-sm">
+                  Enter Circuit
                 </Link>
-                <Link href="/battles" className="btn-secondary">
-                  Challenge a player
+                <Link href="/battles" className="btn-secondary !px-4 !py-2 text-[13px] whitespace-nowrap sm:!px-5 sm:!py-2.5 sm:text-sm">
+                  Challenge <span className="hidden min-[400px]:inline">a player</span>
                 </Link>
               </div>
             </>
@@ -156,38 +196,59 @@ export function CircuitHero({
         </div>
 
         {slideCount > 1 && (
-          <div className="absolute bottom-5 left-8 z-10 flex gap-1.5 sm:left-10">
+          <div className="absolute bottom-3 left-7 z-10 flex sm:left-9">
             {Array.from({ length: slideCount }, (_, i) => (
               <button
                 key={i}
                 type="button"
                 onClick={() => goTo(i)}
                 aria-label={`Go to slide ${i + 1}`}
-                className={`h-1.5 rounded-full transition-all ${i === index ? "w-5 bg-accent-volt" : "w-1.5 bg-foreground/40"}`}
-              />
+                className="flex h-7 items-center px-1"
+              >
+                <span className={`block h-1.5 rounded-full transition-all ${i === index ? "w-5 bg-accent-volt" : "w-1.5 bg-foreground/40"}`} />
+              </button>
             ))}
           </div>
         )}
       </div>
       {stats && (
-        <dl className="grid grid-cols-3 gap-px border-t border-border bg-border">
+        <dl className="grid grid-cols-[0.8fr_1.35fr_0.85fr] gap-px border-t border-border bg-border sm:grid-cols-3">
           {[
             {
               label: "Open tournaments",
+              short: "Events",
               value: stats.openTournaments.toLocaleString("en-NG"),
+              hint: "Tournaments you can register for right now.",
             },
             {
               label: "Challenges waiting",
+              short: "Challenges",
               value: stats.openChallenges.toLocaleString("en-NG"),
+              hint: "Open 1v1 challenges you can accept.",
             },
             {
               label: "Prize money",
-              value: formatNaira(stats.prizeMoney),
+              short: "Prizes",
+              value: (
+                <>
+                  <span className="sm:hidden">{compactNaira(stats.prizeMoney)}</span>
+                  <span className="hidden sm:inline">{formatNaira(stats.prizeMoney)}</span>
+                </>
+              ),
+              hint: "Total prize pools of tournaments that are open or live now.",
               gold: true,
             },
           ].map((item) => (
             <div key={item.label} className="flex min-w-0 flex-col gap-1 bg-surface px-4 py-3 sm:px-8 sm:py-4">
-              <dt className="truncate text-[10px] font-medium tracking-wide text-muted uppercase sm:text-[11px]">{item.label}</dt>
+              <dt className="flex items-center gap-1.5 text-[11px] font-medium tracking-normal text-muted uppercase sm:tracking-wide">
+                {/* Short labels on phones: three columns leave ~100px each. */}
+                <span className="truncate sm:hidden">{item.short}</span>
+                <span className="hidden truncate sm:inline">{item.label}</span>
+                {/* No room beside the labels at phone width. */}
+                <span className="hidden sm:inline-flex">
+                  <InfoTip text={item.hint} label={`What "${item.label}" counts`} />
+                </span>
+              </dt>
               <dd className={`text-stat truncate text-base sm:text-xl ${item.gold ? "text-gold" : ""}`}>{item.value}</dd>
             </div>
           ))}

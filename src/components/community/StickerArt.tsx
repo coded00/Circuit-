@@ -18,8 +18,8 @@ const TONE_CLASSES: Record<StickerTone, string> = {
 export function StickerArt({ sticker, size = "md" }: { sticker: Sticker; size?: "sm" | "md" }) {
   const box =
     size === "md"
-      ? "min-w-[104px] px-4 py-5 text-[26px] rounded-[18px]"
-      : "min-w-0 w-full px-2 py-3 text-[15px] rounded-[12px]";
+      ? "min-w-[104px] px-4 py-5 text-[26px] cut-lg"
+      : "min-w-0 w-full px-2 py-3 text-[15px] cut-sm";
   const badge = size === "md" ? "h-8 w-8 text-base -top-2.5 -right-2.5" : "h-6 w-6 text-xs -top-1.5 -right-1.5";
 
   return (

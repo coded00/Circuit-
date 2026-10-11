@@ -22,7 +22,10 @@ export async function getCurrentUser(): Promise<User | null> {
   const session = await verifySessionToken(token);
   if (!session) return null;
 
-  return prisma.user.findUnique({ where: { id: session.userId } });
+  const user = await prisma.user.findUnique({ where: { id: session.userId } });
+  // A password change/reset or suspension bumps sessionVersion: older tokens stop working.
+  if (!user || (session.sv ?? 0) !== user.sessionVersion) return null;
+  return user;
 }
 
 type AuthGateResult = { user: User; error: null } | { user: null; error: NextResponse };
@@ -51,4 +54,17 @@ export async function requireSuperAdmin(message = "Only a Super Admin can do tha
   if (!user) return { user: null, error: NextResponse.json({ error: "You must be signed in." }, { status: 401 }) };
   if (user.adminRole !== "SUPER_ADMIN") return { user: null, error: NextResponse.json({ error: message }, { status: 403 }) };
   return { user, error: null };
+}
+
+/**
+ * A suspended account may still sign in and read, appeal, and clean up its own pending items,
+ * but must not create content, take part in competitions or move money. Mutating routes call
+ * this right after the sign-in check and return its response when it is not null.
+ */
+export function suspendedResponse(user: Pick<User, "isSuspended" | "suspensionReason">): NextResponse | null {
+  if (!user.isSuspended) return null;
+  return NextResponse.json(
+    { error: `Your account is suspended: ${user.suspensionReason ?? "contact support."}` },
+    { status: 403 }
+  );
 }

@@ -11,8 +11,8 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getCurrentUser } from "@/lib/session";
-import { getPaymentProvider } from "@/lib/payments";
+import { getCurrentUser, suspendedResponse } from "@/lib/session";
+import { currentPaidEntryFee, issueEntryFeeRefund } from "@/lib/payments/transfers";
 import { notify } from "@/lib/notifications";
 import { logAdminAction } from "@/lib/auditLog";
 import { captureException } from "@/lib/observability";
@@ -25,6 +25,8 @@ export async function POST(
   if (!user) {
     return NextResponse.json({ error: "You must be signed in." }, { status: 401 });
   }
+  const suspended = suspendedResponse(user);
+  if (suspended) return suspended;
 
   const { id } = await params;
   const tournament = await prisma.tournament.findUnique({ where: { id } });
@@ -48,7 +50,7 @@ export async function POST(
   }
   if (tournament.fundsFrozen) {
     return NextResponse.json(
-      { error: "Funds for this tournament are frozen pending review — cancelling would refund them." },
+      { error: "Funds for this tournament are frozen pending review. Cancelling would refund them." },
       { status: 409 }
     );
   }
@@ -62,7 +64,7 @@ export async function POST(
   // startAt itself.
   if (tournament.cancellationLockAt && new Date() >= tournament.cancellationLockAt && !user.isStaff) {
     return NextResponse.json(
-      { error: "Past the cancellation lock — only Circuit staff can cancel this tournament now." },
+      { error: "Past the cancellation lock. Only Circuit staff can cancel this tournament now." },
       { status: 409 }
     );
   }
@@ -90,6 +92,11 @@ export async function POST(
     return NextResponse.json({ error: "This tournament can no longer be cancelled." }, { status: 409 });
   }
 
+  // Players partway through paying have no confirmed entry to refund yet. Closing those registrations means a
+  // payment that completes after this point is recognised as one for a cancelled tournament and refunded
+  // (confirmEntryFeePayment; the sweep also re-checks any that were missed).
+  await prisma.registration.updateMany({ where: { tournamentId: id, status: "PENDING_PAYMENT" }, data: { status: "WITHDRAWN" } });
+
   const confirmedRegistrations = await prisma.registration.findMany({
     where: { tournamentId: id, status: "CONFIRMED" },
     include: { escrowTxns: true },
@@ -108,9 +115,7 @@ export async function POST(
   let refundedCount = 0;
 
   for (const registration of confirmedRegistrations) {
-    const paidEntryFeeTxn = registration.escrowTxns.find(
-      (txn) => txn.type === "ENTRY_FEE" && txn.status === "COMPLETE"
-    );
+    const paidEntryFeeTxn = currentPaidEntryFee(registration.escrowTxns);
     if (!paidEntryFeeTxn) continue; // free registration — nothing to refund
 
     // V1 audit follow-up: refunding the ENTRY_FEE alone left that
@@ -129,27 +134,20 @@ export async function POST(
     const organizerRevenueTxn = registration.escrowTxns.find((txn) => txn.type === "ORGANIZER_REVENUE" && txn.status === "PENDING");
 
     try {
-      const provider = getPaymentProvider(paidEntryFeeTxn.provider!); // always set for an ENTRY_FEE row
-      const refund = await provider.refundCharge(
-        paidEntryFeeTxn.providerRef!,
-        paidEntryFeeTxn.amount
-      );
+      // Records the REFUND row too (src/lib/payments/transfers.ts).
+      await issueEntryFeeRefund({
+        tournamentId: id,
+        registrationId: registration.id,
+        provider: paidEntryFeeTxn.provider!, // always set for an ENTRY_FEE row
+        chargeRef: paidEntryFeeTxn.providerRef!,
+        amount: paidEntryFeeTxn.amount,
+        notifyPlayer: true,
+      });
 
       await prisma.$transaction([
         prisma.registration.update({
           where: { id: registration.id },
           data: { status: "REFUNDED" },
-        }),
-        prisma.escrowTransaction.create({
-          data: {
-            tournamentId: id,
-            registrationId: registration.id,
-            type: "REFUND",
-            amount: paidEntryFeeTxn.amount,
-            provider: paidEntryFeeTxn.provider,
-            providerRef: refund.providerReference,
-            status: refund.status === "SUCCESS" ? "COMPLETE" : "PENDING",
-          },
         }),
         ...(platformFeeTxn ? [prisma.escrowTransaction.update({ where: { id: platformFeeTxn.id }, data: { status: "FAILED" as const } })] : []),
         ...(organizerRevenueTxn ? [prisma.escrowTransaction.update({ where: { id: organizerRevenueTxn.id }, data: { status: "FAILED" as const } })] : []),

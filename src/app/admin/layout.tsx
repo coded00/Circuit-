@@ -13,6 +13,8 @@
 
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { loginPath } from "@/lib/safeRedirect";
+import { requestPath } from "@/lib/requestPath";
 import { getCurrentUser } from "@/lib/session";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { AdminTopBar } from "@/components/admin/AdminTopBar";
@@ -23,18 +25,20 @@ export const metadata: Metadata = { robots: { index: false, follow: false } };
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
   if (!user) {
-    redirect("/login?next=/admin");
+    redirect(loginPath(await requestPath("/admin")));
   }
   if (!user.isStaff) {
     redirect("/");
   }
 
   return (
-    <div data-surface="dark" className="flex min-h-screen w-full bg-background text-foreground">
+    <div data-surface="dark" data-admin className="flex min-h-screen w-full bg-background text-foreground">
       <AdminSidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <AdminTopBar admin={{ displayName: user.displayName, avatarUrl: user.avatarUrl }} />
-        <main className="flex flex-1 flex-col gap-6 p-4 sm:p-8">{children}</main>
+        <main className="flex flex-1 flex-col px-4 py-6 sm:px-8 sm:py-8">
+          <div className="admin-page">{children}</div>
+        </main>
       </div>
     </div>
   );

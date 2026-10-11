@@ -7,7 +7,7 @@ import { CreateMenu } from "./CreateMenu";
 import { AccountMenu } from "./AccountMenu";
 import { MobileSearchToggle } from "./MobileSearchToggle";
 import { WalletBalanceChip } from "./WalletBalanceChip";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { GuestAuthLink } from "./GuestAuthLink";
 
 /**
  * Circuit — top header. ~60px, integrated into the page rather than a
@@ -38,55 +38,65 @@ import { ThemeToggle } from "@/components/ThemeToggle";
  * and that column starts centering with side margins instead of touching
  * the true screen edge.
  *
- * Header actions: Notifications, Create, Profile — "Go Live" was removed
- * (Watch/Live/streaming are out of MVP scope for this rework; the button
- * is gone, `.btn-golive`'s two remaining disabled usages elsewhere are
- * being retired in the same pass).
+ * Look: the header shares the sidebar's dark surface, so the app reads as
+ * one dark frame around the light page. Left: search. Right: one HUD
+ * strip — wallet · alerts · Create · you — every control the same size and
+ * separated by hairlines, instead of a row of unrelated widgets.
  *
- * Create is desktop/tablet-only (`hidden sm:block`) — logo + search-toggle
- * + notifications + create + account genuinely don't fit next to each
- * other at 320–375px (measured: they overflow the header by ~70px even
- * with every icon at its minimum size). "New tournament"/"Open a Battle"
+ * Create is desktop/tablet-only (`hidden sm:block`) — at 320–375px the
+ * phone header holds logo, search toggle, wallet, notifications and
+ * account, and Create doesn't fit beside them. "New tournament"/"Open a Battle"
  * move into MobileTabBar's own sheet below `sm` instead, the same place
  * Marketplace/Rewards/Organize already live for the same reason.
  */
+/** One segment of the HUD strip — shared sizing so every control matches. */
+const HUD_BUTTON =
+  "flex h-9 w-9 items-center justify-center cut-avatar text-white/70 transition hover:bg-white/[0.07] hover:text-white";
+
+function HudDivider() {
+  return <span aria-hidden className="mx-0.5 h-5 w-px shrink-0 bg-white/[0.08]" />;
+}
+
 export async function TopBar({ user, disputeCount = 0 }: { user: User | null; disputeCount?: number }) {
-  const [unreadCount, friendRequestCount] = user
-    ? await Promise.all([
-        prisma.notification.count({ where: { userId: user.id, readAt: null } }),
-        prisma.friendship.count({ where: { addresseeId: user.id, accepted: false } }),
-      ])
-    : [0, 0];
+  const [unreadCount, friendRequestCount] = await Promise.all([
+    user ? prisma.notification.count({ where: { userId: user.id, readAt: null } }) : 0,
+    user ? prisma.friendship.count({ where: { addresseeId: user.id, accepted: false } }) : 0,
+  ]);
 
   return (
-    <header className="fixed inset-x-0 top-0 z-30 h-[60px]">
+    // Named so page view transitions leave it pinned (globals.css).
+    <header className="fixed inset-x-0 top-0 z-30 h-[60px]" style={{ viewTransitionName: "site-header" }}>
       {/* A single grid child placed into the second (`1fr`) column at
           sm+ — no empty first-column spacer div needed, which would
           otherwise force a second implicit row (and unwanted extra
           height) once `grid-cols-1` collapses to one column on mobile. */}
       <div className="mx-auto grid h-full w-full max-w-[1920px] grid-cols-1 sm:grid-cols-[var(--sidebar-width-sm)_1fr] lg:grid-cols-[var(--sidebar-width-lg)_1fr]">
-        <div className="col-start-1 flex h-full items-center gap-4 border-b border-border bg-background/85 px-5 backdrop-blur-md sm:col-start-2 sm:px-8">
-          <Link href="/" className="flex shrink-0 items-center sm:hidden">
+        {/* Same dark surface as the sidebar, so the two read as one frame
+            around the page rather than two unrelated bars. */}
+        <div
+          data-surface="dark"
+          className="col-start-1 flex h-full items-center gap-2 border-b border-white/[0.06] bg-background px-3 sm:col-start-2 sm:gap-5 sm:px-6 lg:px-8"
+        >
+          <Link href="/" className="flex shrink-0 items-center sm:hidden" aria-label="Circuit home">
             {/* eslint-disable-next-line @next/next/no-img-element -- local /public asset, no next/image usage elsewhere in this codebase */}
-            <img src="/circuit-logo.png" alt="Circuit" width={700} height={347} className="h-12 w-auto max-w-none" />
+            <img src="/circuit-logo.png" alt="Circuit" width={700} height={347} className="h-9 w-auto max-w-none" />
           </Link>
 
-          <SearchInput className="hidden min-w-0 flex-1 sm:block sm:max-w-[430px]" />
+          <SearchInput className="hidden min-w-0 flex-1 sm:block sm:max-w-[340px] xl:max-w-[460px]" />
 
-          <div className="ml-auto flex shrink-0 items-center gap-3">
+          <div className="ml-auto flex shrink-0 items-center gap-2">
             <MobileSearchToggle />
-            {/* sm+ only, same reason as Create below — the phone header is
-                already full; phones get it in MobileTabBar's sheet. */}
-            <div className="hidden sm:block">
-              <ThemeToggle />
-            </div>
+            {/* The signed-in strip has no clip-path: the notification, create and account menus open out of it, and a cut corner would clip them. */}
             {user ? (
-              <>
+              <div className="flex items-center border border-white/[0.08] bg-white/[0.03] p-1">
                 <WalletBalanceChip balance={user.walletBalance} />
-                <NotificationBell initialUnreadCount={unreadCount} />
-                <div className="hidden sm:block">
+                <HudDivider />
+                <NotificationBell initialUnreadCount={unreadCount} buttonClassName={HUD_BUTTON} />
+                <div className="hidden items-center sm:flex">
+                  <HudDivider />
                   <CreateMenu />
                 </div>
+                <HudDivider />
                 <AccountMenu
                   user={{
                     handle: user.handle,
@@ -97,16 +107,16 @@ export async function TopBar({ user, disputeCount = 0 }: { user: User | null; di
                   disputeCount={disputeCount}
                   friendRequestCount={friendRequestCount}
                 />
-              </>
+              </div>
             ) : (
-              <>
-                <Link href="/login" className="text-sm font-medium text-muted transition hover:text-foreground">
+              <div className="flex items-center gap-1.5">
+                <GuestAuthLink mode="login" className="flex h-8 items-center px-2.5 text-[13px] font-semibold text-white/80 transition hover:text-white sm:h-9 sm:px-3 sm:text-sm">
                   Log in
-                </Link>
-                <Link href="/signup" className="btn-primary px-4 py-1.5">
+                </GuestAuthLink>
+                <GuestAuthLink mode="signup" className="btn-primary !h-8 !px-3.5 !py-0 text-[13px] sm:!h-9 sm:!px-4 sm:text-sm">
                   Sign up
-                </Link>
-              </>
+                </GuestAuthLink>
+              </div>
             )}
           </div>
         </div>

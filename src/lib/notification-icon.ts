@@ -11,7 +11,7 @@
  * doesn't need to repeat it.
  */
 import type { ComponentType } from "react";
-import { Trophy, Swords, Flag, Users, Wallet, Bell } from "lucide-react";
+import { Trophy, Swords, Flag, Users, Wallet, Bell, AtSign, MessagesSquare, ShieldAlert, ShieldCheck, Store } from "lucide-react";
 import type { NotificationType } from "@/lib/notifications";
 
 export type NotificationCategory = {
@@ -25,11 +25,18 @@ const TOURNAMENT: NotificationCategory = { label: "Tournament", Icon: Trophy };
 const MATCH: NotificationCategory = { label: "Match", Icon: Swords };
 const DISPUTE: NotificationCategory = { label: "Dispute", Icon: Flag };
 const SOCIAL: NotificationCategory = { label: "Team & friends", Icon: Users };
+const MARKET: NotificationCategory = { label: "Marketplace", Icon: Store };
 const WALLET: NotificationCategory = { label: "Wallet", Icon: Wallet };
+const COMMUNITY: NotificationCategory = { label: "Community", Icon: MessagesSquare };
+const MENTION: NotificationCategory = { label: "Mention", Icon: AtSign };
+const MODERATION: NotificationCategory = { label: "Moderation", Icon: ShieldAlert };
+const SAFETY: NotificationCategory = { label: "Responsible play", Icon: ShieldCheck };
 const DEFAULT: NotificationCategory = { label: "Notification", Icon: Bell };
 
 const CATEGORY_BY_TYPE: Record<NotificationType, NotificationCategory> = {
   REGISTRATION_CONFIRMED: TOURNAMENT,
+  ACCOUNT_DELETION_REQUESTED: MODERATION,
+  TOURNAMENT_UPDATE: TOURNAMENT,
   TOURNAMENT_CANCELLED: TOURNAMENT,
   TOURNAMENT_COMPLETE: TOURNAMENT,
   REGISTRATION_CAP_FILLED: TOURNAMENT,
@@ -41,6 +48,10 @@ const CATEGORY_BY_TYPE: Record<NotificationType, NotificationCategory> = {
   MATCH_COMPLETE: MATCH,
   BATTLE_CHALLENGE: MATCH,
   BATTLE_ACCEPTED: MATCH,
+  BATTLE_DECLINED: MATCH,
+  ORDER_FULFILLED: MARKET,
+  ORDER_CANCELLED: MARKET,
+  BATTLE_EXPIRED: MATCH,
   NEW_CHALLENGE: MATCH,
   QUICK_MATCH_CHALLENGE: MATCH,
   QUICK_MATCH_ACCEPTED: MATCH,
@@ -57,6 +68,44 @@ const CATEGORY_BY_TYPE: Record<NotificationType, NotificationCategory> = {
   TEAM_INVITE: SOCIAL,
   TEAM_JOIN_REQUEST: SOCIAL,
   ORGANIZER_REVENUE_SETTLED: WALLET,
+  PAYOUT_APPROVED: WALLET,
+  ORDER_PAID: WALLET,
+  CARD_REFUND_FAILED: WALLET,
+  ORGANIZER_PAYOUT_APPROVED: WALLET,
+  WITHDRAWAL_RETURNED: WALLET,
+  PRIZE_PAYOUT_FAILED: WALLET,
+  PAYMENT_REFUNDED: WALLET,
+  ENTRY_FEE_REFUND: WALLET,
+  REGISTRATION_NAME_TAKEN: WALLET,
+  COMMUNITY_MENTION: MENTION,
+  COMMUNITY_APPLICATION: COMMUNITY,
+  COMMUNITY_APPLICATION_APPROVED: COMMUNITY,
+  COMMUNITY_REPORT: MODERATION,
+  COMMUNITY_SUSPENDED: MODERATION,
+  APPEAL_FILED: MODERATION,
+  APPEAL_DECIDED: MODERATION,
+  TEAM_ROSTER_ADDED: TOURNAMENT,
+  LOBBY_STARTED: TOURNAMENT,
+  LOBBY_ROUND_POSTED: TOURNAMENT,
+  LOBBY_FLAG_RAISED: TOURNAMENT,
+  LOBBY_FLAG_ANSWERED: TOURNAMENT,
+  LOBBY_FLAG_ESCALATED: TOURNAMENT,
+  LOBBY_ROOM_POSTED: TOURNAMENT,
+  ROUND_ROBIN_STARTED: TOURNAMENT,
+  LEAGUE_STARTED: TOURNAMENT,
+  LEAGUE_RESULT_AWARDED: TOURNAMENT,
+  LOBBY_FINAL_SET: TOURNAMENT,
+  SWISS_BYE: TOURNAMENT,
+  SELF_EXCLUSION_SET: SAFETY,
+  DAILY_CHALLENGE_LIVE: MATCH,
+  DAILY_CHALLENGE_CANCELLED: WALLET,
+  DAILY_CHALLENGE_SCORE_VERIFIED: MATCH,
+  DAILY_CHALLENGE_SCORE_REJECTED: MATCH,
+  DAILY_CHALLENGE_PRIZE: WALLET,
+  DAILY_CHALLENGE_RESULT: MATCH,
+  DAILY_CHALLENGE_DISPUTE_RULED: DISPUTE,
+  DAILY_CHALLENGE_DISPUTE_RAISED: DISPUTE,
+  STAKE_PATTERN_FLAGGED: MODERATION,
 };
 
 export function getNotificationCategory(type: string): NotificationCategory {

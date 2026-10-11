@@ -7,31 +7,9 @@
 
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { prisma } from "@/lib/db";
+import { loadChampion } from "@/lib/champion";
 import { buildMetadata, absoluteUrl } from "@/lib/seo";
 import { ShareCardPageBody } from "@/components/ShareCardPageBody";
-
-type BracketStructure = {
-  totalRounds: number;
-  rounds: { round: number; slots: { position: number; winnerId: string | null }[] }[];
-};
-
-async function loadChampion(tournamentId: string) {
-  const [tournament, bracket] = await Promise.all([
-    prisma.tournament.findUnique({ where: { id: tournamentId }, select: { id: true, name: true, game: true } }),
-    prisma.bracket.findUnique({ where: { tournamentId } }),
-  ]);
-  if (!tournament || !bracket) return null;
-
-  const structure = bracket.structure as unknown as BracketStructure;
-  const championId = structure.rounds[structure.totalRounds - 1]?.slots[0]?.winnerId ?? null;
-  if (!championId) return null;
-
-  const champion = await prisma.user.findUnique({ where: { id: championId }, select: { displayName: true, handle: true } });
-  if (!champion) return null;
-
-  return { tournament, champion };
-}
 
 export async function generateMetadata({ params }: { params: Promise<{ tournamentId: string }> }): Promise<Metadata> {
   const { tournamentId } = await params;

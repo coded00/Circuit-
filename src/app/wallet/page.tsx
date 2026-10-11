@@ -17,9 +17,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { loginPath } from "@/lib/safeRedirect";
 import { Landmark } from "lucide-react";
 import { getCurrentUser } from "@/lib/session";
 import { getWalletActivity } from "@/lib/wallet";
+import { prisma } from "@/lib/db";
+import { needsEmailVerification } from "@/lib/emailGate";
+import { accountEmail } from "@/lib/emailVerification";
+import { EmailVerificationBanner } from "@/components/EmailVerificationBanner";
 import { StatStrip } from "@/components/ui/StatStrip";
 import { FundWalletButton } from "./FundWalletButton";
 import { WithdrawButton } from "./WithdrawButton";
@@ -42,15 +47,27 @@ const COMPETITION_TITLE: Record<string, string> = {
   PRIZE_PAYOUT: "Prize payout",
   STAKE: "Stake locked",
   STAKE_PAYOUT: "Challenge winnings",
+  CHALLENGE_ENTRY: "Daily challenge entry",
+  CHALLENGE_REFUND: "Daily challenge refund",
+  CHALLENGE_PRIZE: "Daily challenge prize",
 };
 
 export default async function WalletPage() {
   const user = await getCurrentUser();
-  if (!user) redirect("/login?next=/wallet");
+  if (!user) redirect(loginPath("/wallet"));
 
-  const { balance, fundingHistory, rows, totalPaid, totalRefunded, totalWon } = await getWalletActivity(user.id);
+  const { balance, fundingHistory, rows, totalPaid, totalRefunded, totalWon, pendingWithdrawals, heldInChallenges } = await getWalletActivity(user.id);
+
+  // Card orders never touched the wallet, so they are not part of its statement (they show under My orders).
+  const orders = await prisma.order.findMany({ where: { buyerId: user.id, paymentMethod: "WALLET" }, orderBy: { createdAt: "desc" }, take: 100 });
 
   const entries: WalletEntry[] = [
+    ...orders.flatMap((o): WalletEntry[] => [
+      { id: `o-${o.id}`, at: o.createdAt.toISOString(), kind: "PURCHASE", title: "Marketplace purchase", subtitle: o.listingTitle, amount: o.amountKobo, credit: false, status: "COMPLETE", reference: o.id, href: "/marketplace/orders" },
+      ...(o.status === "CANCELLED" && o.cancelledAt
+        ? [{ id: `or-${o.id}`, at: o.cancelledAt.toISOString(), kind: "PURCHASE_REFUND" as const, title: "Marketplace refund", subtitle: o.listingTitle, amount: o.amountKobo, credit: true, status: "COMPLETE" as const, reference: o.id, href: "/marketplace/orders" }]
+        : []),
+    ]),
     ...fundingHistory.map(
       (t): WalletEntry => ({
         id: `w-${t.id}`,
@@ -61,6 +78,8 @@ export default async function WalletPage() {
         amount: t.amount,
         credit: t.type === "FUND",
         status: normalizeStatus(t.status),
+        reference: t.providerRef ?? t.id,
+        href: null,
       })
     ),
     ...rows.map(
@@ -74,20 +93,36 @@ export default async function WalletPage() {
             ? `${r.contextName} · paid to your payout account`
             : [r.contextName, r.contextGame].filter(Boolean).join(" · "),
         amount: r.amount,
-        credit: r.type === "REFUND" || r.type === "PRIZE_PAYOUT" || r.type === "STAKE_PAYOUT",
+        credit: r.type === "REFUND" || r.type === "PRIZE_PAYOUT" || r.type === "STAKE_PAYOUT" || r.type === "CHALLENGE_REFUND" || r.type === "CHALLENGE_PRIZE",
         status: normalizeStatus(r.status),
+        reference: r.reference,
+        href: r.href,
       })
     ),
   ].sort((a, b) => b.at.localeCompare(a.at));
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-4 py-6 sm:px-8 sm:py-10">
-      <section data-surface="dark" className="overflow-hidden rounded-[var(--radius-hero)] border border-border">
+      <section data-surface="dark" className="overflow-hidden cut-lg [--cut-line:var(--border)] border border-border">
         <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-end sm:justify-between sm:p-7">
           <div className="flex flex-col gap-2">
-            <span className="text-eyebrow text-muted">Wallet balance</span>
+            <span className="text-eyebrow text-muted">Available balance</span>
             <span className="text-stat text-4xl leading-none sm:text-5xl">{formatNaira(balance)}</span>
-            <span className="text-xs text-muted">Spend it on entry fees and stakes, or withdraw anytime.</span>
+            <span className="text-xs text-muted">Available to spend on entry fees, stakes and the Marketplace, or withdraw anytime.</span>
+            {(pendingWithdrawals > 0 || heldInChallenges > 0) && (
+              <span className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
+                {heldInChallenges > 0 && (
+                  <span>
+                    <span className="text-stat text-foreground">{formatNaira(heldInChallenges)}</span> held in challenges
+                  </span>
+                )}
+                {pendingWithdrawals > 0 && (
+                  <span>
+                    <span className="text-stat text-foreground">{formatNaira(pendingWithdrawals)}</span> withdrawal processing
+                  </span>
+                )}
+              </span>
+            )}
           </div>
           <div className="flex flex-wrap items-start gap-2">
             <FundWalletButton />
@@ -105,8 +140,10 @@ export default async function WalletPage() {
         />
       </section>
 
+      {needsEmailVerification(user) && accountEmail(user) && <EmailVerificationBanner email={accountEmail(user)!} reason={`Confirm ${accountEmail(user)} is yours to withdraw, claim prizes and enter paid tournaments.`} />}
+
       {!user.payoutMethodRef && (
-        <div className="flex items-center gap-3 rounded-[var(--radius-lg)] border border-dashed border-border-strong px-4 py-3">
+        <div className="flex items-center gap-3 cut-lg [--cut-line:var(--border)] border border-dashed border-border-strong px-4 py-3">
           <Landmark size={18} className="shrink-0 text-muted" />
           <p className="min-w-0 flex-1 text-sm text-muted">Add a payout account to withdraw and receive tournament prizes.</p>
           <Link href="/account" className="shrink-0 text-sm font-medium text-accent-blue hover:underline">

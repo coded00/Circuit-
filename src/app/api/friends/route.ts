@@ -5,14 +5,20 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, suspendedResponse } from "@/lib/session";
 import { notify } from "@/lib/notifications";
+import { blockedBetween } from "@/lib/blocks";
+import { limitOrRespond } from "@/lib/rateLimitHttp";
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "You must be signed in." }, { status: 401 });
   }
+  const suspended = suspendedResponse(user);
+  if (suspended) return suspended;
+  const tooMany = await limitOrRespond(`friend-request:${user.id}`, { max: 30, windowMs: 60 * 60 * 1000 }, "You've sent a lot of friend requests. Try again later.");
+  if (tooMany) return tooMany;
 
   const body = await request.json().catch(() => null);
   const handle = typeof body?.handle === "string" ? body.handle.trim() : "";
@@ -26,6 +32,9 @@ export async function POST(request: Request) {
   }
   if (target.id === user.id) {
     return NextResponse.json({ error: "You can't friend yourself." }, { status: 400 });
+  }
+  if (await blockedBetween(user.id, target.id)) {
+    return NextResponse.json({ error: "You can't send this player a friend request." }, { status: 403 });
   }
 
   const existing = await prisma.friendship.findFirst({

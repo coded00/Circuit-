@@ -11,6 +11,8 @@
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { Avatar, EmptyState, Field, FilterBar, naira, PageHeader, Pagination, plural, StatusBadge } from "@/components/admin/ui";
+import { RowLink } from "@/components/admin/ui-client";
 
 const PAGE_SIZE = 25;
 
@@ -22,10 +24,6 @@ type SearchParams = {
   to?: string;
   page?: string;
 };
-
-function formatNaira(kobo: number): string {
-  return `₦${(kobo / 100).toLocaleString("en-NG")}`;
-}
 
 function formatDate(date: Date): string {
   return date.toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" });
@@ -48,6 +46,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
   }
   if (status === "active") and.push({ isSuspended: false });
   if (status === "suspended") and.push({ isSuspended: true });
+  if (status === "deletion") and.push({ deletionRequestedAt: { not: null } });
   if (game?.trim()) {
     const term = game.trim();
     and.push({
@@ -85,7 +84,6 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
     }),
   ]);
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const hasFilters = !!(q || status || game || from || to);
 
   function pageHref(nextPage: number): string {
@@ -101,131 +99,88 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="font-display text-2xl font-bold tracking-tight">Users</h1>
-        <p className="text-sm text-muted">{total.toLocaleString("en-NG")} accounts on Circuit.</p>
-      </div>
+    <>
+      <PageHeader title="Users" description={`${plural(total, "account")}${hasFilters ? " match these filters" : " on Circuit"}.`} />
 
-      <form className="card flex flex-wrap items-end gap-3">
-        <div className="flex min-w-[200px] flex-1 flex-col gap-1.5">
-          <label className="field-label" htmlFor="q">
-            Search
-          </label>
-          <input id="q" name="q" defaultValue={q ?? ""} placeholder="Name, handle, or email" className="field-input" />
-        </div>
-        <div className="flex min-w-[140px] flex-col gap-1.5">
-          <label className="field-label" htmlFor="status">
-            Status
-          </label>
+      <FilterBar
+        extra={
+          hasFilters && (
+            <Link href="/admin/users" className="text-[12px] font-medium text-muted hover:text-foreground">
+              Clear
+            </Link>
+          )
+        }
+      >
+        <Field label="Search" grow htmlFor="q">
+          <input id="q" name="q" defaultValue={q ?? ""} placeholder="Name, handle or email" className="field-input" />
+        </Field>
+        <Field label="Status" htmlFor="status">
           <select id="status" name="status" defaultValue={status ?? ""} className="field-select">
             <option value="">Any status</option>
             <option value="active">Active</option>
             <option value="suspended">Suspended</option>
+            <option value="deletion">Deletion requested</option>
           </select>
-        </div>
-        <div className="flex min-w-[140px] flex-col gap-1.5">
-          <label className="field-label" htmlFor="game">
-            Game
-          </label>
+        </Field>
+        <Field label="Game" htmlFor="game">
           <input id="game" name="game" defaultValue={game ?? ""} placeholder="e.g. Valorant" className="field-input" />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label className="field-label" htmlFor="from">
-            Joined from
-          </label>
+        </Field>
+        <Field label="Joined from" htmlFor="from">
           <input id="from" name="from" type="date" defaultValue={from ?? ""} className="field-input" />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label className="field-label" htmlFor="to">
-            Joined to
-          </label>
+        </Field>
+        <Field label="Joined to" htmlFor="to">
           <input id="to" name="to" type="date" defaultValue={to ?? ""} className="field-input" />
-        </div>
-        <button type="submit" className="btn-primary">
-          Apply
-        </button>
-        {hasFilters && (
-          <Link href="/admin/users" className="text-xs font-medium text-accent-volt hover:underline">
-            Clear filters
-          </Link>
-        )}
-      </form>
+        </Field>
+      </FilterBar>
 
       {users.length === 0 ? (
-        <div className="card flex flex-col items-center gap-1 py-16 text-center">
-          <p className="text-sm text-muted">No users match those filters.</p>
-        </div>
+        <EmptyState title={hasFilters ? "No users match these filters" : "No users yet"} description={hasFilters ? "Try a broader search or clear the filters." : undefined} />
       ) : (
-        <div className="table-wrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Player</th>
-                <th>Status</th>
-                <th>Matches</th>
-                <th>Wins</th>
-                <th>Wallet</th>
-                <th>Joined</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((u) => {
-                const matches = u._count.matchesAsPlayerA + u._count.matchesAsPlayerB;
-                return (
-                  <tr key={u.id}>
-                    <td>
-                      <Link href={`/admin/users/${u.id}`} className="flex items-center gap-2.5 font-medium hover:text-accent-volt">
-                        {u.avatarUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element -- external, unpredictable-host avatar URLs
-                          <img src={u.avatarUrl} alt="" className="h-7 w-7 shrink-0 rounded-full object-cover" />
-                        ) : (
-                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-elevated text-xs font-semibold text-muted">
-                            {u.displayName.slice(0, 1).toUpperCase()}
+        <div className="flex flex-col gap-3">
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Player</th>
+                  <th>Status</th>
+                  <th className="text-right">Matches</th>
+                  <th className="text-right">Wins</th>
+                  <th className="text-right">Wallet</th>
+                  <th className="text-right">Joined</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((u) => {
+                  const matches = u._count.matchesAsPlayerA + u._count.matchesAsPlayerB;
+                  return (
+                    <RowLink key={u.id} href={`/admin/users/${u.id}`}>
+                      <td>
+                        <Link href={`/admin/users/${u.id}`} className="flex items-center gap-2.5">
+                          <Avatar name={u.displayName} src={u.avatarUrl} />
+                          <span className="flex min-w-0 flex-col leading-tight">
+                            <span className="truncate font-medium text-foreground">{u.displayName}</span>
+                            <span className="truncate text-[12px] text-muted">@{u.handle}</span>
                           </span>
-                        )}
-                        <span className="flex flex-col leading-tight">
-                          <span>{u.displayName}</span>
-                          <span className="text-xs font-normal text-muted">@{u.handle}</span>
-                        </span>
-                      </Link>
-                    </td>
-                    <td>
-                      <span className={`badge ${u.isSuspended ? "badge-cancelled" : "badge-open"}`}>
-                        {u.isSuspended ? "Suspended" : "Active"}
-                      </span>
-                    </td>
-                    <td className="font-mono tabular-nums">{matches}</td>
-                    <td className="font-mono tabular-nums">{u._count.matchesWon}</td>
-                    <td className="font-mono tabular-nums">{formatNaira(u.walletBalance)}</td>
-                    <td className="text-muted">{formatDate(u.createdAt)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-muted">
-            Page {page} of {totalPages}
-          </span>
-          <div className="flex items-center gap-2">
-            {page > 1 && (
-              <Link href={pageHref(page - 1)} className="btn-secondary px-3 py-1.5 text-xs">
-                ← Previous
-              </Link>
-            )}
-            {page < totalPages && (
-              <Link href={pageHref(page + 1)} className="btn-secondary px-3 py-1.5 text-xs">
-                Next →
-              </Link>
-            )}
+                        </Link>
+                      </td>
+                      <td>
+                        <StatusBadge tone={u.isSuspended ? "danger" : "success"} dot>
+                          {u.isSuspended ? "Suspended" : "Active"}
+                        </StatusBadge>
+                      </td>
+                      <td className="text-right font-mono">{matches}</td>
+                      <td className="text-right font-mono">{u._count.matchesWon}</td>
+                      <td className="text-right font-mono">{naira(u.walletBalance)}</td>
+                      <td className="text-right text-muted">{formatDate(u.createdAt)}</td>
+                    </RowLink>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
+          <Pagination page={page} pageSize={PAGE_SIZE} total={total} href={pageHref} />
         </div>
       )}
-    </div>
+    </>
   );
 }

@@ -12,7 +12,16 @@ import { prisma } from "@/lib/db";
 import Poller from "@/app/Poller";
 import { playerRankInGame } from "@/lib/standings";
 import { computeTopFragger } from "@/lib/awards";
+import { asTeam, teamEntryLabels } from "@/lib/teamEntries";
 import { BracketView, type BracketStructure } from "./BracketView";
+import { renderLobbyStandings } from "./lobbyPage";
+import { RoundRobinStandings } from "./RoundRobinStandings";
+import { LeagueStandings } from "./LeagueStandings";
+import { loadLeague } from "@/lib/leagueStandings";
+import { loadLeagueStandings } from "@/lib/roundRobinStandings";
+import { getCurrentUser } from "@/lib/session";
+import { DoubleElimView } from "./DoubleElimView";
+import { isDoubleElimStructure } from "@/lib/doubleElim";
 
 export default async function BracketPage({
   params,
@@ -26,6 +35,87 @@ export default async function BracketPage({
     include: { organizer: { select: { verified: true, user: { select: { displayName: true, handle: true } } } } },
   });
   if (!tournament) notFound();
+
+  // Lobby tournaments have rounds and a leaderboard instead of a bracket.
+  if (tournament.competitionStyle === "LOBBY") {
+    return (
+      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6 sm:px-8 sm:py-10">
+        <Poller />
+        {await renderLobbyStandings(tournament, { backHref: `/tournaments/${id}`, shareUrl: `${process.env.NEXT_PUBLIC_APP_URL}/tournaments/${id}/bracket` })}
+      </div>
+    );
+  }
+
+  if (tournament.format === "ROUND_ROBIN" || tournament.format === "SWISS") {
+    const [view, viewer] = await Promise.all([loadLeagueStandings(tournament), getCurrentUser()]);
+    if (view) {
+      return (
+        <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6 sm:px-8 sm:py-10">
+          <Poller />
+          <RoundRobinStandings
+            tournament={tournament}
+            view={view}
+            viewerId={viewer?.id ?? null}
+            backHref={`/tournaments/${id}`}
+            matchHrefBase="/matches"
+            shareUrl={`${process.env.NEXT_PUBLIC_APP_URL}/tournaments/${id}/bracket`}
+          />
+        </div>
+      );
+    }
+  }
+
+  if (tournament.format === "LEAGUE") {
+    const [view, viewer] = await Promise.all([loadLeague(tournament), getCurrentUser()]);
+    if (view) {
+      return (
+        <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6 sm:px-8 sm:py-10">
+          <Poller />
+          <LeagueStandings
+            tournament={tournament}
+            view={view}
+            viewerId={viewer?.id ?? null}
+            isOrganizer={viewer?.id === tournament.organizerId}
+            backHref={`/tournaments/${id}`}
+            matchHrefBase="/matches"
+            shareUrl={`${process.env.NEXT_PUBLIC_APP_URL}/tournaments/${id}/bracket`}
+          />
+        </div>
+      );
+    }
+  }
+
+  if (tournament.format === "DOUBLE_ELIMINATION") {
+    const bracketRow = await prisma.bracket.findUnique({ where: { tournamentId: id } });
+    if (isDoubleElimStructure(bracketRow?.structure)) {
+      const structure = bracketRow.structure;
+      const ids = [...new Set(structure.nodes.flatMap((n) => [n.playerAId, n.playerBId]).filter((x): x is string => !!x))];
+      const [people, labels, matchRows, viewer] = await Promise.all([
+        prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, displayName: true, handle: true } }),
+        teamEntryLabels(id),
+        prisma.match.findMany({ where: { tournamentId: id }, select: { id: true, status: true } }),
+        getCurrentUser(),
+      ]);
+      const deView = (
+        <DoubleElimView
+          tournament={tournament}
+          structure={structure}
+          people={people.map((p) => ({ ...p, displayName: labels.get(p.id)?.teamName ?? p.displayName }))}
+          statuses={Object.fromEntries(matchRows.map((m) => [m.id, m.status]))}
+          viewerId={viewer?.id ?? null}
+          backHref={`/tournaments/${id}`}
+          matchHrefBase="/matches"
+          shareUrl={`${process.env.NEXT_PUBLIC_APP_URL}/tournaments/${id}/bracket`}
+        />
+      );
+      return (
+        <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6 sm:px-8 sm:py-10">
+          <Poller />
+          {deView}
+        </div>
+      );
+    }
+  }
 
   const bracket = await prisma.bracket.findUnique({ where: { tournamentId: id } });
   if (!bracket) {
@@ -51,12 +141,12 @@ export default async function BracketPage({
       if (slot.playerBId) userIds.add(slot.playerBId);
     }
   }
-  const users = await prisma.user.findMany({
+  const rawUsers = await prisma.user.findMany({
     where: { id: { in: [...userIds] } },
     select: { id: true, displayName: true, handle: true, avatarUrl: true },
   });
 
-  const matches = await prisma.match.findMany({
+  const rawMatches = await prisma.match.findMany({
     where: { tournamentId: id },
     orderBy: [{ round: "asc" }, { createdAt: "asc" }],
     include: {
@@ -65,12 +155,21 @@ export default async function BracketPage({
     },
   });
 
+  // Team tournaments: show the team, not the captain who holds the slot.
+  const labels = await teamEntryLabels(id);
+  const users = rawUsers.map((u) => asTeam(u, u.id, labels));
+  const matches = rawMatches.map((m) => ({
+    ...m,
+    playerA: asTeam(m.playerA, m.playerAId, labels),
+    playerB: asTeam(m.playerB, m.playerBId, labels),
+  }));
+
   const champion = structure.rounds[structure.totalRounds - 1]?.slots[0]?.winnerId ?? null;
   const championRank = champion ? await playerRankInGame(tournament.game, champion) : null;
   const topFragger = await computeTopFragger(id);
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 p-6 sm:p-8">
+    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6 sm:px-8 sm:py-10">
       <Poller />
       <BracketView
         tournament={tournament}

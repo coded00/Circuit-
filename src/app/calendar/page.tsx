@@ -13,25 +13,33 @@
  * URL-is-the-state, same model `/compete`'s filter form already uses:
  * `y`/`m` (visible month), `view` (month/week/list), `type` (all/
  * tournaments/challenges/community/game_releases), `game` (free-text-ish
- * filter over the small curated GAME_ACTIVITY set — only meaningful for
+ * filter over the published game catalog — only meaningful for
  * Tournament/Challenge rows, Community/Game Release have no `game`
  * field), `day` (the day selected in the side panel / week anchor).
  * Every link on this page is a plain server-rendered navigation; the
  * only client component is the auto-submitting game `<select>`.
+ *
+ * All four kinds are always fetched (each capped at 200) and the type
+ * filter is applied in memory, so every filter chip can show its real
+ * count for the month — the chips double as the colour legend.
  */
 
+import { ViewTransition } from "react";
 import Link from "next/link";
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { prisma } from "@/lib/db";
-import { CINEMATIC_GAMING_IMAGE, unsplashUrl } from "@/lib/gameImagery";
-import { GAME_ACTIVITY } from "@/lib/circuitActivity";
+import { getCurrentUser } from "@/lib/session";
+import { communityHref } from "@/lib/community";
+import { openBattleFilter } from "@/lib/battles";
+import { isLeagueStructure } from "@/lib/leagueStandings";
+import { publishedGames } from "@/lib/gameCatalogQueries";
 import {
   addMonths,
   dateKey,
   endOfDay,
   getMonthGridDays,
   getWeekDays,
-  monthLabel,
+  MONTH_LABELS,
   parseDateKey,
   startOfDay,
 } from "@/lib/calendar";
@@ -40,7 +48,16 @@ import { CalendarDayPanel } from "@/components/calendar/CalendarDayPanel";
 import { CalendarListView } from "@/components/calendar/CalendarListView";
 import { GameFilterSelect } from "@/components/calendar/GameFilterSelect";
 import { FeaturedCompetitions } from "@/components/FeaturedCompetitions";
-import type { CalendarEvent } from "@/components/calendar/types";
+import { EVENT_KIND_META, type CalendarEvent, type EventKind } from "@/components/calendar/types";
+import { buildMetadata } from "@/lib/seo";
+
+export const metadata = buildMetadata({
+  title: "Gaming Tournament Calendar",
+  description:
+    "Upcoming gaming tournaments and esports events on Circuit, by date. Plan your week and register before spots fill.",
+  path: "/calendar",
+});
+
 
 type SearchParams = {
   y?: string;
@@ -52,18 +69,25 @@ type SearchParams = {
 };
 
 type ViewMode = "month" | "week" | "list";
-type EventType = "all" | "tournaments" | "challenges" | "community" | "game_releases";
+type EventType = "all" | "mine" | "tournaments" | "challenges" | "community" | "game_releases";
 
-const TYPE_TABS: { value: EventType; label: string }[] = [
-  { value: "all", label: "All Events" },
-  { value: "tournaments", label: "Tournaments" },
-  { value: "challenges", label: "Challenges" },
-  { value: "community", label: "Community" },
-  { value: "game_releases", label: "Game Releases" },
+const TYPE_TABS: { value: Exclude<EventType, "all" | "mine">; kind: EventKind }[] = [
+  { value: "tournaments", kind: "tournament" },
+  { value: "challenges", kind: "challenge" },
+  { value: "community", kind: "community" },
+  { value: "game_releases", kind: "game_release" },
 ];
+
+function formatCompactNaira(kobo: number): string {
+  const naira = kobo / 100;
+  if (naira >= 1_000_000) return `₦${(naira / 1_000_000).toFixed(naira >= 10_000_000 ? 0 : 1).replace(/\.0$/, "")}M`;
+  if (naira >= 1_000) return `₦${Math.round(naira / 1_000)}k`;
+  return `₦${naira.toLocaleString("en-NG")}`;
+}
 
 export default async function CalendarPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams;
+  const user = await getCurrentUser();
   const now = new Date();
   const todayKey = dateKey(now);
 
@@ -73,7 +97,9 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const month = Number.isInteger(mNum) && mNum >= 1 && mNum <= 12 ? mNum : now.getMonth() + 1;
   const view: ViewMode = sp.view === "week" || sp.view === "list" ? sp.view : "month";
   const type: EventType =
-    sp.type === "tournaments" || sp.type === "challenges" || sp.type === "community" || sp.type === "game_releases"
+    sp.type === "mine" && user
+      ? "mine"
+      : sp.type === "tournaments" || sp.type === "challenges" || sp.type === "community" || sp.type === "game_releases"
       ? sp.type
       : "all";
   const game = sp.game?.trim() ?? "";
@@ -82,20 +108,16 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const selectedKey = sp.day && /^\d{4}-\d{2}-\d{2}$/.test(sp.day) ? sp.day : defaultSelected;
   const selectedDate = parseDateKey(selectedKey);
 
-  const gridDays = getMonthGridDays(year, month);
+  // A trailing week made entirely of next month's days is just empty
+  // hatching — drop it rather than always rendering six rows.
+  const fullGrid = getMonthGridDays(year, month);
+  const gridDays = fullGrid.slice(35).every((d) => d.getMonth() + 1 !== month) ? fullGrid.slice(0, 35) : fullGrid;
   const weekDays = getWeekDays(selectedDate);
   const rangeStart = startOfDay(gridDays[0]);
   const rangeEnd = endOfDay(gridDays[gridDays.length - 1]);
 
-  const showTournaments = type === "all" || type === "tournaments";
-  const showChallenges = type === "all" || type === "challenges";
-  const showCommunity = type === "all" || type === "community";
-  const showGameReleases = type === "all" || type === "game_releases";
-
-  const [tournaments, battles, communityEvents, gameReleaseEvents] = await Promise.all([
-    !showTournaments
-      ? Promise.resolve([])
-      : prisma.tournament.findMany({
+  const [tournaments, battles, communityEvents, gameReleaseEvents, myRegistrations, joinedCommunityEvents, myMatches] = await Promise.all([
+    prisma.tournament.findMany({
           where: {
             startAt: { gte: rangeStart, lte: rangeEnd },
             ...(game ? { game: { contains: game, mode: "insensitive" as const } } : {}),
@@ -118,12 +140,10 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
             _count: { select: { registrations: { where: { status: "CONFIRMED" as const } } } },
           },
         }),
-    !showChallenges
-      ? Promise.resolve([])
-      : prisma.battle.findMany({
+    prisma.battle.findMany({
           where: {
             createdAt: { gte: rangeStart, lte: rangeEnd },
-            status: "OPEN" as const,
+            ...openBattleFilter(),
             ...(game ? { game: { contains: game, mode: "insensitive" as const } } : {}),
           },
           orderBy: { createdAt: "asc" },
@@ -140,23 +160,66 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     // Community/Game Release: real, admin-authored CalendarEvent rows
     // (Admin > Calendar) — the `game` filter doesn't apply to either,
     // neither has a `game` field.
-    !showCommunity
-      ? Promise.resolve([])
-      : prisma.calendarEvent.findMany({
+    prisma.calendarEvent.findMany({
           where: { category: "COMMUNITY", cancelled: false, date: { gte: rangeStart, lte: rangeEnd } },
           orderBy: { date: "asc" },
           take: 200,
         }),
-    !showGameReleases
-      ? Promise.resolve([])
-      : prisma.calendarEvent.findMany({
+    prisma.calendarEvent.findMany({
           where: { category: "GAME_RELEASE", cancelled: false, date: { gte: rangeStart, lte: rangeEnd } },
           orderBy: { date: "asc" },
           take: 200,
         }),
+    // Personal layer (signed in): what you've entered, the events of
+    // communities you've joined, and your own league fixtures.
+    user ? prisma.registration.findMany({ where: { userId: user.id, status: "CONFIRMED" }, select: { tournamentId: true } }) : Promise.resolve([]),
+    user
+      ? prisma.communityEvent.findMany({
+          where: { startsAt: { gte: rangeStart, lte: rangeEnd }, cancelledAt: null, community: { enabled: true, members: { some: { userId: user.id } } } },
+          orderBy: { startsAt: "asc" },
+          take: 200,
+          select: { id: true, title: true, startsAt: true, community: { select: { kind: true, slug: true, tournamentId: true } } },
+        })
+      : Promise.resolve([]),
+    user
+      ? prisma.match.findMany({
+          where: {
+            OR: [{ playerAId: user.id }, { playerBId: user.id }],
+            status: { in: ["UPCOMING", "NEEDS_RESULT"] },
+            tournament: { format: "LEAGUE", status: "LIVE" },
+          },
+          take: 100,
+          select: {
+            id: true,
+            round: true,
+            status: true,
+            playerAId: true,
+            playerA: { select: { displayName: true } },
+            playerB: { select: { displayName: true } },
+            tournamentId: true,
+            tournament: { select: { name: true } },
+          },
+        })
+      : Promise.resolve([]),
   ]);
 
-  const events: CalendarEvent[] = [
+  // League fixtures have a due date (their matchday's deadline); other
+  // formats don't schedule individual matches, so they aren't plotted.
+  const myTournamentIds = new Set(myRegistrations.map((r) => r.tournamentId));
+  const leagueBrackets = myMatches.length
+    ? await prisma.bracket.findMany({ where: { tournamentId: { in: [...new Set(myMatches.map((m) => m.tournamentId!))] } }, select: { tournamentId: true, structure: true } })
+    : [];
+  const matchEvents: CalendarEvent[] = myMatches.flatMap((m): CalendarEvent[] => {
+    const structure = leagueBrackets.find((b) => b.tournamentId === m.tournamentId)?.structure;
+    if (!isLeagueStructure(structure) || (m.round ?? 0) > structure.totalRounds) return [];
+    const due = structure.deadlines[(m.round ?? 1) - 1];
+    if (!due) return [];
+    const date = new Date(due);
+    if (date < rangeStart || date > rangeEnd) return [];
+    return [{ kind: "match", id: m.id, date, opponent: m.playerAId === user!.id ? m.playerB.displayName : m.playerA.displayName, tournamentName: m.tournament?.name ?? "League", status: m.status }];
+  });
+
+  const allEvents: CalendarEvent[] = [
     ...tournaments.map(
       (t): CalendarEvent => ({
         kind: "tournament",
@@ -172,6 +235,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         prizeText: t.prizeText,
         participantCap: t.participantCap,
         registered: t._count.registrations,
+        mine: myTournamentIds.has(t.id),
       })
     ),
     ...battles.map(
@@ -185,9 +249,15 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         hostName: b.creator.displayName,
       })
     ),
-    ...communityEvents.map((e): CalendarEvent => ({ kind: "community", id: e.id, date: e.date, title: e.title })),
+    ...communityEvents.map((e): CalendarEvent => ({ kind: "community", id: e.id, date: e.date, title: e.title, href: null, mine: false })),
+    ...joinedCommunityEvents.map((e): CalendarEvent => ({ kind: "community", id: e.id, date: e.startsAt, title: e.title, href: communityHref(e.community), mine: true })),
+    ...matchEvents,
     ...gameReleaseEvents.map((e): CalendarEvent => ({ kind: "game_release", id: e.id, date: e.date, title: e.title })),
   ].sort((a, b) => a.date.getTime() - b.date.getTime());
+
+  const isMine = (e: CalendarEvent) => e.kind === "match" || ((e.kind === "tournament" || e.kind === "community") && e.mine);
+  const kindForType = type === "all" || type === "mine" ? null : TYPE_TABS.find((t) => t.value === type)!.kind;
+  const events = type === "mine" ? allEvents.filter(isMine) : kindForType ? allEvents.filter((e) => e.kind === kindForType) : allEvents;
 
   const eventsByDay = new Map<string, CalendarEvent[]>();
   for (const event of events) {
@@ -203,6 +273,17 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   // strict calendar month, topped up with soonest-starting real ones —
   // same "prized first, soonest-start filler" logic as the homepage's
   // FeaturedCompetitions query, just scoped to this visible month.
+  const inMonth = (e: CalendarEvent) => e.date >= monthStart && e.date <= monthEnd;
+  const kindCounts = new Map<EventKind, number>();
+  for (const e of allEvents) if (inMonth(e)) kindCounts.set(e.kind, (kindCounts.get(e.kind) ?? 0) + 1);
+  const monthPrizePool = tournaments
+    .filter((t) => t.startAt >= monthStart && t.startAt <= monthEnd && t.status !== "CANCELLED")
+    .reduce((sum, t) => sum + (t.prizeAmount ?? 0), 0);
+
+  // First event after the selected day — the empty-day panel's "next up".
+  const selectedEnd = endOfDay(selectedDate);
+  const nextEvent = events.find((e) => e.date > selectedEnd) ?? null;
+
   const inMonthTournaments = tournaments.filter(
     (t) => t.startAt >= monthStart && t.startAt <= monthEnd && (t.status === "OPEN" || t.status === "LIVE")
   );
@@ -214,7 +295,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const featured = [...prized, ...filler];
 
   const listGroups = (() => {
-    const inMonthEvents = events.filter((e) => e.date >= monthStart && e.date <= monthEnd);
+    const inMonthEvents = events.filter(inMonth);
     const map = new Map<string, CalendarEvent[]>();
     for (const e of inMonthEvents) {
       const key = dateKey(e.date);
@@ -242,125 +323,162 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const prevMonth = addMonths(year, month, -1);
   const nextMonth = addMonths(year, month, 1);
 
-  return (
-    <div className="flex w-full flex-1 flex-col gap-6 p-6 sm:p-8">
-      <div
-        data-surface="dark"
-        className="relative flex h-[190px] w-full flex-col justify-center overflow-hidden rounded-[var(--radius-hero)] border border-border px-6 sm:h-[220px] sm:px-8"
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element -- external CDN hero photo, same asset CircuitHero uses */}
-        <img src={unsplashUrl(CINEMATIC_GAMING_IMAGE, 1400)} alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover" />
-        <div
-          aria-hidden
-          className="absolute inset-0"
-          style={{
-            backgroundImage:
-              "linear-gradient(100deg, var(--background) 15%, color-mix(in srgb, var(--background) 70%, transparent) 55%, color-mix(in srgb, var(--background) 30%, transparent) 100%)",
-          }}
-        />
-        {/* Decorative accent only, reusing the same real, established
-            tagline the homepage hero already uses ("More Games. Bigger
-            Moments.") — not new marketing copy, just given the same
-            visual weight the reference layout gave its own headline. */}
-        <div aria-hidden className="absolute top-1/2 right-6 z-10 hidden -translate-y-1/2 -rotate-3 text-right sm:block lg:right-10">
-          <span className="font-display text-3xl leading-[0.95] font-bold tracking-tight text-accent-volt italic lg:text-4xl">
-            More Games.
-            <br />
-            Bigger Moments.
-          </span>
-        </div>
-        <div className="relative z-10 flex flex-col gap-1.5">
-          <h1 className="font-display flex items-center gap-2 text-2xl font-bold tracking-tight sm:text-3xl">
-            <CalendarIcon size={22} className="text-accent-volt" />
-            Calendar
-          </h1>
-          <p className="max-w-md text-sm text-muted">All tournaments and challenges on Circuit, in one place.</p>
-        </div>
-      </div>
+  const tournamentCount = kindCounts.get("tournament") ?? 0;
+  const challengeCount = kindCounts.get("challenge") ?? 0;
+  const summary: [string, string][] = [
+    [String(tournamentCount), tournamentCount === 1 ? "tournament" : "tournaments"],
+    [String(challengeCount), challengeCount === 1 ? "open challenge" : "open challenges"],
+    ...(monthPrizePool > 0 ? [[formatCompactNaira(monthPrizePool), "in prizes"] as [string, string]] : []),
+  ];
+  const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1;
 
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          {TYPE_TABS.map((tab) => (
+  const chipBase =
+    "flex shrink-0 items-center gap-2 rounded-none border px-3 py-[7px] text-[13px] font-medium transition-colors duration-[var(--duration-fast)]";
+  const chipIdle = "border-border bg-surface text-muted hover:border-border-hover hover:text-foreground";
+  const chipActive = "border-foreground bg-foreground text-background";
+
+  return (
+    <div className="flex w-full flex-1 flex-col gap-5 px-4 py-6 sm:gap-6 sm:px-8 sm:py-10">
+      <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-2">
+          <span className="font-mono text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">Calendar</span>
+          <div className="flex items-center gap-3">
+            <h1 className="font-display text-[32px] leading-none font-bold tracking-tight sm:text-[44px]">
+              {MONTH_LABELS[month - 1]}
+              <span className="ml-2 text-muted-strong">{year}</span>
+            </h1>
+            <div className="ml-auto flex items-center gap-1 lg:ml-2">
+              <Link
+                href={href({ y: String(prevMonth.year), m: String(prevMonth.month) })}
+                scroll={false}
+                aria-label="Previous month"
+                className="flex h-9 w-9 items-center justify-center cut-avatar border border-border bg-surface text-muted transition hover:border-border-hover hover:text-foreground"
+              >
+                <ChevronLeft size={16} />
+              </Link>
+              <Link
+                href={href({ y: String(nextMonth.year), m: String(nextMonth.month) })}
+                scroll={false}
+                aria-label="Next month"
+                className="flex h-9 w-9 items-center justify-center cut-avatar border border-border bg-surface text-muted transition hover:border-border-hover hover:text-foreground"
+              >
+                <ChevronRight size={16} />
+              </Link>
+              {!isCurrentMonth || selectedKey !== todayKey ? (
+                <Link
+                  href={href({ y: String(now.getFullYear()), m: String(now.getMonth() + 1), day: todayKey })}
+                  scroll={false}
+                  className="ml-1 flex h-9 items-center rounded-none border border-border bg-surface px-3 text-[13px] font-semibold transition hover:border-border-hover"
+                >
+                  Today
+                </Link>
+              ) : null}
+            </div>
+          </div>
+          <p className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-sm text-muted">
+            {summary.map(([value, label]) => (
+              <span key={label}>
+                <span className="font-semibold text-foreground tabular-nums">{value}</span> {label}
+              </span>
+            ))}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="flex flex-1 items-center rounded-none border border-border bg-surface p-[3px] lg:flex-none" role="tablist" aria-label="View">
+            {(["month", "week", "list"] as const).map((v) => (
+              <Link
+                key={v}
+                href={href({ view: v })}
+                scroll={false}
+                role="tab"
+                aria-selected={view === v}
+                className={`flex-1 rounded-none px-3.5 py-1.5 text-center text-[13px] font-semibold capitalize transition lg:flex-none ${
+                  view === v ? "bg-foreground text-background" : "text-muted hover:text-foreground"
+                }`}
+              >
+                {v}
+              </Link>
+            ))}
+          </div>
+          <GameFilterSelect game={game} options={(await publishedGames()).map((g) => g.name)} baseQuery={baseParams} />
+        </div>
+      </header>
+
+      <nav aria-label="Event types" className="scrollbar-hide -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
+        <Link href={href({ type: "all" })} scroll={false} className={`${chipBase} ${type === "all" ? chipActive : chipIdle}`}>
+          All
+          <span className="font-mono text-[11px] opacity-60 tabular-nums">{Array.from(kindCounts.values()).reduce((a, b) => a + b, 0)}</span>
+        </Link>
+        {user && (
+          <Link
+            href={href({ type: type === "mine" ? "all" : "mine" })}
+            scroll={false}
+            aria-pressed={type === "mine"}
+            className={`${chipBase} ${type === "mine" ? chipActive : chipIdle}`}
+          >
+            My calendar
+            <span className="font-mono text-[11px] opacity-60 tabular-nums">{allEvents.filter((e) => inMonth(e) && isMine(e)).length}</span>
+          </Link>
+        )}
+        {TYPE_TABS.map((tab) => {
+          const meta = EVENT_KIND_META[tab.kind];
+          const active = type === tab.value;
+          return (
             <Link
               key={tab.value}
-              href={href({ type: tab.value })}
-              className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                type === tab.value ? "bg-foreground text-background" : "text-muted hover:bg-surface-elevated hover:text-foreground"
-              }`}
+              href={href({ type: active ? "all" : tab.value })}
+              scroll={false}
+              aria-pressed={active}
+              className={`${chipBase} ${active ? chipActive : chipIdle}`}
             >
-              {tab.label}
+              <span
+                aria-hidden
+                className="cal-dot h-2 w-2 cut-avatar ring-1 ring-black/5"
+                style={{ "--ev": meta.color } as React.CSSProperties}
+              />
+              {meta.plural}
+              <span className="font-mono text-[11px] opacity-60 tabular-nums">{kindCounts.get(tab.kind) ?? 0}</span>
             </Link>
-          ))}
+          );
+        })}
+      </nav>
+
+      {/* One grid, three children in reading order (calendar, day agenda,
+          featured) — so on phones the agenda lands right under the grid
+          it belongs to; from xl it moves into a sticky right rail
+          spanning both rows. */}
+      <div className={`grid grid-cols-1 gap-5 xl:gap-x-6 xl:gap-y-8 ${view === "list" ? "" : "xl:grid-cols-[minmax(0,1fr)_360px]"}`}>
+        <div className="min-w-0 xl:col-start-1 xl:row-start-1">
+          {/* Month/view/filter changes crossfade the grid; picking a day
+              doesn't (only the agenda swaps). */}
+          <ViewTransition key={`${year}-${month}-${view}-${type}-${game}`} name="calendar-grid" share="content-swap" enter="content-swap" default="none">
+            <div>
+              {view === "list" && <CalendarListView groups={listGroups} todayKey={todayKey} />}
+              {view === "month" && (
+                <CalendarGrid days={gridDays} eventsByDay={eventsByDay} currentMonth={month} selectedKey={selectedKey} todayKey={todayKey} dayHref={(key) => href({ day: key })} />
+              )}
+              {view === "week" && (
+                <CalendarGrid days={weekDays} eventsByDay={eventsByDay} currentMonth={null} selectedKey={selectedKey} todayKey={todayKey} dayHref={(key) => href({ day: key })} dense />
+              )}
+            </div>
+          </ViewTransition>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Link href={href({ y: String(now.getFullYear()), m: String(now.getMonth() + 1), day: todayKey })} className="btn-secondary px-3 py-1.5 text-xs">
-              Today
-            </Link>
-            <Link href={href({ y: String(prevMonth.year), m: String(prevMonth.month) })} aria-label="Previous month" className="btn-icon">
-              <ChevronLeft size={16} />
-            </Link>
-            <Link href={href({ y: String(nextMonth.year), m: String(nextMonth.month) })} aria-label="Next month" className="btn-icon">
-              <ChevronRight size={16} />
-            </Link>
-            <h2 className="font-display text-lg font-bold tracking-tight">{monthLabel(year, month)}</h2>
+        {view !== "list" && (
+          <div className="min-w-0 xl:col-start-2 xl:row-span-2 xl:row-start-1 xl:self-start xl:sticky xl:top-[76px]">
+            <ViewTransition key={selectedKey} name="calendar-day" share="content-swap" enter="content-swap" default="none">
+              <CalendarDayPanel
+                date={selectedDate}
+                events={eventsByDay.get(selectedKey) ?? []}
+                isToday={selectedKey === todayKey}
+                nextUp={nextEvent ? { event: nextEvent, href: nextDayHref(nextEvent) } : null}
+              />
+            </ViewTransition>
           </div>
+        )}
 
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1 rounded-[10px] border border-border bg-surface p-1">
-              {(["month", "week", "list"] as const).map((v) => (
-                <Link
-                  key={v}
-                  href={href({ view: v })}
-                  className={`rounded-[7px] px-3 py-1.5 text-xs font-semibold capitalize transition ${
-                    view === v ? "bg-foreground text-background" : "text-muted hover:text-foreground"
-                  }`}
-                >
-                  {v}
-                </Link>
-              ))}
-            </div>
-            <GameFilterSelect game={game} options={GAME_ACTIVITY.map((g) => g.name)} baseQuery={baseParams} />
-          </div>
-        </div>
-      </div>
-
-      <div className={`grid grid-cols-1 gap-6 ${view === "list" ? "" : "xl:grid-cols-[1fr_340px]"}`}>
-        <div className="flex min-w-0 flex-col gap-4">
-          {view === "list" && <CalendarListView groups={listGroups} />}
-          {view === "month" && (
-            <CalendarGrid days={gridDays} eventsByDay={eventsByDay} currentMonth={month} selectedKey={selectedKey} todayKey={todayKey} dayHref={(key) => href({ day: key })} />
-          )}
-          {view === "week" && (
-            <CalendarGrid days={weekDays} eventsByDay={eventsByDay} currentMonth={null} selectedKey={selectedKey} todayKey={todayKey} dayHref={(key) => href({ day: key })} dense />
-          )}
-
-          {view !== "list" && (
-            <div className="flex flex-wrap items-center gap-4 text-xs text-muted">
-              <span className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-accent-blue" aria-hidden />
-                Tournament
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-accent-orange" aria-hidden />
-                Challenge
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-purple-500" aria-hidden />
-                Community
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-rose-500" aria-hidden />
-                Game Release
-              </span>
-            </div>
-          )}
-
-          {/* Directly under the grid/list, in the same column — not a
-              full-width block below the day panel too, which (with a
-              busy day panel) could end up far from the calendar it's
-              actually placed under. */}
+        <div className="mt-3 min-w-0 xl:col-start-1 xl:row-start-2 xl:mt-0">
           <FeaturedCompetitions
             tournaments={featured}
             title="Featured This Month"
@@ -369,9 +487,12 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
             showFeaturedBadge
           />
         </div>
-
-        {view !== "list" && <CalendarDayPanel date={selectedDate} events={eventsByDay.get(selectedKey) ?? []} />}
       </div>
     </div>
   );
+
+  function nextDayHref(event: CalendarEvent): string {
+    const d = event.date;
+    return href({ y: String(d.getFullYear()), m: String(d.getMonth() + 1), day: dateKey(d) });
+  }
 }

@@ -1,108 +1,120 @@
 /**
- * Circuit — signup (ACC-2, part of Build Plan P0-2).
+ * Circuit — email signup (ACC-2), fed by the multi-step form on /signup.
+ * Collects name, email, password (+ confirmation), terms acceptance,
+ * username, country, date of birth and an optional Nigerian mobile
+ * number; everything is re-validated here. Games, avatar and bio are
+ * saved by the form afterwards, through the signed-in endpoints.
  *
- * Handle/username is chosen by the player at signup, not auto-generated
- * (a prior version issued a random `player_xxxxxxxx` tag and deferred
- * customization to profile edit — no such edit path exists, and letting
- * every new account start with a generic tag was the actual complaint).
- * `displayName` still just mirrors `handle` — a separate display name is
- * a real ACC-6 profile-edit feature, not something this signup form
- * needs to also collect. Age-of-majority (ACC-3) is checked at
- * cash-touching actions, not here — see src/lib/age-gate.ts.
+ * - Email is stored lowercased as the login identifier (and as `email`),
+ *   and checked case-insensitively so "Ada@x.com" can't register twice.
+ * - Phone is optional; when given it's normalised to +234… (src/lib/phone.ts)
+ *   — not SMS-verified.
+ * - Date of birth must be 13+ (src/lib/age.ts); the separate 18+ rule for
+ *   paid entry and payouts still lives in src/lib/age-gate.ts.
+ *
+ * Errors carry `field` so the form can jump back to the step that needs
+ * fixing. Email/phone conflicts are worded conditionally ("if you already
+ * have one…") rather than confirming an account exists.
  */
 
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
+import { sendVerificationEmail } from "@/lib/emailVerification";
 import { prisma } from "@/lib/db";
 import { createSessionToken, hashPassword, sessionCookie } from "@/lib/auth";
 import { joinGlobalCommunity } from "@/lib/community";
-import { isRateLimited, recordAttempt, clearAttempts } from "@/lib/rateLimit";
+import { AUTH_LIMITS, callerThrottleKeys, clearAttempts, isCallerThrottled, isRateLimited, recordAttempt, recordCallerAttempt } from "@/lib/rateLimit";
+import { HANDLE_RULES_MESSAGE, validateHandle } from "@/lib/handles";
+import { normalizeNigerianPhone } from "@/lib/phone";
+import { isCountryCode } from "@/lib/countries";
+import { MIN_PASSWORD_LENGTH } from "@/lib/passwordRules";
+import { parseSignupDateOfBirth } from "@/lib/age";
 
-const MIN_PASSWORD_LENGTH = 8;
-const HANDLE_PATTERN = /^[a-z0-9_]{3,20}$/;
-// Same shape as login's own limit — keyed by the submitted identifier, not
-// IP. This stops repeated automated attempts against one identifier (a
-// guessed pending signup, a retry-spam loop); it does NOT by itself stop
-// mass account creation using a fresh email/phone on every attempt — that
-// needs IP-based throttling or a CAPTCHA, a bigger decision left for a
-// follow-up rather than silently bundled into this fix.
-const SIGNUP_MAX_ATTEMPTS = 5;
-const SIGNUP_WINDOW_MS = 15 * 60 * 1000;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+// Throttled on three layers (rateLimit.ts, `AUTH_LIMITS.signup`): 5 attempts per email, 30 per caller and
+// 500 platform-wide per 15 minutes. The per-email bucket alone never stopped mass creation with fresh
+// addresses — each new email opened a window of its own — which is what the caller and global buckets are
+// for. Unlike login's, the caller buckets count attempts that *succeed*, because that is the attack here.
 
-// Names that would be confusing or impersonation-prone as a public handle.
-const RESERVED_HANDLES = new Set([
-  "admin",
-  "administrator",
-  "staff",
-  "support",
-  "help",
-  "circuit",
-  "official",
-  "moderator",
-  "mod",
-  "root",
-  "system",
-  "api",
-  "null",
-  "undefined",
-]);
+const EXISTING_ACCOUNT_MESSAGE = "Couldn't create your account. If you already have one, try logging in instead.";
 
-function validateHandle(raw: string): string | null {
-  const handle = raw.trim().toLowerCase();
-  if (!HANDLE_PATTERN.test(handle)) {
-    return null;
-  }
-  if (RESERVED_HANDLES.has(handle)) {
-    return null;
-  }
-  return handle;
-}
+type Field = "name" | "email" | "password" | "confirmPassword" | "terms" | "handle" | "country" | "phone" | "dateOfBirth";
+const MAX_NAME_LENGTH = 40;
+const fail = (field: Field, error: string, status = 400) => NextResponse.json({ error, field }, { status });
+
+// No `field`: being over the limit is not a problem with anything the form sent, and pinning it to one
+// input would send the user back to a step that is fine.
+const tooManyAttempts = (retryAfterSeconds: number) =>
+  NextResponse.json(
+    { error: `Too many attempts. Try again in ${Math.ceil(retryAfterSeconds / 60)} minute(s).` },
+    { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } }
+  );
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
-  const rawHandle = typeof body?.handle === "string" ? body.handle : "";
-  const emailOrPhone = typeof body?.emailOrPhone === "string" ? body.emailOrPhone.trim() : "";
-  const password = typeof body?.password === "string" ? body.password : "";
+  const str = (key: string) => (typeof body?.[key] === "string" ? (body[key] as string) : "");
 
-  if (!emailOrPhone || password.length < MIN_PASSWORD_LENGTH) {
-    return NextResponse.json(
-      { error: `Email or phone, and a password of at least ${MIN_PASSWORD_LENGTH} characters, are required.` },
-      { status: 400 }
-    );
+  const name = str("name").trim().replace(/\s+/g, " ");
+  if (!name) return fail("name", "Enter your name.");
+  if (name.length > MAX_NAME_LENGTH) return fail("name", `Keep your name to ${MAX_NAME_LENGTH} characters or fewer.`);
+  const email = str("email").trim().toLowerCase();
+  if (!EMAIL_PATTERN.test(email)) return fail("email", "Enter a valid email address.");
+  const password = str("password");
+  if (password.length < MIN_PASSWORD_LENGTH) return fail("password", `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
+  if (str("confirmPassword") !== password) return fail("confirmPassword", "Passwords don't match.");
+  if (body?.acceptTerms !== true) return fail("terms", "Accept the Terms and Privacy Policy to join.");
+  const handle = validateHandle(str("handle"));
+  if (!handle) return fail("handle", HANDLE_RULES_MESSAGE);
+  const country = str("country");
+  if (!isCountryCode(country)) return fail("country", "Choose your country.");
+  const phoneInput = str("phone").trim();
+  const phone = phoneInput ? normalizeNigerianPhone(phoneInput) : null;
+  if (phoneInput && !phone) return fail("phone", "Enter a Nigerian mobile number, e.g. 0803 123 4567. Or leave it blank.");
+  const dob = parseSignupDateOfBirth(body?.dateOfBirth);
+  if (!dob.ok) return fail("dateOfBirth", dob.error);
+
+  // Every attempt that gets this far counts against the caller buckets, successful or not — mass account
+  // creation is an attack that works, so a rule counting only failures would not see it. Malformed fields
+  // are deliberately not counted: nothing past this point touches the database, and spending a shared
+  // address's budget on a client that cannot spell its own birthday is the wrong trade.
+  const callerKeys = callerThrottleKeys("signup", request);
+  const callerThrottle = await isCallerThrottled("signup", callerKeys);
+  if (callerThrottle.limited) return tooManyAttempts(callerThrottle.retryAfterSeconds);
+
+  const rateLimitKey = `signup:${email}`;
+  const { limited, retryAfterSeconds } = await isRateLimited(rateLimitKey, AUTH_LIMITS.signup.identifier);
+  if (limited) return tooManyAttempts(retryAfterSeconds);
+  await recordCallerAttempt(callerKeys);
+
+  // Case-insensitive checks the unique indexes can't do on their own.
+  const [emailTaken, phoneTaken] = await Promise.all([
+    prisma.user.findFirst({
+      where: { OR: [{ emailOrPhone: { equals: email, mode: "insensitive" } }, { email: { equals: email, mode: "insensitive" } }] },
+      select: { id: true },
+    }),
+    phone ? prisma.user.findFirst({ where: { OR: [{ phone }, { emailOrPhone: phone }] }, select: { id: true } }) : null,
+  ]);
+  if (emailTaken) {
+    await recordAttempt(rateLimitKey);
+    return fail("email", EXISTING_ACCOUNT_MESSAGE, 409);
   }
-
-  const handle = validateHandle(rawHandle);
-  if (!handle) {
-    return NextResponse.json(
-      { error: "Username must be 3-20 characters, using only letters, numbers, and underscores." },
-      { status: 400 }
-    );
-  }
-
-  const rateLimitKey = `signup:${emailOrPhone.toLowerCase()}`;
-  const { limited, retryAfterSeconds } = await isRateLimited(rateLimitKey, {
-    max: SIGNUP_MAX_ATTEMPTS,
-    windowMs: SIGNUP_WINDOW_MS,
-  });
-  if (limited) {
-    return NextResponse.json(
-      { error: `Too many attempts. Try again in ${Math.ceil(retryAfterSeconds / 60)} minute(s).` },
-      { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } }
-    );
+  if (phoneTaken) {
+    await recordAttempt(rateLimitKey);
+    return fail("phone", EXISTING_ACCOUNT_MESSAGE, 409);
   }
 
   const passwordHash = await hashPassword(password);
-
   try {
     const user = await prisma.user.create({
-      data: { emailOrPhone, passwordHash, handle, displayName: handle },
+      data: { emailOrPhone: email, email, phone, country, termsAcceptedAt: new Date(), dateOfBirth: dob.date, passwordHash, handle, displayName: name },
     });
     await clearAttempts(rateLimitKey);
 
     // Every account is a member of Circuit's own platform-wide community
-    // from the moment it exists — not something a new player has to
-    // discover and opt into separately.
+    // from the moment it exists.
     await joinGlobalCommunity(user.id);
+    // Best-effort: a failed send just means they resend from Account settings.
+    await sendVerificationEmail(user).catch(() => undefined);
 
     const token = await createSessionToken({ userId: user.id });
     const response = NextResponse.json({ id: user.id, handle: user.handle }, { status: 201 });
@@ -112,20 +124,9 @@ export async function POST(request: Request) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
       await recordAttempt(rateLimitKey);
       const target = (err.meta?.target as string[] | undefined) ?? [];
-      if (target.includes("handle")) {
-        return NextResponse.json({ error: "That username is already taken." }, { status: 409 });
-      }
-      if (target.includes("emailOrPhone")) {
-        // Deliberately doesn't say "an account already exists" — unlike
-        // the handle above (a public, self-chosen username, safe to
-        // confirm), this field can be someone else's real email/phone, and
-        // stating that outright is exactly the enumeration forgot-password
-        // was already careful to avoid. Phrased conditionally instead.
-        return NextResponse.json(
-          { error: "Couldn't create your account. If you already have one, try logging in instead." },
-          { status: 409 }
-        );
-      }
+      if (target.includes("handle")) return fail("handle", "That username is already taken.", 409);
+      if (target.includes("phone")) return fail("phone", EXISTING_ACCOUNT_MESSAGE, 409);
+      return fail("email", EXISTING_ACCOUNT_MESSAGE, 409);
     }
     throw err;
   }

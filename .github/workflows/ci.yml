@@ -22,6 +22,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: "postgresql://circuit:circuit@localhost:5432/circuit_test"
+      # schema.prisma's datasource reads directUrl too; against the CI service container it is the same database.
+      DIRECT_URL: "postgresql://circuit:circuit@localhost:5432/circuit_test"
       JWT_SECRET: "ci-placeholder-secret-do-not-use-in-production"
       NEXT_PUBLIC_APP_URL: "http://localhost:3000"
       # The webhook-signature unit tests need real (if fake) values —

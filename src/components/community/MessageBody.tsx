@@ -2,13 +2,15 @@
 
 /**
  * Circuit Community — renders one message's content by kind: text (with
- * emoji-only messages shown large, the way every chat app does), an image
- * (sized from its stored dimensions so nothing jumps while it loads; tap
- * to view full screen), or a built-in sticker.
+ * emoji-only messages shown large, the way every chat app does, and
+ * @mentions as profile links), an image (sized from its stored
+ * dimensions so nothing jumps while it loads; tap to view full screen),
+ * or a built-in sticker.
  */
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import Link from "next/link";
 import { X } from "lucide-react";
 import { getSticker } from "@/lib/stickers";
 import { StickerArt } from "./StickerArt";
@@ -20,6 +22,8 @@ export type MessageContent = {
   imageWidth: number | null;
   imageHeight: number | null;
   stickerId: string | null;
+  /** Server-resolved @mentions: UTF-16 ranges into `content`. */
+  mentions: { start: number; length: number; user: { id: string; handle: string; displayName: string } }[];
 };
 
 const IMAGE_MAX_WIDTH = 320;
@@ -37,12 +41,46 @@ function bigEmojiCount(text: string): number {
   return count <= 3 ? count : 0;
 }
 
-function TextBody({ text }: { text: string }) {
-  const big = bigEmojiCount(text);
+/** Splits text into plain runs and mention links. A range that no longer
+ *  lines up with an "@" in the text (shouldn't happen — both are written
+ *  together) is skipped rather than rendered in the wrong place. */
+function withMentions(text: string, mentions: MessageContent["mentions"], viewerId: string | undefined): React.ReactNode[] {
+  const parts: React.ReactNode[] = [];
+  let cursor = 0;
+  for (const m of mentions) {
+    if (m.start < cursor || text[m.start] !== "@" || m.start + m.length > text.length) continue;
+    if (m.start > cursor) parts.push(text.slice(cursor, m.start));
+    const isViewer = m.user.id === viewerId;
+    parts.push(
+      <Link
+        key={m.start}
+        href={`/players/${m.user.handle}`}
+        title={m.user.displayName}
+        className={`rounded-none px-1 py-px font-semibold whitespace-nowrap transition-colors ${
+          isViewer
+            ? "bg-accent-volt/30 text-foreground hover:bg-accent-volt/45"
+            : "bg-accent-blue-soft text-accent-blue hover:bg-accent-blue/20 dark:text-blue-300"
+        }`}
+      >
+        {text.slice(m.start, m.start + m.length)}
+      </Link>
+    );
+    cursor = m.start + m.length;
+  }
+  if (cursor < text.length) parts.push(text.slice(cursor));
+  return parts;
+}
+
+function TextBody({ text, mentions, viewerId }: { text: string; mentions: MessageContent["mentions"]; viewerId?: string }) {
+  const big = mentions.length === 0 ? bigEmojiCount(text) : 0;
   if (big > 0) {
     return <p className={`leading-tight ${big === 1 ? "text-5xl" : "text-4xl"}`}>{text.trim()}</p>;
   }
-  return <p className="text-[15px] leading-relaxed whitespace-pre-wrap break-words text-foreground/90">{text}</p>;
+  return (
+    <p className="text-[15px] leading-relaxed whitespace-pre-wrap break-words text-foreground/90">
+      {mentions.length > 0 ? withMentions(text, mentions, viewerId) : text}
+    </p>
+  );
 }
 
 function Lightbox({ src, onClose }: { src: string; onClose: () => void }) {
@@ -69,13 +107,13 @@ function Lightbox({ src, onClose }: { src: string; onClose: () => void }) {
         <X size={20} />
       </button>
       {/* eslint-disable-next-line @next/next/no-img-element -- access-checked API route, not an optimisable static asset */}
-      <img src={src} alt="" className="max-h-full max-w-full rounded-lg object-contain" />
+      <img src={src} alt="" className="max-h-full max-w-full rounded-none object-contain" />
     </div>,
     document.body
   );
 }
 
-function ImageBody({ message }: { message: MessageContent }) {
+function ImageBody({ message, viewerId }: { message: MessageContent; viewerId?: string }) {
   const [open, setOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
   if (!message.imageUrl) return null;
@@ -90,7 +128,7 @@ function ImageBody({ message }: { message: MessageContent }) {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Open image"
-        className={`block max-w-full overflow-hidden rounded-[12px] border border-border ${loaded ? "" : "skeleton"}`}
+        className={`block max-w-full overflow-hidden cut-sm [--cut-line:var(--border)] border border-border ${loaded ? "" : "skeleton"}`}
         style={{ width: `min(100%, ${width}px)`, aspectRatio: `${w} / ${h}` }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- access-checked API route, not an optimisable static asset */}
@@ -102,14 +140,14 @@ function ImageBody({ message }: { message: MessageContent }) {
           className="h-full w-full object-cover"
         />
       </button>
-      {message.content && <TextBody text={message.content} />}
+      {message.content && <TextBody text={message.content} mentions={message.mentions} viewerId={viewerId} />}
       {open && <Lightbox src={message.imageUrl} onClose={() => setOpen(false)} />}
     </div>
   );
 }
 
-export function MessageBody({ message }: { message: MessageContent }) {
-  if (message.kind === "IMAGE") return <ImageBody message={message} />;
+export function MessageBody({ message, viewerId }: { message: MessageContent; viewerId?: string }) {
+  if (message.kind === "IMAGE") return <ImageBody message={message} viewerId={viewerId} />;
   if (message.kind === "STICKER") {
     const sticker = getSticker(message.stickerId);
     return sticker ? (
@@ -120,5 +158,5 @@ export function MessageBody({ message }: { message: MessageContent }) {
       <p className="text-sm text-muted italic">Sticker unavailable</p>
     );
   }
-  return <TextBody text={message.content} />;
+  return <TextBody text={message.content} mentions={message.mentions} viewerId={viewerId} />;
 }

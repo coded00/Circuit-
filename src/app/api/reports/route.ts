@@ -4,18 +4,42 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, suspendedResponse } from "@/lib/session";
 import { proofStorage } from "@/lib/storage";
 import { notifyStaff } from "@/lib/notifications";
+import { PROOF_TYPE_ERROR, sniffProofType } from "@/lib/imageSniff";
+import { isRateLimited, recordAttempt } from "@/lib/rateLimit";
 
 const MAX_EVIDENCE_BYTES = 10 * 1024 * 1024;
-const VALID_REASON_CODES = ["MULTI_ACCOUNTING", "CHEATING", "HARASSMENT", "PAYMENT_FRAUD", "OTHER"];
+const VALID_REASON_CODES = [
+  "HARASSMENT",
+  "HATE",
+  "SPAM",
+  "SCAM",
+  "SEXUAL",
+  "CHEATING",
+  "THREATS",
+  "IMPERSONATION",
+  "MULTI_ACCOUNTING",
+  "PAYMENT_FRAUD",
+  "OTHER",
+];
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "You must be signed in to file a report." }, { status: 401 });
   }
+  const suspended = suspendedResponse(user);
+  if (suspended) return suspended;
+
+  // Every report notifies staff, so one account can't file them without limit.
+  const rateKey = `report:${user.id}`;
+  const { limited, retryAfterSeconds } = await isRateLimited(rateKey, { max: 10, windowMs: 60 * 60 * 1000 });
+  if (limited) {
+    return NextResponse.json({ error: "You've filed a lot of reports. Try again later." }, { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } });
+  }
+  await recordAttempt(rateKey);
 
   const form = await request.formData().catch(() => null);
   if (!form) {
@@ -42,6 +66,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "You can't report yourself." }, { status: 400 });
   }
 
+  // Check the evidence file (size and real type) before anything is filed or staff are notified.
+  let evidenceBuffer: Buffer | null = null;
+  let evidenceType: ReturnType<typeof sniffProofType> = null;
+  if (evidence instanceof File && evidence.size > 0) {
+    if (evidence.size > MAX_EVIDENCE_BYTES) {
+      return NextResponse.json({ error: "Evidence file is too large (10MB max)." }, { status: 400 });
+    }
+    evidenceBuffer = Buffer.from(await evidence.arrayBuffer());
+    evidenceType = sniffProofType(evidenceBuffer);
+    if (!evidenceType) return NextResponse.json({ error: PROOF_TYPE_ERROR }, { status: 400 });
+  }
+
   const reason = details ? `${reasonCode}: ${details}` : reasonCode;
 
   const report = await prisma.report.create({
@@ -49,12 +85,8 @@ export async function POST(request: Request) {
   });
   await notifyStaff("REPORT_FILED", { reportId: report.id });
 
-  if (evidence instanceof File && evidence.size > 0) {
-    if (evidence.size > MAX_EVIDENCE_BYTES) {
-      return NextResponse.json({ error: "Evidence file is too large (10MB max)." }, { status: 400 });
-    }
-    const buffer = Buffer.from(await evidence.arrayBuffer());
-    const ref = await proofStorage.store(report.id, buffer, evidence.type || "application/octet-stream");
+  if (evidenceBuffer && evidenceType) {
+    const ref = await proofStorage.store(report.id, evidenceBuffer, evidenceType);
     await prisma.report.update({ where: { id: report.id }, data: { evidenceRef: ref } });
   }
 

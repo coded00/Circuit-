@@ -11,7 +11,7 @@ import { useEffect } from "react";
 import { AlertTriangle } from "lucide-react";
 import { captureException } from "@/lib/observability";
 
-export default function AdminOverviewError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+export default function AdminError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     captureException(error, { source: "error-boundary:admin", digest: error.digest });
   }, [error]);
@@ -21,9 +21,9 @@ export default function AdminOverviewError({ error, reset }: { error: Error & { 
       <div className="state-icon">
         <AlertTriangle size={22} />
       </div>
-      <h1 className="state-title">Couldn&apos;t load the admin overview</h1>
+      <h1 className="state-title">Couldn&apos;t load this page</h1>
       <p className="state-description">
-        The dashboard numbers failed to load — retry, or check back shortly. Nothing was changed; this is a read
+        Something failed while loading it — retry, or check back shortly. Nothing was changed; this was a read
         failure, not a write.
       </p>
       <button type="button" onClick={reset} className="btn-primary">

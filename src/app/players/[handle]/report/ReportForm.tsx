@@ -4,10 +4,17 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { OptionCard } from "@/components/OptionCard";
 
+// Same reasons as community reports, plus the competition-specific ones.
 const REASONS = [
-  { code: "MULTI_ACCOUNTING", label: "Multi-accounting" },
-  { code: "CHEATING", label: "Cheating" },
   { code: "HARASSMENT", label: "Harassment" },
+  { code: "HATE", label: "Hate or abuse" },
+  { code: "SPAM", label: "Spam" },
+  { code: "SCAM", label: "Scam" },
+  { code: "SEXUAL", label: "Sexual content" },
+  { code: "CHEATING", label: "Cheating" },
+  { code: "THREATS", label: "Threats" },
+  { code: "IMPERSONATION", label: "Impersonation" },
+  { code: "MULTI_ACCOUNTING", label: "Multi-accounting" },
   { code: "PAYMENT_FRAUD", label: "Payment fraud" },
   { code: "OTHER", label: "Other" },
 ];

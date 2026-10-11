@@ -38,7 +38,7 @@ export const POSTER_BOUNDS: ImageSizeBounds = {
   minHeight: 300,
   minRatio: 1.5,
   maxRatio: 4,
-  recommended: "1600×500px (a landscape banner, roughly 3:1) — used as your tournament's hero image and on its cards.",
+  recommended: "1600×500px (a landscape banner, roughly 3:1). Used as your tournament's hero image and on its cards.",
 };
 
 export const BANNER_BOUNDS: ImageSizeBounds = {
@@ -46,22 +46,32 @@ export const BANNER_BOUNDS: ImageSizeBounds = {
   recommended: "1600×500px (a landscape banner, roughly 3:1) works best across every screen size.",
 };
 
-export type ImagePurpose = "avatar" | "poster" | "banner" | "game-icon";
+/** A game's cover art — shown on game tiles and competition cards, so
+ *  landscape but not as extreme as a banner. */
+export const GAME_COVER_BOUNDS: ImageSizeBounds = {
+  minWidth: 800,
+  minHeight: 450,
+  minRatio: 1.2,
+  maxRatio: 2.4,
+  recommended: "1600×900px (16:9). Shown on this game's tiles and on competition cards.",
+};
+
+export type ImagePurpose = "avatar" | "poster" | "listing" | "banner" | "game-icon" | "game-cover" | "community-icon" | "community-banner";
 
 /** Longest edge an upload is downscaled to, per purpose — big enough for
  *  where each is shown (and above POSTER_BOUNDS' 1200px minimum). */
-const MAX_EDGE: Record<ImagePurpose, number> = { avatar: 512, poster: 2400, banner: 2400, "game-icon": 256 };
+const MAX_EDGE: Record<ImagePurpose, number> = { avatar: 512, poster: 2400, listing: 1600, banner: 2400, "game-icon": 256, "game-cover": 1600, "community-icon": 512, "community-banner": 2400 };
 
 function checkImageSize(width: number, height: number, bounds: ImageSizeBounds): string | null {
   if (width < bounds.minWidth || height < bounds.minHeight) {
-    return `Too small (${width}×${height}px) — needs at least ${bounds.minWidth}×${bounds.minHeight}px so it doesn't blur when stretched.`;
+    return `Too small (${width}×${height}px). Needs at least ${bounds.minWidth}×${bounds.minHeight}px so it doesn't blur when stretched.`;
   }
   const ratio = width / height;
   if (ratio < bounds.minRatio) {
-    return `Too narrow/tall (${width}×${height}px, ${ratio.toFixed(1)}:1) — this crops away most of the image on wide screens. Use a landscape image.`;
+    return `Too narrow/tall (${width}×${height}px, ${ratio.toFixed(1)}:1). This crops away most of the image on wide screens. Use a landscape image.`;
   }
   if (ratio > bounds.maxRatio) {
-    return `Too wide/thin (${width}×${height}px, ${ratio.toFixed(1)}:1) — this crops away too much on narrow screens. ${bounds.recommended}`;
+    return `Too wide/thin (${width}×${height}px, ${ratio.toFixed(1)}:1). This crops away too much on narrow screens. ${bounds.recommended}`;
   }
   return null;
 }
@@ -168,9 +178,9 @@ export function ImageUploadField({
   const previewClass =
     purpose === "avatar"
       ? "h-20 w-20 rounded-full"
-      : purpose === "game-icon"
-        ? "h-20 w-20 rounded-[12px]"
-        : "h-32 w-full rounded-[10px]";
+      : purpose === "game-icon" || purpose === "community-icon"
+        ? "h-20 w-20 cut-lg"
+        : "h-32 w-full rounded-none";
 
   return (
     <div className="relative flex flex-col gap-1.5">
@@ -230,7 +240,7 @@ export function ImageUploadField({
                 const file = e.dataTransfer.files?.[0];
                 if (file) upload(file);
               }}
-              className={`flex flex-col items-center justify-center gap-1.5 rounded-[10px] border border-dashed px-4 py-6 text-sm transition ${
+              className={`flex flex-col items-center justify-center gap-1.5 rounded-none border border-dashed px-4 py-6 text-sm transition ${
                 dragging ? "border-accent-blue bg-accent-blue-soft" : "border-border-strong hover:bg-surface-elevated"
               }`}
             >
@@ -246,7 +256,7 @@ export function ImageUploadField({
 
       {value && (
         <div className="flex flex-col gap-1.5">
-          <div className={`flex items-center gap-3 ${purpose === "avatar" || purpose === "game-icon" ? "" : "flex-col items-stretch"}`}>
+          <div className={`flex items-center gap-3 ${purpose === "avatar" || purpose === "game-icon" || purpose === "community-icon" ? "" : "flex-col items-stretch"}`}>
             <div className={`relative shrink-0 overflow-hidden border border-border bg-surface-elevated ${previewClass}`}>
               {/* eslint-disable-next-line @next/next/no-img-element -- upload/pasted-link preview; dimensions read via onLoad */}
               <img key={value} src={value} alt="" className="h-full w-full object-cover" onLoad={handlePreviewLoad} onError={handlePreviewError} />

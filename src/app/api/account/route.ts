@@ -10,9 +10,13 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
+import { verifyPasswordTimingSafe } from "@/lib/auth";
+import { resolveDobChange } from "@/lib/dateOfBirth";
+import { isRateLimited, recordAttempt, clearAttempts } from "@/lib/rateLimit";
 import { parseOptionalEmail, parseOptionalImageUrl } from "@/lib/validation";
+import type { DirectChallengePolicy } from "@prisma/client";
+import { parseDirectPolicy } from "@/lib/privacy";
 
-const MIN_AGE_PLAUSIBLE_YEARS = 130;
 
 export async function PATCH(request: Request) {
   const user = await getCurrentUser();
@@ -37,9 +41,13 @@ export async function PATCH(request: Request) {
     bio?: string | null;
     favoriteGames?: string[];
     email?: string | null;
+    emailVerifiedAt?: Date | null;
     notifyNewContent?: boolean;
     oneSignalPlayerId?: string | null;
     region?: string | null;
+    searchable?: boolean;
+    searchEngineIndexable?: boolean;
+    directChallenges?: DirectChallengePolicy;
   } = {};
 
   if (body.displayName !== undefined) {
@@ -99,21 +107,15 @@ export async function PATCH(request: Request) {
   }
 
   if (body.dateOfBirth !== undefined) {
-    if (body.dateOfBirth === null || body.dateOfBirth === "") {
-      data.dateOfBirth = null;
-    } else {
-      const dob = new Date(body.dateOfBirth);
-      const now = new Date();
-      if (
-        typeof body.dateOfBirth !== "string" ||
-        Number.isNaN(dob.getTime()) ||
-        dob > now ||
-        dob < new Date(now.getFullYear() - MIN_AGE_PLAUSIBLE_YEARS, now.getMonth(), now.getDate())
-      ) {
-        return NextResponse.json({ error: "Date of birth isn't valid." }, { status: 400 });
-      }
-      data.dateOfBirth = dob;
+    const change = resolveDobChange(user.dateOfBirth, body.dateOfBirth);
+    if (change.kind === "invalid") return NextResponse.json({ error: "Date of birth isn't valid." }, { status: 400 });
+    if (change.kind === "locked") {
+      return NextResponse.json(
+        { error: "Your date of birth can't be changed once it's set. If it's wrong, contact support and we'll correct it.", field: "dateOfBirth" },
+        { status: 403 }
+      );
     }
+    if (change.kind === "set") data.dateOfBirth = change.date;
   }
 
   if (body.email !== undefined) {
@@ -122,6 +124,8 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
     }
     data.email = emailResult.email;
+    // A different address hasn't been proven yet.
+    if ((emailResult.email ?? "").toLowerCase() !== (user.email ?? "").toLowerCase()) data.emailVerifiedAt = null;
   }
 
   if (body.notifyNewContent !== undefined) {
@@ -142,12 +146,44 @@ export async function PATCH(request: Request) {
     data.region = region || null;
   }
 
+  if (body.searchable !== undefined) {
+    if (typeof body.searchable !== "boolean") return NextResponse.json({ error: "Searchable must be on or off." }, { status: 400 });
+    data.searchable = body.searchable;
+  }
+  if (body.searchEngineIndexable !== undefined) {
+    if (typeof body.searchEngineIndexable !== "boolean") return NextResponse.json({ error: "That setting must be on or off." }, { status: 400 });
+    data.searchEngineIndexable = body.searchEngineIndexable;
+  }
+  if (body.directChallenges !== undefined) {
+    const policy = parseDirectPolicy(body.directChallenges);
+    if (!policy) return NextResponse.json({ error: "Choose who can challenge you: anyone, friends or nobody." }, { status: 400 });
+    data.directChallenges = policy;
+  }
+
+  // Changing where payouts go or which email password resets go to is what a hijacked session would try
+  // first, so it needs the account password again (accounts with no password, i.e. Google-only, are exempt).
+  const emailChanged = data.email !== undefined && (data.email ?? "").toLowerCase() !== (user.email ?? "").toLowerCase();
+  const payoutChanged = data.payoutMethodRef !== undefined && (data.payoutMethodRef ?? null) !== (user.payoutMethodRef ?? null);
+  if ((emailChanged || payoutChanged) && user.passwordHash) {
+    const key = `account-sensitive:${user.id}`;
+    const { limited, retryAfterSeconds } = await isRateLimited(key, { max: 5, windowMs: 15 * 60 * 1000 });
+    if (limited) {
+      return NextResponse.json({ error: "Too many attempts. Try again later." }, { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } });
+    }
+    const currentPassword = typeof body.currentPassword === "string" ? body.currentPassword : "";
+    if (!currentPassword || !(await verifyPasswordTimingSafe(currentPassword, user.passwordHash))) {
+      await recordAttempt(key);
+      return NextResponse.json({ error: "Enter your current password to change your email or payout account.", field: "currentPassword" }, { status: 400 });
+    }
+    await clearAttempts(key);
+  }
+
   let updated;
   try {
     updated = await prisma.user.update({ where: { id: user.id }, data });
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
-      return NextResponse.json({ error: "That email is already in use." }, { status: 409 });
+      return NextResponse.json({ error: "We couldn't use that email. If it's yours, it may already be on another account.", field: "email" }, { status: 409 });
     }
     throw err;
   }
@@ -163,5 +199,8 @@ export async function PATCH(request: Request) {
     email: updated.email,
     notifyNewContent: updated.notifyNewContent,
     region: updated.region,
+    searchable: updated.searchable,
+    searchEngineIndexable: updated.searchEngineIndexable,
+    directChallenges: updated.directChallenges,
   });
 }

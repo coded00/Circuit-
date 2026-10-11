@@ -10,6 +10,7 @@ type Bank = {
   slug: string;
 };
 
+const BANK_VALUE_SEPARATOR = "::";
 const MAX_FAVORITE_GAMES = 6;
 const MAX_BIO_LENGTH = 160;
 const MAX_REGION_LENGTH = 60;
@@ -24,6 +25,7 @@ export default function AccountForm({
   initialEmail,
   initialNotifyNewContent,
   initialRegion,
+  hasPassword,
 }: {
   initialDisplayName: string;
   initialAvatarUrl: string;
@@ -34,6 +36,7 @@ export default function AccountForm({
   initialEmail: string;
   initialNotifyNewContent: boolean;
   initialRegion: string;
+  hasPassword: boolean;
 }) {
   const router = useRouter();
   const [displayName, setDisplayName] = useState(initialDisplayName);
@@ -44,6 +47,7 @@ export default function AccountForm({
   const [bio, setBio] = useState(initialBio);
   const [favoriteGames, setFavoriteGames] = useState(initialFavoriteGames.join(", "));
   const [email, setEmail] = useState(initialEmail);
+  const [currentPassword, setCurrentPassword] = useState("");
   const [notifyNewContent, setNotifyNewContent] = useState(initialNotifyNewContent);
   const [region, setRegion] = useState(initialRegion);
   const [error, setError] = useState<string | null>(null);
@@ -68,7 +72,15 @@ export default function AccountForm({
         if (res.ok) {
           const data = await res.json();
           if (active && Array.isArray(data.banks)) {
-            setBanks(data.banks);
+            const seen = new Set<string>();
+            setBanks(
+              (data.banks as Bank[]).filter((b) => {
+                const key = `${b.code}${BANK_VALUE_SEPARATOR}${b.name}`;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+              })
+            );
           }
         }
       } catch (err) {
@@ -93,7 +105,7 @@ export default function AccountForm({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          bankCode: selectedBank,
+          bankCode: selectedBank.split(BANK_VALUE_SEPARATOR)[0],
           accountNumber,
         }),
       });
@@ -133,6 +145,7 @@ export default function AccountForm({
           .filter(Boolean)
           .slice(0, MAX_FAVORITE_GAMES),
         email: email || null,
+        ...(currentPassword ? { currentPassword } : {}),
         notifyNewContent,
         region: region || null,
       }),
@@ -206,6 +219,23 @@ export default function AccountForm({
         <span className="field-hint">Used only to notify you about new tournaments and Challenges.</span>
       </div>
 
+      {hasPassword && (email !== initialEmail || payoutMethodRef !== initialPayoutMethodRef) && (
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="currentPassword" className="field-label">
+            Current password
+          </label>
+          <input
+            id="currentPassword"
+            type="password"
+            autoComplete="current-password"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+            className="field-input"
+          />
+          <span className="field-hint">Needed to change your email or payout account.</span>
+        </div>
+      )}
+
       <label className="flex items-start gap-2 text-sm text-muted">
         <input
           type="checkbox"
@@ -227,7 +257,7 @@ export default function AccountForm({
           onChange={(e) => setFavoriteGames(e.target.value)}
           className="field-input"
         />
-        <span className="field-hint">Comma-separated, up to {MAX_FAVORITE_GAMES} games — shown on your public profile.</span>
+        <span className="field-hint">Comma-separated, up to {MAX_FAVORITE_GAMES} games. Shown on your public profile.</span>
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -254,15 +284,17 @@ export default function AccountForm({
           type="date"
           value={dateOfBirth}
           onChange={(e) => setDateOfBirth(e.target.value)}
+          disabled={!!initialDateOfBirth}
           className="field-input"
         />
         <span className="field-hint">
-          Required before any paid registration or prize payout (ACC-3) — never checked for free
-          browsing or free tournaments.
+          {initialDateOfBirth
+            ? "This can't be changed once it's set. If it's wrong, contact support and we'll correct it."
+            : "Required before any paid registration or prize payout. Once you set it, it can't be changed. Never checked for free browsing or free tournaments."}
         </span>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-lg border border-border bg-card/50 p-4">
+      <div className="flex flex-col gap-3 border-t border-border pt-5 sm:border sm:bg-card/50 sm:p-4">
         <div className="flex items-center justify-between">
           <div>
             <label className="text-sm font-semibold text-foreground">
@@ -273,7 +305,7 @@ export default function AccountForm({
             </p>
           </div>
           {payoutMethodRef && (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-success/15 px-2.5 py-0.5 text-xs font-medium text-success border border-success/30">
+            <span className="inline-flex items-center gap-1.5 cut-xs bg-success/15 px-2.5 py-0.5 text-xs font-medium text-success border border-success/30">
               <span className="h-1.5 w-1.5 rounded-full bg-success" />
               Active
             </span>
@@ -322,7 +354,8 @@ export default function AccountForm({
                 >
                   <option value="">{loadingBanks ? "Loading banks…" : "— Choose Bank —"}</option>
                   {banks.map((b) => (
-                    <option key={b.code} value={b.code}>
+                    // Paystack lists some different banks under one code, so the code alone isn't a unique key.
+                    <option key={`${b.code}${BANK_VALUE_SEPARATOR}${b.name}`} value={`${b.code}${BANK_VALUE_SEPARATOR}${b.name}`}>
                       {b.name}
                     </option>
                   ))}
@@ -364,7 +397,7 @@ export default function AccountForm({
               type="button"
               disabled={resolvingAccount || !selectedBank || accountNumber.length !== 10}
               onClick={handleResolveAndLink}
-              className="btn-secondary self-start text-xs py-1.5 px-3"
+              className="btn-secondary self-start !px-3 !py-2 text-xs"
             >
               {resolvingAccount ? "Verifying with Paystack…" : "Verify & Link Bank Account"}
             </button>
