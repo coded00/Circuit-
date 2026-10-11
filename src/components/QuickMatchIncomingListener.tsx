@@ -10,9 +10,10 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Clock } from "lucide-react";
 import { DialogOverlay } from "@/components/ui/Overlay";
 import { QuickMatchChallengeCard, type QuickMatchChallengeInfo } from "@/components/QuickMatchChallengeCard";
+import { QuickMatchRefusalNotice } from "@/components/QuickMatchRefusalNotice";
+import { refusalFromResponse, type AcceptRefusal } from "@/lib/quickMatchRefusal";
 
 const POLL_INTERVAL_MS = 5000;
 
@@ -21,7 +22,7 @@ export function QuickMatchIncomingListener() {
   const pathname = usePathname();
   const [challenge, setChallenge] = useState<QuickMatchChallengeInfo | null>(null);
   const [dismissedId, setDismissedId] = useState<string | null>(null);
-  const [unavailable, setUnavailable] = useState(false);
+  const [refusal, setRefusal] = useState<AcceptRefusal | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -65,12 +66,30 @@ export function QuickMatchIncomingListener() {
       await new Promise((r) => setTimeout(r, 800));
       return handleAccept();
     }
-    setUnavailable(true);
+    // Whatever the route said. This used to be a fixed "another player
+    // accepted this battle first" whatever came back, which was a lie to every
+    // player refused for a reason of their own — a cool-off, a stake limit, an
+    // unverified email. See src/lib/quickMatchRefusal.ts.
+    const why = refusalFromResponse(res.status, data);
+    setRefusal(why);
+    // Stops the next poll tick from re-opening the request for the challenge
+    // just answered.
     setDismissedId(challenge.id);
-    setTimeout(() => {
-      setUnavailable(false);
-      setChallenge(null);
-    }, 3000);
+    // A challenge somebody else won needs no answer — say so and get out of the
+    // way. Anything the player has to act on stays until they close it: three
+    // seconds is not long enough to read "verify your email and come back", and
+    // by then the modal is the only thing on screen that knew why.
+    if (why.gone) {
+      setTimeout(() => {
+        setRefusal(null);
+        setChallenge(null);
+      }, 3000);
+    }
+  }
+
+  function handleRefusalClose() {
+    setRefusal(null);
+    setChallenge(null);
   }
 
   async function handleDecline() {
@@ -88,22 +107,15 @@ export function QuickMatchIncomingListener() {
   // best and, since both wire up to the same accept endpoint, a genuine
   // double-submit risk at worst.
   const onThisChallengesOwnPage = !!challenge && pathname === `/quick-match/${challenge.id}`;
-  const open = (!!challenge || unavailable) && !onThisChallengesOwnPage;
+  const open = (!!challenge || !!refusal) && !onThisChallengesOwnPage;
 
   // Not dismissible by tapping away: a request must be answered (or run
-  // out), same as before — the backdrop never closed this one.
+  // out), same as before — the backdrop never closed this one. The refusal
+  // panel carries its own Close button once the request *has* been answered.
   return (
     <DialogOverlay open={open} onClose={() => {}} label="Battle request" maxWidth={400} dismissible={false}>
-      {unavailable ? (
-        <div className="flex items-start gap-3.5 px-5 pt-2 pb-6 sm:px-6 sm:pt-6">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center cut-sm bg-surface-elevated text-muted">
-            <Clock size={20} />
-          </span>
-          <div className="flex flex-col gap-1">
-            <p className="font-display text-[17px] font-bold tracking-tight">Too late this time</p>
-            <p className="text-sm text-muted">Another player accepted this battle first.</p>
-          </div>
-        </div>
+      {refusal ? (
+        <QuickMatchRefusalNotice refusal={refusal} onClose={handleRefusalClose} />
       ) : (
         challenge && <QuickMatchChallengeCard challenge={challenge} onAccept={handleAccept} onDecline={handleDecline} framed={false} />
       )}

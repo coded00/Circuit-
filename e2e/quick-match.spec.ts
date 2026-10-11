@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import { prisma } from "@/lib/db";
 import { cleanupAll } from "@/testHelpers";
 import { createE2EUser, loginViaUI } from "./helpers";
+import { DAY_MS } from "@/lib/selfExclusion";
 
 /**
  * Regression coverage for Quick Match's "first accept wins" flow, end to
@@ -166,5 +167,86 @@ test.describe("Quick Match: first accept wins (end to end)", () => {
     await expect(page.locator("dl", { hasText: "In play now" })).toContainText("₦300");
 
     await context.close();
+  });
+
+  test("a refused accept says why, on both surfaces", async ({ browser }) => {
+    // The refusal clients used to answer every rejection with "another player
+    // accepted this battle first". A self-excluded player is the sharpest case
+    // of how wrong that is: they asked to be stopped, that is why they were
+    // stopped, and the old copy told them somebody had simply been faster.
+    //
+    // The refusal itself is checked at the unit level in
+    // src/lib/quickMatchRefusal.test.ts. What this covers is the part nothing
+    // below a browser can reach: that the accept route sends the real reason
+    // and that both clients render it instead of their own guess — the live
+    // request modal and the dedicated page, which are separate components.
+    const stakeAmount = 30_000; // ₦300, in kobo
+    const host = await createE2EUser({ walletBalance: 1_000_000 });
+    const excluded = await createE2EUser({
+      walletBalance: 1_000_000,
+      // Online, so a staked Quick Match fans out to them (getEligibleRecipients
+      // requires recent activity) — and self-exclusion is deliberately not one
+      // of its exclusions, so being challenged at all is expected here. What
+      // happens when they take it up is what this test is about.
+      lastActiveAt: new Date(),
+      selfExcludedUntil: new Date(Date.now() + 30 * DAY_MS),
+    });
+
+    const hostContext = await browser.newContext();
+    const hostPage = await hostContext.newPage();
+    await loginViaUI(hostPage, host.emailOrPhone!);
+    await hostPage.goto("/battles/new");
+    await hostPage.getByRole("button", { name: "Quick Match" }).click();
+    await hostPage.getByRole("button", { name: "Staked" }).click();
+    await hostPage.locator("#stakeNaira").fill(String(stakeAmount / 100));
+    const [createResponse] = await Promise.all([
+      hostPage.waitForResponse(
+        (res) => res.url().includes("/api/quick-match") && res.request().method() === "POST",
+        { timeout: 30_000 }
+      ),
+      hostPage.getByRole("button", { name: "Challenge All Available Players", exact: true }).click(),
+    ]);
+    expect(createResponse.ok()).toBe(true);
+    const { id: challengeId } = await createResponse.json();
+
+    // Surface one: the live request modal. Landing on /battles mounts the
+    // listener, which polls immediately, so the modal is up without waiting a
+    // full tick.
+    const excludedContext = await browser.newContext();
+    const excludedPage = await excludedContext.newPage();
+    await loginViaUI(excludedPage, excluded.emailOrPhone!);
+    await excludedPage.goto("/battles");
+    await excludedPage.getByRole("button", { name: "Accept battle", exact: true }).click();
+
+    // The cool-off's own sentence, which lockStake raised and the route passed
+    // through — not a paraphrase of it.
+    await expect(excludedPage.getByText(/paused staked Battles until/i)).toBeVisible();
+    await expect(excludedPage.getByText(/another player/i)).toHaveCount(0);
+    // A refusal the player has to act on waits for them rather than clearing
+    // itself after three seconds.
+    await excludedPage.getByRole("button", { name: "Close", exact: true }).click();
+
+    // Surface two: the dedicated page, which is a different component with its
+    // own state — and the one a notification link lands on. Clicked the moment
+    // the page loads, deliberately: this card is server-rendered, and its
+    // countdown is read off the clock, so the server's value never matches the
+    // browser's and React used to answer that by rebuilding the card on
+    // hydration. The rebuild detached the Accept button, so an immediate press
+    // landed on a node with no listener and was silently swallowed — no
+    // request, no spinner, no refusal, nothing. That is why this test does not
+    // wait for anything first; waiting would hide the regression.
+    await excludedPage.goto(`/quick-match/${challengeId}`);
+    await excludedPage.getByRole("button", { name: "Accept battle", exact: true }).click();
+    await expect(excludedPage.getByText(/paused staked Battles until/i)).toBeVisible();
+    await expect(excludedPage.getByText(/another player/i)).toHaveCount(0);
+
+    // The challenge is untouched by all of this: a refused accept reopens it
+    // for every other recipient rather than closing it out.
+    const challenge = await prisma.quickMatchChallenge.findUniqueOrThrow({ where: { id: challengeId } });
+    expect(challenge.status).toBe("PENDING");
+    expect(await prisma.quickMatchRecipient.count({ where: { challengeId, status: "PENDING" } })).toBe(1);
+
+    await excludedContext.close();
+    await hostContext.close();
   });
 });
